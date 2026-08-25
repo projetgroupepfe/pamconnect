@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>PamConnect - Connexion</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/index.html">Accueil</a>
+    <a href="/employeur.html">Espace employeur</a>
+    <a href="/prestataire.html">Espace prestataire</a>
+    <a href="/inscription.html">Inscription</a>
+    <a href="/connexion.html">Connexion</a>
+  </nav>
+
+  <h1>Se connecter</h1>
+
+  <form action="/connexion" method="POST">
+    <p>
+      <label for="email">Email :</label>
+      <input type="email" id="email" name="email" required>
+    </p>
+    <p>
+      <label for="motdepasse">Mot de passe :</label>
+      <input type="password" id="motdepasse" name="motdepasse" required>
+    </p>
+    <p>
+      <button type="submit">Se connecter</button>
+    </p>
+  </form>
+</body>
+</html>

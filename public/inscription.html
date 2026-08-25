@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>PamConnect - Inscription</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/index.html">Accueil</a>
+    <a href="/employeur.html">Espace employeur</a>
+    <a href="/prestataire.html">Espace prestataire</a>
+    <a href="/inscription.html">Inscription</a>
+  </nav>
+
+  <h1>Créer un compte</h1>
+
+  <form action="/inscription" method="POST">
+    <p>
+      <label for="role">Je suis :</label>
+      <select id="role" name="role">
+        <option value="employeur">Employeur</option>
+        <option value="prestataire">Prestataire</option>
+      </select>
+    </p>
+    <p>
+      <label for="nom">Nom complet :</label>
+      <input type="text" id="nom" name="nom" required>
+    </p>
+    <p>
+      <label for="email">Email :</label>
+      <input type="email" id="email" name="email" required>
+    </p>
+    <p>
+      <label for="motdepasse">Mot de passe :</label>
+      <input type="password" id="motdepasse" name="motdepasse" required>
+    </p>
+    <p>
+      <button type="submit">S'inscrire</button>
+    </p>
+  </form>
+</body>
+</html>
