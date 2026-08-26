@@ -7,6 +7,12 @@ const crypto = require("crypto");
 const PORT = 3000;
 const FICHIER_UTILISATEURS = path.join(__dirname, "data", "utilisateurs.json");
 
+const sessions = {};
+
+function genererToken() {
+  return crypto.randomBytes(32).toString("hex");
+}
+
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -14,6 +20,9 @@ const MIME_TYPES = {
 };
 
 function lireUtilisateurs() {
+  if (!fs.existsSync(FICHIER_UTILISATEURS)) {
+    fs.writeFileSync(FICHIER_UTILISATEURS, "[]");
+  }
   const contenu = fs.readFileSync(FICHIER_UTILISATEURS, "utf-8");
   return JSON.parse(contenu);
 }
@@ -34,6 +43,15 @@ function verifierMotDePasse(motDePasseSaisi, motDePasseHache) {
   return hache === hacheTest;
 }
 
+function trouverEmailConnecte(request) {
+  const enteteCookie = request.headers.cookie || "";
+  const paire = enteteCookie.split("; ").find((c) => c.startsWith("session="));
+  if (!paire) return null;
+
+  const token = paire.split("=")[1];
+  return sessions[token] || null;
+}
+
 const server = http.createServer((request, response) => {
   if (request.method === "POST" && request.url === "/inscription") {
     let body = "";
@@ -51,6 +69,10 @@ const server = http.createServer((request, response) => {
         nom: donnees.nom,
         email: donnees.email,
         motdepasse: hacherMotDePasse(donnees.motdepasse),
+        arrondissement: donnees.arrondissement,
+        quartier: donnees.quartier || null,
+        metier: donnees.metier || null,
+        tarif: donnees.tarif || null,
       };
 
       const utilisateurs = lireUtilisateurs();
@@ -79,15 +101,64 @@ const server = http.createServer((request, response) => {
 
       const utilisateurTrouve = utilisateurs.find((u) => u.email === donnees.email);
 
-      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-
       if (utilisateurTrouve && verifierMotDePasse(donnees.motdepasse, utilisateurTrouve.motdepasse)) {
-        response.end(`<h1>Bienvenue ${utilisateurTrouve.nom} !</h1><p>Connexion réussie en tant que ${utilisateurTrouve.role}.</p><a href="/index.html">Retour à l'accueil</a>`);
+        const token = genererToken();
+        sessions[token] = utilisateurTrouve.email;
+
+        response.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Set-Cookie": `session=${token}; HttpOnly; Path=/`,
+        });
+        response.end(`<h1>Bienvenue ${utilisateurTrouve.nom} !</h1><p>Connexion réussie en tant que ${utilisateurTrouve.role}.</p><a href="/mon-profil">Voir mon profil</a>`);
       } else {
+        response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         response.end(`<h1>Connexion échouée</h1><p>Email ou mot de passe incorrect.</p><a href="/connexion.html">Réessayer</a>`);
       }
     });
 
+    return;
+  }
+
+  if (request.method === "GET" && request.url === "/mon-profil") {
+    const emailConnecte = trouverEmailConnecte(request);
+
+    if (!emailConnecte) {
+      response.writeHead(302, { "Location": "/connexion.html" });
+      response.end();
+      return;
+    }
+
+    const utilisateurs = lireUtilisateurs();
+    const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
+
+    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    response.end(`
+      <!DOCTYPE html>
+      <html lang="fr">
+      <head>
+        <meta charset="UTF-8">
+        <title>PamConnect - Mon profil</title>
+        <link rel="stylesheet" href="/style.css">
+      </head>
+      <body>
+        <nav>
+          <a href="/index.html">Accueil</a>
+          <a href="/employeur.html">Espace employeur</a>
+          <a href="/prestataire.html">Espace prestataire</a>
+          <a href="/inscription.html">Inscription</a>
+          <a href="/connexion.html">Connexion</a>
+        </nav>
+        <h1>Mon profil</h1>
+        <p><strong>Nom :</strong> ${utilisateur.nom}</p>
+        <p><strong>Email :</strong> ${utilisateur.email}</p>
+        <p><strong>Rôle :</strong> ${utilisateur.role}</p>
+        <p><strong>Arrondissement :</strong> ${utilisateur.arrondissement}</p>
+        <p><strong>Quartier :</strong> ${utilisateur.quartier || "Non renseigné"}</p>
+        <p><strong>Métier :</strong> ${utilisateur.metier || "Non renseigné"}</p>
+        <p><strong>Tarif :</strong> ${utilisateur.tarif || "Non renseigné"}</p>
+      </body>
+      </html>
+    `);
     return;
   }
 
