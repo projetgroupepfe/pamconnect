@@ -7,7 +7,7 @@ const crypto = require("crypto");
 const PORT = 3000;
 const FICHIER_UTILISATEURS = path.join(__dirname, "data", "utilisateurs.json");
 const FICHIER_ANNONCES = path.join(__dirname, "data", "annonces.json");
-
+const FICHIER_CANDIDATURES = path.join(__dirname, "data", "candidatures.json");
 const sessions = {};
 
 function genererToken() {
@@ -44,6 +44,22 @@ function lireAnnonces() {
 function sauvegarderAnnonces(annonces) {
   fs.writeFileSync(FICHIER_ANNONCES, JSON.stringify(annonces, null, 2));
 }
+
+
+
+
+function lireCandidatures() {
+  if (!fs.existsSync(FICHIER_CANDIDATURES)) {
+    fs.writeFileSync(FICHIER_CANDIDATURES, "[]");
+  }
+  const contenu = fs.readFileSync(FICHIER_CANDIDATURES, "utf-8");
+  return JSON.parse(contenu);
+}
+
+function sauvegarderCandidatures(candidatures) {
+  fs.writeFileSync(FICHIER_CANDIDATURES, JSON.stringify(candidatures, null, 2));
+}
+
 
 function hacherMotDePasse(motDePasse) {
   const sel = crypto.randomBytes(16).toString("hex");
@@ -276,6 +292,105 @@ const server = http.createServer((request, response) => {
         });
         return;
       }
+      if (request.method === "GET" && request.url === "/annonces") {
+        const emailConnecte = trouverEmailConnecte(request);
+        let role = null;
+        if (emailConnecte) {
+          const utilisateurs = lireUtilisateurs();
+          const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
+          role = utilisateur ? utilisateur.role : null;
+        }
+
+        const annonces = lireAnnonces();
+
+        let html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>PamConnect - Annonces</title><link rel="stylesheet" href="/style.css"></head><body>
+          <nav>
+            <a href="/index.html">Accueil</a>
+            <a href="/employeur.html">Espace employeur</a>
+            <a href="/prestataire.html">Espace prestataire</a>
+            <a href="/recherche.html">Recherche</a>
+            <a href="/annonces">Annonces</a>
+            <a href="/inscription.html">Inscription</a>
+            <a href="/connexion.html">Connexion</a>
+            <a href="/mon-profil">Mon profil</a>
+          </nav>
+          <h1>Annonces disponibles</h1>`;
+
+        if (annonces.length === 0) {
+          html += `<p>Aucune annonce pour le moment.</p>`;
+        } else {
+          annonces.forEach((a) => {
+            html += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
+              <p><strong>${a.titre}</strong></p>
+              <p>${a.description}</p>
+              <p>Metier : ${a.metier}</p>
+              <p>Arrondissement : ${a.arrondissement}</p>`;
+
+            if (role === "prestataire") {
+              html += `<form action="/candidatures" method="POST">
+                <input type="hidden" name="annonceId" value="${a.id}">
+                <button type="submit">Postuler</button>
+              </form>`;
+            } else {
+              html += `<p><a href="/connexion.html">Connecte-toi en tant que prestataire</a> pour postuler.</p>`;
+            }
+
+            html += `</div>`;
+          });
+        }
+
+        html += `</body></html>`;
+
+        response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        response.end(html);
+        return;
+      }
+
+      if (request.method === "POST" && request.url === "/candidatures") {
+        const emailConnecte = trouverEmailConnecte(request);
+        if (!emailConnecte) {
+          response.writeHead(302, { "Location": "/connexion.html" });
+          response.end();
+          return;
+        }
+        const utilisateurs = lireUtilisateurs();
+        const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
+        if (!utilisateur || utilisateur.role !== "prestataire") {
+          response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          response.end(`<h1>Acces refuse</h1><p>Seuls les prestataires peuvent postuler.</p><a href="/annonces">Retour aux annonces</a>`);
+          return;
+        }
+
+        let body = "";
+        request.on("data", (chunk) => { body += chunk; });
+        request.on("end", () => {
+          const donnees = querystring.parse(body);
+          const nouvelleCandidature = {
+            id: Date.now(),
+            annonceId: donnees.annonceId,
+            prestataireEmail: emailConnecte,
+            statut: "en attente",
+          };
+          const candidatures = lireCandidatures();
+          candidatures.push(nouvelleCandidature);
+          sauvegarderCandidatures(candidatures);
+
+          response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          response.end(`<h1>Candidature envoyee !</h1><p>Ta candidature a bien ete enregistree.</p><a href="/annonces">Retour aux annonces</a>`);
+        });
+        return;
+      }
+
+
+
+
+
+
+
+
+
 
     if (request.method === "GET" && (request.url === "/recherche" || request.url.startsWith("/recherche?"))) {
         const urlObjet = new URL(request.url, `http://${request.headers.host}`);
