@@ -65,6 +65,25 @@
     <p>
       <button type="submit">S'inscrire</button>
     </p>
+    
+  <input type="hidden" id="latitude" name="latitude">
+  <input type="hidden" id="longitude" name="longitude">
+</form>
   </form>
+<script>
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      function (position) {
+        document.getElementById("latitude").value = position.coords.latitude;
+        document.getElementById("longitude").value = position.coords.longitude;
+      },
+      function (erreur) {
+        console.log("Position non disponible :", erreur.message);
+      }
+    );
+  }
+</script>
+
+
 </body>
 </html>

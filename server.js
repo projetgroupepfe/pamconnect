@@ -73,6 +73,8 @@ const server = http.createServer((request, response) => {
         quartier: donnees.quartier || null,
         metier: donnees.metier || null,
         tarif: donnees.tarif || null,
+        latitude: donnees.latitude || null,
+        longitude: donnees.longitude || null,
       };
 
       const utilisateurs = lireUtilisateurs();
