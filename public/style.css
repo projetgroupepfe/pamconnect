@@ -4,7 +4,45 @@ body {
   color: #1f2d3d;
   text-align: center;
   padding-top: 80px;
+  padding-left: 20px;
+  padding-right: 20px;
 }
 h1 {
   color: #1f4e79;
+}
+nav {
+  margin-bottom: 30px;
+}
+nav a {
+  margin: 0 12px;
+  color: #1f4e79;
+  text-decoration: none;
+  font-weight: bold;
+}
+nav a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  body {
+    padding-top: 40px;
+  }
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+  nav a {
+    margin: 4px;
+  }
+  input, select, button {
+    width: 100%;
+    max-width: 300px;
+    padding: 8px;
+    font-size: 16px;
+  }
+  h1 {
+    font-size: 1.5em;
+  }
 }
