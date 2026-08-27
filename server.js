@@ -43,6 +43,18 @@ function verifierMotDePasse(motDePasseSaisi, motDePasseHache) {
   return hache === hacheTest;
 }
 
+function calculerDistanceKm(lat1, lon1, lat2, lon2) {
+  const rayonTerre = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return rayonTerre * c;
+}
+
 function trouverEmailConnecte(request) {
   const enteteCookie = request.headers.cookie || "";
   const paire = enteteCookie.split("; ").find((c) => c.startsWith("session="));
@@ -164,6 +176,65 @@ const server = http.createServer((request, response) => {
     `);
     return;
   }
+    
+    if (request.method === "GET" && (request.url === "/recherche" || request.url.startsWith("/recherche?"))) {
+        const urlObjet = new URL(request.url, `http://${request.headers.host}`);
+        const metierRecherche = (urlObjet.searchParams.get("metier") || "").toLowerCase();
+        const latEmployeur = parseFloat(urlObjet.searchParams.get("latitude"));
+        const lonEmployeur = parseFloat(urlObjet.searchParams.get("longitude"));
+
+        const utilisateurs = lireUtilisateurs();
+        let prestataires = utilisateurs.filter((u) => u.role === "prestataire");
+
+        if (metierRecherche) {
+          prestataires = prestataires.filter((p) =>
+            (p.metier || "").toLowerCase().includes(metierRecherche)
+          );
+        }
+
+        if (!isNaN(latEmployeur) && !isNaN(lonEmployeur)) {
+          prestataires = prestataires
+            .filter((p) => p.latitude && p.longitude)
+            .map((p) => ({
+              ...p,
+              distance: calculerDistanceKm(latEmployeur, lonEmployeur, parseFloat(p.latitude), parseFloat(p.longitude)),
+            }))
+            .sort((a, b) => a.distance - b.distance);
+        }
+
+        let html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>PamConnect - Resultats</title><link rel="stylesheet" href="/style.css"></head><body>
+          <nav>
+            <a href="/index.html">Accueil</a>
+            <a href="/employeur.html">Espace employeur</a>
+            <a href="/prestataire.html">Espace prestataire</a>
+            <a href="/inscription.html">Inscription</a>
+            <a href="/connexion.html">Connexion</a>
+            <a href="/mon-profil">Mon profil</a>
+          </nav>
+          <h1>Resultats de recherche</h1>`;
+
+        if (prestataires.length === 0) {
+          html += `<p>Aucun prestataire trouve.</p>`;
+        } else {
+          prestataires.forEach((p) => {
+            const distanceTexte = p.distance !== undefined ? `${p.distance.toFixed(1)} km` : "Distance inconnue";
+            html += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
+              <p><strong>${p.nom}</strong> - ${p.metier}</p>
+              <p>${p.arrondissement}, ${p.quartier || ""}</p>
+              <p>Tarif : ${p.tarif || "Non renseigne"}</p>
+              <p>Distance : ${distanceTexte}</p>
+            </div>`;
+          });
+        }
+
+        html += `<a href="/recherche.html">Nouvelle recherche</a></body></html>`;
+
+        response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        response.end(html);
+        return;
+      }
 
   let requestedPath = request.url === "/" ? "/index.html" : request.url;
   const filePath = path.join(__dirname, "public", requestedPath);
