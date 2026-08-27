@@ -6,6 +6,7 @@ const crypto = require("crypto");
 
 const PORT = 3000;
 const FICHIER_UTILISATEURS = path.join(__dirname, "data", "utilisateurs.json");
+const FICHIER_ANNONCES = path.join(__dirname, "data", "annonces.json");
 
 const sessions = {};
 
@@ -29,6 +30,19 @@ function lireUtilisateurs() {
 
 function sauvegarderUtilisateurs(utilisateurs) {
   fs.writeFileSync(FICHIER_UTILISATEURS, JSON.stringify(utilisateurs, null, 2));
+}
+
+
+function lireAnnonces() {
+  if (!fs.existsSync(FICHIER_ANNONCES)) {
+    fs.writeFileSync(FICHIER_ANNONCES, "[]");
+  }
+  const contenu = fs.readFileSync(FICHIER_ANNONCES, "utf-8");
+  return JSON.parse(contenu);
+}
+
+function sauvegarderAnnonces(annonces) {
+  fs.writeFileSync(FICHIER_ANNONCES, JSON.stringify(annonces, null, 2));
 }
 
 function hacherMotDePasse(motDePasse) {
@@ -176,7 +190,93 @@ const server = http.createServer((request, response) => {
     `);
     return;
   }
-    
+  
+        if (request.method === "GET" && request.url === "/publier-annonce") {
+        const emailConnecte = trouverEmailConnecte(request);
+        if (!emailConnecte) {
+          response.writeHead(302, { "Location": "/connexion.html" });
+          response.end();
+          return;
+        }
+        const utilisateurs = lireUtilisateurs();
+        const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
+
+        if (utilisateur.role !== "employeur") {
+          response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          response.end(`<h1>Acces refuse</h1><p>Seuls les employeurs peuvent publier une annonce.</p><a href="/index.html">Retour a l'accueil</a>`);
+          return;
+        }
+
+        response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        response.end(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>PamConnect - Publier une annonce</title><link rel="stylesheet" href="/style.css"></head><body>
+          <nav>
+            <a href="/index.html">Accueil</a>
+            <a href="/employeur.html">Espace employeur</a>
+            <a href="/prestataire.html">Espace prestataire</a>
+            <a href="/recherche.html">Recherche</a>
+            <a href="/inscription.html">Inscription</a>
+            <a href="/connexion.html">Connexion</a>
+            <a href="/mon-profil">Mon profil</a>
+          </nav>
+          <h1>Publier une annonce</h1>
+          <form action="/annonces" method="POST">
+            <label for="titre">Titre :</label>
+            <input type="text" id="titre" name="titre" required>
+
+            <label for="description">Description :</label>
+            <textarea id="description" name="description" required></textarea>
+
+            <label for="metier">Metier recherche :</label>
+            <input type="text" id="metier" name="metier" required>
+
+            <label for="arrondissement">Arrondissement :</label>
+            <select id="arrondissement" name="arrondissement" required>
+              <option value="Yaounde 1">Yaounde 1</option>
+              <option value="Yaounde 2">Yaounde 2</option>
+              <option value="Yaounde 3">Yaounde 3</option>
+              <option value="Yaounde 4">Yaounde 4</option>
+              <option value="Yaounde 5">Yaounde 5</option>
+              <option value="Yaounde 6">Yaounde 6</option>
+              <option value="Yaounde 7">Yaounde 7</option>
+            </select>
+
+            <button type="submit">Publier</button>
+          </form>
+        </body></html>`);
+        return;
+      }
+
+      if (request.method === "POST" && request.url === "/annonces") {
+        const emailConnecte = trouverEmailConnecte(request);
+        if (!emailConnecte) {
+          response.writeHead(302, { "Location": "/connexion.html" });
+          response.end();
+          return;
+        }
+        let body = "";
+        request.on("data", (chunk) => { body += chunk; });
+        request.on("end", () => {
+          const donnees = querystring.parse(body);
+          const nouvelleAnnonce = {
+            id: Date.now(),
+            employeurEmail: emailConnecte,
+            titre: donnees.titre,
+            description: donnees.description,
+            metier: donnees.metier,
+            arrondissement: donnees.arrondissement,
+          };
+          const annonces = lireAnnonces();
+          annonces.push(nouvelleAnnonce);
+          sauvegarderAnnonces(annonces);
+
+          response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          response.end(`<h1>Annonce publiee !</h1><p>Ton annonce "${donnees.titre}" a bien ete enregistree.</p><a href="/index.html">Retour a l'accueil</a>`);
+        });
+        return;
+      }
+
     if (request.method === "GET" && (request.url === "/recherche" || request.url.startsWith("/recherche?"))) {
         const urlObjet = new URL(request.url, `http://${request.headers.host}`);
         const metierRecherche = (urlObjet.searchParams.get("metier") || "").toLowerCase();
