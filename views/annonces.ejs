@@ -1,0 +1,27 @@
+<%- include("partiels/tete") %>
+
+  <h1>Annonces disponibles</h1>
+
+  <% if (annonces.length === 0) { %>
+    <p>Aucune annonce pour le moment.</p>
+  <% } else { %>
+    <% annonces.forEach(function (annonce) { %>
+      <div class="carte">
+        <p><strong><%= annonce.titre %></strong></p>
+        <p><%= annonce.description %></p>
+        <p>Metier : <%= annonce.metier %></p>
+        <p>Arrondissement : <%= annonce.arrondissement %></p>
+
+        <% if (role === "prestataire") { %>
+          <form action="/candidatures" method="POST">
+            <input type="hidden" name="annonceId" value="<%= annonce.id %>">
+            <button type="submit">Postuler</button>
+          </form>
+        <% } else { %>
+          <p><a href="/connexion.html">Connecte-toi en tant que prestataire</a> pour postuler.</p>
+        <% } %>
+      </div>
+    <% }); %>
+  <% } %>
+
+<%- include("partiels/pied") %>

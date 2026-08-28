@@ -3,13 +3,18 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-// "app" est notre application Express : c'est elle qui recoit maintenant
+// "app" est notre application Express : c'est elle qui recoit
 // toutes les requetes et decide quelle route doit y repondre.
 const app = express();
 
-// Petit outil fourni par Express : il lit le corps d'une requete de formulaire
-// et range le resultat dans req.body. Il remplace le "panier" que l'on
-// remplissait a la main avec request.on("data") puis querystring.parse().
+// On dit a Express : les pages sont des fichiers .ejs, ranges dans views/.
+// A partir de la, res.render("profil", { ... }) va chercher views/profil.ejs,
+// y injecte les donnees, et envoie le HTML obtenu au navigateur.
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
+// Outil fourni par Express : il lit le corps d'une requete de formulaire
+// et range le resultat dans req.body.
 const lireFormulaire = express.urlencoded({ extended: false });
 
 const PORT = 3000;
@@ -70,26 +75,18 @@ function verifierMotDePasse(motDePasseSaisi, motDePasseHache) {
   return hache === hacheTest;
 }
 
-// Rend inoffensif tout texte venant d'un utilisateur avant de l'afficher dans une page.
-// Les caracteres qui servent a ecrire du HTML sont remplaces par leur equivalent "texte".
-function echapper(valeur) {
-  if (valeur === null || valeur === undefined) return "";
-  return String(valeur)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 // Decide comment afficher un tarif. Un prestataire peut laisser le champ vide :
-// on affiche alors "A negocier" plutot qu'un vide ou un "Non renseigne" peu clair.
+// on affiche alors "A negocier" plutot qu'un vide peu clair.
 // C'est LE SEUL endroit a modifier si l'equipe change d'avis sur ce texte.
 function formaterTarif(tarif) {
   const valeur = String(tarif === null || tarif === undefined ? "" : tarif).trim();
   if (valeur === "") return "À négocier";
   return valeur + " FCFA";
 }
+
+// app.locals : tout ce qu'on met ici est utilisable dans TOUTES les vues .ejs
+// sans avoir a le repasser a chaque res.render().
+app.locals.formaterTarif = formaterTarif;
 
 function calculerDistanceKm(lat1, lon1, lat2, lon2) {
   const rayonTerre = 6371;
@@ -134,8 +131,6 @@ function exigerConnexion(req, res, next) {
 
 // ============================================================
 // PARTIE 1 - Les fichiers du dossier public/ (HTML, CSS, images)
-// express.static les sert tout seul, et refuse deja les chemins
-// qui essaient de sortir du dossier.
 // ============================================================
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -154,18 +149,25 @@ app.post("/inscription", lireFormulaire, (req, res) => {
   );
 
   if (dejaInscrit) {
-    return res.status(409).send(
-      `<h1>Email deja utilise</h1><p>Un compte existe deja avec l'adresse ${echapper(donnees.email)}.</p><a href="/connexion.html">Se connecter</a> - <a href="/inscription.html">Reessayer</a>`
-    );
+    return res.status(409).render("message", {
+      titre: "Email deja utilise",
+      texte: `Un compte existe deja avec l'adresse ${donnees.email}.`,
+      liens: [
+        { url: "/connexion.html", texte: "Se connecter" },
+        { url: "/inscription.html", texte: "Reessayer" },
+      ],
+    });
   }
 
   // Un prestataire sans metier n'apparaitrait jamais dans une recherche.
   // On refuse donc, meme si la requete ne vient pas de notre formulaire.
   // Le tarif, lui, reste facultatif : il devient "A negocier".
   if (donnees.role === "prestataire" && !String(donnees.metier || "").trim()) {
-    return res.status(400).send(
-      `<h1>Métier obligatoire</h1><p>Un prestataire doit indiquer son métier pour être visible dans les recherches.</p><a href="/inscription.html">Retour au formulaire</a>`
-    );
+    return res.status(400).render("message", {
+      titre: "Métier obligatoire",
+      texte: "Un prestataire doit indiquer son métier pour être visible dans les recherches.",
+      liens: [{ url: "/inscription.html", texte: "Retour au formulaire" }],
+    });
   }
 
   const nouvelUtilisateur = {
@@ -187,9 +189,11 @@ app.post("/inscription", lireFormulaire, (req, res) => {
 
   console.log("Nouvel utilisateur enregistré :", nouvelUtilisateur);
 
-  res.send(
-    `<h1>Merci ${echapper(donnees.nom)} !</h1><p>Ton inscription en tant que ${echapper(donnees.role)} a bien été enregistrée.</p><a href="/index.html">Retour à l'accueil</a>`
-  );
+  res.render("message", {
+    titre: `Merci ${donnees.nom} !`,
+    texte: `Ton inscription en tant que ${donnees.role} a bien été enregistrée.`,
+    liens: [{ url: "/index.html", texte: "Retour à l'accueil" }],
+  });
 });
 
 // --- Connexion -----------------------------------------------------
@@ -210,131 +214,63 @@ app.post("/connexion", lireFormulaire, (req, res) => {
     // httpOnly : le JavaScript de la page ne peut pas lire ce cookie.
     res.cookie("session", token, { httpOnly: true, path: "/" });
 
-    return res.send(
-      `<h1>Bienvenue ${echapper(utilisateurTrouve.nom)} !</h1><p>Connexion réussie en tant que ${echapper(utilisateurTrouve.role)}.</p><a href="/mon-profil">Voir mon profil</a>`
-    );
+    return res.render("message", {
+      titre: `Bienvenue ${utilisateurTrouve.nom} !`,
+      texte: `Connexion réussie en tant que ${utilisateurTrouve.role}.`,
+      liens: [{ url: "/mon-profil", texte: "Voir mon profil" }],
+    });
   }
 
-  res.send(
-    `<h1>Connexion échouée</h1><p>Email ou mot de passe incorrect.</p><a href="/connexion.html">Réessayer</a>`
-  );
+  res.status(401).render("message", {
+    titre: "Connexion échouée",
+    texte: "Email ou mot de passe incorrect.",
+    liens: [{ url: "/connexion.html", texte: "Réessayer" }],
+  });
 });
 
 // --- Mon profil ----------------------------------------------------
 app.get("/mon-profil", exigerConnexion, (req, res) => {
   const emailConnecte = req.emailConnecte;
-
   const utilisateurs = lireUtilisateurs();
   const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
 
-  let sectionSupplementaire = "";
+  // La route PREPARE les donnees, la vue se contente de les AFFICHER.
+  let mesAnnonces = [];
+  let mesCandidatures = [];
 
   if (utilisateur.role === "employeur") {
-    const mesAnnonces = lireAnnonces().filter((a) => a.employeurEmail === emailConnecte);
     const toutesCandidatures = lireCandidatures();
 
-    sectionSupplementaire += `<h2>Mes annonces</h2>`;
-
-    if (mesAnnonces.length === 0) {
-      sectionSupplementaire += `<p>Tu n'as publie aucune annonce.</p>`;
-    } else {
-      mesAnnonces.forEach((annonce) => {
-        sectionSupplementaire += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
-          <p><strong>${echapper(annonce.titre)}</strong></p>`;
-
-        const candidaturesPourAnnonce = toutesCandidatures.filter((c) => String(c.annonceId) === String(annonce.id));
-
-        if (candidaturesPourAnnonce.length === 0) {
-          sectionSupplementaire += `<p>Aucune candidature pour l'instant.</p>`;
-        } else {
-          candidaturesPourAnnonce.forEach((candidature) => {
-            const prestataire = utilisateurs.find((u) => u.email === candidature.prestataireEmail);
-            sectionSupplementaire += `<div style="border-top:1px solid #eee; padding-top:8px; margin-top:8px;">
-              <p>${echapper(prestataire ? prestataire.nom : "Prestataire inconnu")} - Statut : ${echapper(candidature.statut)}</p>`;
-
-            if (candidature.statut === "en attente") {
-              sectionSupplementaire += `
-                <form action="/candidatures/statut" method="POST" style="display:inline;">
-                  <input type="hidden" name="candidatureId" value="${echapper(candidature.id)}">
-                  <input type="hidden" name="statut" value="acceptee">
-                  <button type="submit">Accepter</button>
-                </form>
-                <form action="/candidatures/statut" method="POST" style="display:inline;">
-                  <input type="hidden" name="candidatureId" value="${echapper(candidature.id)}">
-                  <input type="hidden" name="statut" value="refusee">
-                  <button type="submit">Refuser</button>
-                </form>`;
-            }
-
-            sectionSupplementaire += `</div>`;
-          });
-        }
-
-        sectionSupplementaire += `</div>`;
-      });
-    }
+    mesAnnonces = lireAnnonces()
+      .filter((annonce) => annonce.employeurEmail === emailConnecte)
+      .map((annonce) => ({
+        ...annonce,
+        candidatures: toutesCandidatures
+          .filter((c) => String(c.annonceId) === String(annonce.id))
+          .map((c) => {
+            const prestataire = utilisateurs.find((u) => u.email === c.prestataireEmail);
+            return { ...c, nomPrestataire: prestataire ? prestataire.nom : "Prestataire inconnu" };
+          }),
+      }));
   }
 
   if (utilisateur.role === "prestataire") {
-    const mesCandidatures = lireCandidatures().filter((c) => c.prestataireEmail === emailConnecte);
     const toutesAnnonces = lireAnnonces();
 
-    sectionSupplementaire += `<h2>Mes candidatures</h2>`;
-
-    if (mesCandidatures.length === 0) {
-      sectionSupplementaire += `<p>Tu n'as postule a aucune annonce.</p>`;
-    } else {
-      mesCandidatures.forEach((candidature) => {
-        const annonce = toutesAnnonces.find((a) => String(a.id) === String(candidature.annonceId));
-        sectionSupplementaire += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
-          <p><strong>${echapper(annonce ? annonce.titre : "Annonce supprimee")}</strong></p>
-          <p>Statut : ${echapper(candidature.statut)}</p>
-        </div>`;
+    mesCandidatures = lireCandidatures()
+      .filter((c) => c.prestataireEmail === emailConnecte)
+      .map((c) => {
+        const annonce = toutesAnnonces.find((a) => String(a.id) === String(c.annonceId));
+        return { ...c, titreAnnonce: annonce ? annonce.titre : "Annonce supprimee" };
       });
-    }
   }
 
-  // Le metier et le tarif ne concernent que les prestataires.
-  // Pour un employeur, ces deux lignes ne sont tout simplement pas construites.
-  let lignesPrestataire = "";
-
-  if (utilisateur.role === "prestataire") {
-    lignesPrestataire = `
-        <p><strong>Métier :</strong> ${echapper(utilisateur.metier || "Non renseigné")}</p>
-        <p><strong>Tarif :</strong> ${echapper(formaterTarif(utilisateur.tarif))}</p>`;
-  }
-
-  res.send(`
-      <!DOCTYPE html>
-      <html lang="fr">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PamConnect - Mon profil</title>
-        <link rel="stylesheet" href="/style.css">
-      </head>
-      <body>
-        <nav>
-          <a href="/index.html">Accueil</a>
-          <a href="/employeur.html">Espace employeur</a>
-          <a href="/prestataire.html">Espace prestataire</a>
-          <a href="/recherche.html">Recherche</a>
-          <a href="/annonces">Annonces</a>
-          <a href="/inscription.html">Inscription</a>
-          <a href="/connexion.html">Connexion</a>
-          <a href="/mon-profil">Mon profil</a>
-        </nav>
-        <h1>Mon profil</h1>
-        <p><strong>Nom :</strong> ${echapper(utilisateur.nom)}</p>
-        <p><strong>Email :</strong> ${echapper(utilisateur.email)}</p>
-        <p><strong>Rôle :</strong> ${echapper(utilisateur.role)}</p>
-        <p><strong>Arrondissement :</strong> ${echapper(utilisateur.arrondissement)}</p>
-        <p><strong>Quartier :</strong> ${echapper(utilisateur.quartier || "Non renseigné")}</p>
-        ${lignesPrestataire}
-        ${sectionSupplementaire}
-      </body>
-      </html>
-    `);
+  res.render("profil", {
+    titre: "Mon profil",
+    utilisateur,
+    mesAnnonces,
+    mesCandidatures,
+  });
 });
 
 // --- Publier une annonce (le formulaire) ---------------------------
@@ -343,48 +279,14 @@ app.get("/publier-annonce", exigerConnexion, (req, res) => {
   const utilisateur = utilisateurs.find((u) => u.email === req.emailConnecte);
 
   if (utilisateur.role !== "employeur") {
-    return res.status(403).send(
-      `<h1>Acces refuse</h1><p>Seuls les employeurs peuvent publier une annonce.</p><a href="/index.html">Retour a l'accueil</a>`
-    );
+    return res.status(403).render("message", {
+      titre: "Acces refuse",
+      texte: "Seuls les employeurs peuvent publier une annonce.",
+      liens: [{ url: "/index.html", texte: "Retour a l'accueil" }],
+    });
   }
 
-  res.send(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>PamConnect - Publier une annonce</title><link rel="stylesheet" href="/style.css"></head><body>
-      <nav>
-        <a href="/index.html">Accueil</a>
-        <a href="/employeur.html">Espace employeur</a>
-        <a href="/prestataire.html">Espace prestataire</a>
-        <a href="/recherche.html">Recherche</a>
-        <a href="/inscription.html">Inscription</a>
-        <a href="/connexion.html">Connexion</a>
-        <a href="/mon-profil">Mon profil</a>
-      </nav>
-      <h1>Publier une annonce</h1>
-      <form action="/annonces" method="POST">
-        <label for="titre">Titre :</label>
-        <input type="text" id="titre" name="titre" required>
-
-        <label for="description">Description :</label>
-        <textarea id="description" name="description" required></textarea>
-
-        <label for="metier">Metier recherche :</label>
-        <input type="text" id="metier" name="metier" required>
-
-        <label for="arrondissement">Arrondissement :</label>
-        <select id="arrondissement" name="arrondissement" required>
-          <option value="Yaounde 1">Yaounde 1</option>
-          <option value="Yaounde 2">Yaounde 2</option>
-          <option value="Yaounde 3">Yaounde 3</option>
-          <option value="Yaounde 4">Yaounde 4</option>
-          <option value="Yaounde 5">Yaounde 5</option>
-          <option value="Yaounde 6">Yaounde 6</option>
-          <option value="Yaounde 7">Yaounde 7</option>
-        </select>
-
-        <button type="submit">Publier</button>
-      </form>
-    </body></html>`);
+  res.render("publier-annonce", { titre: "Publier une annonce" });
 });
 
 // --- Enregistrer une annonce ---------------------------------------
@@ -404,64 +306,29 @@ app.post("/annonces", exigerConnexion, lireFormulaire, (req, res) => {
   annonces.push(nouvelleAnnonce);
   sauvegarderAnnonces(annonces);
 
-  res.send(
-    `<h1>Annonce publiee !</h1><p>Ton annonce "${echapper(donnees.titre)}" a bien ete enregistree.</p><a href="/index.html">Retour a l'accueil</a>`
-  );
+  res.render("message", {
+    titre: "Annonce publiee !",
+    texte: `Ton annonce "${donnees.titre}" a bien ete enregistree.`,
+    liens: [{ url: "/index.html", texte: "Retour a l'accueil" }],
+  });
 });
 
 // --- Liste des annonces --------------------------------------------
 app.get("/annonces", (req, res) => {
   const emailConnecte = trouverEmailConnecte(req);
   let role = null;
+
   if (emailConnecte) {
     const utilisateurs = lireUtilisateurs();
     const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
     role = utilisateur ? utilisateur.role : null;
   }
 
-  const annonces = lireAnnonces();
-
-  let html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>PamConnect - Annonces</title><link rel="stylesheet" href="/style.css"></head><body>
-      <nav>
-        <a href="/index.html">Accueil</a>
-        <a href="/employeur.html">Espace employeur</a>
-        <a href="/prestataire.html">Espace prestataire</a>
-        <a href="/recherche.html">Recherche</a>
-        <a href="/annonces">Annonces</a>
-        <a href="/inscription.html">Inscription</a>
-        <a href="/connexion.html">Connexion</a>
-        <a href="/mon-profil">Mon profil</a>
-      </nav>
-      <h1>Annonces disponibles</h1>`;
-
-  if (annonces.length === 0) {
-    html += `<p>Aucune annonce pour le moment.</p>`;
-  } else {
-    annonces.forEach((a) => {
-      html += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
-          <p><strong>${echapper(a.titre)}</strong></p>
-          <p>${echapper(a.description)}</p>
-          <p>Metier : ${echapper(a.metier)}</p>
-          <p>Arrondissement : ${echapper(a.arrondissement)}</p>`;
-
-      if (role === "prestataire") {
-        html += `<form action="/candidatures" method="POST">
-            <input type="hidden" name="annonceId" value="${echapper(a.id)}">
-            <button type="submit">Postuler</button>
-          </form>`;
-      } else {
-        html += `<p><a href="/connexion.html">Connecte-toi en tant que prestataire</a> pour postuler.</p>`;
-      }
-
-      html += `</div>`;
-    });
-  }
-
-  html += `</body></html>`;
-
-  res.send(html);
+  res.render("annonces", {
+    titre: "Annonces",
+    annonces: lireAnnonces(),
+    role,
+  });
 });
 
 // --- Postuler a une annonce ----------------------------------------
@@ -470,9 +337,11 @@ app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
   const utilisateur = utilisateurs.find((u) => u.email === req.emailConnecte);
 
   if (!utilisateur || utilisateur.role !== "prestataire") {
-    return res.status(403).send(
-      `<h1>Acces refuse</h1><p>Seuls les prestataires peuvent postuler.</p><a href="/annonces">Retour aux annonces</a>`
-    );
+    return res.status(403).render("message", {
+      titre: "Acces refuse",
+      texte: "Seuls les prestataires peuvent postuler.",
+      liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
+    });
   }
 
   const donnees = req.body;
@@ -488,9 +357,11 @@ app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
   candidatures.push(nouvelleCandidature);
   sauvegarderCandidatures(candidatures);
 
-  res.send(
-    `<h1>Candidature envoyee !</h1><p>Ta candidature a bien ete enregistree.</p><a href="/annonces">Retour aux annonces</a>`
-  );
+  res.render("message", {
+    titre: "Candidature envoyee !",
+    texte: "Ta candidature a bien ete enregistree.",
+    liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
+  });
 });
 
 // --- Accepter ou refuser une candidature ---------------------------
@@ -541,36 +412,16 @@ app.get("/recherche", (req, res) => {
       .sort((a, b) => a.distance - b.distance);
   }
 
-  let html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>PamConnect - Resultats</title><link rel="stylesheet" href="/style.css"></head><body>
-      <nav>
-        <a href="/index.html">Accueil</a>
-        <a href="/employeur.html">Espace employeur</a>
-        <a href="/prestataire.html">Espace prestataire</a>
-        <a href="/inscription.html">Inscription</a>
-        <a href="/connexion.html">Connexion</a>
-        <a href="/mon-profil">Mon profil</a>
-      </nav>
-      <h1>Resultats de recherche</h1>`;
+  // On prepare le texte de la distance ici : la vue ne fait plus de calcul.
+  const resultats = prestataires.map((p) => ({
+    ...p,
+    distanceTexte: p.distance !== undefined ? `${p.distance.toFixed(1)} km` : "Distance inconnue",
+  }));
 
-  if (prestataires.length === 0) {
-    html += `<p>Aucun prestataire trouve.</p>`;
-  } else {
-    prestataires.forEach((p) => {
-      const distanceTexte = p.distance !== undefined ? `${p.distance.toFixed(1)} km` : "Distance inconnue";
-      html += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
-          <p><strong>${echapper(p.nom)}</strong> - ${echapper(p.metier)}</p>
-          <p>${echapper(p.arrondissement)}, ${echapper(p.quartier || "")}</p>
-          <p>Tarif : ${echapper(formaterTarif(p.tarif))}</p>
-          <p>Distance : ${distanceTexte}</p>
-        </div>`;
-    });
-  }
-
-  html += `<a href="/recherche.html">Nouvelle recherche</a></body></html>`;
-
-  res.send(html);
+  res.render("recherche", {
+    titre: "Resultats",
+    prestataires: resultats,
+  });
 });
 
 // ============================================================
@@ -578,7 +429,11 @@ app.get("/recherche", (req, res) => {
 // Ce bloc doit imperativement rester EN DERNIER.
 // ============================================================
 app.use((req, res) => {
-  res.status(404).send("<h1>404 - Page introuvable</h1>");
+  res.status(404).render("message", {
+    titre: "404 - Page introuvable",
+    texte: "Cette page n'existe pas.",
+    liens: [{ url: "/index.html", texte: "Retour a l'accueil" }],
+  });
 });
 
 app.listen(PORT, () => {

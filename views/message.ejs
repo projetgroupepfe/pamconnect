@@ -1,0 +1,18 @@
+<%# Page de message simple : un titre, un texte, un ou plusieurs liens.     %>
+<%# Elle remplace les 10 petites pages qui etaient ecrites a la main dans   %>
+<%# server.js, et qui n'avaient ni style ni menu.                          %>
+<%- include("partiels/tete") %>
+
+  <h1><%= titre %></h1>
+
+  <% if (locals.texte) { %>
+    <p><%= texte %></p>
+  <% } %>
+
+  <p>
+    <% (locals.liens || []).forEach(function (lien) { %>
+      <a href="<%= lien.url %>"><%= lien.texte %></a>
+    <% }); %>
+  </p>
+
+<%- include("partiels/pied") %>

@@ -1,0 +1,20 @@
+<%- include("partiels/tete") %>
+
+  <h1>Resultats de recherche</h1>
+
+  <% if (prestataires.length === 0) { %>
+    <p>Aucun prestataire trouve.</p>
+  <% } else { %>
+    <% prestataires.forEach(function (prestataire) { %>
+      <div class="carte">
+        <p><strong><%= prestataire.nom %></strong> - <%= prestataire.metier %></p>
+        <p><%= prestataire.arrondissement %>, <%= prestataire.quartier || "" %></p>
+        <p>Tarif : <%= formaterTarif(prestataire.tarif) %></p>
+        <p>Distance : <%= prestataire.distanceTexte %></p>
+      </div>
+    <% }); %>
+  <% } %>
+
+  <p><a href="/recherche.html">Nouvelle recherche</a></p>
+
+<%- include("partiels/pied") %>

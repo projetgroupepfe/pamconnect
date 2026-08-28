@@ -1,0 +1,35 @@
+<%- include("partiels/tete") %>
+
+  <h1>Publier une annonce</h1>
+
+  <form action="/annonces" method="POST">
+    <p>
+      <label for="titre">Titre :</label>
+      <input type="text" id="titre" name="titre" required>
+    </p>
+    <p>
+      <label for="description">Description :</label>
+      <textarea id="description" name="description" required></textarea>
+    </p>
+    <p>
+      <label for="metier">Metier recherche :</label>
+      <input type="text" id="metier" name="metier" required>
+    </p>
+    <p>
+      <label for="arrondissement">Arrondissement :</label>
+      <select id="arrondissement" name="arrondissement" required>
+        <option value="Yaounde 1">Yaounde 1</option>
+        <option value="Yaounde 2">Yaounde 2</option>
+        <option value="Yaounde 3">Yaounde 3</option>
+        <option value="Yaounde 4">Yaounde 4</option>
+        <option value="Yaounde 5">Yaounde 5</option>
+        <option value="Yaounde 6">Yaounde 6</option>
+        <option value="Yaounde 7">Yaounde 7</option>
+      </select>
+    </p>
+    <p>
+      <button type="submit">Publier</button>
+    </p>
+  </form>
+
+<%- include("partiels/pied") %>

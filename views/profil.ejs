@@ -1,0 +1,71 @@
+<%- include("partiels/tete") %>
+
+  <h1>Mon profil</h1>
+
+  <p><strong>Nom :</strong> <%= utilisateur.nom %></p>
+  <p><strong>Email :</strong> <%= utilisateur.email %></p>
+  <p><strong>Rôle :</strong> <%= utilisateur.role %></p>
+  <p><strong>Arrondissement :</strong> <%= utilisateur.arrondissement %></p>
+  <p><strong>Quartier :</strong> <%= utilisateur.quartier || "Non renseigné" %></p>
+
+  <%# Metier et tarif ne concernent que les prestataires. %>
+  <% if (utilisateur.role === "prestataire") { %>
+    <p><strong>Métier :</strong> <%= utilisateur.metier || "Non renseigné" %></p>
+    <p><strong>Tarif :</strong> <%= formaterTarif(utilisateur.tarif) %></p>
+  <% } %>
+
+  <%# ---- Cote employeur : ses annonces et les candidatures recues ---- %>
+  <% if (utilisateur.role === "employeur") { %>
+    <h2>Mes annonces</h2>
+
+    <% if (mesAnnonces.length === 0) { %>
+      <p>Tu n'as publié aucune annonce.</p>
+    <% } else { %>
+      <% mesAnnonces.forEach(function (annonce) { %>
+        <div class="carte">
+          <p><strong><%= annonce.titre %></strong></p>
+
+          <% if (annonce.candidatures.length === 0) { %>
+            <p>Aucune candidature pour l'instant.</p>
+          <% } else { %>
+            <% annonce.candidatures.forEach(function (candidature) { %>
+              <div class="candidature">
+                <p><%= candidature.nomPrestataire %> - Statut : <%= candidature.statut %></p>
+
+                <% if (candidature.statut === "en attente") { %>
+                  <form action="/candidatures/statut" method="POST" class="en-ligne">
+                    <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
+                    <input type="hidden" name="statut" value="acceptee">
+                    <button type="submit">Accepter</button>
+                  </form>
+                  <form action="/candidatures/statut" method="POST" class="en-ligne">
+                    <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
+                    <input type="hidden" name="statut" value="refusee">
+                    <button type="submit">Refuser</button>
+                  </form>
+                <% } %>
+              </div>
+            <% }); %>
+          <% } %>
+        </div>
+      <% }); %>
+    <% } %>
+  <% } %>
+
+  <%# ---- Cote prestataire : les candidatures envoyees ---- %>
+  <% if (utilisateur.role === "prestataire") { %>
+    <h2>Mes candidatures</h2>
+
+    <% if (mesCandidatures.length === 0) { %>
+      <p>Tu n'as postulé à aucune annonce.</p>
+    <% } else { %>
+      <% mesCandidatures.forEach(function (candidature) { %>
+        <div class="carte">
+          <p><strong><%= candidature.titreAnnonce %></strong></p>
+          <p>Statut : <%= candidature.statut %></p>
+        </div>
+      <% }); %>
+    <% } %>
+  <% } %>
+
+<%- include("partiels/pied") %>
