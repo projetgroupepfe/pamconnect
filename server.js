@@ -1,15 +1,14 @@
 const express = require("express");
-const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const Database = require("better-sqlite3");
 
 // "app" est notre application Express : c'est elle qui recoit
 // toutes les requetes et decide quelle route doit y repondre.
 const app = express();
 
-// On dit a Express : les pages sont des fichiers .ejs, ranges dans views/.
-// A partir de la, res.render("profil", { ... }) va chercher views/profil.ejs,
-// y injecte les donnees, et envoie le HTML obtenu au navigateur.
+// Les pages sont des fichiers .ejs ranges dans views/.
+// res.render("profil", {...}) va chercher views/profil.ejs.
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
@@ -18,49 +17,111 @@ app.set("views", path.join(__dirname, "views"));
 const lireFormulaire = express.urlencoded({ extended: false });
 
 const PORT = 3000;
-const FICHIER_UTILISATEURS = path.join(__dirname, "data", "utilisateurs.json");
-const FICHIER_ANNONCES = path.join(__dirname, "data", "annonces.json");
-const FICHIER_CANDIDATURES = path.join(__dirname, "data", "candidatures.json");
 const sessions = {};
+
+// ============================================================
+// LA BASE DE DONNEES
+// ============================================================
+// Un seul fichier, ouvert une fois au demarrage du serveur.
+const db = new Database(path.join(__dirname, "data", "pamconnect.db"));
+
+// SQLite ne fait PAS respecter les cles etrangeres par defaut.
+// Sans cette ligne, on pourrait creer une annonce sans employeur.
+db.pragma("foreign_keys = ON");
+
+// ============================================================
+// LES REQUETES
+// ============================================================
+// Elles sont "preparees" une seule fois au demarrage : SQLite les
+// analyse maintenant, puis les reutilise a chaque appel.
+//
+// Les ? sont des emplacements a remplir. Les valeurs passees ensuite
+// ne sont JAMAIS melangees au texte de la requete : c'est ce qui rend
+// l'injection SQL impossible.
+const requetes = {
+  utilisateurParId: db.prepare(`
+    SELECT * FROM utilisateurs WHERE id = ?
+  `),
+
+  utilisateurParEmail: db.prepare(`
+    SELECT * FROM utilisateurs WHERE email = ?
+  `),
+
+  creerUtilisateur: db.prepare(`
+    INSERT INTO utilisateurs
+      (role, nom, email, motdepasse, arrondissement, quartier, metier, tarif, latitude, longitude)
+    VALUES
+      (@role, @nom, @email, @motdepasse, @arrondissement, @quartier, @metier, @tarif, @latitude, @longitude)
+  `),
+
+  tousLesPrestataires: db.prepare(`
+    SELECT * FROM utilisateurs WHERE role = 'prestataire'
+  `),
+
+  prestatairesParMetier: db.prepare(`
+    SELECT * FROM utilisateurs
+    WHERE role = 'prestataire' AND LOWER(metier) LIKE ?
+  `),
+
+  toutesLesAnnonces: db.prepare(`
+    SELECT * FROM annonces ORDER BY cree_le DESC, id DESC
+  `),
+
+  annonceParId: db.prepare(`
+    SELECT * FROM annonces WHERE id = ?
+  `),
+
+  annoncesDeEmployeur: db.prepare(`
+    SELECT * FROM annonces WHERE employeur_id = ? ORDER BY cree_le DESC, id DESC
+  `),
+
+  creerAnnonce: db.prepare(`
+    INSERT INTO annonces (employeur_id, titre, description, metier, arrondissement)
+    VALUES (@employeur_id, @titre, @description, @metier, @arrondissement)
+  `),
+
+  // JOIN : on recupere la candidature ET le nom du prestataire
+  // en une seule requete, au lieu de chercher ensuite dans une liste.
+  candidaturesDeAnnonce: db.prepare(`
+    SELECT c.id, c.statut, u.nom AS nomPrestataire
+    FROM candidatures c
+    JOIN utilisateurs u ON u.id = c.prestataire_id
+    WHERE c.annonce_id = ?
+    ORDER BY c.id
+  `),
+
+  candidaturesDePrestataire: db.prepare(`
+    SELECT c.id, c.statut, a.titre AS titreAnnonce
+    FROM candidatures c
+    JOIN annonces a ON a.id = c.annonce_id
+    WHERE c.prestataire_id = ?
+    ORDER BY c.id DESC
+  `),
+
+  creerCandidature: db.prepare(`
+    INSERT INTO candidatures (annonce_id, prestataire_id) VALUES (?, ?)
+  `),
+
+  // Verifie en UNE requete que la candidature existe ET que l'annonce
+  // concernee appartient bien a l'employeur connecte.
+  candidatureDeMonAnnonce: db.prepare(`
+    SELECT c.id
+    FROM candidatures c
+    JOIN annonces a ON a.id = c.annonce_id
+    WHERE c.id = ? AND a.employeur_id = ?
+  `),
+
+  changerStatutCandidature: db.prepare(`
+    UPDATE candidatures SET statut = ? WHERE id = ?
+  `),
+};
+
+// ============================================================
+// OUTILS
+// ============================================================
 
 function genererToken() {
   return crypto.randomBytes(32).toString("hex");
-}
-
-function lireUtilisateurs() {
-  if (!fs.existsSync(FICHIER_UTILISATEURS)) {
-    fs.writeFileSync(FICHIER_UTILISATEURS, "[]");
-  }
-  const contenu = fs.readFileSync(FICHIER_UTILISATEURS, "utf-8");
-  return JSON.parse(contenu);
-}
-
-function sauvegarderUtilisateurs(utilisateurs) {
-  fs.writeFileSync(FICHIER_UTILISATEURS, JSON.stringify(utilisateurs, null, 2));
-}
-
-function lireAnnonces() {
-  if (!fs.existsSync(FICHIER_ANNONCES)) {
-    fs.writeFileSync(FICHIER_ANNONCES, "[]");
-  }
-  const contenu = fs.readFileSync(FICHIER_ANNONCES, "utf-8");
-  return JSON.parse(contenu);
-}
-
-function sauvegarderAnnonces(annonces) {
-  fs.writeFileSync(FICHIER_ANNONCES, JSON.stringify(annonces, null, 2));
-}
-
-function lireCandidatures() {
-  if (!fs.existsSync(FICHIER_CANDIDATURES)) {
-    fs.writeFileSync(FICHIER_CANDIDATURES, "[]");
-  }
-  const contenu = fs.readFileSync(FICHIER_CANDIDATURES, "utf-8");
-  return JSON.parse(contenu);
-}
-
-function sauvegarderCandidatures(candidatures) {
-  fs.writeFileSync(FICHIER_CANDIDATURES, JSON.stringify(candidatures, null, 2));
 }
 
 function hacherMotDePasse(motDePasse) {
@@ -84,8 +145,7 @@ function formaterTarif(tarif) {
   return valeur + " FCFA";
 }
 
-// app.locals : tout ce qu'on met ici est utilisable dans TOUTES les vues .ejs
-// sans avoir a le repasser a chaque res.render().
+// app.locals : disponible dans TOUTES les vues .ejs sans le repasser.
 app.locals.formaterTarif = formaterTarif;
 
 function calculerDistanceKm(lat1, lon1, lat2, lon2) {
@@ -100,32 +160,36 @@ function calculerDistanceKm(lat1, lon1, lat2, lon2) {
   return rayonTerre * c;
 }
 
-function trouverEmailConnecte(request) {
-  const enteteCookie = request.headers.cookie || "";
+// Retrouve la personne connectee a partir du cookie, ou null.
+// La session ne retient que l'identifiant : les informations
+// affichees viennent toujours de la base, donc toujours a jour.
+function utilisateurConnecte(req) {
+  const enteteCookie = req.headers.cookie || "";
   const paire = enteteCookie.split("; ").find((c) => c.startsWith("session="));
   if (!paire) return null;
 
-  const token = paire.split("=")[1];
-  return sessions[token] || null;
+  const identifiant = sessions[paire.split("=")[1]];
+  if (!identifiant) return null;
+
+  return requetes.utilisateurParId.get(identifiant) || null;
 }
 
 // ============================================================
 // Le "portier" : verifie qu'une personne est bien connectee.
-// Express execute cette fonction AVANT la route sur laquelle
-// on la pose. Deux issues possibles, jamais les deux :
+// Express l'execute AVANT la route sur laquelle on le pose.
 //   - personne connectee  -> on redirige et on s'arrete
 //   - quelqu'un connecte  -> next() laisse passer vers la route
 // ============================================================
 function exigerConnexion(req, res, next) {
-  const emailConnecte = trouverEmailConnecte(req);
+  const utilisateur = utilisateurConnecte(req);
 
-  if (!emailConnecte) {
+  if (!utilisateur) {
     return res.redirect("/connexion.html");
   }
 
-  // On accroche l'email a la requete : les routes qui suivent
-  // n'ont plus besoin de le rechercher, elles lisent req.emailConnecte.
-  req.emailConnecte = emailConnecte;
+  // On accroche la personne a la requete : les routes qui suivent
+  // n'ont plus rien a rechercher, elles lisent req.utilisateur.
+  req.utilisateur = utilisateur;
   next();
 }
 
@@ -141,14 +205,9 @@ app.use(express.static(path.join(__dirname, "public")));
 // --- Inscription ---------------------------------------------------
 app.post("/inscription", lireFormulaire, (req, res) => {
   const donnees = req.body;
-  const emailNormalise = (donnees.email || "").trim().toLowerCase();
+  const email = (donnees.email || "").trim().toLowerCase();
 
-  const utilisateurs = lireUtilisateurs();
-  const dejaInscrit = utilisateurs.find(
-    (u) => (u.email || "").toLowerCase() === emailNormalise
-  );
-
-  if (dejaInscrit) {
+  if (requetes.utilisateurParEmail.get(email)) {
     return res.status(409).render("message", {
       titre: "Email deja utilise",
       texte: `Un compte existe deja avec l'adresse ${donnees.email}.`,
@@ -170,24 +229,20 @@ app.post("/inscription", lireFormulaire, (req, res) => {
     });
   }
 
-  const nouvelUtilisateur = {
-    id: Date.now(),
+  requetes.creerUtilisateur.run({
     role: donnees.role,
     nom: donnees.nom,
-    email: emailNormalise,
+    email,
     motdepasse: hacherMotDePasse(donnees.motdepasse),
-    arrondissement: donnees.arrondissement,
+    arrondissement: donnees.arrondissement || null,
     quartier: donnees.quartier || null,
     metier: donnees.metier || null,
-    tarif: donnees.tarif || null,
-    latitude: donnees.latitude || null,
-    longitude: donnees.longitude || null,
-  };
+    tarif: donnees.tarif ? Number(donnees.tarif) : null,
+    latitude: donnees.latitude ? Number(donnees.latitude) : null,
+    longitude: donnees.longitude ? Number(donnees.longitude) : null,
+  });
 
-  utilisateurs.push(nouvelUtilisateur);
-  sauvegarderUtilisateurs(utilisateurs);
-
-  console.log("Nouvel utilisateur enregistré :", nouvelUtilisateur);
+  console.log("Nouvel utilisateur enregistré :", email);
 
   res.render("message", {
     titre: `Merci ${donnees.nom} !`,
@@ -199,24 +254,20 @@ app.post("/inscription", lireFormulaire, (req, res) => {
 // --- Connexion -----------------------------------------------------
 app.post("/connexion", lireFormulaire, (req, res) => {
   const donnees = req.body;
-  const utilisateurs = lireUtilisateurs();
+  const email = (donnees.email || "").trim().toLowerCase();
+  const utilisateur = requetes.utilisateurParEmail.get(email);
 
-  const emailSaisi = (donnees.email || "").trim().toLowerCase();
-  const utilisateurTrouve = utilisateurs.find(
-    (u) => (u.email || "").toLowerCase() === emailSaisi
-  );
-
-  if (utilisateurTrouve && verifierMotDePasse(donnees.motdepasse, utilisateurTrouve.motdepasse)) {
+  if (utilisateur && verifierMotDePasse(donnees.motdepasse, utilisateur.motdepasse)) {
     const token = genererToken();
-    sessions[token] = utilisateurTrouve.email;
+    sessions[token] = utilisateur.id;
 
     // res.cookie ecrit l'en-tete Set-Cookie a notre place.
     // httpOnly : le JavaScript de la page ne peut pas lire ce cookie.
     res.cookie("session", token, { httpOnly: true, path: "/" });
 
     return res.render("message", {
-      titre: `Bienvenue ${utilisateurTrouve.nom} !`,
-      texte: `Connexion réussie en tant que ${utilisateurTrouve.role}.`,
+      titre: `Bienvenue ${utilisateur.nom} !`,
+      texte: `Connexion réussie en tant que ${utilisateur.role}.`,
       liens: [{ url: "/mon-profil", texte: "Voir mon profil" }],
     });
   }
@@ -230,39 +281,21 @@ app.post("/connexion", lireFormulaire, (req, res) => {
 
 // --- Mon profil ----------------------------------------------------
 app.get("/mon-profil", exigerConnexion, (req, res) => {
-  const emailConnecte = req.emailConnecte;
-  const utilisateurs = lireUtilisateurs();
-  const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
+  const utilisateur = req.utilisateur;
 
   // La route PREPARE les donnees, la vue se contente de les AFFICHER.
   let mesAnnonces = [];
   let mesCandidatures = [];
 
   if (utilisateur.role === "employeur") {
-    const toutesCandidatures = lireCandidatures();
-
-    mesAnnonces = lireAnnonces()
-      .filter((annonce) => annonce.employeurEmail === emailConnecte)
-      .map((annonce) => ({
-        ...annonce,
-        candidatures: toutesCandidatures
-          .filter((c) => String(c.annonceId) === String(annonce.id))
-          .map((c) => {
-            const prestataire = utilisateurs.find((u) => u.email === c.prestataireEmail);
-            return { ...c, nomPrestataire: prestataire ? prestataire.nom : "Prestataire inconnu" };
-          }),
-      }));
+    mesAnnonces = requetes.annoncesDeEmployeur.all(utilisateur.id).map((annonce) => ({
+      ...annonce,
+      candidatures: requetes.candidaturesDeAnnonce.all(annonce.id),
+    }));
   }
 
   if (utilisateur.role === "prestataire") {
-    const toutesAnnonces = lireAnnonces();
-
-    mesCandidatures = lireCandidatures()
-      .filter((c) => c.prestataireEmail === emailConnecte)
-      .map((c) => {
-        const annonce = toutesAnnonces.find((a) => String(a.id) === String(c.annonceId));
-        return { ...c, titreAnnonce: annonce ? annonce.titre : "Annonce supprimee" };
-      });
+    mesCandidatures = requetes.candidaturesDePrestataire.all(utilisateur.id);
   }
 
   res.render("profil", {
@@ -275,10 +308,7 @@ app.get("/mon-profil", exigerConnexion, (req, res) => {
 
 // --- Publier une annonce (le formulaire) ---------------------------
 app.get("/publier-annonce", exigerConnexion, (req, res) => {
-  const utilisateurs = lireUtilisateurs();
-  const utilisateur = utilisateurs.find((u) => u.email === req.emailConnecte);
-
-  if (utilisateur.role !== "employeur") {
+  if (req.utilisateur.role !== "employeur") {
     return res.status(403).render("message", {
       titre: "Acces refuse",
       texte: "Seuls les employeurs peuvent publier une annonce.",
@@ -293,18 +323,13 @@ app.get("/publier-annonce", exigerConnexion, (req, res) => {
 app.post("/annonces", exigerConnexion, lireFormulaire, (req, res) => {
   const donnees = req.body;
 
-  const nouvelleAnnonce = {
-    id: Date.now(),
-    employeurEmail: req.emailConnecte,
+  requetes.creerAnnonce.run({
+    employeur_id: req.utilisateur.id,
     titre: donnees.titre,
-    description: donnees.description,
+    description: donnees.description || null,
     metier: donnees.metier,
-    arrondissement: donnees.arrondissement,
-  };
-
-  const annonces = lireAnnonces();
-  annonces.push(nouvelleAnnonce);
-  sauvegarderAnnonces(annonces);
+    arrondissement: donnees.arrondissement || null,
+  });
 
   res.render("message", {
     titre: "Annonce publiee !",
@@ -315,28 +340,18 @@ app.post("/annonces", exigerConnexion, lireFormulaire, (req, res) => {
 
 // --- Liste des annonces --------------------------------------------
 app.get("/annonces", (req, res) => {
-  const emailConnecte = trouverEmailConnecte(req);
-  let role = null;
-
-  if (emailConnecte) {
-    const utilisateurs = lireUtilisateurs();
-    const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
-    role = utilisateur ? utilisateur.role : null;
-  }
+  const utilisateur = utilisateurConnecte(req);
 
   res.render("annonces", {
     titre: "Annonces",
-    annonces: lireAnnonces(),
-    role,
+    annonces: requetes.toutesLesAnnonces.all(),
+    role: utilisateur ? utilisateur.role : null,
   });
 });
 
 // --- Postuler a une annonce ----------------------------------------
 app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
-  const utilisateurs = lireUtilisateurs();
-  const utilisateur = utilisateurs.find((u) => u.email === req.emailConnecte);
-
-  if (!utilisateur || utilisateur.role !== "prestataire") {
+  if (req.utilisateur.role !== "prestataire") {
     return res.status(403).render("message", {
       titre: "Acces refuse",
       texte: "Seuls les prestataires peuvent postuler.",
@@ -344,18 +359,30 @@ app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
     });
   }
 
-  const donnees = req.body;
+  const annonce = requetes.annonceParId.get(Number(req.body.annonceId));
 
-  const nouvelleCandidature = {
-    id: Date.now(),
-    annonceId: donnees.annonceId,
-    prestataireEmail: req.emailConnecte,
-    statut: "en attente",
-  };
+  if (!annonce) {
+    return res.status(404).render("message", {
+      titre: "Annonce introuvable",
+      texte: "Cette annonce n'existe plus.",
+      liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
+    });
+  }
 
-  const candidatures = lireCandidatures();
-  candidatures.push(nouvelleCandidature);
-  sauvegarderCandidatures(candidatures);
+  try {
+    requetes.creerCandidature.run(annonce.id, req.utilisateur.id);
+  } catch (erreur) {
+    // La regle UNIQUE (annonce_id, prestataire_id) du schema empeche
+    // de postuler deux fois a la meme annonce.
+    if (String(erreur.message).includes("UNIQUE")) {
+      return res.status(409).render("message", {
+        titre: "Candidature deja envoyee",
+        texte: "Tu as deja postule a cette annonce.",
+        liens: [{ url: "/mon-profil", texte: "Voir mes candidatures" }],
+      });
+    }
+    throw erreur;
+  }
 
   res.render("message", {
     titre: "Candidature envoyee !",
@@ -366,20 +393,14 @@ app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
 
 // --- Accepter ou refuser une candidature ---------------------------
 app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => {
-  const donnees = req.body;
-  const candidatures = lireCandidatures();
-  const candidature = candidatures.find((c) => String(c.id) === String(donnees.candidatureId));
+  const candidatureId = Number(req.body.candidatureId);
 
-  if (candidature) {
-    const annonces = lireAnnonces();
-    const annonce = annonces.find((a) => String(a.id) === String(candidature.annonceId));
+  // Une seule requete verifie que la candidature existe ET que
+  // l'annonce concernee appartient bien a la personne connectee.
+  const autorisee = requetes.candidatureDeMonAnnonce.get(candidatureId, req.utilisateur.id);
 
-    // On ne change le statut que si l'annonce appartient bien
-    // a la personne connectee.
-    if (annonce && annonce.employeurEmail === req.emailConnecte) {
-      candidature.statut = donnees.statut;
-      sauvegarderCandidatures(candidatures);
-    }
+  if (autorisee) {
+    requetes.changerStatutCandidature.run(req.body.statut, candidatureId);
   }
 
   res.redirect("/mon-profil");
@@ -389,30 +410,26 @@ app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => 
 app.get("/recherche", (req, res) => {
   // req.query contient deja les parametres de l'adresse :
   // /recherche?metier=menage&latitude=3.8  ->  { metier: "menage", latitude: "3.8" }
-  const metierRecherche = (req.query.metier || "").toLowerCase();
+  const metierRecherche = (req.query.metier || "").trim().toLowerCase();
   const latEmployeur = parseFloat(req.query.latitude);
   const lonEmployeur = parseFloat(req.query.longitude);
 
-  const utilisateurs = lireUtilisateurs();
-  let prestataires = utilisateurs.filter((u) => u.role === "prestataire");
-
-  if (metierRecherche) {
-    prestataires = prestataires.filter((p) =>
-      (p.metier || "").toLowerCase().includes(metierRecherche)
-    );
-  }
+  // C'est la base qui filtre par metier, pas JavaScript.
+  let prestataires = metierRecherche
+    ? requetes.prestatairesParMetier.all(`%${metierRecherche}%`)
+    : requetes.tousLesPrestataires.all();
 
   if (!isNaN(latEmployeur) && !isNaN(lonEmployeur)) {
     prestataires = prestataires
       .filter((p) => p.latitude && p.longitude)
       .map((p) => ({
         ...p,
-        distance: calculerDistanceKm(latEmployeur, lonEmployeur, parseFloat(p.latitude), parseFloat(p.longitude)),
+        distance: calculerDistanceKm(latEmployeur, lonEmployeur, p.latitude, p.longitude),
       }))
       .sort((a, b) => a.distance - b.distance);
   }
 
-  // On prepare le texte de la distance ici : la vue ne fait plus de calcul.
+  // On prepare le texte de la distance ici : la vue ne fait aucun calcul.
   const resultats = prestataires.map((p) => ({
     ...p,
     distanceTexte: p.distance !== undefined ? `${p.distance.toFixed(1)} km` : "Distance inconnue",
