@@ -1,0 +1,10 @@
+{
+  "name": "pamconnect",
+  "version": "1.0.0",
+  "description": "Plateforme de mise en relation entre employeurs et prestataires de services a la personne - Yaounde",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT"
+}

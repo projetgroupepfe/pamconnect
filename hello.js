@@ -1,1 +1,0 @@
-console.log("PamConnect - le serveur Node.js fonctionne !");
