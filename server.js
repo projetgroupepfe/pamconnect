@@ -1,7 +1,6 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-const querystring = require("querystring");
 const crypto = require("crypto");
 
 // "app" est notre application Express : c'est elle qui recoit maintenant
@@ -114,6 +113,26 @@ function trouverEmailConnecte(request) {
 }
 
 // ============================================================
+// Le "portier" : verifie qu'une personne est bien connectee.
+// Express execute cette fonction AVANT la route sur laquelle
+// on la pose. Deux issues possibles, jamais les deux :
+//   - personne connectee  -> on redirige et on s'arrete
+//   - quelqu'un connecte  -> next() laisse passer vers la route
+// ============================================================
+function exigerConnexion(req, res, next) {
+  const emailConnecte = trouverEmailConnecte(req);
+
+  if (!emailConnecte) {
+    return res.redirect("/connexion.html");
+  }
+
+  // On accroche l'email a la requete : les routes qui suivent
+  // n'ont plus besoin de le rechercher, elles lisent req.emailConnecte.
+  req.emailConnecte = emailConnecte;
+  next();
+}
+
+// ============================================================
 // PARTIE 1 - Les fichiers du dossier public/ (HTML, CSS, images)
 // express.static les sert tout seul, et refuse deja les chemins
 // qui essaient de sortir du dossier.
@@ -121,9 +140,10 @@ function trouverEmailConnecte(request) {
 app.use(express.static(path.join(__dirname, "public")));
 
 // ============================================================
-// PARTIE 2 - Les routes deja migrees vers Express
+// PARTIE 2 - Les routes de l'application
 // ============================================================
 
+// --- Inscription ---------------------------------------------------
 app.post("/inscription", lireFormulaire, (req, res) => {
   const donnees = req.body;
   const emailNormalise = (donnees.email || "").trim().toLowerCase();
@@ -165,204 +185,132 @@ app.post("/inscription", lireFormulaire, (req, res) => {
   utilisateurs.push(nouvelUtilisateur);
   sauvegarderUtilisateurs(utilisateurs);
 
-  console.log("Nouvel utilisateur enregistr\u00e9 :", nouvelUtilisateur);
+  console.log("Nouvel utilisateur enregistré :", nouvelUtilisateur);
 
   res.send(
-    `<h1>Merci ${echapper(donnees.nom)} !</h1><p>Ton inscription en tant que ${echapper(donnees.role)} a bien \u00e9t\u00e9 enregistr\u00e9e.</p><a href="/index.html">Retour \u00e0 l'accueil</a>`
+    `<h1>Merci ${echapper(donnees.nom)} !</h1><p>Ton inscription en tant que ${echapper(donnees.role)} a bien été enregistrée.</p><a href="/index.html">Retour à l'accueil</a>`
   );
 });
 
-app.get("/annonces", (req, res) => {
-  const emailConnecte = trouverEmailConnecte(req);
-  let role = null;
-  if (emailConnecte) {
-    const utilisateurs = lireUtilisateurs();
-    const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
-    role = utilisateur ? utilisateur.role : null;
+// --- Connexion -----------------------------------------------------
+app.post("/connexion", lireFormulaire, (req, res) => {
+  const donnees = req.body;
+  const utilisateurs = lireUtilisateurs();
+
+  const emailSaisi = (donnees.email || "").trim().toLowerCase();
+  const utilisateurTrouve = utilisateurs.find(
+    (u) => (u.email || "").toLowerCase() === emailSaisi
+  );
+
+  if (utilisateurTrouve && verifierMotDePasse(donnees.motdepasse, utilisateurTrouve.motdepasse)) {
+    const token = genererToken();
+    sessions[token] = utilisateurTrouve.email;
+
+    // res.cookie ecrit l'en-tete Set-Cookie a notre place.
+    // httpOnly : le JavaScript de la page ne peut pas lire ce cookie.
+    res.cookie("session", token, { httpOnly: true, path: "/" });
+
+    return res.send(
+      `<h1>Bienvenue ${echapper(utilisateurTrouve.nom)} !</h1><p>Connexion réussie en tant que ${echapper(utilisateurTrouve.role)}.</p><a href="/mon-profil">Voir mon profil</a>`
+    );
   }
 
-  const annonces = lireAnnonces();
-
-  let html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PamConnect - Annonces</title><link rel="stylesheet" href="/style.css"></head><body>
-    <nav>
-      <a href="/index.html">Accueil</a>
-      <a href="/employeur.html">Espace employeur</a>
-      <a href="/prestataire.html">Espace prestataire</a>
-      <a href="/recherche.html">Recherche</a>
-      <a href="/annonces">Annonces</a>
-      <a href="/inscription.html">Inscription</a>
-      <a href="/connexion.html">Connexion</a>
-      <a href="/mon-profil">Mon profil</a>
-    </nav>
-    <h1>Annonces disponibles</h1>`;
-
-  if (annonces.length === 0) {
-    html += `<p>Aucune annonce pour le moment.</p>`;
-  } else {
-    annonces.forEach((a) => {
-      html += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
-        <p><strong>${echapper(a.titre)}</strong></p>
-        <p>${echapper(a.description)}</p>
-        <p>Metier : ${echapper(a.metier)}</p>
-        <p>Arrondissement : ${echapper(a.arrondissement)}</p>`;
-
-      if (role === "prestataire") {
-        html += `<form action="/candidatures" method="POST">
-          <input type="hidden" name="annonceId" value="${echapper(a.id)}">
-          <button type="submit">Postuler</button>
-        </form>`;
-      } else {
-        html += `<p><a href="/connexion.html">Connecte-toi en tant que prestataire</a> pour postuler.</p>`;
-      }
-
-      html += `</div>`;
-    });
-  }
-
-  html += `</body></html>`;
-
-  res.send(html);
+  res.send(
+    `<h1>Connexion échouée</h1><p>Email ou mot de passe incorrect.</p><a href="/connexion.html">Réessayer</a>`
+  );
 });
 
-// ============================================================
-// PARTIE 3 - L'ancien code, pas encore migre.
-// Express appelle cette fonction seulement si aucune route
-// ci-dessus n'a repondu. On migrera ces routes une par une.
-// ============================================================
-function ancienServeur(request, response) {
-  if (request.method === "POST" && request.url === "/connexion") {
-    let body = "";
+// --- Mon profil ----------------------------------------------------
+app.get("/mon-profil", exigerConnexion, (req, res) => {
+  const emailConnecte = req.emailConnecte;
 
-    request.on("data", (chunk) => {
-      body += chunk;
-    });
+  const utilisateurs = lireUtilisateurs();
+  const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
 
-    request.on("end", () => {
-      const donnees = querystring.parse(body);
-      const utilisateurs = lireUtilisateurs();
+  let sectionSupplementaire = "";
 
-      const emailSaisi = (donnees.email || "").trim().toLowerCase();
-      const utilisateurTrouve = utilisateurs.find(
-        (u) => (u.email || "").toLowerCase() === emailSaisi
-      );
+  if (utilisateur.role === "employeur") {
+    const mesAnnonces = lireAnnonces().filter((a) => a.employeurEmail === emailConnecte);
+    const toutesCandidatures = lireCandidatures();
 
-      if (utilisateurTrouve && verifierMotDePasse(donnees.motdepasse, utilisateurTrouve.motdepasse)) {
-        const token = genererToken();
-        sessions[token] = utilisateurTrouve.email;
+    sectionSupplementaire += `<h2>Mes annonces</h2>`;
 
-        response.writeHead(200, {
-          "Content-Type": "text/html; charset=utf-8",
-          "Set-Cookie": `session=${token}; HttpOnly; Path=/`,
-        });
-        response.end(`<h1>Bienvenue ${echapper(utilisateurTrouve.nom)} !</h1><p>Connexion réussie en tant que ${echapper(utilisateurTrouve.role)}.</p><a href="/mon-profil">Voir mon profil</a>`);
-      } else {
-        response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-        response.end(`<h1>Connexion échouée</h1><p>Email ou mot de passe incorrect.</p><a href="/connexion.html">Réessayer</a>`);
-      }
-    });
+    if (mesAnnonces.length === 0) {
+      sectionSupplementaire += `<p>Tu n'as publie aucune annonce.</p>`;
+    } else {
+      mesAnnonces.forEach((annonce) => {
+        sectionSupplementaire += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
+          <p><strong>${echapper(annonce.titre)}</strong></p>`;
 
-    return;
+        const candidaturesPourAnnonce = toutesCandidatures.filter((c) => String(c.annonceId) === String(annonce.id));
+
+        if (candidaturesPourAnnonce.length === 0) {
+          sectionSupplementaire += `<p>Aucune candidature pour l'instant.</p>`;
+        } else {
+          candidaturesPourAnnonce.forEach((candidature) => {
+            const prestataire = utilisateurs.find((u) => u.email === candidature.prestataireEmail);
+            sectionSupplementaire += `<div style="border-top:1px solid #eee; padding-top:8px; margin-top:8px;">
+              <p>${echapper(prestataire ? prestataire.nom : "Prestataire inconnu")} - Statut : ${echapper(candidature.statut)}</p>`;
+
+            if (candidature.statut === "en attente") {
+              sectionSupplementaire += `
+                <form action="/candidatures/statut" method="POST" style="display:inline;">
+                  <input type="hidden" name="candidatureId" value="${echapper(candidature.id)}">
+                  <input type="hidden" name="statut" value="acceptee">
+                  <button type="submit">Accepter</button>
+                </form>
+                <form action="/candidatures/statut" method="POST" style="display:inline;">
+                  <input type="hidden" name="candidatureId" value="${echapper(candidature.id)}">
+                  <input type="hidden" name="statut" value="refusee">
+                  <button type="submit">Refuser</button>
+                </form>`;
+            }
+
+            sectionSupplementaire += `</div>`;
+          });
+        }
+
+        sectionSupplementaire += `</div>`;
+      });
+    }
   }
 
-  if (request.method === "GET" && request.url === "/mon-profil") {
-    const emailConnecte = trouverEmailConnecte(request);
+  if (utilisateur.role === "prestataire") {
+    const mesCandidatures = lireCandidatures().filter((c) => c.prestataireEmail === emailConnecte);
+    const toutesAnnonces = lireAnnonces();
 
-    if (!emailConnecte) {
-      response.writeHead(302, { "Location": "/connexion.html" });
-      response.end();
-      return;
+    sectionSupplementaire += `<h2>Mes candidatures</h2>`;
+
+    if (mesCandidatures.length === 0) {
+      sectionSupplementaire += `<p>Tu n'as postule a aucune annonce.</p>`;
+    } else {
+      mesCandidatures.forEach((candidature) => {
+        const annonce = toutesAnnonces.find((a) => String(a.id) === String(candidature.annonceId));
+        sectionSupplementaire += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
+          <p><strong>${echapper(annonce ? annonce.titre : "Annonce supprimee")}</strong></p>
+          <p>Statut : ${echapper(candidature.statut)}</p>
+        </div>`;
+      });
     }
+  }
 
-    const utilisateurs = lireUtilisateurs();
-    const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
+  // Le metier et le tarif ne concernent que les prestataires.
+  // Pour un employeur, ces deux lignes ne sont tout simplement pas construites.
+  let lignesPrestataire = "";
 
-    let sectionSupplementaire = "";
-
-    if (utilisateur.role === "employeur") {
-      const mesAnnonces = lireAnnonces().filter((a) => a.employeurEmail === emailConnecte);
-      const toutesCandidatures = lireCandidatures();
-
-      sectionSupplementaire += `<h2>Mes annonces</h2>`;
-
-      if (mesAnnonces.length === 0) {
-        sectionSupplementaire += `<p>Tu n'as publie aucune annonce.</p>`;
-      } else {
-        mesAnnonces.forEach((annonce) => {
-          sectionSupplementaire += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
-            <p><strong>${echapper(annonce.titre)}</strong></p>`;
-
-          const candidaturesPourAnnonce = toutesCandidatures.filter((c) => String(c.annonceId) === String(annonce.id));
-
-          if (candidaturesPourAnnonce.length === 0) {
-            sectionSupplementaire += `<p>Aucune candidature pour l'instant.</p>`;
-          } else {
-            candidaturesPourAnnonce.forEach((candidature) => {
-              const prestataire = utilisateurs.find((u) => u.email === candidature.prestataireEmail);
-              sectionSupplementaire += `<div style="border-top:1px solid #eee; padding-top:8px; margin-top:8px;">
-                <p>${echapper(prestataire ? prestataire.nom : "Prestataire inconnu")} - Statut : ${echapper(candidature.statut)}</p>`;
-
-              if (candidature.statut === "en attente") {
-                sectionSupplementaire += `
-                  <form action="/candidatures/statut" method="POST" style="display:inline;">
-                    <input type="hidden" name="candidatureId" value="${echapper(candidature.id)}">
-                    <input type="hidden" name="statut" value="acceptee">
-                    <button type="submit">Accepter</button>
-                  </form>
-                  <form action="/candidatures/statut" method="POST" style="display:inline;">
-                    <input type="hidden" name="candidatureId" value="${echapper(candidature.id)}">
-                    <input type="hidden" name="statut" value="refusee">
-                    <button type="submit">Refuser</button>
-                  </form>`;
-              }
-
-              sectionSupplementaire += `</div>`;
-            });
-          }
-
-          sectionSupplementaire += `</div>`;
-        });
-      }
-    }
-
-    if (utilisateur.role === "prestataire") {
-      const mesCandidatures = lireCandidatures().filter((c) => c.prestataireEmail === emailConnecte);
-      const toutesAnnonces = lireAnnonces();
-
-      sectionSupplementaire += `<h2>Mes candidatures</h2>`;
-
-      if (mesCandidatures.length === 0) {
-        sectionSupplementaire += `<p>Tu n'as postule a aucune annonce.</p>`;
-      } else {
-        mesCandidatures.forEach((candidature) => {
-          const annonce = toutesAnnonces.find((a) => String(a.id) === String(candidature.annonceId));
-          sectionSupplementaire += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
-            <p><strong>${echapper(annonce ? annonce.titre : "Annonce supprimee")}</strong></p>
-            <p>Statut : ${echapper(candidature.statut)}</p>
-          </div>`;
-        });
-      }
-    }
-
-    // Le metier et le tarif ne concernent que les prestataires.
-    // Pour un employeur, ces deux lignes ne sont tout simplement pas construites.
-    let lignesPrestataire = "";
-
-    if (utilisateur.role === "prestataire") {
-      lignesPrestataire = `
+  if (utilisateur.role === "prestataire") {
+    lignesPrestataire = `
         <p><strong>Métier :</strong> ${echapper(utilisateur.metier || "Non renseigné")}</p>
         <p><strong>Tarif :</strong> ${echapper(formaterTarif(utilisateur.tarif))}</p>`;
-    }
+  }
 
-    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    response.end(`
+  res.send(`
       <!DOCTYPE html>
       <html lang="fr">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PamConnect - Mon profil</title>
+        <title>PamConnect - Mon profil</title>
         <link rel="stylesheet" href="/style.css">
       </head>
       <body>
@@ -387,26 +335,20 @@ function ancienServeur(request, response) {
       </body>
       </html>
     `);
-    return;
+});
+
+// --- Publier une annonce (le formulaire) ---------------------------
+app.get("/publier-annonce", exigerConnexion, (req, res) => {
+  const utilisateurs = lireUtilisateurs();
+  const utilisateur = utilisateurs.find((u) => u.email === req.emailConnecte);
+
+  if (utilisateur.role !== "employeur") {
+    return res.status(403).send(
+      `<h1>Acces refuse</h1><p>Seuls les employeurs peuvent publier une annonce.</p><a href="/index.html">Retour a l'accueil</a>`
+    );
   }
 
-  if (request.method === "GET" && request.url === "/publier-annonce") {
-    const emailConnecte = trouverEmailConnecte(request);
-    if (!emailConnecte) {
-      response.writeHead(302, { "Location": "/connexion.html" });
-      response.end();
-      return;
-    }
-    const utilisateurs = lireUtilisateurs();
-    const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
-
-    if (utilisateur.role !== "employeur") {
-      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      response.end(`<h1>Acces refuse</h1><p>Seuls les employeurs peuvent publier une annonce.</p><a href="/index.html">Retour a l'accueil</a>`);
-      return;
-    }
-    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    response.end(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+  res.send(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>PamConnect - Publier une annonce</title><link rel="stylesheet" href="/style.css"></head><body>
       <nav>
@@ -443,128 +385,163 @@ function ancienServeur(request, response) {
         <button type="submit">Publier</button>
       </form>
     </body></html>`);
-    return;
-  }
+});
 
-  if (request.method === "POST" && request.url === "/annonces") {
-    const emailConnecte = trouverEmailConnecte(request);
-    if (!emailConnecte) {
-      response.writeHead(302, { "Location": "/connexion.html" });
-      response.end();
-      return;
-    }
-    let body = "";
-    request.on("data", (chunk) => { body += chunk; });
-    request.on("end", () => {
-      const donnees = querystring.parse(body);
-      const nouvelleAnnonce = {
-        id: Date.now(),
-        employeurEmail: emailConnecte,
-        titre: donnees.titre,
-        description: donnees.description,
-        metier: donnees.metier,
-        arrondissement: donnees.arrondissement,
-      };
-      const annonces = lireAnnonces();
-      annonces.push(nouvelleAnnonce);
-      sauvegarderAnnonces(annonces);
+// --- Enregistrer une annonce ---------------------------------------
+app.post("/annonces", exigerConnexion, lireFormulaire, (req, res) => {
+  const donnees = req.body;
 
-      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      response.end(`<h1>Annonce publiee !</h1><p>Ton annonce "${echapper(donnees.titre)}" a bien ete enregistree.</p><a href="/index.html">Retour a l'accueil</a>`);
-    });
-    return;
-  }
+  const nouvelleAnnonce = {
+    id: Date.now(),
+    employeurEmail: req.emailConnecte,
+    titre: donnees.titre,
+    description: donnees.description,
+    metier: donnees.metier,
+    arrondissement: donnees.arrondissement,
+  };
 
-  if (request.method === "POST" && request.url === "/candidatures") {
-    const emailConnecte = trouverEmailConnecte(request);
-    if (!emailConnecte) {
-      response.writeHead(302, { "Location": "/connexion.html" });
-      response.end();
-      return;
-    }
+  const annonces = lireAnnonces();
+  annonces.push(nouvelleAnnonce);
+  sauvegarderAnnonces(annonces);
+
+  res.send(
+    `<h1>Annonce publiee !</h1><p>Ton annonce "${echapper(donnees.titre)}" a bien ete enregistree.</p><a href="/index.html">Retour a l'accueil</a>`
+  );
+});
+
+// --- Liste des annonces --------------------------------------------
+app.get("/annonces", (req, res) => {
+  const emailConnecte = trouverEmailConnecte(req);
+  let role = null;
+  if (emailConnecte) {
     const utilisateurs = lireUtilisateurs();
     const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
-    if (!utilisateur || utilisateur.role !== "prestataire") {
-      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      response.end(`<h1>Acces refuse</h1><p>Seuls les prestataires peuvent postuler.</p><a href="/annonces">Retour aux annonces</a>`);
-      return;
-    }
-
-    let body = "";
-    request.on("data", (chunk) => { body += chunk; });
-    request.on("end", () => {
-      const donnees = querystring.parse(body);
-      const nouvelleCandidature = {
-        id: Date.now(),
-        annonceId: donnees.annonceId,
-        prestataireEmail: emailConnecte,
-        statut: "en attente",
-      };
-      const candidatures = lireCandidatures();
-      candidatures.push(nouvelleCandidature);
-      sauvegarderCandidatures(candidatures);
-
-      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      response.end(`<h1>Candidature envoyee !</h1><p>Ta candidature a bien ete enregistree.</p><a href="/annonces">Retour aux annonces</a>`);
-    });
-    return;
+    role = utilisateur ? utilisateur.role : null;
   }
 
-  if (request.method === "POST" && request.url === "/candidatures/statut") {
-    const emailConnecte = trouverEmailConnecte(request);
-    if (!emailConnecte) {
-      response.writeHead(302, { "Location": "/connexion.html" });
-      response.end();
-      return;
-    }
-    let body = "";
-    request.on("data", (chunk) => { body += chunk; });
-    request.on("end", () => {
-      const donnees = querystring.parse(body);
-      const candidatures = lireCandidatures();
-      const candidature = candidatures.find((c) => String(c.id) === String(donnees.candidatureId));
+  const annonces = lireAnnonces();
 
-      if (candidature) {
-        const annonces = lireAnnonces();
-        const annonce = annonces.find((a) => String(a.id) === String(candidature.annonceId));
-        if (annonce && annonce.employeurEmail === emailConnecte) {
-          candidature.statut = donnees.statut;
-          sauvegarderCandidatures(candidatures);
-        }
+  let html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>PamConnect - Annonces</title><link rel="stylesheet" href="/style.css"></head><body>
+      <nav>
+        <a href="/index.html">Accueil</a>
+        <a href="/employeur.html">Espace employeur</a>
+        <a href="/prestataire.html">Espace prestataire</a>
+        <a href="/recherche.html">Recherche</a>
+        <a href="/annonces">Annonces</a>
+        <a href="/inscription.html">Inscription</a>
+        <a href="/connexion.html">Connexion</a>
+        <a href="/mon-profil">Mon profil</a>
+      </nav>
+      <h1>Annonces disponibles</h1>`;
+
+  if (annonces.length === 0) {
+    html += `<p>Aucune annonce pour le moment.</p>`;
+  } else {
+    annonces.forEach((a) => {
+      html += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
+          <p><strong>${echapper(a.titre)}</strong></p>
+          <p>${echapper(a.description)}</p>
+          <p>Metier : ${echapper(a.metier)}</p>
+          <p>Arrondissement : ${echapper(a.arrondissement)}</p>`;
+
+      if (role === "prestataire") {
+        html += `<form action="/candidatures" method="POST">
+            <input type="hidden" name="annonceId" value="${echapper(a.id)}">
+            <button type="submit">Postuler</button>
+          </form>`;
+      } else {
+        html += `<p><a href="/connexion.html">Connecte-toi en tant que prestataire</a> pour postuler.</p>`;
       }
 
-      response.writeHead(302, { "Location": "/mon-profil" });
-      response.end();
+      html += `</div>`;
     });
-    return;
   }
 
-  if (request.method === "GET" && (request.url === "/recherche" || request.url.startsWith("/recherche?"))) {
-    const urlObjet = new URL(request.url, `http://${request.headers.host}`);
-    const metierRecherche = (urlObjet.searchParams.get("metier") || "").toLowerCase();
-    const latEmployeur = parseFloat(urlObjet.searchParams.get("latitude"));
-    const lonEmployeur = parseFloat(urlObjet.searchParams.get("longitude"));
+  html += `</body></html>`;
 
-    const utilisateurs = lireUtilisateurs();
-    let prestataires = utilisateurs.filter((u) => u.role === "prestataire");
+  res.send(html);
+});
 
-    if (metierRecherche) {
-      prestataires = prestataires.filter((p) =>
-        (p.metier || "").toLowerCase().includes(metierRecherche)
-      );
+// --- Postuler a une annonce ----------------------------------------
+app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
+  const utilisateurs = lireUtilisateurs();
+  const utilisateur = utilisateurs.find((u) => u.email === req.emailConnecte);
+
+  if (!utilisateur || utilisateur.role !== "prestataire") {
+    return res.status(403).send(
+      `<h1>Acces refuse</h1><p>Seuls les prestataires peuvent postuler.</p><a href="/annonces">Retour aux annonces</a>`
+    );
+  }
+
+  const donnees = req.body;
+
+  const nouvelleCandidature = {
+    id: Date.now(),
+    annonceId: donnees.annonceId,
+    prestataireEmail: req.emailConnecte,
+    statut: "en attente",
+  };
+
+  const candidatures = lireCandidatures();
+  candidatures.push(nouvelleCandidature);
+  sauvegarderCandidatures(candidatures);
+
+  res.send(
+    `<h1>Candidature envoyee !</h1><p>Ta candidature a bien ete enregistree.</p><a href="/annonces">Retour aux annonces</a>`
+  );
+});
+
+// --- Accepter ou refuser une candidature ---------------------------
+app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => {
+  const donnees = req.body;
+  const candidatures = lireCandidatures();
+  const candidature = candidatures.find((c) => String(c.id) === String(donnees.candidatureId));
+
+  if (candidature) {
+    const annonces = lireAnnonces();
+    const annonce = annonces.find((a) => String(a.id) === String(candidature.annonceId));
+
+    // On ne change le statut que si l'annonce appartient bien
+    // a la personne connectee.
+    if (annonce && annonce.employeurEmail === req.emailConnecte) {
+      candidature.statut = donnees.statut;
+      sauvegarderCandidatures(candidatures);
     }
+  }
 
-    if (!isNaN(latEmployeur) && !isNaN(lonEmployeur)) {
-      prestataires = prestataires
-        .filter((p) => p.latitude && p.longitude)
-        .map((p) => ({
-          ...p,
-          distance: calculerDistanceKm(latEmployeur, lonEmployeur, parseFloat(p.latitude), parseFloat(p.longitude)),
-        }))
-        .sort((a, b) => a.distance - b.distance);
-    }
+  res.redirect("/mon-profil");
+});
 
-    let html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+// --- Recherche de prestataires -------------------------------------
+app.get("/recherche", (req, res) => {
+  // req.query contient deja les parametres de l'adresse :
+  // /recherche?metier=menage&latitude=3.8  ->  { metier: "menage", latitude: "3.8" }
+  const metierRecherche = (req.query.metier || "").toLowerCase();
+  const latEmployeur = parseFloat(req.query.latitude);
+  const lonEmployeur = parseFloat(req.query.longitude);
+
+  const utilisateurs = lireUtilisateurs();
+  let prestataires = utilisateurs.filter((u) => u.role === "prestataire");
+
+  if (metierRecherche) {
+    prestataires = prestataires.filter((p) =>
+      (p.metier || "").toLowerCase().includes(metierRecherche)
+    );
+  }
+
+  if (!isNaN(latEmployeur) && !isNaN(lonEmployeur)) {
+    prestataires = prestataires
+      .filter((p) => p.latitude && p.longitude)
+      .map((p) => ({
+        ...p,
+        distance: calculerDistanceKm(latEmployeur, lonEmployeur, parseFloat(p.latitude), parseFloat(p.longitude)),
+      }))
+      .sort((a, b) => a.distance - b.distance);
+  }
+
+  let html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>PamConnect - Resultats</title><link rel="stylesheet" href="/style.css"></head><body>
       <nav>
@@ -577,35 +554,32 @@ function ancienServeur(request, response) {
       </nav>
       <h1>Resultats de recherche</h1>`;
 
-    if (prestataires.length === 0) {
-      html += `<p>Aucun prestataire trouve.</p>`;
-    } else {
-      prestataires.forEach((p) => {
-        const distanceTexte = p.distance !== undefined ? `${p.distance.toFixed(1)} km` : "Distance inconnue";
-        html += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
+  if (prestataires.length === 0) {
+    html += `<p>Aucun prestataire trouve.</p>`;
+  } else {
+    prestataires.forEach((p) => {
+      const distanceTexte = p.distance !== undefined ? `${p.distance.toFixed(1)} km` : "Distance inconnue";
+      html += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
           <p><strong>${echapper(p.nom)}</strong> - ${echapper(p.metier)}</p>
           <p>${echapper(p.arrondissement)}, ${echapper(p.quartier || "")}</p>
           <p>Tarif : ${echapper(formaterTarif(p.tarif))}</p>
           <p>Distance : ${distanceTexte}</p>
         </div>`;
-      });
-    }
-
-    html += `<a href="/recherche.html">Nouvelle recherche</a></body></html>`;
-
-    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    response.end(html);
-    return;
+    });
   }
 
-  // Ni Express ni l'ancien code n'ont su repondre : la page n'existe pas.
-  response.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
-  response.end("<h1>404 - Page introuvable</h1>");
-}
+  html += `<a href="/recherche.html">Nouvelle recherche</a></body></html>`;
 
-// On branche l'ancien code EN DERNIER : Express essaie ses routes dans
-// l'ordre ou elles sont ecrites, et ne vient ici qu'en dernier recours.
-app.use(ancienServeur);
+  res.send(html);
+});
+
+// ============================================================
+// PARTIE 3 - Aucune route n'a repondu : la page n'existe pas.
+// Ce bloc doit imperativement rester EN DERNIER.
+// ============================================================
+app.use((req, res) => {
+  res.status(404).send("<h1>404 - Page introuvable</h1>");
+});
 
 app.listen(PORT, () => {
   console.log(`Serveur PamConnect démarré : http://localhost:${PORT}`);
