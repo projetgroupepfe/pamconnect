@@ -7,7 +7,12 @@
   <% } else { %>
     <% prestataires.forEach(function (prestataire) { %>
       <div class="carte">
-        <p><strong><%= prestataire.nom %></strong> - <%= prestataire.metier %></p>
+        <p>
+          <strong><%= prestataire.nom %></strong> - <%= prestataire.metier %>
+          <% if (prestataire.statut_verification === "verifie") { %>
+            <span class="badge badge-verifie">Identité vérifiée</span>
+          <% } %>
+        </p>
         <p><%= prestataire.arrondissement %>, <%= prestataire.quartier || "" %></p>
         <p>Tarif : <%= formaterTarif(prestataire.tarif) %></p>
         <p>Distance : <%= prestataire.distanceTexte %></p>

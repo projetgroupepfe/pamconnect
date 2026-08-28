@@ -42,6 +42,20 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
   latitude        REAL,
   longitude       REAL,
 
+  -- --- Verification d'identite (prestataires) ---
+  -- Les documents eux-memes ne sont PAS en base : seuls leurs noms de
+  -- fichier y figurent, le temps de la verification. Ils sont effaces
+  -- du disque des que le dossier est valide (principe de minimisation).
+  statut_verification TEXT NOT NULL DEFAULT 'non soumis'
+                      CHECK (statut_verification IN ('non soumis', 'en attente', 'verifie', 'refuse')),
+  cni_fichier     TEXT,
+  casier_fichier  TEXT,
+  verifie_le      TEXT,
+  motif_refus     TEXT,
+
+  -- Membre de l'equipe projet, autorise a valider les dossiers.
+  est_admin       INTEGER NOT NULL DEFAULT 0 CHECK (est_admin IN (0, 1)),
+
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 

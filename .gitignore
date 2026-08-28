@@ -3,3 +3,4 @@ node_modules/
 data/annonces.json
 data/candidatures.json
 data/*.db
+data/documents/

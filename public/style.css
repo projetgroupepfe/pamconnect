@@ -61,3 +61,17 @@ nav a:hover {
 .en-ligne {
   display: inline;
 }
+
+/* Pastilles de statut de verification */
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: bold;
+  white-space: nowrap;
+}
+.badge-verifie     { background-color: #e2f2e7; color: #1c6334; }
+.badge-en-attente  { background-color: #fbf0da; color: #8a5a05; }
+.badge-refuse      { background-color: #fae2e5; color: #92222f; }
+.badge-non-soumis  { background-color: #eaeef2; color: #52606c; }

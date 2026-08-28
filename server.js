@@ -2,6 +2,8 @@ const express = require("express");
 const path = require("path");
 const crypto = require("crypto");
 const Database = require("better-sqlite3");
+const multer = require("multer");
+const fs = require("fs");
 
 // "app" est notre application Express : c'est elle qui recoit
 // toutes les requetes et decide quelle route doit y repondre.
@@ -114,6 +116,16 @@ const requetes = {
   changerStatutCandidature: db.prepare(`
     UPDATE candidatures SET statut = ? WHERE id = ?
   `),
+
+  enregistrerDocuments: db.prepare(`
+    UPDATE utilisateurs
+    SET cni_fichier = @cni,
+        casier_fichier = @casier,
+        statut_verification = 'en attente',
+        verifie_le = NULL,
+        motif_refus = NULL
+    WHERE id = @id
+  `),
 };
 
 // ============================================================
@@ -145,8 +157,67 @@ function formaterTarif(tarif) {
   return valeur + " FCFA";
 }
 
+// Traduit le statut technique en texte lisible par un humain.
+function libelleVerification(statut) {
+  if (statut === "verifie") return "Identité vérifiée";
+  if (statut === "en attente") return "Vérification en cours";
+  if (statut === "refuse") return "Vérification refusée";
+  return "Identité non vérifiée";
+}
+
 // app.locals : disponible dans TOUTES les vues .ejs sans le repasser.
 app.locals.formaterTarif = formaterTarif;
+app.locals.libelleVerification = libelleVerification;
+
+// ============================================================
+// RECEPTION DES DOCUMENTS DE VERIFICATION
+// ============================================================
+// Les fichiers sont ranges dans data/documents/, c'est-a-dire
+// EN DEHORS du dossier public/. Aucune adresse web ne permet donc
+// de les telecharger : seule une route qui verifie qui demande
+// pourra les servir (etape suivante).
+const DOSSIER_DOCUMENTS = path.join(__dirname, "data", "documents");
+fs.mkdirSync(DOSSIER_DOCUMENTS, { recursive: true });
+
+const EXTENSIONS_AUTORISEES = [".jpg", ".jpeg", ".png", ".pdf"];
+const TAILLE_MAX_OCTETS = 5 * 1024 * 1024; // 5 Mo
+
+const recevoirDocuments = multer({
+  storage: multer.diskStorage({
+    destination: (req, fichier, suite) => suite(null, DOSSIER_DOCUMENTS),
+
+    // Le nom d'origine n'est JAMAIS reutilise : il pourrait contenir
+    // un chemin ("../../server.js") ou ecraser le fichier d'un autre
+    // utilisateur. On tire un nom au hasard, on ne garde que l'extension.
+    filename: (req, fichier, suite) => {
+      const extension = path.extname(fichier.originalname).toLowerCase();
+      suite(null, crypto.randomBytes(16).toString("hex") + extension);
+    },
+  }),
+
+  limits: { fileSize: TAILLE_MAX_OCTETS, files: 2 },
+
+  fileFilter: (req, fichier, suite) => {
+    const extension = path.extname(fichier.originalname).toLowerCase();
+    if (!EXTENSIONS_AUTORISEES.includes(extension)) {
+      return suite(new Error("TYPE_NON_AUTORISE"));
+    }
+    suite(null, true);
+  },
+}).fields([
+  { name: "cni", maxCount: 1 },
+  { name: "casier", maxCount: 1 },
+]);
+
+// Efface un fichier sans faire planter le serveur s'il n'existe plus.
+function supprimerDocument(nomFichier) {
+  if (!nomFichier) return;
+  try {
+    fs.unlinkSync(path.join(DOSSIER_DOCUMENTS, nomFichier));
+  } catch (erreur) {
+    console.log("Suppression impossible :", nomFichier, erreur.code);
+  }
+}
 
 function calculerDistanceKm(lat1, lon1, lat2, lon2) {
   const rayonTerre = 6371;
@@ -438,6 +509,96 @@ app.get("/recherche", (req, res) => {
   res.render("recherche", {
     titre: "Resultats",
     prestataires: resultats,
+  });
+});
+
+// --- Verification d'identite : le formulaire -----------------------
+app.get("/verification", exigerConnexion, (req, res) => {
+  if (req.utilisateur.role !== "prestataire") {
+    return res.status(403).render("message", {
+      titre: "Acces refuse",
+      texte: "Seuls les prestataires ont besoin d'une verification d'identite.",
+      liens: [{ url: "/mon-profil", texte: "Retour a mon profil" }],
+    });
+  }
+
+  res.render("verification", {
+    titre: "Vérification d'identité",
+    utilisateur: req.utilisateur,
+    tailleMaxMo: TAILLE_MAX_OCTETS / 1024 / 1024,
+    extensions: EXTENSIONS_AUTORISEES.join(", "),
+  });
+});
+
+// --- Verification d'identite : l'envoi des documents ---------------
+app.post("/verification", exigerConnexion, (req, res) => {
+  if (req.utilisateur.role !== "prestataire") {
+    return res.status(403).render("message", {
+      titre: "Acces refuse",
+      texte: "Seuls les prestataires peuvent envoyer ces documents.",
+      liens: [{ url: "/mon-profil", texte: "Retour a mon profil" }],
+    });
+  }
+
+  if (req.utilisateur.statut_verification === "verifie") {
+    return res.status(409).render("message", {
+      titre: "Deja verifie",
+      texte: "Ton identite a deja ete validee, il n'y a rien a renvoyer.",
+      liens: [{ url: "/mon-profil", texte: "Retour a mon profil" }],
+    });
+  }
+
+  // On appelle multer nous-memes pour pouvoir afficher un message clair
+  // au lieu de laisser une erreur brute remonter jusqu'a l'utilisateur.
+  recevoirDocuments(req, res, (erreur) => {
+    const recus = req.files || {};
+    const cni = recus.cni ? recus.cni[0] : null;
+    const casier = recus.casier ? recus.casier[0] : null;
+
+    function refuser(titre, texte) {
+      // Un envoi refuse ne doit laisser aucun fichier sur le disque.
+      if (cni) supprimerDocument(cni.filename);
+      if (casier) supprimerDocument(casier.filename);
+      return res.status(400).render("message", {
+        titre,
+        texte,
+        liens: [{ url: "/verification", texte: "Reessayer" }],
+      });
+    }
+
+    if (erreur) {
+      if (erreur.code === "LIMIT_FILE_SIZE") {
+        return refuser("Fichier trop volumineux",
+          `Chaque document doit peser moins de ${TAILLE_MAX_OCTETS / 1024 / 1024} Mo.`);
+      }
+      if (erreur.message === "TYPE_NON_AUTORISE") {
+        return refuser("Format non accepte",
+          `Formats acceptes : ${EXTENSIONS_AUTORISEES.join(", ")}.`);
+      }
+      return refuser("Envoi impossible", "Le fichier n'a pas pu etre recu. Reessaie.");
+    }
+
+    if (!cni || !casier) {
+      return refuser("Deux documents sont necessaires",
+        "Il faut envoyer la piece d'identite ET l'extrait de casier judiciaire.");
+    }
+
+    // Un envoi precedent est remplace : on efface les anciens fichiers.
+    supprimerDocument(req.utilisateur.cni_fichier);
+    supprimerDocument(req.utilisateur.casier_fichier);
+
+    requetes.enregistrerDocuments.run({
+      cni: cni.filename,
+      casier: casier.filename,
+      id: req.utilisateur.id,
+    });
+
+    res.render("message", {
+      titre: "Documents envoyes",
+      texte: "Ton dossier est en cours de verification par notre equipe. " +
+             "Tu seras visible comme verifie des qu'il sera valide.",
+      liens: [{ url: "/mon-profil", texte: "Retour a mon profil" }],
+    });
   });
 });
 

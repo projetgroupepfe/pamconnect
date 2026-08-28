@@ -12,6 +12,29 @@
   <% if (utilisateur.role === "prestataire") { %>
     <p><strong>Métier :</strong> <%= utilisateur.metier || "Non renseigné" %></p>
     <p><strong>Tarif :</strong> <%= formaterTarif(utilisateur.tarif) %></p>
+
+    <p>
+      <strong>Vérification :</strong>
+      <span class="badge badge-<%= utilisateur.statut_verification.replace(/ /g, "-") %>">
+        <%= libelleVerification(utilisateur.statut_verification) %>
+      </span>
+    </p>
+
+    <% if (utilisateur.statut_verification === "refuse" && utilisateur.motif_refus) { %>
+      <p>Motif du refus : <%= utilisateur.motif_refus %></p>
+    <% } %>
+
+    <% if (utilisateur.statut_verification !== "verifie") { %>
+      <p>
+        <a href="/verification">
+          <% if (utilisateur.statut_verification === "non soumis") { %>
+            Faire vérifier mon identité
+          <% } else { %>
+            Voir ou modifier mon dossier de vérification
+          <% } %>
+        </a>
+      </p>
+    <% } %>
   <% } %>
 
   <%# ---- Cote employeur : ses annonces et les candidatures recues ---- %>
