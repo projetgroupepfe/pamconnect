@@ -2,3 +2,4 @@ data/utilisateurs.json
 node_modules/
 data/annonces.json
 data/candidatures.json
+data/*.db
