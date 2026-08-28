@@ -1,8 +1,17 @@
-const http = require("http");
+const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const querystring = require("querystring");
 const crypto = require("crypto");
+
+// "app" est notre application Express : c'est elle qui recoit maintenant
+// toutes les requetes et decide quelle route doit y repondre.
+const app = express();
+
+// Petit outil fourni par Express : il lit le corps d'une requete de formulaire
+// et range le resultat dans req.body. Il remplace le "panier" que l'on
+// remplissait a la main avec request.on("data") puis querystring.parse().
+const lireFormulaire = express.urlencoded({ extended: false });
 
 const PORT = 3000;
 const FICHIER_UTILISATEURS = path.join(__dirname, "data", "utilisateurs.json");
@@ -13,12 +22,6 @@ const sessions = {};
 function genererToken() {
   return crypto.randomBytes(32).toString("hex");
 }
-
-const MIME_TYPES = {
-  ".html": "text/html; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-};
 
 function lireUtilisateurs() {
   if (!fs.existsSync(FICHIER_UTILISATEURS)) {
@@ -80,6 +83,15 @@ function echapper(valeur) {
     .replace(/'/g, "&#39;");
 }
 
+// Decide comment afficher un tarif. Un prestataire peut laisser le champ vide :
+// on affiche alors "A negocier" plutot qu'un vide ou un "Non renseigne" peu clair.
+// C'est LE SEUL endroit a modifier si l'equipe change d'avis sur ce texte.
+function formaterTarif(tarif) {
+  const valeur = String(tarif === null || tarif === undefined ? "" : tarif).trim();
+  if (valeur === "") return "À négocier";
+  return valeur + " FCFA";
+}
+
 function calculerDistanceKm(lat1, lon1, lat2, lon2) {
   const rayonTerre = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -101,55 +113,125 @@ function trouverEmailConnecte(request) {
   return sessions[token] || null;
 }
 
-const server = http.createServer((request, response) => {
-  if (request.method === "POST" && request.url === "/inscription") {
-    let body = "";
+// ============================================================
+// PARTIE 1 - Les fichiers du dossier public/ (HTML, CSS, images)
+// express.static les sert tout seul, et refuse deja les chemins
+// qui essaient de sortir du dossier.
+// ============================================================
+app.use(express.static(path.join(__dirname, "public")));
 
-    request.on("data", (chunk) => {
-      body += chunk;
-    });
+// ============================================================
+// PARTIE 2 - Les routes deja migrees vers Express
+// ============================================================
 
-    request.on("end", () => {
-      const donnees = querystring.parse(body);
-      const emailNormalise = (donnees.email || "").trim().toLowerCase();
+app.post("/inscription", lireFormulaire, (req, res) => {
+  const donnees = req.body;
+  const emailNormalise = (donnees.email || "").trim().toLowerCase();
 
-      const utilisateurs = lireUtilisateurs();
-      const dejaInscrit = utilisateurs.find(
-        (u) => (u.email || "").toLowerCase() === emailNormalise
-      );
+  const utilisateurs = lireUtilisateurs();
+  const dejaInscrit = utilisateurs.find(
+    (u) => (u.email || "").toLowerCase() === emailNormalise
+  );
 
-      if (dejaInscrit) {
-        response.writeHead(409, { "Content-Type": "text/html; charset=utf-8" });
-        response.end(`<h1>Email deja utilise</h1><p>Un compte existe deja avec l'adresse ${echapper(donnees.email)}.</p><a href="/connexion.html">Se connecter</a> - <a href="/inscription.html">Reessayer</a>`);
-        return;
-      }
-
-      const nouvelUtilisateur = {
-        id: Date.now(),
-        role: donnees.role,
-        nom: donnees.nom,
-        email: emailNormalise,
-        motdepasse: hacherMotDePasse(donnees.motdepasse),
-        arrondissement: donnees.arrondissement,
-        quartier: donnees.quartier || null,
-        metier: donnees.metier || null,
-        tarif: donnees.tarif || null,
-        latitude: donnees.latitude || null,
-        longitude: donnees.longitude || null,
-      };
-
-      utilisateurs.push(nouvelUtilisateur);
-      sauvegarderUtilisateurs(utilisateurs);
-
-      console.log("Nouvel utilisateur enregistré :", nouvelUtilisateur);
-
-      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      response.end(`<h1>Merci ${echapper(donnees.nom)} !</h1><p>Ton inscription en tant que ${echapper(donnees.role)} a bien été enregistrée.</p><a href="/index.html">Retour à l'accueil</a>`);
-    });
-
-    return;
+  if (dejaInscrit) {
+    return res.status(409).send(
+      `<h1>Email deja utilise</h1><p>Un compte existe deja avec l'adresse ${echapper(donnees.email)}.</p><a href="/connexion.html">Se connecter</a> - <a href="/inscription.html">Reessayer</a>`
+    );
   }
 
+  // Un prestataire sans metier n'apparaitrait jamais dans une recherche.
+  // On refuse donc, meme si la requete ne vient pas de notre formulaire.
+  // Le tarif, lui, reste facultatif : il devient "A negocier".
+  if (donnees.role === "prestataire" && !String(donnees.metier || "").trim()) {
+    return res.status(400).send(
+      `<h1>Métier obligatoire</h1><p>Un prestataire doit indiquer son métier pour être visible dans les recherches.</p><a href="/inscription.html">Retour au formulaire</a>`
+    );
+  }
+
+  const nouvelUtilisateur = {
+    id: Date.now(),
+    role: donnees.role,
+    nom: donnees.nom,
+    email: emailNormalise,
+    motdepasse: hacherMotDePasse(donnees.motdepasse),
+    arrondissement: donnees.arrondissement,
+    quartier: donnees.quartier || null,
+    metier: donnees.metier || null,
+    tarif: donnees.tarif || null,
+    latitude: donnees.latitude || null,
+    longitude: donnees.longitude || null,
+  };
+
+  utilisateurs.push(nouvelUtilisateur);
+  sauvegarderUtilisateurs(utilisateurs);
+
+  console.log("Nouvel utilisateur enregistr\u00e9 :", nouvelUtilisateur);
+
+  res.send(
+    `<h1>Merci ${echapper(donnees.nom)} !</h1><p>Ton inscription en tant que ${echapper(donnees.role)} a bien \u00e9t\u00e9 enregistr\u00e9e.</p><a href="/index.html">Retour \u00e0 l'accueil</a>`
+  );
+});
+
+app.get("/annonces", (req, res) => {
+  const emailConnecte = trouverEmailConnecte(req);
+  let role = null;
+  if (emailConnecte) {
+    const utilisateurs = lireUtilisateurs();
+    const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
+    role = utilisateur ? utilisateur.role : null;
+  }
+
+  const annonces = lireAnnonces();
+
+  let html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PamConnect - Annonces</title><link rel="stylesheet" href="/style.css"></head><body>
+    <nav>
+      <a href="/index.html">Accueil</a>
+      <a href="/employeur.html">Espace employeur</a>
+      <a href="/prestataire.html">Espace prestataire</a>
+      <a href="/recherche.html">Recherche</a>
+      <a href="/annonces">Annonces</a>
+      <a href="/inscription.html">Inscription</a>
+      <a href="/connexion.html">Connexion</a>
+      <a href="/mon-profil">Mon profil</a>
+    </nav>
+    <h1>Annonces disponibles</h1>`;
+
+  if (annonces.length === 0) {
+    html += `<p>Aucune annonce pour le moment.</p>`;
+  } else {
+    annonces.forEach((a) => {
+      html += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
+        <p><strong>${echapper(a.titre)}</strong></p>
+        <p>${echapper(a.description)}</p>
+        <p>Metier : ${echapper(a.metier)}</p>
+        <p>Arrondissement : ${echapper(a.arrondissement)}</p>`;
+
+      if (role === "prestataire") {
+        html += `<form action="/candidatures" method="POST">
+          <input type="hidden" name="annonceId" value="${echapper(a.id)}">
+          <button type="submit">Postuler</button>
+        </form>`;
+      } else {
+        html += `<p><a href="/connexion.html">Connecte-toi en tant que prestataire</a> pour postuler.</p>`;
+      }
+
+      html += `</div>`;
+    });
+  }
+
+  html += `</body></html>`;
+
+  res.send(html);
+});
+
+// ============================================================
+// PARTIE 3 - L'ancien code, pas encore migre.
+// Express appelle cette fonction seulement si aucune route
+// ci-dessus n'a repondu. On migrera ces routes une par une.
+// ============================================================
+function ancienServeur(request, response) {
   if (request.method === "POST" && request.url === "/connexion") {
     let body = "";
 
@@ -263,6 +345,16 @@ const server = http.createServer((request, response) => {
       }
     }
 
+    // Le metier et le tarif ne concernent que les prestataires.
+    // Pour un employeur, ces deux lignes ne sont tout simplement pas construites.
+    let lignesPrestataire = "";
+
+    if (utilisateur.role === "prestataire") {
+      lignesPrestataire = `
+        <p><strong>Métier :</strong> ${echapper(utilisateur.metier || "Non renseigné")}</p>
+        <p><strong>Tarif :</strong> ${echapper(formaterTarif(utilisateur.tarif))}</p>`;
+    }
+
     response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     response.end(`
       <!DOCTYPE html>
@@ -282,6 +374,7 @@ const server = http.createServer((request, response) => {
           <a href="/annonces">Annonces</a>
           <a href="/inscription.html">Inscription</a>
           <a href="/connexion.html">Connexion</a>
+          <a href="/mon-profil">Mon profil</a>
         </nav>
         <h1>Mon profil</h1>
         <p><strong>Nom :</strong> ${echapper(utilisateur.nom)}</p>
@@ -289,8 +382,7 @@ const server = http.createServer((request, response) => {
         <p><strong>Rôle :</strong> ${echapper(utilisateur.role)}</p>
         <p><strong>Arrondissement :</strong> ${echapper(utilisateur.arrondissement)}</p>
         <p><strong>Quartier :</strong> ${echapper(utilisateur.quartier || "Non renseigné")}</p>
-        <p><strong>Métier :</strong> ${echapper(utilisateur.metier || "Non renseigné")}</p>
-        <p><strong>Tarif :</strong> ${echapper(utilisateur.tarif || "Non renseigné")}</p>
+        ${lignesPrestataire}
         ${sectionSupplementaire}
       </body>
       </html>
@@ -380,62 +472,6 @@ const server = http.createServer((request, response) => {
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       response.end(`<h1>Annonce publiee !</h1><p>Ton annonce "${echapper(donnees.titre)}" a bien ete enregistree.</p><a href="/index.html">Retour a l'accueil</a>`);
     });
-    return;
-  }
-
-  if (request.method === "GET" && request.url === "/annonces") {
-    const emailConnecte = trouverEmailConnecte(request);
-    let role = null;
-    if (emailConnecte) {
-      const utilisateurs = lireUtilisateurs();
-      const utilisateur = utilisateurs.find((u) => u.email === emailConnecte);
-      role = utilisateur ? utilisateur.role : null;
-    }
-
-    const annonces = lireAnnonces();
-
-    let html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>PamConnect - Annonces</title><link rel="stylesheet" href="/style.css"></head><body>
-      <nav>
-        <a href="/index.html">Accueil</a>
-        <a href="/employeur.html">Espace employeur</a>
-        <a href="/prestataire.html">Espace prestataire</a>
-        <a href="/recherche.html">Recherche</a>
-        <a href="/annonces">Annonces</a>
-        <a href="/inscription.html">Inscription</a>
-        <a href="/connexion.html">Connexion</a>
-        <a href="/mon-profil">Mon profil</a>
-      </nav>
-      <h1>Annonces disponibles</h1>`;
-
-    if (annonces.length === 0) {
-      html += `<p>Aucune annonce pour le moment.</p>`;
-    } else {
-      annonces.forEach((a) => {
-        html += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
-          <p><strong>${echapper(a.titre)}</strong></p>
-          <p>${echapper(a.description)}</p>
-          <p>Metier : ${echapper(a.metier)}</p>
-          <p>Arrondissement : ${echapper(a.arrondissement)}</p>`;
-
-        if (role === "prestataire") {
-          html += `<form action="/candidatures" method="POST">
-            <input type="hidden" name="annonceId" value="${echapper(a.id)}">
-            <button type="submit">Postuler</button>
-          </form>`;
-        } else {
-          html += `<p><a href="/connexion.html">Connecte-toi en tant que prestataire</a> pour postuler.</p>`;
-        }
-
-        html += `</div>`;
-      });
-    }
-
-    html += `</body></html>`;
-
-    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    response.end(html);
     return;
   }
 
@@ -549,7 +585,7 @@ const server = http.createServer((request, response) => {
         html += `<div style="border:1px solid #ccc; margin:10px auto; padding:10px; max-width:400px;">
           <p><strong>${echapper(p.nom)}</strong> - ${echapper(p.metier)}</p>
           <p>${echapper(p.arrondissement)}, ${echapper(p.quartier || "")}</p>
-          <p>Tarif : ${echapper(p.tarif || "Non renseigne")}</p>
+          <p>Tarif : ${echapper(formaterTarif(p.tarif))}</p>
           <p>Distance : ${distanceTexte}</p>
         </div>`;
       });
@@ -562,34 +598,15 @@ const server = http.createServer((request, response) => {
     return;
   }
 
-  // On ne garde que le chemin de l'URL (sans les ?parametres), et on verifie
-  // que le fichier demande se trouve bien A L'INTERIEUR du dossier public.
-  const urlDemandee = new URL(request.url, `http://${request.headers.host}`);
-  const requestedPath = urlDemandee.pathname === "/" ? "/index.html" : urlDemandee.pathname;
+  // Ni Express ni l'ancien code n'ont su repondre : la page n'existe pas.
+  response.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+  response.end("<h1>404 - Page introuvable</h1>");
+}
 
-  const dossierPublic = path.join(__dirname, "public");
-  const filePath = path.join(dossierPublic, requestedPath);
+// On branche l'ancien code EN DERNIER : Express essaie ses routes dans
+// l'ordre ou elles sont ecrites, et ne vient ici qu'en dernier recours.
+app.use(ancienServeur);
 
-  if (!filePath.startsWith(dossierPublic + path.sep)) {
-    response.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
-    response.end("<h1>403 - Acces interdit</h1>");
-    return;
-  }
-
-  const extension = path.extname(filePath);
-  const contentType = MIME_TYPES[extension] || "text/plain";
-
-  fs.readFile(filePath, (error, content) => {
-    if (error) {
-      response.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
-      response.end("<h1>404 - Page introuvable</h1>");
-      return;
-    }
-    response.writeHead(200, { "Content-Type": contentType });
-    response.end(content);
-  });
-});
-
-server.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Serveur PamConnect démarré : http://localhost:${PORT}`);
 });
