@@ -210,9 +210,19 @@ function libelleVerification(statut) {
   return "Identité non vérifiée";
 }
 
+// Meme principe pour le statut d'une candidature : la base stocke une
+// valeur technique sans accent (comparaisons simples, contrainte CHECK),
+// et c'est l'affichage qui la traduit en francais correct.
+function libelleCandidature(statut) {
+  if (statut === "acceptee") return "Acceptée";
+  if (statut === "refusee") return "Refusée";
+  return "En attente";
+}
+
 // app.locals : disponible dans TOUTES les vues .ejs sans le repasser.
 app.locals.formaterTarif = formaterTarif;
 app.locals.libelleVerification = libelleVerification;
+app.locals.libelleCandidature = libelleCandidature;
 
 // ============================================================
 // RECEPTION DES DOCUMENTS DE VERIFICATION

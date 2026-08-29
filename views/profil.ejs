@@ -54,7 +54,7 @@
             <% annonce.candidatures.forEach(function (candidature) { %>
               <div class="candidature">
                 <p>
-                  <%= candidature.nomPrestataire %> - Statut : <%= candidature.statut %>
+                  <%= candidature.nomPrestataire %> - Statut : <%= libelleCandidature(candidature.statut) %>
                   <span class="badge badge-<%= candidature.verificationPrestataire.replace(/ /g, "-") %>">
                     <%= libelleVerification(candidature.verificationPrestataire) %>
                   </span>
@@ -100,7 +100,7 @@
       <% mesCandidatures.forEach(function (candidature) { %>
         <div class="carte">
           <p><strong><%= candidature.titreAnnonce %></strong></p>
-          <p>Statut : <%= candidature.statut %></p>
+          <p>Statut : <%= libelleCandidature(candidature.statut) %></p>
         </div>
       <% }); %>
     <% } %>
