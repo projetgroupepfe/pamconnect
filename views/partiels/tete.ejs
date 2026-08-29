@@ -1,6 +1,7 @@
-<%# Debut de page commun a TOUTES les vues : en-tete, logo, menu.   %>
-<%# Le menu s'adapte a la personne connectee (variable "moi",        %>
-<%# fournie a toutes les vues par server.js).                        %>
+<%# Debut de page commun a TOUTES les vues.
+    Sur telephone, le menu est une barre fixe en bas de l'ecran, comme
+    dans une application : chaque bouton porte une icone ET son mot.
+    Sur grand ecran, ce meme menu remonte dans l'en-tete (voir style.css). %>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -17,46 +18,44 @@
       <a class="logo" href="/">
         <%# Un bouclier avec une coche : la verification d'identite,
             qui est la promesse centrale de la plateforme. %>
-        <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-          <path d="M16 2.4 4.6 6.9v9.2c0 7 4.8 11.7 11.4 13.5 6.6-1.8 11.4-6.5 11.4-13.5V6.9L16 2.4Z" fill="#1F4E79"/>
-          <path d="m10.6 16.2 3.7 3.7 7.1-7.2" fill="none" stroke="#fff" stroke-width="2.6"
-                stroke-linecap="round" stroke-linejoin="round"/>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1F4E79"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true" focusable="false">
+          <path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.7 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.5 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1Z"/>
+          <path d="m9 12 2 2 4-4"/>
         </svg>
         <span>Pam<strong>Connect</strong></span>
       </a>
 
-      <nav class="menu">
-        <a href="/">Accueil</a>
-        <a href="/recherche">Rechercher</a>
-        <a href="/annonces">Annonces</a>
+      <nav class="menu" aria-label="Navigation principale">
+        <a href="/"><%- include("icone", { nom: "maison" }) %>Accueil</a>
+        <a href="/recherche"><%- include("icone", { nom: "recherche" }) %>Rechercher</a>
+        <a href="/annonces"><%- include("icone", { nom: "document" }) %>Annonces</a>
 
         <% if (locals.moi) { %>
-
-          <% if (moi.role === "employeur") { %>
-            <a href="/publier-annonce">Publier une annonce</a>
-          <% } %>
-
+          <a href="/mon-profil"><%- include("icone", { nom: "profil" }) %>Mon profil</a>
           <% if (moi.est_admin) { %>
-            <a href="/admin">Administration</a>
+            <a href="/admin"><%- include("icone", { nom: "equipe" }) %>Équipe</a>
           <% } %>
+        <% } else { %>
+          <a href="/connexion"><%- include("icone", { nom: "profil" }) %>Connexion</a>
+        <% } %>
+      </nav>
 
-          <span class="menu-separateur"></span>
-          <a href="/mon-profil">Mon profil</a>
-
+      <div class="entete-actions">
+        <% if (locals.moi) { %>
           <%# La deconnexion passe par un formulaire POST : une simple
               adresse GET pourrait etre declenchee a l'insu de la personne. %>
           <form action="/deconnexion" method="POST">
-            <button type="submit">Déconnexion</button>
+            <button type="submit" class="bouton-icone" title="Déconnexion">
+              <%- include("icone", { nom: "deconnexion" }) %>
+              <span class="lecture-ecran">Déconnexion</span>
+            </button>
           </form>
-
         <% } else { %>
-
-          <span class="menu-separateur"></span>
-          <a href="/connexion">Connexion</a>
-          <a class="principal" href="/inscription">Créer un compte</a>
-
+          <a class="bouton" href="/inscription">Créer un compte</a>
         <% } %>
-      </nav>
+      </div>
 
     </div>
   </header>

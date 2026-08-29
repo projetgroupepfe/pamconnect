@@ -1,35 +1,47 @@
 <%- include("partiels/tete") %>
 
   <section class="accroche">
-    <div class="accroche-texte">
-      <p class="sur-titre">Yaoundé</p>
-      <h1>Trouvez du personnel de maison vérifié, près de chez vous.</h1>
+    <div>
+      <p class="sur-titre">
+        <%- include("partiels/icone", { nom: "lieu", taille: 18 }) %>
+        Yaoundé
+      </p>
+
+      <h1>Du personnel de maison dont l'identité a été vérifiée.</h1>
+
       <p class="chapeau">
-        PamConnect met en relation les familles et les entreprises avec des ménagères,
-        nounous, gardiens, jardiniers et cuisiniers dont l'identité et le casier
-        judiciaire ont été contrôlés par notre équipe.
+        Ménagères, nounous, gardiens, jardiniers, cuisiniers.
+        Notre équipe contrôle la pièce d'identité et le casier judiciaire
+        de chaque prestataire avant qu'un employeur puisse le retenir.
       </p>
-      <p class="actions">
-        <a class="bouton" href="/recherche">Chercher un prestataire</a>
-        <a class="bouton bouton-secondaire" href="/inscription">Proposer mes services</a>
-      </p>
+
+      <div class="actions">
+        <a class="bouton" href="/recherche">
+          <%- include("partiels/icone", { nom: "recherche" }) %>
+          Chercher quelqu'un
+        </a>
+        <a class="bouton bouton-secondaire" href="/inscription">
+          Proposer mes services
+        </a>
+      </div>
     </div>
 
-    <%# Illustration : un bouclier de confiance entoure de deux personnes. %>
-    <svg class="accroche-image" viewBox="0 0 320 220" role="img"
-         aria-label="Deux personnes mises en relation par une plateforme vérifiée">
-      <circle cx="160" cy="112" r="96" fill="#E9F0F6"/>
-
-      <path d="M160 42 122 57v30c0 23 16 38.5 38 44.5 22-6 38-21.5 38-44.5V57l-38-15Z" fill="#1F4E79"/>
-      <path d="m143 88 12 12 23-23.5" fill="none" stroke="#fff" stroke-width="8"
-            stroke-linecap="round" stroke-linejoin="round"/>
-
-      <g fill="none" stroke="#1F4E79" stroke-width="6" stroke-linecap="round">
-        <circle cx="66" cy="132" r="18"/>
-        <path d="M38 186a28 28 0 0 1 56 0"/>
-        <circle cx="254" cy="132" r="18"/>
-        <path d="M226 186a28 28 0 0 1 56 0"/>
-        <path d="M104 152h32M184 152h32" stroke-dasharray="2 12"/>
+    <%# ILLUSTRATION 1 sur 3 du site. Une scene d'objets : une maison
+        et le bouclier de verification. Aucune personne dessinee : la
+        confiance se montre dans les fiches, pas dans un decor. %>
+    <svg class="accroche-image" viewBox="0 0 300 220" role="img"
+         aria-label="Une maison protégée par une vérification d'identité">
+      <g fill="none" stroke="#1F4E79" stroke-width="4"
+         stroke-linecap="round" stroke-linejoin="round">
+        <path d="M42 108 118 52l76 56v88a6 6 0 0 1-6 6H48a6 6 0 0 1-6-6Z"/>
+        <path d="M96 202v-56h44v56"/>
+        <path d="M118 52V32"/>
+      </g>
+      <g fill="none" stroke="#C25E14" stroke-width="4"
+         stroke-linecap="round" stroke-linejoin="round">
+        <path d="M222 46c-14 0-31-8-42-18a8 8 0 0 0-10 0c-11 10-28 18-42 18a7 7 0 0 0-7 7v48c0 34 24 51 52 61a7 7 0 0 0 4 0c28-10 52-27 52-61V53a7 7 0 0 0-7-7Z"
+              transform="translate(46 12) scale(.62)"/>
+        <path d="m150 92 12 12 24-24"/>
       </g>
     </svg>
   </section>
@@ -38,88 +50,52 @@
   <ol class="etapes">
     <li>
       <span class="etape-numero">1</span>
-      <h3>Décrivez votre besoin</h3>
-      <p>Recherchez par métier et par proximité, ou publiez une annonce à laquelle les prestataires répondent.</p>
+      <div>
+        <h3>Vous dites ce que vous cherchez</h3>
+        <p>Un métier, un quartier. Ou vous publiez une annonce et on vous répond.</p>
+      </div>
     </li>
     <li>
       <span class="etape-numero">2</span>
-      <h3>Choisissez en confiance</h3>
-      <p>Seuls les prestataires dont l'identité a été vérifiée par notre équipe peuvent être retenus.</p>
+      <div>
+        <h3>Vous voyez qui est vérifié</h3>
+        <p>Une pastille verte indique que nous avons contrôlé les papiers de la personne.</p>
+      </div>
     </li>
     <li>
       <span class="etape-numero">3</span>
-      <h3>Convenez d'un créneau</h3>
-      <p>Vous vous accordez directement sur la date, l'heure et le tarif de la prestation.</p>
+      <div>
+        <h3>Vous vous mettez d'accord</h3>
+        <p>Vous convenez ensemble du jour, de l'heure et du prix.</p>
+      </div>
     </li>
   </ol>
 
-  <h2>Les métiers représentés</h2>
+  <h2>Les métiers</h2>
   <ul class="metiers">
-    <li>
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <g fill="none" stroke="#1F4E79" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M24 6v20"/><path d="M14 26h20l3 16H11l3-16Z"/><path d="M18 33h12"/>
-        </g>
-      </svg>
-      Ménage et entretien
-    </li>
-    <li>
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <g fill="none" stroke="#1F4E79" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="19" cy="14" r="6"/><path d="M8 40a11 11 0 0 1 22 0"/>
-          <circle cx="34" cy="24" r="4"/><path d="M28 40a6 6 0 0 1 12 0"/>
-        </g>
-      </svg>
-      Garde d'enfants
-    </li>
-    <li>
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <g fill="none" stroke="#1F4E79" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M24 5 8 11v12c0 11 7 18.5 16 21 9-2.5 16-10 16-21V11L24 5Z"/>
-          <path d="M24 17v10"/>
-        </g>
-      </svg>
-      Gardiennage
-    </li>
-    <li>
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <g fill="none" stroke="#1F4E79" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M24 42V22"/><path d="M24 22c0-7 5-12 12-12 0 7-5 12-12 12Z"/>
-          <path d="M24 28c0-6-4-10-10-10 0 6 4 10 10 10Z"/><path d="M15 42h18"/>
-        </g>
-      </svg>
-      Jardinage
-    </li>
-    <li>
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <g fill="none" stroke="#1F4E79" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M13 7v14M19 7v14M16 21v20"/><path d="M33 7c-4 4-4 12 0 14v20"/>
-        </g>
-      </svg>
-      Cuisine
-    </li>
-    <li>
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <g fill="none" stroke="#1F4E79" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 38V16l14-9 14 9v22"/><path d="M19 38V26h10v12"/>
-        </g>
-      </svg>
-      Autres services à domicile
-    </li>
+    <li><%- include("partiels/icone", { nom: "menage", taille: 24 }) %> Ménage</li>
+    <li><%- include("partiels/icone", { nom: "enfants", taille: 24 }) %> Garde d'enfants</li>
+    <li><%- include("partiels/icone", { nom: "gardien", taille: 24 }) %> Gardiennage</li>
+    <li><%- include("partiels/icone", { nom: "jardin", taille: 24 }) %> Jardinage</li>
+    <li><%- include("partiels/icone", { nom: "cuisine", taille: 24 }) %> Cuisine</li>
+    <li><%- include("partiels/icone", { nom: "maison", taille: 24 }) %> Autres</li>
   </ul>
 
   <div class="carte confiance">
-    <h3>Pourquoi la vérification change tout</h3>
+    <h3>
+      <%- include("partiels/icone", { nom: "verifie", taille: 22 }) %>
+      Pourquoi la vérification change tout
+    </h3>
     <p>
-      Recruter du personnel de maison, c'est confier l'accès à son domicile. Aujourd'hui,
-      cela repose presque uniquement sur le bouche-à-oreille. PamConnect contrôle la pièce
-      d'identité et l'extrait de casier judiciaire de chaque prestataire avant qu'il puisse
-      être retenu par un employeur — et supprime ces documents dès la vérification effectuée.
+      Faire venir quelqu'un chez soi, c'est lui ouvrir sa porte. Aujourd'hui, cela
+      repose surtout sur le bouche-à-oreille. PamConnect contrôle la pièce d'identité
+      et le casier judiciaire avant qu'une personne puisse être retenue —
+      puis supprime ces documents une fois le contrôle fait.
     </p>
-    <p class="actions">
-      <a class="bouton bouton-secondaire" href="/employeur">Je cherche du personnel</a>
+    <div class="actions">
+      <a class="bouton bouton-secondaire" href="/employeur">Je cherche quelqu'un</a>
       <a class="bouton bouton-secondaire" href="/prestataire">Je propose mes services</a>
-    </p>
+    </div>
   </div>
 
 <%- include("partiels/pied") %>

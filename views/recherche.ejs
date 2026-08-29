@@ -1,12 +1,13 @@
 <%- include("partiels/tete") %>
 
-  <h1>Rechercher un prestataire</h1>
+  <h1>Trouver quelqu'un</h1>
 
   <div class="carte">
     <form id="formulaireRecherche" action="/recherche" method="GET">
       <div class="champ">
-        <label for="metier">Métier recherché</label>
-        <input type="text" id="metier" name="metier" placeholder="ex : ménage, nounou, jardinage"
+        <label for="metier">Qu'est-ce que vous cherchez ?</label>
+        <input type="text" id="metier" name="metier"
+               placeholder="ménage, nounou, jardinage..."
                value="<%= locals.metierRecherche || "" %>">
       </div>
 
@@ -14,9 +15,14 @@
       <input type="hidden" id="longitude" name="longitude">
 
       <div class="actions">
-        <button type="submit" id="boutonProximite">Rechercher près de moi</button>
-        <button type="submit" class="bouton-secondaire" id="boutonSimple"
-                formnovalidate>Rechercher sans ma position</button>
+        <button type="submit" id="boutonProximite">
+          <%- include("partiels/icone", { nom: "lieu" }) %>
+          Chercher près de moi
+        </button>
+        <button type="submit" class="bouton-secondaire" id="boutonSimple" formnovalidate>
+          <%- include("partiels/icone", { nom: "recherche" }) %>
+          Chercher sans ma position
+        </button>
       </div>
       <p class="aide" id="messageGps"></p>
     </form>
@@ -24,35 +30,66 @@
 
   <h2>
     <%= prestataires.length %>
-    prestataire<%= prestataires.length > 1 ? "s" : "" %>
+    personne<%= prestataires.length > 1 ? "s" : "" %>
     <%= locals.metierRecherche ? "pour « " + metierRecherche + " »" : "au total" %>
   </h2>
 
   <% if (prestataires.length === 0) { %>
 
-    <p class="vide">Aucun prestataire ne correspond à cette recherche.</p>
+    <%# ILLUSTRATION 2 sur 3 : un etat vide, pour ne pas laisser
+        la personne devant une page blanche. %>
+    <div class="vide">
+      <svg class="illustration" width="72" height="72" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+           stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6"/>
+      </svg>
+      <p>Personne ne correspond à cette recherche.</p>
+      <p class="aide">Essayez un autre mot, par exemple « ménage » au lieu de « nettoyage ».</p>
+    </div>
 
   <% } else { %>
 
     <div class="grille">
       <% prestataires.forEach(function (prestataire) { %>
         <div class="carte">
-          <h3><%= prestataire.nom %></h3>
-          <p class="discret"><%= prestataire.metier %></p>
+
+          <div class="fiche-tete">
+            <%# En attendant les photos de profil, l'initiale du prenom
+                donne deja un repere visuel a chaque fiche. %>
+            <div class="portrait"><%= prestataire.nom.charAt(0) %></div>
+            <div>
+              <h3><%= prestataire.nom %></h3>
+              <div class="metier"><%= prestataire.metier %></div>
+            </div>
+          </div>
 
           <p>
             <% if (prestataire.statut_verification === "verifie") { %>
-              <span class="badge badge-verifie">Identité vérifiée</span>
+              <span class="badge badge-verifie">
+                <%- include("partiels/icone", { nom: "verifie" }) %>
+                Identité vérifiée
+              </span>
             <% } else { %>
               <span class="badge badge-non-soumis">Identité non vérifiée</span>
             <% } %>
           </p>
 
-          <p class="discret">
-            <%= prestataire.arrondissement %><%= prestataire.quartier ? ", " + prestataire.quartier : "" %><br>
-            Tarif : <%= formaterTarif(prestataire.tarif) %><br>
-            Distance : <%= prestataire.distanceTexte %>
-          </p>
+          <ul class="infos">
+            <li>
+              <%- include("partiels/icone", { nom: "lieu" }) %>
+              <span><%= prestataire.arrondissement %><%= prestataire.quartier ? ", " + prestataire.quartier : "" %></span>
+            </li>
+            <li>
+              <%- include("partiels/icone", { nom: "remuneration" }) %>
+              <span><%= formaterTarif(prestataire.tarif) %></span>
+            </li>
+            <li>
+              <%- include("partiels/icone", { nom: "disponibilite" }) %>
+              <span><%= prestataire.distanceTexte %></span>
+            </li>
+          </ul>
+
         </div>
       <% }); %>
     </div>
@@ -76,7 +113,7 @@
     if (!utiliserPosition) return;          // recherche sans position : rien a faire
 
     if (!navigator.geolocation) {
-      message.textContent = "La géolocalisation n'est pas disponible sur cet appareil.";
+      message.textContent = "La localisation n'est pas disponible sur cet appareil.";
       return;                                // on laisse partir la recherche sans position
     }
 
@@ -91,7 +128,7 @@
         formulaire.submit();
       },
       function (erreur) {
-        message.textContent = "Position indisponible (" + erreur.message + "). Recherche sans classement par distance.";
+        message.textContent = "Position indisponible. Recherche sans classement par distance.";
         utiliserPosition = false;
         formulaire.submit();
       }

@@ -3,41 +3,59 @@
   <h1>Mon profil</h1>
 
   <div class="carte">
-    <h3><%= utilisateur.nom %></h3>
-    <p class="discret">
-      <%= utilisateur.email %><br>
-      <%= utilisateur.role === "employeur" ? "Employeur" : "Prestataire" %><%= utilisateur.est_admin ? " · Administrateur de la plateforme" : "" %><br>
-      <%= utilisateur.arrondissement %><%= utilisateur.quartier ? ", " + utilisateur.quartier : "" %>
-    </p>
+    <div class="fiche-tete">
+      <div class="portrait"><%= utilisateur.nom.charAt(0) %></div>
+      <div>
+        <h3><%= utilisateur.nom %></h3>
+        <div class="metier">
+          <%= utilisateur.role === "employeur" ? "Employeur" : utilisateur.metier || "Prestataire" %><%= utilisateur.est_admin ? " · Équipe PamConnect" : "" %>
+        </div>
+      </div>
+    </div>
 
-    <%# Metier, tarif et verification ne concernent que les prestataires. %>
     <% if (utilisateur.role === "prestataire") { %>
-      <p class="discret">
-        Métier : <%= utilisateur.metier || "Non renseigné" %><br>
-        Tarif : <%= formaterTarif(utilisateur.tarif) %>
-      </p>
-
       <p>
         <span class="badge badge-<%= utilisateur.statut_verification.replace(/ /g, "-") %>">
+          <% if (utilisateur.statut_verification === "verifie") { %>
+            <%- include("partiels/icone", { nom: "verifie" }) %>
+          <% } %>
           <%= libelleVerification(utilisateur.statut_verification) %>
         </span>
       </p>
+    <% } %>
 
-      <% if (utilisateur.statut_verification === "refuse" && utilisateur.motif_refus) { %>
-        <p class="discret">Motif du refus : <%= utilisateur.motif_refus %></p>
+    <ul class="infos">
+      <li>
+        <%- include("partiels/icone", { nom: "lieu" }) %>
+        <span><%= utilisateur.arrondissement %><%= utilisateur.quartier ? ", " + utilisateur.quartier : "" %></span>
+      </li>
+      <li>
+        <%- include("partiels/icone", { nom: "message" }) %>
+        <span><%= utilisateur.email %></span>
+      </li>
+      <% if (utilisateur.role === "prestataire") { %>
+        <li>
+          <%- include("partiels/icone", { nom: "remuneration" }) %>
+          <span><%= formaterTarif(utilisateur.tarif) %></span>
+        </li>
       <% } %>
+    </ul>
 
-      <% if (utilisateur.statut_verification !== "verifie") { %>
-        <p class="actions">
-          <a class="bouton" href="/verification">
-            <% if (utilisateur.statut_verification === "non soumis") { %>
-              Faire vérifier mon identité
-            <% } else { %>
-              Voir mon dossier de vérification
-            <% } %>
-          </a>
-        </p>
-      <% } %>
+    <% if (utilisateur.role === "prestataire" && utilisateur.statut_verification === "refuse" && utilisateur.motif_refus) { %>
+      <p class="aide">Motif du refus : <%= utilisateur.motif_refus %></p>
+    <% } %>
+
+    <% if (utilisateur.role === "prestataire" && utilisateur.statut_verification !== "verifie") { %>
+      <div class="actions">
+        <a class="bouton" href="/verification">
+          <%- include("partiels/icone", { nom: "envoi" }) %>
+          <% if (utilisateur.statut_verification === "non soumis") { %>
+            Faire vérifier mon identité
+          <% } else { %>
+            Voir mon dossier
+          <% } %>
+        </a>
+      </div>
     <% } %>
   </div>
 
@@ -45,26 +63,58 @@
   <% if (utilisateur.role === "employeur") { %>
     <h2>Mes annonces</h2>
 
+    <%# L'action principale d'un employeur reste accessible en permanence,
+        et non cachee dans un menu. %>
+    <div class="actions">
+      <a class="bouton" href="/publier-annonce">
+        <%- include("partiels/icone", { nom: "ajouter" }) %>
+        Publier une annonce
+      </a>
+    </div>
+
     <% if (mesAnnonces.length === 0) { %>
-      <p class="vide">
-        Vous n'avez publié aucune annonce.
-        <a href="/publier-annonce">Publier ma première annonce</a>
-      </p>
+      <div class="vide">
+        <p>Vous n'avez publié aucune annonce.</p>
+        <div class="actions">
+          <a class="bouton" href="/publier-annonce">
+            <%- include("partiels/icone", { nom: "ajouter" }) %>
+            Publier une annonce
+          </a>
+        </div>
+      </div>
     <% } else { %>
       <% mesAnnonces.forEach(function (annonce) { %>
         <div class="carte">
           <h3><%= annonce.titre %></h3>
-          <p class="discret"><%= annonce.metier %> · <%= annonce.arrondissement %></p>
+          <ul class="infos">
+            <li>
+              <%- include("partiels/icone", { nom: "experience" }) %>
+              <span><%= annonce.metier %></span>
+            </li>
+            <li>
+              <%- include("partiels/icone", { nom: "lieu" }) %>
+              <span><%= annonce.arrondissement %></span>
+            </li>
+          </ul>
 
           <% if (annonce.candidatures.length === 0) { %>
-            <p class="aide">Aucune candidature pour l'instant.</p>
+            <p class="aide" style="margin-top:1rem">Personne n'a encore répondu.</p>
           <% } else { %>
             <% annonce.candidatures.forEach(function (candidature) { %>
               <div class="candidature">
+                <div class="fiche-tete">
+                  <div class="portrait"><%= candidature.nomPrestataire.charAt(0) %></div>
+                  <div>
+                    <h3><%= candidature.nomPrestataire %></h3>
+                    <div class="metier"><%= libelleCandidature(candidature.statut) %></div>
+                  </div>
+                </div>
+
                 <p>
-                  <strong><%= candidature.nomPrestataire %></strong>
-                  — <%= libelleCandidature(candidature.statut) %>
                   <span class="badge badge-<%= candidature.verificationPrestataire.replace(/ /g, "-") %>">
+                    <% if (candidature.verificationPrestataire === "verifie") { %>
+                      <%- include("partiels/icone", { nom: "verifie" }) %>
+                    <% } %>
                     <%= libelleVerification(candidature.verificationPrestataire) %>
                   </span>
                 </p>
@@ -74,12 +124,15 @@
                   <%# On n'engage personne dont l'identite n'est pas verifiee. %>
                   <% if (candidature.verificationPrestataire === "verifie") { %>
                     <div class="actions">
-                      <form action="/candidatures/statut" method="POST" class="en-ligne">
+                      <form action="/candidatures/statut" method="POST">
                         <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
                         <input type="hidden" name="statut" value="acceptee">
-                        <button type="submit">Accepter</button>
+                        <button type="submit">
+                          <%- include("partiels/icone", { nom: "valider" }) %>
+                          Accepter
+                        </button>
                       </form>
-                      <form action="/candidatures/statut" method="POST" class="en-ligne">
+                      <form action="/candidatures/statut" method="POST">
                         <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
                         <input type="hidden" name="statut" value="refusee">
                         <button type="submit" class="bouton-danger">Refuser</button>
@@ -88,10 +141,10 @@
                   <% } else { %>
                     <p class="aide">
                       Vous pourrez accepter cette candidature dès que PamConnect aura
-                      vérifié l'identité de ce prestataire.
+                      vérifié l'identité de cette personne.
                     </p>
                     <div class="actions">
-                      <form action="/candidatures/statut" method="POST" class="en-ligne">
+                      <form action="/candidatures/statut" method="POST">
                         <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
                         <input type="hidden" name="statut" value="refusee">
                         <button type="submit" class="bouton-danger">Refuser</button>
@@ -113,16 +166,26 @@
     <h2>Mes candidatures</h2>
 
     <% if (mesCandidatures.length === 0) { %>
-      <p class="vide">
-        Vous n'avez postulé à aucune annonce.
-        <a href="/annonces">Voir les annonces disponibles</a>
-      </p>
+      <div class="vide">
+        <p>Vous n'avez répondu à aucune annonce.</p>
+        <div class="actions">
+          <a class="bouton" href="/annonces">
+            <%- include("partiels/icone", { nom: "document" }) %>
+            Voir les annonces
+          </a>
+        </div>
+      </div>
     <% } else { %>
       <div class="grille">
         <% mesCandidatures.forEach(function (candidature) { %>
           <div class="carte">
             <h3><%= candidature.titreAnnonce %></h3>
-            <p class="discret"><%= libelleCandidature(candidature.statut) %></p>
+            <ul class="infos">
+              <li>
+                <%- include("partiels/icone", { nom: "disponibilite" }) %>
+                <span><strong><%= libelleCandidature(candidature.statut) %></strong></span>
+              </li>
+            </ul>
           </div>
         <% }); %>
       </div>

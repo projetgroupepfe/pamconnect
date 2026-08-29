@@ -1,47 +1,64 @@
 /* ============================================================
    PamConnect - feuille de style
    ------------------------------------------------------------
-   Organisation du fichier :
-     1. Variables de couleur et d'espacement
-     2. Bases (corps de page, titres, texte)
-     3. En-tete et menu
-     4. Conteneur et pied de page
-     5. Cartes
-     6. Formulaires
-     7. Boutons
-     8. Pastilles de statut
-     9. Adaptation aux petits ecrans
+   CONCEPTION MOBILE D'ABORD :
+   les regles de base decrivent l'affichage sur telephone.
+   Les ajouts pour les grands ecrans sont regroupes tout en bas,
+   dans une seule regle @media (min-width: 760px).
+
+   Aucune police ni icone n'est telechargee depuis internet :
+   la plateforme s'affiche a l'identique SANS CONNEXION.
+
+   Sommaire
+     1. Couleurs et reglages
+     2. Bases
+     3. En-tete
+     4. Navigation
+     5. Contenu et pied de page
+     6. Cartes et fiches
+     7. Lignes d'information a icone
+     8. Formulaires
+     9. Boutons
+    10. Pastilles de statut
+    11. Page d'accueil
+    12. Grands ecrans
    ============================================================ */
 
 
-/* ---------- 1. Variables ---------------------------------- */
-/* Une couleur definie ICI est utilisee partout ailleurs.      */
+/* ---------- 1. Couleurs et reglages ----------------------- */
 /* Changer la charte du site = changer ces quelques lignes.    */
 :root {
-  --bleu:         #1F4E79;   /* la couleur de PamConnect */
-  --bleu-fonce:   #163A5C;
-  --bleu-clair:   #E9F0F6;
+  /* Le bleu profond porte la confiance : c'est la couleur de la marque. */
+  --bleu:         #1F4E79;
+  --bleu-fonce:   #143656;
+  --bleu-clair:   #E8F0F7;
 
-  --encre:        #1B2733;   /* le texte principal */
-  --encre-douce:  #57687A;   /* le texte secondaire */
-  --encre-pale:   #8496A5;   /* les mentions discretes */
+  /* L'orange chaud ne sert QU'aux actions principales.
+     Rare, donc immediatement reperable. */
+  --orange:       #C25E14;
+  --orange-fonce: #9E4B0E;
+  --orange-clair: #FDF0E3;
 
-  --trait:        #DCE4EB;   /* les bordures */
-  --fond:         #F4F7FA;   /* le fond de page */
-  --surface:      #FFFFFF;   /* le fond des cartes */
+  /* Des gris legerement chauds : moins froids qu'un gris pur. */
+  --encre:        #1A2430;
+  --encre-douce:  #4E5D6C;
+  --encre-pale:   #67757F;
+  --trait:        #E3DDD5;
+  --fond:         #FAF8F5;
+  --surface:      #FFFFFF;
 
-  --vert:         #1C6334;   --vert-fond:  #E2F2E7;
-  --ambre:        #8A5A05;   --ambre-fond: #FBF0DA;
-  --rouge:        #92222F;   --rouge-fond: #FAE2E5;
+  --vert:  #1B6B3A;   --vert-fond:  #E3F3E8;
+  --ambre: #8A5A05;   --ambre-fond: #FBF0DA;
+  --rouge: #A32B33;   --rouge-fond: #FBE7E8;
 
-  --rayon:        8px;
-  --ombre:        0 1px 2px rgba(27, 39, 51, .06),
-                  0 6px 16px rgba(27, 39, 51, .05);
+  --rayon:  12px;
+  --ombre:  0 1px 2px rgba(26, 36, 48, .05), 0 4px 14px rgba(26, 36, 48, .06);
 
-  /* Polices du systeme : aucun telechargement, aucune dependance
-     a un service exterieur, et le site s'affiche identiquement
-     meme sans connexion internet. */
+  /* Polices du systeme : rien a telecharger, rien a attendre. */
   --police: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+
+  /* Hauteur de la barre de navigation du bas, sur telephone. */
+  --barre-basse: 64px;
 }
 
 
@@ -53,19 +70,21 @@ body {
   background-color: var(--fond);
   color: var(--encre);
   font-family: var(--police);
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 17px;      /* plus grand que l'habitude : lisibilite d'abord */
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
 }
 
 h1, h2, h3 {
   color: var(--bleu);
-  line-height: 1.25;
-  margin: 0 0 .6em;
+  line-height: 1.3;
+  margin: 0 0 .5em;
+  text-wrap: balance;
 }
-h1 { font-size: 1.9rem; letter-spacing: -.01em; }
-h2 { font-size: 1.3rem; margin-top: 2rem; }
-h3 { font-size: 1.05rem; }
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.25rem; margin-top: 2rem; }
+h3 { font-size: 1.08rem; }
 
 p { margin: 0 0 1rem; }
 p:last-child { margin-bottom: 0; }
@@ -73,15 +92,21 @@ p:last-child { margin-bottom: 0; }
 a { color: var(--bleu); }
 a:hover { color: var(--bleu-fonce); }
 
-.discret { color: var(--encre-douce); font-size: .92rem; }
+.discret { color: var(--encre-douce); font-size: .95rem; }
+.aide    { color: var(--encre-pale);  font-size: .9rem; }
 
+/* Le repere de focus doit rester tres visible : certaines personnes
+   naviguent uniquement au clavier. */
 :focus-visible {
-  outline: 2px solid var(--bleu);
+  outline: 3px solid var(--orange);
   outline-offset: 2px;
+  border-radius: 4px;
 }
 
+.icone { flex: none; vertical-align: -.2em; }
 
-/* ---------- 3. En-tete et menu ---------------------------- */
+
+/* ---------- 3. En-tete ------------------------------------ */
 .entete {
   background-color: var(--surface);
   border-bottom: 1px solid var(--trait);
@@ -89,96 +114,95 @@ a:hover { color: var(--bleu-fonce); }
   top: 0;
   z-index: 10;
 }
-
 .entete-interieur {
-  max-width: 1060px;
+  max-width: 1040px;
   margin: 0 auto;
-  padding: 0 20px;
-  min-height: 62px;
+  padding: 0 16px;
+  min-height: 60px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+  gap: .75rem;
 }
 
 .logo {
   display: inline-flex;
   align-items: center;
-  gap: .55rem;
+  gap: .5rem;
   color: var(--bleu);
   text-decoration: none;
-  font-size: 1.18rem;
+  font-size: 1.15rem;
   font-weight: 600;
-  letter-spacing: -.01em;
   padding: .6rem 0;
 }
-.logo svg { display: block; }
-.logo span { font-weight: 400; }
+.logo span  { font-weight: 400; }
 .logo strong { font-weight: 700; }
 
+/* Sur telephone, seul le raccourci de connexion reste en haut. */
+.entete-actions { display: flex; align-items: center; gap: .4rem; }
+
+
+/* ---------- 4. Navigation --------------------------------- */
+/* Sur telephone : une barre fixe en bas, comme dans une vraie
+   application. Chaque bouton porte une icone ET son mot : personne
+   n'a a deviner ce que signifie un pictogramme. */
 .menu {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 20;
   display: flex;
-  align-items: center;
-  gap: .15rem;
-  flex-wrap: wrap;
+  justify-content: space-around;
+  align-items: stretch;
+  background-color: var(--surface);
+  border-top: 1px solid var(--trait);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 .menu a,
 .menu button {
-  display: inline-block;
-  padding: .45rem .7rem;
-  border-radius: 6px;
-  color: var(--encre-douce);
-  text-decoration: none;
-  font-size: .93rem;
+  flex: 1;
+  min-height: var(--barre-basse);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: .4rem .2rem;
   font-family: inherit;
-  border: none;
+  font-size: .72rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  color: var(--encre-douce);
   background: none;
+  border: none;
   cursor: pointer;
 }
-.menu a:hover,
-.menu button:hover {
-  background-color: var(--bleu-clair);
-  color: var(--bleu);
-}
-.menu .principal {
-  background-color: var(--bleu);
-  color: #fff;
-  font-weight: 500;
-}
-.menu .principal:hover { background-color: var(--bleu-fonce); color: #fff; }
-.menu form { display: inline; margin: 0; }
-.menu-separateur {
-  width: 1px;
-  height: 22px;
-  background-color: var(--trait);
-  margin: 0 .4rem;
-}
+.menu a:hover, .menu button:hover { color: var(--bleu); background-color: var(--bleu-clair); }
+.menu form { display: contents; }
+.menu-separateur { display: none; }
 
 
-/* ---------- 4. Conteneur et pied de page ------------------ */
+/* ---------- 5. Contenu et pied de page -------------------- */
 .contenu {
-  max-width: 1060px;
+  max-width: 1040px;
   margin: 0 auto;
-  padding: 2.5rem 20px 4rem;
+  /* L'espace du bas laisse la place a la barre de navigation. */
+  padding: 1.5rem 16px calc(var(--barre-basse) + 2rem);
 }
-
-/* Les formulaires et les pages courtes respirent mieux etroits. */
-.colonne {
-  max-width: 32rem;
-  margin: 0 auto;
-}
+.colonne { max-width: 34rem; margin: 0 auto; }
 
 .pied {
+  display: none;   /* masque sur telephone : la barre du bas suffit */
   border-top: 1px solid var(--trait);
   background-color: var(--surface);
   color: var(--encre-pale);
-  font-size: .87rem;
+  font-size: .9rem;
 }
 .pied-interieur {
-  max-width: 1060px;
+  max-width: 1040px;
   margin: 0 auto;
-  padding: 1.5rem 20px;
+  padding: 1.5rem 16px;
   display: flex;
   justify-content: space-between;
   gap: 1rem;
@@ -187,29 +211,23 @@ a:hover { color: var(--bleu-fonce); }
 .pied p { margin: 0; }
 
 
-/* ---------- 5. Cartes ------------------------------------- */
+/* ---------- 6. Cartes et fiches --------------------------- */
 .carte {
   background-color: var(--surface);
   border: 1px solid var(--trait);
   border-radius: var(--rayon);
   box-shadow: var(--ombre);
-  padding: 1.25rem 1.4rem;
+  padding: 1.1rem 1.2rem;
   margin: 0 0 1rem;
 }
-.carte h3 { margin-bottom: .35rem; }
+.carte h3 { margin-bottom: .4rem; }
 
-/* Une grille de cartes qui s'adapte a la largeur disponible. */
-.grille {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
-  align-items: start;
-}
+.grille { display: grid; gap: 1rem; align-items: start; }
 
 .candidature {
   border-top: 1px solid var(--trait);
-  padding-top: .9rem;
-  margin-top: .9rem;
+  padding-top: 1rem;
+  margin-top: 1rem;
 }
 .en-ligne { display: inline; }
 
@@ -218,213 +236,318 @@ a:hover { color: var(--bleu-fonce); }
   background-color: var(--surface);
   border: 1px dashed var(--trait);
   border-radius: var(--rayon);
-  padding: 1.5rem;
+  padding: 2rem 1.2rem;
   text-align: center;
 }
+.vide .illustration { margin-bottom: .8rem; color: var(--encre-pale); }
+
+/* La tete d'une fiche prestataire : photo (ou initiale) + nom + metier */
+.fiche-tete {
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+  margin-bottom: .9rem;
+}
+.portrait {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  flex: none;
+  object-fit: cover;
+  background-color: var(--bleu-clair);
+  color: var(--bleu);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.fiche-tete h3 { margin: 0; }
+.fiche-tete .metier { color: var(--encre-douce); font-size: .95rem; }
 
 
-/* ---------- 6. Formulaires -------------------------------- */
-/* L'etiquette est AU-DESSUS du champ et les champs font tous  */
-/* la meme largeur : c'est ce qui donne un formulaire aligne.   */
-.champ { margin-bottom: 1.1rem; }
+/* ---------- 7. Lignes d'information a icone --------------- */
+/* Une icone, puis un mot simple : c'est ce qui rend une fiche
+   lisible d'un coup d'oeil, sans lire de phrase. */
+.infos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+.infos li {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  color: var(--encre-douce);
+  font-size: .96rem;
+}
+.infos .icone { color: var(--bleu); margin-top: .18rem; }
+.infos strong { color: var(--encre); font-weight: 600; }
+
+
+/* ---------- 8. Formulaires -------------------------------- */
+/* L'etiquette est AU-DESSUS du champ et tous les champs font la
+   meme largeur : c'est ce qui donne un formulaire aligne.       */
+.champ { margin-bottom: 1.2rem; }
 
 .champ label {
   display: block;
-  margin-bottom: .35rem;
-  font-size: .9rem;
+  margin-bottom: .4rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--encre);
 }
+.champ .aide { display: block; margin-top: .35rem; }
 
-.champ .aide {
-  display: block;
-  margin-top: .3rem;
-  font-size: .84rem;
-  color: var(--encre-pale);
-}
-
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="number"],
-input[type="file"],
-select,
-textarea {
+input[type="text"], input[type="email"], input[type="password"],
+input[type="number"], input[type="tel"], input[type="file"],
+select, textarea {
   width: 100%;
-  padding: .6rem .7rem;
+  min-height: 52px;          /* confortable au doigt */
+  padding: .7rem .8rem;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: 1rem;           /* 16px minimum : evite le zoom sur iPhone */
   color: var(--encre);
   background-color: var(--surface);
-  border: 1px solid var(--trait);
-  border-radius: 6px;
+  border: 1.5px solid var(--trait);
+  border-radius: 10px;
 }
-textarea { min-height: 6rem; resize: vertical; }
+textarea { min-height: 7rem; resize: vertical; }
 
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--bleu);
   box-shadow: 0 0 0 3px var(--bleu-clair);
 }
-
 input::placeholder, textarea::placeholder { color: var(--encre-pale); }
 
 
-/* ---------- 7. Boutons ------------------------------------ */
-button,
-.bouton {
-  display: inline-block;
-  padding: .6rem 1.1rem;
+/* ---------- 9. Boutons ------------------------------------ */
+/* Sur telephone, un bouton occupe toute la largeur : impossible
+   de le rater, impossible de se tromper de cible.              */
+button, .bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  width: 100%;
+  min-height: 52px;
+  padding: .75rem 1.2rem;
   font-family: inherit;
-  font-size: .95rem;
-  font-weight: 500;
+  font-size: 1rem;
+  font-weight: 600;
   color: #fff;
-  background-color: var(--bleu);
-  border: 1px solid var(--bleu);
-  border-radius: 6px;
+  background-color: var(--orange);
+  border: 1.5px solid var(--orange);
+  border-radius: 10px;
   cursor: pointer;
   text-decoration: none;
+  text-align: center;
 }
-button:hover,
-.bouton:hover { background-color: var(--bleu-fonce); border-color: var(--bleu-fonce); color: #fff; }
+button:hover, .bouton:hover {
+  background-color: var(--orange-fonce);
+  border-color: var(--orange-fonce);
+  color: #fff;
+}
 
 .bouton-secondaire {
   color: var(--bleu);
   background-color: var(--surface);
-  border-color: var(--trait);
+  border-color: var(--bleu);
 }
-.bouton-secondaire:hover { background-color: var(--bleu-clair); color: var(--bleu); border-color: var(--bleu-clair); }
+.bouton-secondaire:hover { background-color: var(--bleu-clair); color: var(--bleu-fonce); border-color: var(--bleu-fonce); }
 
 .bouton-danger {
   color: var(--rouge);
   background-color: var(--surface);
   border-color: var(--trait);
 }
-.bouton-danger:hover { background-color: var(--rouge-fond); color: var(--rouge); border-color: var(--rouge-fond); }
+.bouton-danger:hover { background-color: var(--rouge-fond); color: var(--rouge); border-color: var(--rouge); }
 
 .actions {
   display: flex;
-  gap: .5rem;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  gap: .6rem;
+  margin-top: 1.2rem;
 }
+.actions:first-child { margin-top: 0; }
 
 
-/* ---------- 8. Pastilles de statut ------------------------ */
+/* ---------- 10. Pastilles de statut ----------------------- */
 .badge {
-  display: inline-block;
-  padding: .15rem .6rem;
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .25rem .7rem;
   border-radius: 999px;
-  font-size: .8rem;
+  font-size: .85rem;
   font-weight: 600;
   white-space: nowrap;
-  vertical-align: 1px;
 }
-.badge-verifie     { background-color: var(--vert-fond);  color: var(--vert); }
-.badge-en-attente  { background-color: var(--ambre-fond); color: var(--ambre); }
-.badge-refuse      { background-color: var(--rouge-fond); color: var(--rouge); }
-.badge-non-soumis  { background-color: var(--bleu-clair); color: var(--encre-douce); }
+.badge .icone { width: 16px; height: 16px; }
+.badge-verifie    { background-color: var(--vert-fond);  color: var(--vert); }
+.badge-en-attente { background-color: var(--ambre-fond); color: var(--ambre); }
+.badge-refuse     { background-color: var(--rouge-fond); color: var(--rouge); }
+.badge-non-soumis { background-color: var(--bleu-clair); color: var(--encre-douce); }
 
 
-/* ---------- 9. Petits ecrans ------------------------------ */
-@media (max-width: 720px) {
-  .entete-interieur {
-    padding: .6rem 16px;
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .menu { gap: .1rem; }
-  .menu a, .menu button { padding: .4rem .55rem; font-size: .88rem; }
-  .menu-separateur { display: none; }
-
-  .contenu { padding: 1.75rem 16px 3rem; }
-  h1 { font-size: 1.55rem; }
-  .pied-interieur { flex-direction: column; padding: 1.25rem 16px; }
-}
-
-
-/* ---------- 10. Page d'accueil ---------------------------- */
-.accroche {
-  display: grid;
-  grid-template-columns: 1.15fr .85fr;
-  gap: 2.5rem;
-  align-items: center;
-  margin-bottom: 3.5rem;
-}
-.accroche-image { width: 100%; height: auto; }
-
-.sur-titre {
-  font-size: .8rem;
-  font-weight: 700;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--encre-pale);
-  margin-bottom: .5rem;
-}
-.accroche h1 { font-size: 2.4rem; margin-bottom: .8rem; }
+/* ---------- 11. Page d'accueil ---------------------------- */
+.accroche { margin-bottom: 2.5rem; }
+.accroche h1 { font-size: 1.75rem; margin-bottom: .6rem; }
 .chapeau {
-  font-size: 1.08rem;
+  font-size: 1.05rem;
   color: var(--encre-douce);
   max-width: 34rem;
-  margin-bottom: 1.6rem;
+  margin-bottom: 1.4rem;
+}
+.sur-titre {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--orange);
+  margin-bottom: .5rem;
 }
 
-.etapes {
-  list-style: none;
-  margin: 0 0 3rem;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1rem;
-}
+.etapes { list-style: none; margin: 0 0 2.5rem; padding: 0; display: grid; gap: .9rem; }
 .etapes li {
   background-color: var(--surface);
   border: 1px solid var(--trait);
   border-radius: var(--rayon);
-  padding: 1.4rem;
+  padding: 1.2rem;
+  display: flex;
+  gap: .9rem;
+  align-items: flex-start;
 }
 .etape-numero {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
+  flex: none;
+  width: 34px; height: 34px;
   border-radius: 50%;
-  background-color: var(--bleu-clair);
-  color: var(--bleu);
+  background-color: var(--orange-clair);
+  color: var(--orange);
+  display: flex; align-items: center; justify-content: center;
   font-weight: 700;
-  font-size: .95rem;
-  margin-bottom: .7rem;
 }
-.etapes h3 { margin-bottom: .3rem; }
-.etapes p { color: var(--encre-douce); font-size: .94rem; }
+.etapes h3 { margin-bottom: .2rem; }
+.etapes p  { color: var(--encre-douce); font-size: .95rem; }
 
-.metiers {
-  list-style: none;
-  margin: 0 0 3rem;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: .8rem;
-}
+.metiers { list-style: none; margin: 0 0 2.5rem; padding: 0; display: grid; gap: .7rem; grid-template-columns: 1fr 1fr; }
 .metiers li {
   display: flex;
   align-items: center;
-  gap: .8rem;
+  gap: .6rem;
   background-color: var(--surface);
   border: 1px solid var(--trait);
   border-radius: var(--rayon);
-  padding: .9rem 1.1rem;
+  padding: .9rem;
   font-size: .95rem;
   font-weight: 500;
 }
-.metiers svg { width: 30px; height: 30px; flex: none; }
+.metiers .icone { color: var(--bleu); }
 
-.confiance { background-color: var(--bleu-clair); border-color: transparent; box-shadow: none; }
-.confiance p { color: var(--encre-douce); }
+.confiance {
+  background-color: var(--bleu-clair);
+  border-color: transparent;
+  box-shadow: none;
+}
+.confiance h3 { display: flex; align-items: center; gap: .5rem; }
+.confiance p  { color: var(--encre-douce); }
 
-@media (max-width: 860px) {
-  .accroche { grid-template-columns: 1fr; gap: 1.5rem; }
-  .accroche-image { max-width: 340px; margin: 0 auto; }
-  .accroche h1 { font-size: 1.8rem; }
+
+/* ---------- 12. Grands ecrans ----------------------------- */
+@media (min-width: 760px) {
+
+  body { font-size: 17px; }
+  h1 { font-size: 2rem; }
+  .accroche h1 { font-size: 2.3rem; }
+
+  /* Le menu remonte dans l'en-tete et redevient une ligne de liens. */
+  .menu {
+    position: static;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: .15rem;
+    background: none;
+    border-top: none;
+    padding-bottom: 0;
+  }
+  .menu a, .menu button {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: .4rem;
+    min-height: 40px;
+    padding: .45rem .7rem;
+    border-radius: 8px;
+    font-size: .95rem;
+  }
+  .menu form { display: inline; }
+  .menu-separateur {
+    display: block;
+    width: 1px; height: 22px;
+    background-color: var(--trait);
+    margin: 0 .4rem;
+  }
+  .entete-interieur { padding: 0 20px; min-height: 66px; }
+
+  .contenu { padding: 2.5rem 20px 4rem; }
+  .pied { display: block; }
+
+  /* Les boutons reprennent leur largeur naturelle, cote a cote. */
+  button, .bouton { width: auto; min-height: 46px; }
+  .actions { flex-direction: row; flex-wrap: wrap; align-items: center; }
+
+  .grille { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .etapes { grid-template-columns: repeat(3, 1fr); }
+  .metiers { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+
+  .accroche { display: grid; grid-template-columns: 1.1fr .9fr; gap: 2.5rem; align-items: center; }
+  .accroche-image { width: 100%; height: auto; }
+}
+
+@media (max-width: 759px) {
+  .accroche-image { display: none; }  /* une illustration de moins a charger */
+}
+
+
+/* ---------- 13. Raccourcis de l'en-tete -------------------- */
+.entete-actions .bouton {
+  width: auto;
+  min-height: 44px;
+  padding: .5rem .9rem;
+  font-size: .93rem;
+}
+.bouton-icone {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 10px;
+  color: var(--encre-douce);
+  background-color: var(--surface);
+  border: 1.5px solid var(--trait);
+}
+.bouton-icone:hover {
+  background-color: var(--bleu-clair);
+  color: var(--bleu);
+  border-color: var(--bleu-clair);
+}
+
+/* Une illustration reste discrete : un trait, jamais de remplissage. */
+.illustration { color: var(--bleu); opacity: .55; }
+
+/* Texte reserve aux lecteurs d'ecran : invisible, mais annonce. */
+.lecture-ecran {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
