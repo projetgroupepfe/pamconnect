@@ -126,6 +126,47 @@ const requetes = {
         motif_refus = NULL
     WHERE id = @id
   `),
+
+  dossiersEnAttente: db.prepare(`
+    SELECT id, nom, email, metier, arrondissement, quartier
+    FROM utilisateurs
+    WHERE statut_verification = 'en attente'
+    ORDER BY id
+  `),
+
+  dossierEnAttenteParId: db.prepare(`
+    SELECT * FROM utilisateurs WHERE id = ? AND statut_verification = 'en attente'
+  `),
+
+  // Valider ou refuser efface les deux noms de fichier : les documents
+  // eux-memes sont supprimes du disque au meme moment.
+  validerVerification: db.prepare(`
+    UPDATE utilisateurs
+    SET statut_verification = 'verifie',
+        verifie_le = datetime('now'),
+        motif_refus = NULL,
+        cni_fichier = NULL,
+        casier_fichier = NULL
+    WHERE id = ?
+  `),
+
+  refuserVerification: db.prepare(`
+    UPDATE utilisateurs
+    SET statut_verification = 'refuse',
+        motif_refus = ?,
+        verifie_le = NULL,
+        cni_fichier = NULL,
+        casier_fichier = NULL
+    WHERE id = ?
+  `),
+
+  statistiquesVerification: db.prepare(`
+    SELECT statut_verification AS statut, COUNT(*) AS nb
+    FROM utilisateurs
+    WHERE role = 'prestataire'
+    GROUP BY statut_verification
+    ORDER BY statut_verification
+  `),
 };
 
 // ============================================================
@@ -264,10 +305,38 @@ function exigerConnexion(req, res, next) {
   next();
 }
 
+// Second portier, plus strict : reserve aux membres de l'equipe projet.
+function exigerAdmin(req, res, next) {
+  const utilisateur = utilisateurConnecte(req);
+
+  if (!utilisateur) {
+    return res.redirect("/connexion.html");
+  }
+
+  if (!utilisateur.est_admin) {
+    return res.status(403).render("message", {
+      titre: "Acces refuse",
+      texte: "Cette page est reservee a l'equipe de PamConnect.",
+      liens: [{ url: "/index.html", texte: "Retour a l'accueil" }],
+    });
+  }
+
+  req.utilisateur = utilisateur;
+  next();
+}
+
 // ============================================================
 // PARTIE 1 - Les fichiers du dossier public/ (HTML, CSS, images)
 // ============================================================
 app.use(express.static(path.join(__dirname, "public")));
+
+// Rend la personne connectee disponible dans TOUTES les vues, pour que
+// le menu puisse s'adapter. Place apres express.static : inutile de
+// consulter la base pour servir une feuille de style.
+app.use((req, res, next) => {
+  res.locals.moi = utilisateurConnecte(req);
+  next();
+});
 
 // ============================================================
 // PARTIE 2 - Les routes de l'application
@@ -600,6 +669,75 @@ app.post("/verification", exigerConnexion, (req, res) => {
       liens: [{ url: "/mon-profil", texte: "Retour a mon profil" }],
     });
   });
+});
+
+// --- Administration : les dossiers a verifier ----------------------
+app.get("/admin", exigerAdmin, (req, res) => {
+  res.render("admin", {
+    titre: "Administration",
+    dossiers: requetes.dossiersEnAttente.all(),
+    statistiques: requetes.statistiquesVerification.all(),
+  });
+});
+
+// --- Administration : consulter un document ------------------------
+// C'est la SEULE facon d'atteindre un fichier de data/documents/.
+// L'adresse ne contient jamais le nom du fichier, seulement
+// l'identifiant du prestataire et le type de piece demande.
+app.get("/admin/document/:id/:type", exigerAdmin, (req, res) => {
+  const dossier = requetes.dossierEnAttenteParId.get(Number(req.params.id));
+
+  if (!dossier) {
+    return res.status(404).render("message", {
+      titre: "Dossier introuvable",
+      texte: "Ce dossier n'existe pas ou a deja ete traite.",
+      liens: [{ url: "/admin", texte: "Retour a l'administration" }],
+    });
+  }
+
+  const nomFichier =
+    req.params.type === "cni" ? dossier.cni_fichier :
+    req.params.type === "casier" ? dossier.casier_fichier : null;
+
+  // Ceinture et bretelles : ce nom vient de notre base, donc il a la
+  // forme que nous lui avons donnee. On le verifie quand meme avant de
+  // construire un chemin de fichier avec.
+  if (!nomFichier || !/^[0-9a-f]{32}\.[a-z0-9]+$/.test(nomFichier)) {
+    return res.status(404).render("message", {
+      titre: "Document introuvable",
+      texte: "Ce document n'est plus disponible.",
+      liens: [{ url: "/admin", texte: "Retour a l'administration" }],
+    });
+  }
+
+  res.sendFile(path.join(DOSSIER_DOCUMENTS, nomFichier));
+});
+
+// --- Administration : valider ou refuser ---------------------------
+app.post("/admin/verification", exigerAdmin, lireFormulaire, (req, res) => {
+  const dossier = requetes.dossierEnAttenteParId.get(Number(req.body.utilisateurId));
+
+  if (!dossier) {
+    return res.status(404).render("message", {
+      titre: "Dossier introuvable",
+      texte: "Ce dossier n'existe pas ou a deja ete traite.",
+      liens: [{ url: "/admin", texte: "Retour a l'administration" }],
+    });
+  }
+
+  if (req.body.decision === "valider") {
+    requetes.validerVerification.run(dossier.id);
+  } else {
+    const motif = String(req.body.motif || "").trim() || "Documents non conformes.";
+    requetes.refuserVerification.run(motif, dossier.id);
+  }
+
+  // Dans les deux cas les documents sont effaces : nous ne conservons
+  // que le statut et sa date (minimisation des donnees personnelles).
+  supprimerDocument(dossier.cni_fichier);
+  supprimerDocument(dossier.casier_fichier);
+
+  res.redirect("/admin");
 });
 
 // ============================================================

@@ -18,4 +18,8 @@
     <a href="/inscription.html">Inscription</a>
     <a href="/connexion.html">Connexion</a>
     <a href="/mon-profil">Mon profil</a>
+    <%# Visible uniquement pour les membres de l'equipe projet. %>
+    <% if (locals.moi && locals.moi.est_admin) { %>
+      <a href="/admin">Administration</a>
+    <% } %>
   </nav>

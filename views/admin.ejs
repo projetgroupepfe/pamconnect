@@ -1,0 +1,72 @@
+<%- include("partiels/tete") %>
+
+  <h1>Administration</h1>
+
+  <p>
+    <% statistiques.forEach(function (ligne) { %>
+      <span class="badge badge-<%= ligne.statut.replace(/ /g, "-") %>">
+        <%= libelleVerification(ligne.statut) %> : <%= ligne.nb %>
+      </span>
+    <% }); %>
+  </p>
+
+  <h2>Dossiers à vérifier</h2>
+
+  <% if (dossiers.length === 0) { %>
+
+    <p>Aucun dossier en attente.</p>
+
+  <% } else { %>
+
+    <% dossiers.forEach(function (dossier) { %>
+      <div class="carte">
+        <p><strong><%= dossier.nom %></strong> — <%= dossier.metier %></p>
+        <p><%= dossier.email %></p>
+        <p><%= dossier.arrondissement %><%= dossier.quartier ? ", " + dossier.quartier : "" %></p>
+
+        <%# Ces liens passent par une route qui verifie que le demandeur   %>
+        <%# est administrateur. Le nom du fichier n'apparait jamais dans   %>
+        <%# l'adresse : on ne transmet que l'identifiant du prestataire.   %>
+        <p>
+          <a href="/admin/document/<%= dossier.id %>/cni" target="_blank" rel="noopener">
+            Ouvrir la pièce d'identité
+          </a>
+          &nbsp;·&nbsp;
+          <a href="/admin/document/<%= dossier.id %>/casier" target="_blank" rel="noopener">
+            Ouvrir le casier judiciaire
+          </a>
+        </p>
+
+        <div class="candidature">
+          <form action="/admin/verification" method="POST" class="en-ligne">
+            <input type="hidden" name="utilisateurId" value="<%= dossier.id %>">
+            <input type="hidden" name="decision" value="valider">
+            <button type="submit">Valider l'identité</button>
+          </form>
+
+          <form action="/admin/verification" method="POST">
+            <input type="hidden" name="utilisateurId" value="<%= dossier.id %>">
+            <input type="hidden" name="decision" value="refuser">
+            <p>
+              <label for="motif-<%= dossier.id %>">Motif du refus :</label>
+              <input type="text" id="motif-<%= dossier.id %>" name="motif"
+                     placeholder="ex : document illisible">
+            </p>
+            <button type="submit">Refuser</button>
+          </form>
+        </div>
+      </div>
+    <% }); %>
+
+  <% } %>
+
+  <div class="carte">
+    <p><strong>Rappel</strong></p>
+    <p>
+      Dans les deux cas, valider ou refuser, les deux documents sont
+      <strong>définitivement supprimés du serveur</strong>. Seuls le statut et
+      sa date sont conservés. Vérifie donc les pièces avant de décider.
+    </p>
+  </div>
+
+<%- include("partiels/pied") %>
