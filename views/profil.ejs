@@ -39,6 +39,13 @@
       <%- include("partiels/detail-tarif", { tarif: utilisateur.tarif }) %>
     <% } %>
 
+    <div class="actions">
+      <a class="bouton bouton-secondaire" href="/mon-profil/modifier">
+        <%- include("partiels/icone", { nom: "profil" }) %>
+        Modifier mon profil
+      </a>
+    </div>
+
     <% if (utilisateur.role === "prestataire" && utilisateur.statut_verification === "refuse" && utilisateur.motif_refus) { %>
       <p class="aide">Motif du refus : <%= utilisateur.motif_refus %></p>
     <% } %>

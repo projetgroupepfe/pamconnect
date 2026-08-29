@@ -121,6 +121,24 @@ const requetes = {
     UPDATE candidatures SET statut = ? WHERE id = ?
   `),
 
+  majProfil: db.prepare(`
+    UPDATE utilisateurs
+    SET nom = @nom,
+        arrondissement = @arrondissement,
+        quartier = @quartier,
+        metier = @metier,
+        tarif = @tarif
+    WHERE id = @id
+  `),
+
+  majPosition: db.prepare(`
+    UPDATE utilisateurs SET latitude = ?, longitude = ? WHERE id = ?
+  `),
+
+  majMotDePasse: db.prepare(`
+    UPDATE utilisateurs SET motdepasse = ? WHERE id = ?
+  `),
+
   enregistrerDocuments: db.prepare(`
     UPDATE utilisateurs
     SET cni_fichier = @cni,
@@ -225,6 +243,29 @@ function formaterTarif(tarif) {
   const brut = Math.round(Number(tarif) || 0);
   if (brut <= 0) return "Tarif non indiqué";
   return formaterMontant(brut);
+}
+
+// Les memes regles s'appliquent quand on cree un compte et quand on le
+// modifie. Elles sont ecrites ICI, une seule fois : impossible qu'elles
+// finissent par dire deux choses differentes selon l'ecran.
+// Renvoie null si tout va bien, sinon le message a afficher.
+function verifierProfilPrestataire(donnees) {
+  if (!String(donnees.metier || "").trim()) {
+    return {
+      titre: "Métier obligatoire",
+      texte: "Indiquez votre métier pour apparaître dans les recherches.",
+    };
+  }
+
+  if (!(Math.round(Number(donnees.tarif) || 0) > 0)) {
+    return {
+      titre: "Tarif obligatoire",
+      texte: "Indiquez le tarif que vous demandez pour une prestation. " +
+             "C'est ce montant que l'employeur paiera.",
+    };
+  }
+
+  return null;
 }
 
 // Traduit le statut technique en texte lisible par un humain.
@@ -429,24 +470,15 @@ app.post("/inscription", lireFormulaire, (req, res) => {
     });
   }
 
-  // Sans metier, la personne n'apparaitrait dans aucune recherche.
-  if (donnees.role === "prestataire" && !String(donnees.metier || "").trim()) {
-    return res.status(400).render("message", {
-      titre: "Métier obligatoire",
-      texte: "Indiquez votre métier pour apparaître dans les recherches.",
-      liens: [{ url: "/inscription", texte: "Retour au formulaire" }],
-    });
-  }
-
-  // Sans tarif, la plateforme ne peut ni faire payer l'employeur,
-  // ni calculer la commission, ni reverser quoi que ce soit.
-  if (donnees.role === "prestataire" && !(Math.round(Number(donnees.tarif) || 0) > 0)) {
-    return res.status(400).render("message", {
-      titre: "Tarif obligatoire",
-      texte: "Indiquez le tarif que vous demandez pour une prestation. " +
-             "C'est ce montant que l'employeur paiera.",
-      liens: [{ url: "/inscription", texte: "Retour au formulaire" }],
-    });
+  // Sans metier, la personne n'apparait dans aucune recherche.
+  // Sans tarif, la plateforme ne peut ni faire payer, ni reverser.
+  if (donnees.role === "prestataire") {
+    const probleme = verifierProfilPrestataire(donnees);
+    if (probleme) {
+      return res.status(400).render("message", Object.assign({}, probleme, {
+        liens: [{ url: "/inscription", texte: "Retour au formulaire" }],
+      }));
+    }
   }
 
   requetes.creerUtilisateur.run({
@@ -523,6 +555,96 @@ app.get("/mon-profil", exigerConnexion, (req, res) => {
     utilisateur,
     mesAnnonces,
     mesCandidatures,
+  });
+});
+
+// --- Modifier son profil : le formulaire ---------------------------
+app.get("/mon-profil/modifier", exigerConnexion, (req, res) => {
+  res.render("modifier-profil", {
+    titre: "Modifier mon profil",
+    utilisateur: req.utilisateur,
+  });
+});
+
+// --- Modifier son profil : l'enregistrement ------------------------
+app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => {
+  const donnees = req.body;
+  const moi = req.utilisateur;
+
+  if (!String(donnees.nom || "").trim()) {
+    return res.status(400).render("message", {
+      titre: "Nom obligatoire",
+      texte: "Indiquez le nom sous lequel vous souhaitez apparaître.",
+      liens: [{ url: "/mon-profil/modifier", texte: "Retour au formulaire" }],
+    });
+  }
+
+  // Les memes regles qu'a l'inscription, appelees au meme endroit.
+  if (moi.role === "prestataire") {
+    const probleme = verifierProfilPrestataire(donnees);
+    if (probleme) {
+      return res.status(400).render("message", Object.assign({}, probleme, {
+        liens: [{ url: "/mon-profil/modifier", texte: "Retour au formulaire" }],
+      }));
+    }
+  }
+
+  requetes.majProfil.run({
+    id: moi.id,
+    nom: String(donnees.nom).trim(),
+    arrondissement: donnees.arrondissement || null,
+    quartier: String(donnees.quartier || "").trim() || null,
+    // Un employeur n'a ni metier ni tarif : on ne les invente pas.
+    metier: moi.role === "prestataire" ? String(donnees.metier).trim() : null,
+    tarif: moi.role === "prestataire" ? Math.round(Number(donnees.tarif)) : null,
+  });
+
+  // La position n'est mise a jour que si le navigateur l'a fournie :
+  // on ne remplace jamais une position connue par du vide.
+  const latitude = Number(donnees.latitude);
+  const longitude = Number(donnees.longitude);
+  if (!isNaN(latitude) && !isNaN(longitude) && donnees.latitude && donnees.longitude) {
+    requetes.majPosition.run(latitude, longitude, moi.id);
+  }
+
+  res.render("message", {
+    titre: "Profil mis à jour",
+    texte: "Vos informations ont bien été enregistrées.",
+    liens: [{ url: "/mon-profil", texte: "Voir mon profil" }],
+  });
+});
+
+// --- Changer son mot de passe --------------------------------------
+app.post("/mon-profil/mot-de-passe", exigerConnexion, lireFormulaire, (req, res) => {
+  const donnees = req.body;
+  const moi = req.utilisateur;
+
+  // On redemande l'ancien mot de passe : sans cela, quelqu'un qui
+  // trouverait un ordinateur ouvert pourrait s'approprier le compte.
+  if (!verifierMotDePasse(donnees.ancien || "", moi.motdepasse)) {
+    return res.status(403).render("message", {
+      titre: "Mot de passe actuel incorrect",
+      texte: "Pour changer votre mot de passe, il faut d'abord saisir l'ancien.",
+      liens: [{ url: "/mon-profil/modifier", texte: "Réessayer" }],
+    });
+  }
+
+  const nouveau = String(donnees.nouveau || "");
+
+  if (nouveau.length < 6) {
+    return res.status(400).render("message", {
+      titre: "Mot de passe trop court",
+      texte: "Choisissez un mot de passe d'au moins 6 caractères.",
+      liens: [{ url: "/mon-profil/modifier", texte: "Réessayer" }],
+    });
+  }
+
+  requetes.majMotDePasse.run(hacherMotDePasse(nouveau), moi.id);
+
+  res.render("message", {
+    titre: "Mot de passe modifié",
+    texte: "Votre nouveau mot de passe est actif dès maintenant.",
+    liens: [{ url: "/mon-profil", texte: "Voir mon profil" }],
   });
 });
 
