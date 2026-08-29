@@ -1,25 +1,102 @@
 <%- include("partiels/tete") %>
 
-  <h1>Resultats de recherche</h1>
+  <h1>Rechercher un prestataire</h1>
+
+  <div class="carte">
+    <form id="formulaireRecherche" action="/recherche" method="GET">
+      <div class="champ">
+        <label for="metier">Métier recherché</label>
+        <input type="text" id="metier" name="metier" placeholder="ex : ménage, nounou, jardinage"
+               value="<%= locals.metierRecherche || "" %>">
+      </div>
+
+      <input type="hidden" id="latitude" name="latitude">
+      <input type="hidden" id="longitude" name="longitude">
+
+      <div class="actions">
+        <button type="submit" id="boutonProximite">Rechercher près de moi</button>
+        <button type="submit" class="bouton-secondaire" id="boutonSimple"
+                formnovalidate>Rechercher sans ma position</button>
+      </div>
+      <p class="aide" id="messageGps"></p>
+    </form>
+  </div>
+
+  <h2>
+    <%= prestataires.length %>
+    prestataire<%= prestataires.length > 1 ? "s" : "" %>
+    <%= locals.metierRecherche ? "pour « " + metierRecherche + " »" : "au total" %>
+  </h2>
 
   <% if (prestataires.length === 0) { %>
-    <p>Aucun prestataire trouve.</p>
+
+    <p class="vide">Aucun prestataire ne correspond à cette recherche.</p>
+
   <% } else { %>
-    <% prestataires.forEach(function (prestataire) { %>
-      <div class="carte">
-        <p>
-          <strong><%= prestataire.nom %></strong> - <%= prestataire.metier %>
-          <% if (prestataire.statut_verification === "verifie") { %>
-            <span class="badge badge-verifie">Identité vérifiée</span>
-          <% } %>
-        </p>
-        <p><%= prestataire.arrondissement %>, <%= prestataire.quartier || "" %></p>
-        <p>Tarif : <%= formaterTarif(prestataire.tarif) %></p>
-        <p>Distance : <%= prestataire.distanceTexte %></p>
-      </div>
-    <% }); %>
+
+    <div class="grille">
+      <% prestataires.forEach(function (prestataire) { %>
+        <div class="carte">
+          <h3><%= prestataire.nom %></h3>
+          <p class="discret"><%= prestataire.metier %></p>
+
+          <p>
+            <% if (prestataire.statut_verification === "verifie") { %>
+              <span class="badge badge-verifie">Identité vérifiée</span>
+            <% } else { %>
+              <span class="badge badge-non-soumis">Identité non vérifiée</span>
+            <% } %>
+          </p>
+
+          <p class="discret">
+            <%= prestataire.arrondissement %><%= prestataire.quartier ? ", " + prestataire.quartier : "" %><br>
+            Tarif : <%= formaterTarif(prestataire.tarif) %><br>
+            Distance : <%= prestataire.distanceTexte %>
+          </p>
+        </div>
+      <% }); %>
+    </div>
+
   <% } %>
 
-  <p><a href="/recherche.html">Nouvelle recherche</a></p>
+<script>
+  // Le bouton "pres de moi" demande la position AVANT d'envoyer le formulaire.
+  const formulaire = document.getElementById("formulaireRecherche");
+  const message = document.getElementById("messageGps");
+  let utiliserPosition = false;
+
+  document.getElementById("boutonProximite").addEventListener("click", function () {
+    utiliserPosition = true;
+  });
+  document.getElementById("boutonSimple").addEventListener("click", function () {
+    utiliserPosition = false;
+  });
+
+  formulaire.addEventListener("submit", function (evenement) {
+    if (!utiliserPosition) return;          // recherche sans position : rien a faire
+
+    if (!navigator.geolocation) {
+      message.textContent = "La géolocalisation n'est pas disponible sur cet appareil.";
+      return;                                // on laisse partir la recherche sans position
+    }
+
+    // On arrete l'envoi le temps d'obtenir la position, puis on relance.
+    evenement.preventDefault();
+    message.textContent = "Recherche de votre position...";
+
+    navigator.geolocation.getCurrentPosition(
+      function (position) {
+        document.getElementById("latitude").value = position.coords.latitude;
+        document.getElementById("longitude").value = position.coords.longitude;
+        formulaire.submit();
+      },
+      function (erreur) {
+        message.textContent = "Position indisponible (" + erreur.message + "). Recherche sans classement par distance.";
+        utiliserPosition = false;
+        formulaire.submit();
+      }
+    );
+  });
+</script>
 
 <%- include("partiels/pied") %>

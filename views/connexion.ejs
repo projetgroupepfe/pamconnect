@@ -1,0 +1,24 @@
+<%- include("partiels/tete") %>
+
+  <div class="colonne">
+    <h1>Se connecter</h1>
+
+    <div class="carte">
+      <form action="/connexion" method="POST">
+        <div class="champ">
+          <label for="email">Adresse email</label>
+          <input type="email" id="email" name="email" autocomplete="email" required>
+        </div>
+        <div class="champ">
+          <label for="motdepasse">Mot de passe</label>
+          <input type="password" id="motdepasse" name="motdepasse" autocomplete="current-password" required>
+        </div>
+        <div class="actions">
+          <button type="submit">Se connecter</button>
+          <a class="bouton bouton-secondaire" href="/inscription">Créer un compte</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<%- include("partiels/pied") %>

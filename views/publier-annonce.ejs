@@ -1,35 +1,51 @@
 <%- include("partiels/tete") %>
 
-  <h1>Publier une annonce</h1>
+  <div class="colonne">
+    <h1>Publier une annonce</h1>
+    <p class="discret">
+      Décrivez votre besoin. Les prestataires dont le métier correspond
+      pourront y répondre depuis la page des annonces.
+    </p>
 
-  <form action="/annonces" method="POST">
-    <p>
-      <label for="titre">Titre :</label>
-      <input type="text" id="titre" name="titre" required>
-    </p>
-    <p>
-      <label for="description">Description :</label>
-      <textarea id="description" name="description" required></textarea>
-    </p>
-    <p>
-      <label for="metier">Metier recherche :</label>
-      <input type="text" id="metier" name="metier" required>
-    </p>
-    <p>
-      <label for="arrondissement">Arrondissement :</label>
-      <select id="arrondissement" name="arrondissement" required>
-        <option value="Yaounde 1">Yaounde 1</option>
-        <option value="Yaounde 2">Yaounde 2</option>
-        <option value="Yaounde 3">Yaounde 3</option>
-        <option value="Yaounde 4">Yaounde 4</option>
-        <option value="Yaounde 5">Yaounde 5</option>
-        <option value="Yaounde 6">Yaounde 6</option>
-        <option value="Yaounde 7">Yaounde 7</option>
-      </select>
-    </p>
-    <p>
-      <button type="submit">Publier</button>
-    </p>
-  </form>
+    <div class="carte">
+      <form action="/annonces" method="POST">
+
+        <div class="champ">
+          <label for="titre">Titre de l'annonce</label>
+          <input type="text" id="titre" name="titre" placeholder="ex : Ménage deux fois par semaine" required>
+        </div>
+
+        <div class="champ">
+          <label for="description">Description</label>
+          <textarea id="description" name="description"
+                    placeholder="Précisez le volume de travail, les jours souhaités, les conditions..." required></textarea>
+        </div>
+
+        <div class="champ">
+          <label for="metier">Métier recherché</label>
+          <input type="text" id="metier" name="metier" placeholder="ex : Ménage, Nounou, Jardinage" required>
+          <span class="aide">Ce mot sert aux prestataires pour retrouver votre annonce.</span>
+        </div>
+
+        <div class="champ">
+          <label for="arrondissement">Arrondissement</label>
+          <select id="arrondissement" name="arrondissement" required>
+            <option value="Yaoundé 1">Yaoundé 1</option>
+            <option value="Yaoundé 2">Yaoundé 2</option>
+            <option value="Yaoundé 3">Yaoundé 3</option>
+            <option value="Yaoundé 4">Yaoundé 4</option>
+            <option value="Yaoundé 5">Yaoundé 5</option>
+            <option value="Yaoundé 6">Yaoundé 6</option>
+            <option value="Yaoundé 7">Yaoundé 7</option>
+          </select>
+        </div>
+
+        <div class="actions">
+          <button type="submit">Publier l'annonce</button>
+          <a class="bouton bouton-secondaire" href="/mon-profil">Annuler</a>
+        </div>
+      </form>
+    </div>
+  </div>
 
 <%- include("partiels/pied") %>

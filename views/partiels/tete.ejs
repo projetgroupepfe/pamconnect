@@ -1,5 +1,6 @@
-<%# Debut de page commun a toutes les vues : le <head> et le menu.        %>
-<%# Toute modification du menu se fait ICI, une seule fois, pour tout le site. %>
+<%# Debut de page commun a TOUTES les vues : en-tete, logo, menu.   %>
+<%# Le menu s'adapte a la personne connectee (variable "moi",        %>
+<%# fournie a toutes les vues par server.js).                        %>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -9,17 +10,55 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <nav>
-    <a href="/index.html">Accueil</a>
-    <a href="/employeur.html">Espace employeur</a>
-    <a href="/prestataire.html">Espace prestataire</a>
-    <a href="/recherche.html">Recherche</a>
-    <a href="/annonces">Annonces</a>
-    <a href="/inscription.html">Inscription</a>
-    <a href="/connexion.html">Connexion</a>
-    <a href="/mon-profil">Mon profil</a>
-    <%# Visible uniquement pour les membres de l'equipe projet. %>
-    <% if (locals.moi && locals.moi.est_admin) { %>
-      <a href="/admin">Administration</a>
-    <% } %>
-  </nav>
+
+  <header class="entete">
+    <div class="entete-interieur">
+
+      <a class="logo" href="/">
+        <%# Un bouclier avec une coche : la verification d'identite,
+            qui est la promesse centrale de la plateforme. %>
+        <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <path d="M16 2.4 4.6 6.9v9.2c0 7 4.8 11.7 11.4 13.5 6.6-1.8 11.4-6.5 11.4-13.5V6.9L16 2.4Z" fill="#1F4E79"/>
+          <path d="m10.6 16.2 3.7 3.7 7.1-7.2" fill="none" stroke="#fff" stroke-width="2.6"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Pam<strong>Connect</strong></span>
+      </a>
+
+      <nav class="menu">
+        <a href="/">Accueil</a>
+        <a href="/recherche">Rechercher</a>
+        <a href="/annonces">Annonces</a>
+
+        <% if (locals.moi) { %>
+
+          <% if (moi.role === "employeur") { %>
+            <a href="/publier-annonce">Publier une annonce</a>
+          <% } %>
+
+          <% if (moi.est_admin) { %>
+            <a href="/admin">Administration</a>
+          <% } %>
+
+          <span class="menu-separateur"></span>
+          <a href="/mon-profil">Mon profil</a>
+
+          <%# La deconnexion passe par un formulaire POST : une simple
+              adresse GET pourrait etre declenchee a l'insu de la personne. %>
+          <form action="/deconnexion" method="POST">
+            <button type="submit">Déconnexion</button>
+          </form>
+
+        <% } else { %>
+
+          <span class="menu-separateur"></span>
+          <a href="/connexion">Connexion</a>
+          <a class="principal" href="/inscription">Créer un compte</a>
+
+        <% } %>
+      </nav>
+
+    </div>
+  </header>
+
+  <main class="contenu">

@@ -356,6 +356,35 @@ app.use((req, res, next) => {
 // PARTIE 2 - Les routes de l'application
 // ============================================================
 
+// --- Les pages de presentation -------------------------------------
+// Elles ne font qu'afficher une vue : aucune donnee a preparer.
+app.get("/", (req, res) => res.render("accueil", { titre: "Accueil" }));
+app.get("/employeur", (req, res) => res.render("employeur", { titre: "Espace employeur" }));
+app.get("/prestataire", (req, res) => res.render("prestataire", { titre: "Espace prestataire" }));
+app.get("/inscription", (req, res) => res.render("inscription", { titre: "Creer un compte" }));
+app.get("/connexion", (req, res) => res.render("connexion", { titre: "Se connecter" }));
+
+// Ces pages etaient auparavant des fichiers .html. On redirige les
+// anciennes adresses pour ne casser aucun lien deja partage.
+["index", "employeur", "prestataire", "inscription", "connexion", "recherche"].forEach((page) => {
+  app.get(`/${page}.html`, (req, res) => res.redirect(301, page === "index" ? "/" : `/${page}`));
+});
+
+// --- Deconnexion ---------------------------------------------------
+// En POST et non en GET : une simple adresse pourrait etre declenchee
+// a l'insu de la personne, par exemple par une image piegee.
+app.post("/deconnexion", (req, res) => {
+  const enteteCookie = req.headers.cookie || "";
+  const paire = enteteCookie.split("; ").find((c) => c.startsWith("session="));
+
+  if (paire) {
+    delete sessions[paire.split("=")[1]];   // la session n'existe plus cote serveur
+  }
+
+  res.clearCookie("session", { path: "/" }); // et le navigateur oublie le cookie
+  res.redirect("/");
+});
+
 // --- Inscription ---------------------------------------------------
 app.post("/inscription", lireFormulaire, (req, res) => {
   const donnees = req.body;
@@ -618,8 +647,9 @@ app.get("/recherche", (req, res) => {
   }));
 
   res.render("recherche", {
-    titre: "Resultats",
+    titre: "Rechercher un prestataire",
     prestataires: resultats,
+    metierRecherche: (req.query.metier || "").trim(),
   });
 });
 

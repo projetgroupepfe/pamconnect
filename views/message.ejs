@@ -1,18 +1,20 @@
-<%# Page de message simple : un titre, un texte, un ou plusieurs liens.     %>
-<%# Elle remplace les 10 petites pages qui etaient ecrites a la main dans   %>
-<%# server.js, et qui n'avaient ni style ni menu.                          %>
+<%# Page de message simple : un titre, un texte, un ou plusieurs liens. %>
 <%- include("partiels/tete") %>
 
-  <h1><%= titre %></h1>
+  <div class="colonne">
+    <div class="carte">
+      <h1><%= titre %></h1>
 
-  <% if (locals.texte) { %>
-    <p><%= texte %></p>
-  <% } %>
+      <% if (locals.texte) { %>
+        <p class="discret"><%= texte %></p>
+      <% } %>
 
-  <p>
-    <% (locals.liens || []).forEach(function (lien) { %>
-      <a href="<%= lien.url %>"><%= lien.texte %></a>
-    <% }); %>
-  </p>
+      <p class="actions">
+        <% (locals.liens || []).forEach(function (lien, index) { %>
+          <a class="bouton <%= index === 0 ? "" : "bouton-secondaire" %>" href="<%= lien.url %>"><%= lien.texte %></a>
+        <% }); %>
+      </p>
+    </div>
+  </div>
 
 <%- include("partiels/pied") %>

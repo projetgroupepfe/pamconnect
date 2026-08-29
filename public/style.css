@@ -1,77 +1,430 @@
+/* ============================================================
+   PamConnect - feuille de style
+   ------------------------------------------------------------
+   Organisation du fichier :
+     1. Variables de couleur et d'espacement
+     2. Bases (corps de page, titres, texte)
+     3. En-tete et menu
+     4. Conteneur et pied de page
+     5. Cartes
+     6. Formulaires
+     7. Boutons
+     8. Pastilles de statut
+     9. Adaptation aux petits ecrans
+   ============================================================ */
+
+
+/* ---------- 1. Variables ---------------------------------- */
+/* Une couleur definie ICI est utilisee partout ailleurs.      */
+/* Changer la charte du site = changer ces quelques lignes.    */
+:root {
+  --bleu:         #1F4E79;   /* la couleur de PamConnect */
+  --bleu-fonce:   #163A5C;
+  --bleu-clair:   #E9F0F6;
+
+  --encre:        #1B2733;   /* le texte principal */
+  --encre-douce:  #57687A;   /* le texte secondaire */
+  --encre-pale:   #8496A5;   /* les mentions discretes */
+
+  --trait:        #DCE4EB;   /* les bordures */
+  --fond:         #F4F7FA;   /* le fond de page */
+  --surface:      #FFFFFF;   /* le fond des cartes */
+
+  --vert:         #1C6334;   --vert-fond:  #E2F2E7;
+  --ambre:        #8A5A05;   --ambre-fond: #FBF0DA;
+  --rouge:        #92222F;   --rouge-fond: #FAE2E5;
+
+  --rayon:        8px;
+  --ombre:        0 1px 2px rgba(27, 39, 51, .06),
+                  0 6px 16px rgba(27, 39, 51, .05);
+
+  /* Polices du systeme : aucun telechargement, aucune dependance
+     a un service exterieur, et le site s'affiche identiquement
+     meme sans connexion internet. */
+  --police: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+
+
+/* ---------- 2. Bases -------------------------------------- */
+* { box-sizing: border-box; }
+
 body {
-  font-family: Arial, sans-serif;
-  background-color: #f4f6f8;
-  color: #1f2d3d;
-  text-align: center;
-  padding-top: 80px;
-  padding-left: 20px;
-  padding-right: 20px;
+  margin: 0;
+  background-color: var(--fond);
+  color: var(--encre);
+  font-family: var(--police);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
-h1 {
-  color: #1f4e79;
+
+h1, h2, h3 {
+  color: var(--bleu);
+  line-height: 1.25;
+  margin: 0 0 .6em;
 }
-nav {
-  margin-bottom: 30px;
+h1 { font-size: 1.9rem; letter-spacing: -.01em; }
+h2 { font-size: 1.3rem; margin-top: 2rem; }
+h3 { font-size: 1.05rem; }
+
+p { margin: 0 0 1rem; }
+p:last-child { margin-bottom: 0; }
+
+a { color: var(--bleu); }
+a:hover { color: var(--bleu-fonce); }
+
+.discret { color: var(--encre-douce); font-size: .92rem; }
+
+:focus-visible {
+  outline: 2px solid var(--bleu);
+  outline-offset: 2px;
 }
-nav a {
-  margin: 0 12px;
-  color: #1f4e79;
+
+
+/* ---------- 3. En-tete et menu ---------------------------- */
+.entete {
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--trait);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.entete-interieur {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 0 20px;
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  color: var(--bleu);
   text-decoration: none;
-  font-weight: bold;
+  font-size: 1.18rem;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  padding: .6rem 0;
 }
-nav a:hover {
-  text-decoration: underline;
+.logo svg { display: block; }
+.logo span { font-weight: 400; }
+.logo strong { font-weight: 700; }
+
+.menu {
+  display: flex;
+  align-items: center;
+  gap: .15rem;
+  flex-wrap: wrap;
+}
+.menu a,
+.menu button {
+  display: inline-block;
+  padding: .45rem .7rem;
+  border-radius: 6px;
+  color: var(--encre-douce);
+  text-decoration: none;
+  font-size: .93rem;
+  font-family: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.menu a:hover,
+.menu button:hover {
+  background-color: var(--bleu-clair);
+  color: var(--bleu);
+}
+.menu .principal {
+  background-color: var(--bleu);
+  color: #fff;
+  font-weight: 500;
+}
+.menu .principal:hover { background-color: var(--bleu-fonce); color: #fff; }
+.menu form { display: inline; margin: 0; }
+.menu-separateur {
+  width: 1px;
+  height: 22px;
+  background-color: var(--trait);
+  margin: 0 .4rem;
 }
 
-@media (max-width: 600px) {
-  body {
-    padding-top: 40px;
-  }
-  nav {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
-  }
-  nav a {
-    margin: 4px;
-  }
-  input, select, button {
-    width: 100%;
-    max-width: 300px;
-    padding: 8px;
-    font-size: 16px;
-  }
-  h1 {
-    font-size: 1.5em;
-  }
+
+/* ---------- 4. Conteneur et pied de page ------------------ */
+.contenu {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 2.5rem 20px 4rem;
 }
-/* Cartes utilisees pour les annonces, les candidatures et les resultats */
+
+/* Les formulaires et les pages courtes respirent mieux etroits. */
+.colonne {
+  max-width: 32rem;
+  margin: 0 auto;
+}
+
+.pied {
+  border-top: 1px solid var(--trait);
+  background-color: var(--surface);
+  color: var(--encre-pale);
+  font-size: .87rem;
+}
+.pied-interieur {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 1.5rem 20px;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.pied p { margin: 0; }
+
+
+/* ---------- 5. Cartes ------------------------------------- */
 .carte {
-  border: 1px solid #ccc;
-  margin: 10px auto;
-  padding: 10px;
-  max-width: 400px;
+  background-color: var(--surface);
+  border: 1px solid var(--trait);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre);
+  padding: 1.25rem 1.4rem;
+  margin: 0 0 1rem;
 }
-.candidature {
-  border-top: 1px solid #eee;
-  padding-top: 8px;
-  margin-top: 8px;
-}
-.en-ligne {
-  display: inline;
+.carte h3 { margin-bottom: .35rem; }
+
+/* Une grille de cartes qui s'adapte a la largeur disponible. */
+.grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  align-items: start;
 }
 
-/* Pastilles de statut de verification */
+.candidature {
+  border-top: 1px solid var(--trait);
+  padding-top: .9rem;
+  margin-top: .9rem;
+}
+.en-ligne { display: inline; }
+
+.vide {
+  color: var(--encre-douce);
+  background-color: var(--surface);
+  border: 1px dashed var(--trait);
+  border-radius: var(--rayon);
+  padding: 1.5rem;
+  text-align: center;
+}
+
+
+/* ---------- 6. Formulaires -------------------------------- */
+/* L'etiquette est AU-DESSUS du champ et les champs font tous  */
+/* la meme largeur : c'est ce qui donne un formulaire aligne.   */
+.champ { margin-bottom: 1.1rem; }
+
+.champ label {
+  display: block;
+  margin-bottom: .35rem;
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--encre);
+}
+
+.champ .aide {
+  display: block;
+  margin-top: .3rem;
+  font-size: .84rem;
+  color: var(--encre-pale);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="file"],
+select,
+textarea {
+  width: 100%;
+  padding: .6rem .7rem;
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--encre);
+  background-color: var(--surface);
+  border: 1px solid var(--trait);
+  border-radius: 6px;
+}
+textarea { min-height: 6rem; resize: vertical; }
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--bleu);
+  box-shadow: 0 0 0 3px var(--bleu-clair);
+}
+
+input::placeholder, textarea::placeholder { color: var(--encre-pale); }
+
+
+/* ---------- 7. Boutons ------------------------------------ */
+button,
+.bouton {
+  display: inline-block;
+  padding: .6rem 1.1rem;
+  font-family: inherit;
+  font-size: .95rem;
+  font-weight: 500;
+  color: #fff;
+  background-color: var(--bleu);
+  border: 1px solid var(--bleu);
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+}
+button:hover,
+.bouton:hover { background-color: var(--bleu-fonce); border-color: var(--bleu-fonce); color: #fff; }
+
+.bouton-secondaire {
+  color: var(--bleu);
+  background-color: var(--surface);
+  border-color: var(--trait);
+}
+.bouton-secondaire:hover { background-color: var(--bleu-clair); color: var(--bleu); border-color: var(--bleu-clair); }
+
+.bouton-danger {
+  color: var(--rouge);
+  background-color: var(--surface);
+  border-color: var(--trait);
+}
+.bouton-danger:hover { background-color: var(--rouge-fond); color: var(--rouge); border-color: var(--rouge-fond); }
+
+.actions {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+
+/* ---------- 8. Pastilles de statut ------------------------ */
 .badge {
   display: inline-block;
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-size: 0.85em;
-  font-weight: bold;
+  padding: .15rem .6rem;
+  border-radius: 999px;
+  font-size: .8rem;
+  font-weight: 600;
   white-space: nowrap;
+  vertical-align: 1px;
 }
-.badge-verifie     { background-color: #e2f2e7; color: #1c6334; }
-.badge-en-attente  { background-color: #fbf0da; color: #8a5a05; }
-.badge-refuse      { background-color: #fae2e5; color: #92222f; }
-.badge-non-soumis  { background-color: #eaeef2; color: #52606c; }
+.badge-verifie     { background-color: var(--vert-fond);  color: var(--vert); }
+.badge-en-attente  { background-color: var(--ambre-fond); color: var(--ambre); }
+.badge-refuse      { background-color: var(--rouge-fond); color: var(--rouge); }
+.badge-non-soumis  { background-color: var(--bleu-clair); color: var(--encre-douce); }
+
+
+/* ---------- 9. Petits ecrans ------------------------------ */
+@media (max-width: 720px) {
+  .entete-interieur {
+    padding: .6rem 16px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .menu { gap: .1rem; }
+  .menu a, .menu button { padding: .4rem .55rem; font-size: .88rem; }
+  .menu-separateur { display: none; }
+
+  .contenu { padding: 1.75rem 16px 3rem; }
+  h1 { font-size: 1.55rem; }
+  .pied-interieur { flex-direction: column; padding: 1.25rem 16px; }
+}
+
+
+/* ---------- 10. Page d'accueil ---------------------------- */
+.accroche {
+  display: grid;
+  grid-template-columns: 1.15fr .85fr;
+  gap: 2.5rem;
+  align-items: center;
+  margin-bottom: 3.5rem;
+}
+.accroche-image { width: 100%; height: auto; }
+
+.sur-titre {
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--encre-pale);
+  margin-bottom: .5rem;
+}
+.accroche h1 { font-size: 2.4rem; margin-bottom: .8rem; }
+.chapeau {
+  font-size: 1.08rem;
+  color: var(--encre-douce);
+  max-width: 34rem;
+  margin-bottom: 1.6rem;
+}
+
+.etapes {
+  list-style: none;
+  margin: 0 0 3rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+.etapes li {
+  background-color: var(--surface);
+  border: 1px solid var(--trait);
+  border-radius: var(--rayon);
+  padding: 1.4rem;
+}
+.etape-numero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: var(--bleu-clair);
+  color: var(--bleu);
+  font-weight: 700;
+  font-size: .95rem;
+  margin-bottom: .7rem;
+}
+.etapes h3 { margin-bottom: .3rem; }
+.etapes p { color: var(--encre-douce); font-size: .94rem; }
+
+.metiers {
+  list-style: none;
+  margin: 0 0 3rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: .8rem;
+}
+.metiers li {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  background-color: var(--surface);
+  border: 1px solid var(--trait);
+  border-radius: var(--rayon);
+  padding: .9rem 1.1rem;
+  font-size: .95rem;
+  font-weight: 500;
+}
+.metiers svg { width: 30px; height: 30px; flex: none; }
+
+.confiance { background-color: var(--bleu-clair); border-color: transparent; box-shadow: none; }
+.confiance p { color: var(--encre-douce); }
+
+@media (max-width: 860px) {
+  .accroche { grid-template-columns: 1fr; gap: 1.5rem; }
+  .accroche-image { max-width: 340px; margin: 0 auto; }
+  .accroche h1 { font-size: 1.8rem; }
+}

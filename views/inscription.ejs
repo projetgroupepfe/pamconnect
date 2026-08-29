@@ -1,0 +1,124 @@
+<%- include("partiels/tete") %>
+
+  <div class="colonne">
+    <h1>Créer un compte</h1>
+    <p class="discret">
+      Employeur ou prestataire, l'inscription est gratuite. Les prestataires devront
+      ensuite faire vérifier leur identité pour être visibles.
+    </p>
+
+    <div class="carte">
+      <form action="/inscription" method="POST">
+
+        <div class="champ">
+          <label for="role">Je suis</label>
+          <select id="role" name="role">
+            <option value="employeur">Un employeur — je cherche du personnel</option>
+            <option value="prestataire">Un prestataire — je propose mes services</option>
+          </select>
+        </div>
+
+        <div class="champ">
+          <label for="nom">Nom complet</label>
+          <input type="text" id="nom" name="nom" autocomplete="name" required>
+        </div>
+
+        <div class="champ">
+          <label for="email">Adresse email</label>
+          <input type="email" id="email" name="email" autocomplete="email" required>
+        </div>
+
+        <div class="champ">
+          <label for="motdepasse">Mot de passe</label>
+          <input type="password" id="motdepasse" name="motdepasse" autocomplete="new-password" required>
+        </div>
+
+        <div class="champ">
+          <label for="arrondissement">Arrondissement</label>
+          <select id="arrondissement" name="arrondissement">
+            <option value="Yaoundé 1">Yaoundé 1</option>
+            <option value="Yaoundé 2">Yaoundé 2</option>
+            <option value="Yaoundé 3">Yaoundé 3</option>
+            <option value="Yaoundé 4">Yaoundé 4</option>
+            <option value="Yaoundé 5">Yaoundé 5</option>
+            <option value="Yaoundé 6">Yaoundé 6</option>
+            <option value="Yaoundé 7">Yaoundé 7</option>
+          </select>
+        </div>
+
+        <div class="champ">
+          <label for="quartier">Quartier</label>
+          <input type="text" id="quartier" name="quartier" placeholder="ex : Bastos, Mvan, Nsam...">
+        </div>
+
+        <%# Ce bloc n'est affiche que pour les prestataires (voir le script plus bas). %>
+        <div id="champsPrestataire">
+          <div class="champ">
+            <label for="metier">Métier</label>
+            <input type="text" id="metier" name="metier" placeholder="ex : Ménage, Jardinage...">
+            <span class="aide">Sans métier renseigné, vous n'apparaîtrez dans aucune recherche.</span>
+          </div>
+
+          <div class="champ">
+            <label for="tarif">Tarif souhaité (FCFA)</label>
+            <input type="number" id="tarif" name="tarif" placeholder="laissez vide si à négocier" min="0">
+          </div>
+        </div>
+
+        <input type="hidden" id="latitude" name="latitude">
+        <input type="hidden" id="longitude" name="longitude">
+
+        <div class="actions">
+          <button type="submit">Créer mon compte</button>
+          <a class="bouton bouton-secondaire" href="/connexion">J'ai déjà un compte</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+  // --- Champs reserves aux prestataires -------------------------------
+  // Un employeur n'a ni metier ni tarif : on cache ces deux champs pour lui.
+  const choixRole = document.getElementById("role");
+  const champsPrestataire = document.getElementById("champsPrestataire");
+  const champMetier = document.getElementById("metier");
+  const champTarif = document.getElementById("tarif");
+
+  function majChampsPrestataire() {
+    const estPrestataire = choixRole.value === "prestataire";
+
+    // "none" = invisible et ne prend plus de place ; "block" = visible.
+    champsPrestataire.style.display = estPrestataire ? "block" : "none";
+
+    // Le metier est obligatoire pour un prestataire...
+    // On ne rend le champ obligatoire QUE lorsqu'il est visible : un champ
+    // "required" mais cache empecherait le navigateur de valider le
+    // formulaire, sans pouvoir expliquer pourquoi a l'utilisateur.
+    champMetier.required = estPrestataire;
+    // ...mais pas le tarif : laisse vide = "A negocier".
+
+    // Si on repasse en employeur, on vide ce qui aurait ete tape par erreur.
+    if (!estPrestataire) {
+      champMetier.value = "";
+      champTarif.value = "";
+    }
+  }
+
+  choixRole.addEventListener("change", majChampsPrestataire);
+  majChampsPrestataire(); // au chargement de la page
+
+  // --- Position GPS, si la personne l'autorise ------------------------
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      function (position) {
+        document.getElementById("latitude").value = position.coords.latitude;
+        document.getElementById("longitude").value = position.coords.longitude;
+      },
+      function (erreur) {
+        console.log("Position non disponible :", erreur.message);
+      }
+    );
+  }
+</script>
+
+<%- include("partiels/pied") %>

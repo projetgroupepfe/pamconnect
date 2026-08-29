@@ -1,8 +1,12 @@
 <%- include("partiels/tete") %>
 
   <h1>Administration</h1>
+  <p class="chapeau">
+    Espace réservé à l'équipe PamConnect. Vérifiez les pièces déposées par les
+    prestataires avant de valider leur identité.
+  </p>
 
-  <p>
+  <p class="actions">
     <% statistiques.forEach(function (ligne) { %>
       <span class="badge badge-<%= ligne.statut.replace(/ /g, "-") %>">
         <%= libelleVerification(ligne.statut) %> : <%= ligne.nb %>
@@ -14,45 +18,47 @@
 
   <% if (dossiers.length === 0) { %>
 
-    <p>Aucun dossier en attente.</p>
+    <p class="vide">Aucun dossier en attente.</p>
 
   <% } else { %>
 
     <% dossiers.forEach(function (dossier) { %>
       <div class="carte">
-        <p><strong><%= dossier.nom %></strong> — <%= dossier.metier %></p>
-        <p><%= dossier.email %></p>
-        <p><%= dossier.arrondissement %><%= dossier.quartier ? ", " + dossier.quartier : "" %></p>
+        <h3><%= dossier.nom %></h3>
+        <p class="discret">
+          <%= dossier.metier %><br>
+          <%= dossier.email %><br>
+          <%= dossier.arrondissement %><%= dossier.quartier ? ", " + dossier.quartier : "" %>
+        </p>
 
-        <%# Ces liens passent par une route qui verifie que le demandeur   %>
-        <%# est administrateur. Le nom du fichier n'apparait jamais dans   %>
-        <%# l'adresse : on ne transmet que l'identifiant du prestataire.   %>
-        <p>
-          <a href="/admin/document/<%= dossier.id %>/cni" target="_blank" rel="noopener">
-            Ouvrir la pièce d'identité
-          </a>
-          &nbsp;·&nbsp;
-          <a href="/admin/document/<%= dossier.id %>/casier" target="_blank" rel="noopener">
-            Ouvrir le casier judiciaire
-          </a>
+        <%# Ces liens passent par une route qui verifie que le demandeur est
+            administrateur. Le nom du fichier n'apparait jamais dans l'adresse :
+            on ne transmet que l'identifiant du prestataire. %>
+        <p class="actions">
+          <a class="bouton bouton-secondaire" target="_blank" rel="noopener"
+             href="/admin/document/<%= dossier.id %>/cni">Ouvrir la pièce d'identité</a>
+          <a class="bouton bouton-secondaire" target="_blank" rel="noopener"
+             href="/admin/document/<%= dossier.id %>/casier">Ouvrir le casier judiciaire</a>
         </p>
 
         <div class="candidature">
-          <form action="/admin/verification" method="POST" class="en-ligne">
-            <input type="hidden" name="utilisateurId" value="<%= dossier.id %>">
-            <input type="hidden" name="decision" value="valider">
-            <button type="submit">Valider l'identité</button>
-          </form>
+          <div class="actions">
+            <form action="/admin/verification" method="POST" class="en-ligne">
+              <input type="hidden" name="utilisateurId" value="<%= dossier.id %>">
+              <input type="hidden" name="decision" value="valider">
+              <button type="submit">Valider l'identité</button>
+            </form>
+          </div>
 
           <form action="/admin/verification" method="POST">
             <input type="hidden" name="utilisateurId" value="<%= dossier.id %>">
             <input type="hidden" name="decision" value="refuser">
-            <p>
-              <label for="motif-<%= dossier.id %>">Motif du refus :</label>
+            <div class="champ" style="margin-top:1rem">
+              <label for="motif-<%= dossier.id %>">Motif du refus</label>
               <input type="text" id="motif-<%= dossier.id %>" name="motif"
                      placeholder="ex : document illisible">
-            </p>
-            <button type="submit">Refuser</button>
+            </div>
+            <button type="submit" class="bouton-danger">Refuser le dossier</button>
           </form>
         </div>
       </div>
@@ -60,12 +66,12 @@
 
   <% } %>
 
-  <div class="carte">
-    <p><strong>Rappel</strong></p>
+  <div class="carte confiance">
+    <h3>Rappel</h3>
     <p>
       Dans les deux cas, valider ou refuser, les deux documents sont
       <strong>définitivement supprimés du serveur</strong>. Seuls le statut et
-      sa date sont conservés. Vérifie donc les pièces avant de décider.
+      sa date sont conservés. Vérifiez donc les pièces avant de décider.
     </p>
   </div>
 

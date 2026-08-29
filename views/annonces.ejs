@@ -1,27 +1,40 @@
 <%- include("partiels/tete") %>
 
   <h1>Annonces disponibles</h1>
+  <p class="chapeau">Les demandes publiées par les employeurs de Yaoundé.</p>
 
   <% if (annonces.length === 0) { %>
-    <p>Aucune annonce pour le moment.</p>
-  <% } else { %>
-    <% annonces.forEach(function (annonce) { %>
-      <div class="carte">
-        <p><strong><%= annonce.titre %></strong></p>
-        <p><%= annonce.description %></p>
-        <p>Metier : <%= annonce.metier %></p>
-        <p>Arrondissement : <%= annonce.arrondissement %></p>
 
-        <% if (role === "prestataire") { %>
-          <form action="/candidatures" method="POST">
-            <input type="hidden" name="annonceId" value="<%= annonce.id %>">
-            <button type="submit">Postuler</button>
-          </form>
-        <% } else { %>
-          <p><a href="/connexion.html">Connecte-toi en tant que prestataire</a> pour postuler.</p>
-        <% } %>
-      </div>
-    <% }); %>
+    <p class="vide">Aucune annonce pour le moment.</p>
+
+  <% } else { %>
+
+    <div class="grille">
+      <% annonces.forEach(function (annonce) { %>
+        <div class="carte">
+          <h3><%= annonce.titre %></h3>
+          <p><%= annonce.description %></p>
+          <p class="discret">
+            Métier recherché : <%= annonce.metier %><br>
+            <%= annonce.arrondissement %>
+          </p>
+
+          <% if (role === "prestataire") { %>
+            <form action="/candidatures" method="POST">
+              <input type="hidden" name="annonceId" value="<%= annonce.id %>">
+              <button type="submit">Postuler</button>
+            </form>
+          <% } else if (role === "employeur") { %>
+            <p class="aide">Seuls les prestataires peuvent répondre à une annonce.</p>
+          <% } else { %>
+            <p class="aide">
+              <a href="/connexion">Connectez-vous en tant que prestataire</a> pour postuler.
+            </p>
+          <% } %>
+        </div>
+      <% }); %>
+    </div>
+
   <% } %>
 
 <%- include("partiels/pied") %>
