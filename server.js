@@ -78,8 +78,8 @@ const requetes = {
   `),
 
   creerAnnonce: db.prepare(`
-    INSERT INTO annonces (employeur_id, titre, description, metier, arrondissement, horaire)
-    VALUES (@employeur_id, @titre, @description, @metier, @arrondissement, @horaire)
+    INSERT INTO annonces (employeur_id, titre, metier, arrondissement, quartier, horaire)
+    VALUES (@employeur_id, @titre, @metier, @arrondissement, @quartier, @horaire)
   `),
 
   // JOIN : on recupere la candidature ET le nom du prestataire
@@ -554,12 +554,24 @@ app.post("/annonces", exigerConnexion, lireFormulaire, (req, res) => {
     });
   }
 
+  // Le quartier aussi : beaucoup de gens connaissent "Bastos" sans
+  // savoir que c'est Yaounde 2. Sans ce repere, une candidate ne peut
+  // pas juger si le lieu est accessible pour elle.
+  if (!String(donnees.quartier || "").trim()) {
+    return res.status(400).render("message", {
+      titre: "Quartier obligatoire",
+      texte: "Indiquez votre quartier. C'est ce qui permet aux candidates " +
+             "de savoir si elles peuvent s'y rendre.",
+      liens: [{ url: "/publier-annonce", texte: "Retour au formulaire" }],
+    });
+  }
+
   requetes.creerAnnonce.run({
     employeur_id: req.utilisateur.id,
     titre: donnees.titre,
-    description: donnees.description || null,
     metier: donnees.metier,
     arrondissement: donnees.arrondissement || null,
+    quartier: String(donnees.quartier).trim(),
     horaire: String(donnees.horaire).trim(),
   });
 

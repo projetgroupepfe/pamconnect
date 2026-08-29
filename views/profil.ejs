@@ -95,7 +95,9 @@
             </li>
             <li>
               <%- include("partiels/icone", { nom: "lieu" }) %>
-              <span><%= annonce.arrondissement %></span>
+              <span>
+                <% if (annonce.quartier) { %><%= annonce.quartier %>, <% } %><%= annonce.arrondissement %>
+              </span>
             </li>
           </ul>
 

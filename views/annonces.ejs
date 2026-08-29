@@ -31,7 +31,6 @@
       <% annonces.forEach(function (annonce) { %>
         <div class="carte">
           <h3><%= annonce.titre %></h3>
-          <p class="discret"><%= annonce.description %></p>
 
           <ul class="infos">
             <li>
@@ -44,7 +43,9 @@
             </li>
             <li>
               <%- include("partiels/icone", { nom: "lieu" }) %>
-              <span><%= annonce.arrondissement %></span>
+              <span>
+                <% if (annonce.quartier) { %><strong><%= annonce.quartier %></strong>, <% } %><%= annonce.arrondissement %>
+              </span>
             </li>
           </ul>
 

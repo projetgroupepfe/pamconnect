@@ -72,14 +72,21 @@ CREATE TABLE IF NOT EXISTS annonces (
   employeur_id    INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
 
   titre           TEXT    NOT NULL,
-  description     TEXT,
   metier          TEXT    NOT NULL,
   arrondissement  TEXT,
+
+  -- Le quartier plutot que l'adresse : beaucoup de gens connaissent
+  -- "Bastos" sans savoir que c'est Yaounde 2. C'est ce repere qui
+  -- permet a une candidate de juger si elle peut s'y rendre.
+  quartier        TEXT,
 
   -- Quand l'employeur a besoin de quelqu'un. C'est le critere sur
   -- lequel une candidate decide de repondre ou non a l'annonce.
   -- Texte libre : "Lundi et jeudi, 8h a 12h" est plus parlant
   -- qu'un calendrier a remplir, et bien plus rapide a saisir.
+  --
+  -- Il n'y a PAS de champ description : il faisait doublon avec
+  -- l'horaire, et les employeurs le remplissaient au hasard.
   horaire         TEXT,
 
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now'))

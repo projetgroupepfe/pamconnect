@@ -11,14 +11,9 @@
       <form action="/annonces" method="POST">
 
         <div class="champ">
-          <label for="titre">Titre de l'annonce</label>
-          <input type="text" id="titre" name="titre" placeholder="ex : Ménage deux fois par semaine" required>
-        </div>
-
-        <div class="champ">
-          <label for="description">Description</label>
-          <textarea id="description" name="description"
-                    placeholder="Précisez le volume de travail, les jours souhaités, les conditions..." required></textarea>
+          <label for="titre">Votre demande en une phrase</label>
+          <input type="text" id="titre" name="titre"
+                 placeholder="Ménage deux fois par semaine" required>
         </div>
 
         <div class="champ">
@@ -34,6 +29,17 @@
           <span class="aide">
             C'est la première chose que les candidates regardent : indiquez
             les jours et les heures aussi précisément que possible.
+          </span>
+        </div>
+
+        <div class="champ">
+          <label for="quartier">Dans quel quartier ?</label>
+          <input type="text" id="quartier" name="quartier"
+                 placeholder="Bastos, Mvan, Nsam, Mokolo..." required>
+          <span class="aide">
+            Le nom du quartier suffit — n'indiquez pas votre adresse exacte.
+            Beaucoup de candidates connaissent le quartier sans connaître
+            le numéro de l'arrondissement.
           </span>
         </div>
 
