@@ -53,14 +53,29 @@
           <% } else { %>
             <% annonce.candidatures.forEach(function (candidature) { %>
               <div class="candidature">
-                <p><%= candidature.nomPrestataire %> - Statut : <%= candidature.statut %></p>
+                <p>
+                  <%= candidature.nomPrestataire %> - Statut : <%= candidature.statut %>
+                  <span class="badge badge-<%= candidature.verificationPrestataire.replace(/ /g, "-") %>">
+                    <%= libelleVerification(candidature.verificationPrestataire) %>
+                  </span>
+                </p>
 
                 <% if (candidature.statut === "en attente") { %>
-                  <form action="/candidatures/statut" method="POST" class="en-ligne">
-                    <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
-                    <input type="hidden" name="statut" value="acceptee">
-                    <button type="submit">Accepter</button>
-                  </form>
+
+                  <%# On n'engage personne dont l'identite n'est pas verifiee. %>
+                  <% if (candidature.verificationPrestataire === "verifie") { %>
+                    <form action="/candidatures/statut" method="POST" class="en-ligne">
+                      <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
+                      <input type="hidden" name="statut" value="acceptee">
+                      <button type="submit">Accepter</button>
+                    </form>
+                  <% } else { %>
+                    <p>
+                      Tu pourras accepter cette candidature dès que PamConnect aura
+                      vérifié l'identité de ce prestataire.
+                    </p>
+                  <% } %>
+
                   <form action="/candidatures/statut" method="POST" class="en-ligne">
                     <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
                     <input type="hidden" name="statut" value="refusee">

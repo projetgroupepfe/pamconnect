@@ -85,7 +85,10 @@ const requetes = {
   // JOIN : on recupere la candidature ET le nom du prestataire
   // en une seule requete, au lieu de chercher ensuite dans une liste.
   candidaturesDeAnnonce: db.prepare(`
-    SELECT c.id, c.statut, u.nom AS nomPrestataire
+    SELECT c.id,
+           c.statut,
+           u.nom                 AS nomPrestataire,
+           u.statut_verification AS verificationPrestataire
     FROM candidatures c
     JOIN utilisateurs u ON u.id = c.prestataire_id
     WHERE c.annonce_id = ?
@@ -107,9 +110,10 @@ const requetes = {
   // Verifie en UNE requete que la candidature existe ET que l'annonce
   // concernee appartient bien a l'employeur connecte.
   candidatureDeMonAnnonce: db.prepare(`
-    SELECT c.id
+    SELECT c.id, u.statut_verification AS verificationPrestataire
     FROM candidatures c
-    JOIN annonces a ON a.id = c.annonce_id
+    JOIN annonces     a ON a.id = c.annonce_id
+    JOIN utilisateurs u ON u.id = c.prestataire_id
     WHERE c.id = ? AND a.employeur_id = ?
   `),
 
@@ -534,14 +538,42 @@ app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
 // --- Accepter ou refuser une candidature ---------------------------
 app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => {
   const candidatureId = Number(req.body.candidatureId);
+  const nouveauStatut = req.body.statut;
 
-  // Une seule requete verifie que la candidature existe ET que
-  // l'annonce concernee appartient bien a la personne connectee.
-  const autorisee = requetes.candidatureDeMonAnnonce.get(candidatureId, req.utilisateur.id);
-
-  if (autorisee) {
-    requetes.changerStatutCandidature.run(req.body.statut, candidatureId);
+  if (nouveauStatut !== "acceptee" && nouveauStatut !== "refusee") {
+    return res.status(400).render("message", {
+      titre: "Decision inconnue",
+      texte: "Une candidature ne peut qu'etre acceptee ou refusee.",
+      liens: [{ url: "/mon-profil", texte: "Retour a mes annonces" }],
+    });
   }
+
+  // Une seule requete verifie que la candidature existe, que l'annonce
+  // appartient bien a la personne connectee, et ramene au passage l'etat
+  // de verification du prestataire concerne.
+  const candidature = requetes.candidatureDeMonAnnonce.get(candidatureId, req.utilisateur.id);
+
+  if (!candidature) {
+    return res.status(404).render("message", {
+      titre: "Candidature introuvable",
+      texte: "Cette candidature n'existe pas, ou elle ne concerne aucune de tes annonces.",
+      liens: [{ url: "/mon-profil", texte: "Retour a mes annonces" }],
+    });
+  }
+
+  // REGLE METIER : on n'engage personne dont l'identite n'a pas ete verifiee.
+  // C'est la promesse centrale de PamConnect ; elle est appliquee ICI,
+  // cote serveur, et pas seulement en cachant un bouton dans la page.
+  if (nouveauStatut === "acceptee" && candidature.verificationPrestataire !== "verifie") {
+    return res.status(403).render("message", {
+      titre: "Verification requise",
+      texte: "L'identite de ce prestataire n'a pas encore ete verifiee par PamConnect. " +
+             "Tu pourras accepter sa candidature des que son dossier sera valide.",
+      liens: [{ url: "/mon-profil", texte: "Retour a mes annonces" }],
+    });
+  }
+
+  requetes.changerStatutCandidature.run(nouveauStatut, candidatureId);
 
   res.redirect("/mon-profil");
 });
