@@ -14,7 +14,7 @@
      2. Bases
      3. En-tete
      4. Navigation
-     5. Contenu et pied de page
+     5. Contenu
      6. Cartes et fiches
      7. Lignes d'information a icone
      8. Formulaires
@@ -138,6 +138,22 @@ a:hover { color: var(--bleu-fonce); }
 .logo span  { font-weight: 400; }
 .logo strong { font-weight: 700; }
 
+/* Le nom et la zone couverte forment un bloc, a gauche de l'en-tete. */
+.marque { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+
+.lieu-entete {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  padding: .2rem .6rem;
+  border-radius: 999px;
+  background-color: var(--bleu-clair);
+  color: var(--bleu);
+  font-size: .8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* Sur telephone, seul le raccourci de connexion reste en haut. */
 .entete-actions { display: flex; align-items: center; gap: .4rem; }
 
@@ -183,7 +199,7 @@ a:hover { color: var(--bleu-fonce); }
 .menu-separateur { display: none; }
 
 
-/* ---------- 5. Contenu et pied de page -------------------- */
+/* ---------- 5. Contenu ------------------------------------ */
 .contenu {
   max-width: 1040px;
   margin: 0 auto;
@@ -191,25 +207,6 @@ a:hover { color: var(--bleu-fonce); }
   padding: 1.5rem 16px calc(var(--barre-basse) + 2rem);
 }
 .colonne { max-width: 34rem; margin: 0 auto; }
-
-.pied {
-  display: none;   /* masque sur telephone : la barre du bas suffit */
-  border-top: 1px solid var(--trait);
-  background-color: var(--surface);
-  color: var(--encre-pale);
-  font-size: .9rem;
-}
-.pied-interieur {
-  max-width: 1040px;
-  margin: 0 auto;
-  padding: 1.5rem 16px;
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-.pied p { margin: 0; }
-
 
 /* ---------- 6. Cartes et fiches --------------------------- */
 .carte {
@@ -404,16 +401,6 @@ button:hover, .bouton:hover {
   max-width: 34rem;
   margin-bottom: 1.4rem;
 }
-.sur-titre {
-  display: inline-flex;
-  align-items: center;
-  gap: .35rem;
-  font-size: .85rem;
-  font-weight: 700;
-  color: var(--orange);
-  margin-bottom: .5rem;
-}
-
 .etapes { list-style: none; margin: 0 0 2.5rem; padding: 0; display: grid; gap: .9rem; }
 .etapes li {
   background-color: var(--surface);
@@ -496,7 +483,6 @@ button:hover, .bouton:hover {
   .entete-interieur { padding: 0 20px; min-height: 66px; }
 
   .contenu { padding: 2.5rem 20px 4rem; }
-  .pied { display: block; }
 
   /* Les boutons reprennent leur largeur naturelle, cote a cote. */
   button, .bouton { width: auto; min-height: 46px; }
