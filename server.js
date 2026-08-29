@@ -78,8 +78,8 @@ const requetes = {
   `),
 
   creerAnnonce: db.prepare(`
-    INSERT INTO annonces (employeur_id, titre, description, metier, arrondissement)
-    VALUES (@employeur_id, @titre, @description, @metier, @arrondissement)
+    INSERT INTO annonces (employeur_id, titre, description, metier, arrondissement, horaire)
+    VALUES (@employeur_id, @titre, @description, @metier, @arrondissement, @horaire)
   `),
 
   // JOIN : on recupere la candidature ET le nom du prestataire
@@ -96,7 +96,7 @@ const requetes = {
   `),
 
   candidaturesDePrestataire: db.prepare(`
-    SELECT c.id, c.statut, a.titre AS titreAnnonce
+    SELECT c.id, c.statut, a.titre AS titreAnnonce, a.horaire AS horaireAnnonce
     FROM candidatures c
     JOIN annonces a ON a.id = c.annonce_id
     WHERE c.prestataire_id = ?
@@ -193,13 +193,38 @@ function verifierMotDePasse(motDePasseSaisi, motDePasseHache) {
   return hache === hacheTest;
 }
 
-// Decide comment afficher un tarif. Un prestataire peut laisser le champ vide :
-// on affiche alors "A negocier" plutot qu'un vide peu clair.
-// C'est LE SEUL endroit a modifier si l'equipe change d'avis sur ce texte.
+// ============================================================
+// LE MODELE ECONOMIQUE
+// ------------------------------------------------------------
+// La personne qui propose ses services annonce son tarif BRUT.
+// L'employeur paie exactement ce tarif, sans frais ajoute.
+// La plateforme retient une commission sur ce montant, puis
+// reverse le solde a la personne qui a fait le travail.
+//
+// Le taux est ecrit ICI, une seule fois. Le changer met a jour
+// tous les calculs et tous les affichages du site.
+// ============================================================
+const TAUX_COMMISSION = 0.10;   // 10 %
+
+// Ecrit un montant a la francaise : 10000 -> "10 000 FCFA"
+function formaterMontant(valeur) {
+  const nombre = Math.round(Number(valeur) || 0);
+  return nombre.toLocaleString("fr-FR").replace(/[\u202f\u00a0]/g, " ") + " FCFA";
+}
+
+// Detaille un tarif : ce qui est demande, ce que retient la
+// plateforme, et ce qui revient reellement a la personne.
+function detaillerTarif(tarifBrut) {
+  const brut = Math.round(Number(tarifBrut) || 0);
+  const commission = Math.round(brut * TAUX_COMMISSION);
+  return { brut, commission, net: brut - commission };
+}
+
+// Affiche le tarif tel que l'employeur le paiera.
 function formaterTarif(tarif) {
-  const valeur = String(tarif === null || tarif === undefined ? "" : tarif).trim();
-  if (valeur === "") return "À négocier";
-  return valeur + " FCFA";
+  const brut = Math.round(Number(tarif) || 0);
+  if (brut <= 0) return "Tarif non indiqué";
+  return formaterMontant(brut);
 }
 
 // Traduit le statut technique en texte lisible par un humain.
@@ -221,6 +246,9 @@ function libelleCandidature(statut) {
 
 // app.locals : disponible dans TOUTES les vues .ejs sans le repasser.
 app.locals.formaterTarif = formaterTarif;
+app.locals.formaterMontant = formaterMontant;
+app.locals.detaillerTarif = detaillerTarif;
+app.locals.pourcentageCommission = Math.round(TAUX_COMMISSION * 100);
 app.locals.libelleVerification = libelleVerification;
 app.locals.libelleCandidature = libelleCandidature;
 
@@ -401,14 +429,23 @@ app.post("/inscription", lireFormulaire, (req, res) => {
     });
   }
 
-  // Un prestataire sans metier n'apparaitrait jamais dans une recherche.
-  // On refuse donc, meme si la requete ne vient pas de notre formulaire.
-  // Le tarif, lui, reste facultatif : il devient "A negocier".
+  // Sans metier, la personne n'apparaitrait dans aucune recherche.
   if (donnees.role === "prestataire" && !String(donnees.metier || "").trim()) {
     return res.status(400).render("message", {
       titre: "Métier obligatoire",
-      texte: "Un prestataire doit indiquer son métier pour être visible dans les recherches.",
-      liens: [{ url: "/inscription.html", texte: "Retour au formulaire" }],
+      texte: "Indiquez votre métier pour apparaître dans les recherches.",
+      liens: [{ url: "/inscription", texte: "Retour au formulaire" }],
+    });
+  }
+
+  // Sans tarif, la plateforme ne peut ni faire payer l'employeur,
+  // ni calculer la commission, ni reverser quoi que ce soit.
+  if (donnees.role === "prestataire" && !(Math.round(Number(donnees.tarif) || 0) > 0)) {
+    return res.status(400).render("message", {
+      titre: "Tarif obligatoire",
+      texte: "Indiquez le tarif que vous demandez pour une prestation. " +
+             "C'est ce montant que l'employeur paiera.",
+      liens: [{ url: "/inscription", texte: "Retour au formulaire" }],
     });
   }
 
@@ -506,12 +543,24 @@ app.get("/publier-annonce", exigerConnexion, (req, res) => {
 app.post("/annonces", exigerConnexion, lireFormulaire, (req, res) => {
   const donnees = req.body;
 
+  // L'horaire est le critere sur lequel une personne decide de
+  // repondre ou non a l'annonce : il est donc obligatoire.
+  if (!String(donnees.horaire || "").trim()) {
+    return res.status(400).render("message", {
+      titre: "Horaire obligatoire",
+      texte: "Indiquez quand vous avez besoin de quelqu'un. " +
+             "C'est la première chose que les candidates regardent.",
+      liens: [{ url: "/publier-annonce", texte: "Retour au formulaire" }],
+    });
+  }
+
   requetes.creerAnnonce.run({
     employeur_id: req.utilisateur.id,
     titre: donnees.titre,
     description: donnees.description || null,
     metier: donnees.metier,
     arrondissement: donnees.arrondissement || null,
+    horaire: String(donnees.horaire).trim(),
   });
 
   res.render("message", {

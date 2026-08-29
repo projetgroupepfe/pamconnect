@@ -3,38 +3,38 @@
   <div class="colonne">
     <h1>Créer un compte</h1>
     <p class="discret">
-      Employeur ou prestataire, l'inscription est gratuite. Les prestataires devront
-      ensuite faire vérifier leur identité pour être visibles.
+      C'est gratuit. Si vous proposez vos services, vous devrez ensuite
+      faire vérifier votre identité pour être visible.
     </p>
 
     <div class="carte">
       <form action="/inscription" method="POST">
 
         <div class="champ">
-          <label for="role">Je suis</label>
+          <label for="role">Vous êtes ici pour</label>
           <select id="role" name="role">
-            <option value="employeur">Un employeur — je cherche du personnel</option>
-            <option value="prestataire">Un prestataire — je propose mes services</option>
+            <option value="employeur">Trouver quelqu'un pour ma maison</option>
+            <option value="prestataire">Proposer mes services</option>
           </select>
         </div>
 
         <div class="champ">
-          <label for="nom">Nom complet</label>
+          <label for="nom">Votre nom complet</label>
           <input type="text" id="nom" name="nom" autocomplete="name" required>
         </div>
 
         <div class="champ">
-          <label for="email">Adresse email</label>
+          <label for="email">Votre adresse email</label>
           <input type="email" id="email" name="email" autocomplete="email" required>
         </div>
 
         <div class="champ">
-          <label for="motdepasse">Mot de passe</label>
+          <label for="motdepasse">Votre mot de passe</label>
           <input type="password" id="motdepasse" name="motdepasse" autocomplete="new-password" required>
         </div>
 
         <div class="champ">
-          <label for="arrondissement">Arrondissement</label>
+          <label for="arrondissement">Votre arrondissement</label>
           <select id="arrondissement" name="arrondissement">
             <option value="Yaoundé 1">Yaoundé 1</option>
             <option value="Yaoundé 2">Yaoundé 2</option>
@@ -47,22 +47,47 @@
         </div>
 
         <div class="champ">
-          <label for="quartier">Quartier</label>
-          <input type="text" id="quartier" name="quartier" placeholder="ex : Bastos, Mvan, Nsam...">
+          <label for="quartier">Votre quartier</label>
+          <input type="text" id="quartier" name="quartier" placeholder="Bastos, Mvan, Nsam...">
         </div>
 
-        <%# Ce bloc n'est affiche que pour les prestataires (voir le script plus bas). %>
+        <%# Ce bloc n'apparait que pour les personnes qui proposent
+            leurs services (voir le script en bas de page). %>
         <div id="champsPrestataire">
           <div class="champ">
-            <label for="metier">Métier</label>
-            <input type="text" id="metier" name="metier" placeholder="ex : Ménage, Jardinage...">
-            <span class="aide">Sans métier renseigné, vous n'apparaîtrez dans aucune recherche.</span>
+            <label for="metier">Ce que vous faites</label>
+            <input type="text" id="metier" name="metier" placeholder="Ménage, garde d'enfants, jardinage...">
+            <span class="aide">Sans cette information, personne ne vous trouvera.</span>
           </div>
 
           <div class="champ">
-            <label for="tarif">Tarif souhaité (FCFA)</label>
-            <input type="number" id="tarif" name="tarif" placeholder="laissez vide si à négocier" min="0">
+            <label for="tarif">Le tarif que vous demandez (FCFA)</label>
+            <input type="number" id="tarif" name="tarif" placeholder="10000" min="500" step="500">
+            <span class="aide">C'est le montant que l'employeur paiera pour une prestation.</span>
           </div>
+
+          <%# Le detail apparait des que le montant est saisi : la personne
+              voit ce qu'elle touchera AVANT de valider son inscription. %>
+          <div class="detail-tarif" id="detailTarif" hidden>
+            <div class="ligne-tarif">
+              <span>Vous demandez</span>
+              <strong id="montantBrut">—</strong>
+            </div>
+            <div class="ligne-tarif">
+              <span>Commission PamConnect (<%= pourcentageCommission %> %)</span>
+              <span class="retenue" id="montantCommission">—</span>
+            </div>
+            <div class="ligne-tarif total">
+              <span>Vous recevez</span>
+              <strong id="montantNet">—</strong>
+            </div>
+          </div>
+
+          <p class="exemple">
+            Par exemple : pour une prestation à <strong>10 000 FCFA</strong>,
+            la commission est de <strong>1 000 FCFA</strong>.
+            Vous recevrez <strong>9 000 FCFA</strong>.
+          </p>
         </div>
 
         <input type="hidden" id="latitude" name="latitude">
@@ -77,28 +102,25 @@
   </div>
 
 <script>
-  // --- Champs reserves aux prestataires -------------------------------
-  // Un employeur n'a ni metier ni tarif : on cache ces deux champs pour lui.
+  // --- Champs reserves aux personnes qui proposent leurs services -----
   const choixRole = document.getElementById("role");
   const champsPrestataire = document.getElementById("champsPrestataire");
   const champMetier = document.getElementById("metier");
   const champTarif = document.getElementById("tarif");
 
   function majChampsPrestataire() {
-    const estPrestataire = choixRole.value === "prestataire";
+    const proposeServices = choixRole.value === "prestataire";
 
     // "none" = invisible et ne prend plus de place ; "block" = visible.
-    champsPrestataire.style.display = estPrestataire ? "block" : "none";
+    champsPrestataire.style.display = proposeServices ? "block" : "none";
 
-    // Le metier est obligatoire pour un prestataire...
-    // On ne rend le champ obligatoire QUE lorsqu'il est visible : un champ
+    // On ne rend un champ obligatoire QUE lorsqu'il est visible : un champ
     // "required" mais cache empecherait le navigateur de valider le
-    // formulaire, sans pouvoir expliquer pourquoi a l'utilisateur.
-    champMetier.required = estPrestataire;
-    // ...mais pas le tarif : laisse vide = "A negocier".
+    // formulaire, sans pouvoir expliquer pourquoi a la personne.
+    champMetier.required = proposeServices;
+    champTarif.required = proposeServices;   // sans tarif, aucun paiement possible
 
-    // Si on repasse en employeur, on vide ce qui aurait ete tape par erreur.
-    if (!estPrestataire) {
+    if (!proposeServices) {
       champMetier.value = "";
       champTarif.value = "";
     }
@@ -106,6 +128,32 @@
 
   choixRole.addEventListener("change", majChampsPrestataire);
   majChampsPrestataire(); // au chargement de la page
+
+  // --- Le detail du tarif, calcule pendant la saisie ------------------
+  // Le taux vient du serveur : il n'est ecrit qu'a un seul endroit.
+  const TAUX = <%= pourcentageCommission %> / 100;
+  const detail = document.getElementById("detailTarif");
+
+  function montant(nombre) {
+    return Math.round(nombre).toLocaleString("fr-FR") + " FCFA";
+  }
+
+  function majDetailTarif() {
+    const brut = Math.round(Number(champTarif.value) || 0);
+
+    if (brut <= 0) {
+      detail.hidden = true;
+      return;
+    }
+
+    const commission = Math.round(brut * TAUX);
+    document.getElementById("montantBrut").textContent = montant(brut);
+    document.getElementById("montantCommission").textContent = "− " + montant(commission);
+    document.getElementById("montantNet").textContent = montant(brut - commission);
+    detail.hidden = false;
+  }
+
+  champTarif.addEventListener("input", majDetailTarif);
 
   // --- Position GPS, si la personne l'autorise ------------------------
   if (navigator.geolocation) {

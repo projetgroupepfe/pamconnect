@@ -33,13 +33,11 @@
         <%- include("partiels/icone", { nom: "message" }) %>
         <span><%= utilisateur.email %></span>
       </li>
-      <% if (utilisateur.role === "prestataire") { %>
-        <li>
-          <%- include("partiels/icone", { nom: "remuneration" }) %>
-          <span><%= formaterTarif(utilisateur.tarif) %></span>
-        </li>
-      <% } %>
     </ul>
+
+    <% if (utilisateur.role === "prestataire") { %>
+      <%- include("partiels/detail-tarif", { tarif: utilisateur.tarif }) %>
+    <% } %>
 
     <% if (utilisateur.role === "prestataire" && utilisateur.statut_verification === "refuse" && utilisateur.motif_refus) { %>
       <p class="aide">Motif du refus : <%= utilisateur.motif_refus %></p>
@@ -90,6 +88,10 @@
             <li>
               <%- include("partiels/icone", { nom: "experience" }) %>
               <span><%= annonce.metier %></span>
+            </li>
+            <li>
+              <%- include("partiels/icone", { nom: "calendrier" }) %>
+              <span><%= annonce.horaire || "Horaire non précisé" %></span>
             </li>
             <li>
               <%- include("partiels/icone", { nom: "lieu" }) %>

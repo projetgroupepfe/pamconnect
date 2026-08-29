@@ -1,10 +1,10 @@
 <%- include("partiels/tete") %>
 
   <div class="colonne">
-    <h1>Publier une annonce</h1>
+    <h1>Publier une demande</h1>
     <p class="discret">
-      Décrivez votre besoin. Les prestataires dont le métier correspond
-      pourront y répondre depuis la page des annonces.
+      Dites ce dont vous avez besoin et quand. Les personnes que l'horaire
+      arrange vous répondront.
     </p>
 
     <div class="carte">
@@ -22,9 +22,19 @@
         </div>
 
         <div class="champ">
-          <label for="metier">Métier recherché</label>
-          <input type="text" id="metier" name="metier" placeholder="ex : Ménage, Nounou, Jardinage" required>
-          <span class="aide">Ce mot sert aux prestataires pour retrouver votre annonce.</span>
+          <label for="metier">Qui cherchez-vous ?</label>
+          <input type="text" id="metier" name="metier" placeholder="Ménage, nounou, jardinage..." required>
+          <span class="aide">Ce mot sert aux candidates pour retrouver votre demande.</span>
+        </div>
+
+        <div class="champ">
+          <label for="horaire">Quand avez-vous besoin de quelqu'un ?</label>
+          <input type="text" id="horaire" name="horaire"
+                 placeholder="Lundi et jeudi, 8h à 12h" required>
+          <span class="aide">
+            C'est la première chose que les candidates regardent : indiquez
+            les jours et les heures aussi précisément que possible.
+          </span>
         </div>
 
         <div class="champ">
@@ -41,7 +51,7 @@
         </div>
 
         <div class="actions">
-          <button type="submit">Publier l'annonce</button>
+          <button type="submit">Publier ma demande</button>
           <a class="bouton bouton-secondaire" href="/mon-profil">Annuler</a>
         </div>
       </form>

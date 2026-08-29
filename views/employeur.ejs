@@ -1,47 +1,67 @@
 <%- include("partiels/tete") %>
 
-  <h1>Espace employeur</h1>
+  <h1>Vous cherchez quelqu'un</h1>
   <p class="chapeau">
     Particulier, famille ou entreprise : trouvez la personne qu'il vous faut,
-    dans votre arrondissement, avec une identité vérifiée.
+    dans votre quartier, avec une identité vérifiée.
   </p>
+
+  <h2>Ce que vous payez</h2>
+
+  <div class="carte">
+    <p>
+      Vous payez <strong>le tarif affiché sur le profil</strong> de la personne
+      que vous retenez. PamConnect n'ajoute aucun frais de votre côté :
+      le montant que vous voyez est le montant que vous payez.
+    </p>
+    <p class="aide">
+      Le paiement se fait sur la plateforme, après la prestation.
+      La personne est reversée aussitôt.
+    </p>
+  </div>
+
+  <h2>Deux façons de trouver</h2>
 
   <div class="grille">
     <div class="carte">
-      <h3>Rechercher un prestataire</h3>
+      <h3>Chercher vous-même</h3>
       <p class="discret">
-        Filtrez par métier et laissez la plateforme classer les profils du plus proche
-        au plus éloigné de chez vous.
+        Vous indiquez ce que vous cherchez, la plateforme classe les personnes
+        de la plus proche à la plus éloignée de chez vous.
       </p>
-      <p class="actions"><a class="bouton" href="/recherche">Lancer une recherche</a></p>
+      <div class="actions">
+        <a class="bouton" href="/recherche">
+          <%- include("partiels/icone", { nom: "recherche" }) %>
+          Chercher maintenant
+        </a>
+      </div>
     </div>
 
     <div class="carte">
-      <h3>Publier une annonce</h3>
+      <h3>Publier une demande</h3>
       <p class="discret">
-        Décrivez votre besoin une seule fois : les prestataires disponibles
-        vous répondent, vous n'avez plus qu'à choisir.
+        Vous décrivez votre besoin et surtout <strong>quand</strong> vous avez
+        besoin de quelqu'un. Les personnes que l'horaire arrange vous répondent.
       </p>
-      <p class="actions"><a class="bouton bouton-secondaire" href="/publier-annonce">Publier une annonce</a></p>
-    </div>
-
-    <div class="carte">
-      <h3>Suivre mes candidatures</h3>
-      <p class="discret">
-        Retrouvez vos annonces et les personnes qui y ont répondu,
-        avec leur statut de vérification.
-      </p>
-      <p class="actions"><a class="bouton bouton-secondaire" href="/mon-profil">Voir mon espace</a></p>
+      <div class="actions">
+        <a class="bouton bouton-secondaire" href="/publier-annonce">
+          <%- include("partiels/icone", { nom: "ajouter" }) %>
+          Publier une demande
+        </a>
+      </div>
     </div>
   </div>
 
   <div class="carte confiance">
-    <h3>Ce que PamConnect vérifie pour vous</h3>
+    <h3>
+      <%- include("partiels/icone", { nom: "verifie", taille: 22 }) %>
+      Ce que PamConnect vérifie pour vous
+    </h3>
     <p>
-      Avant qu'un prestataire puisse être retenu, notre équipe contrôle sa
+      Avant qu'une personne puisse être retenue, notre équipe contrôle sa
       <strong>pièce d'identité</strong> et son <strong>extrait de casier judiciaire</strong>.
-      Tant que ce contrôle n'a pas été fait, sa candidature ne peut pas être acceptée —
-      c'est la plateforme qui l'empêche, pas seulement un affichage.
+      Tant que ce contrôle n'a pas été fait, vous ne pouvez pas accepter sa candidature —
+      c'est la plateforme qui l'empêche, pas seulement un bouton grisé.
     </p>
   </div>
 

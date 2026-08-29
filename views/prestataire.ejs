@@ -1,47 +1,88 @@
 <%- include("partiels/tete") %>
 
-  <h1>Espace prestataire</h1>
+  <h1>Vous proposez vos services</h1>
   <p class="chapeau">
-    Ménagère, nounou, gardien, jardinier, cuisinier : faites-vous connaître
-    des familles et des entreprises de Yaoundé.
+    Aide-ménagère, technicienne de surface, nounou, gardien, jardinier, cuisinier :
+    faites-vous connaître des familles et des entreprises de Yaoundé.
   </p>
+
+  <h2>Ce que vous gagnez</h2>
+
+  <div class="carte">
+    <p>
+      Vous indiquez le tarif que vous demandez. C'est ce montant que l'employeur paie,
+      sans rien y ajouter. PamConnect retient une commission de
+      <strong><%= pourcentageCommission %> %</strong> sur ce montant, et vous verse le reste
+      dès que l'employeur a payé.
+    </p>
+
+    <p class="exemple">
+      Pour une prestation à <strong>10 000 FCFA</strong>,
+      la commission est de <strong>1 000 FCFA</strong>.
+      Vous recevrez <strong>9 000 FCFA</strong>.
+    </p>
+
+    <p class="aide">
+      Vous voyez ce calcul au moment de saisir votre tarif, puis sur votre profil.
+      Aucun montant ne change en cours de route.
+    </p>
+  </div>
+
+  <h2>Comment commencer</h2>
 
   <div class="grille">
     <div class="carte">
-      <h3>Créer mon profil</h3>
+      <h3>1. Créez votre compte</h3>
       <p class="discret">
-        Indiquez votre métier, votre arrondissement et votre tarif.
-        Vous pouvez laisser le tarif vide : il s'affichera « À négocier ».
+        Votre métier, votre quartier et votre tarif. Cela prend deux minutes.
       </p>
-      <p class="actions"><a class="bouton" href="/inscription">M'inscrire</a></p>
+      <div class="actions">
+        <a class="bouton" href="/inscription">
+          <%- include("partiels/icone", { nom: "profil" }) %>
+          M'inscrire
+        </a>
+      </div>
     </div>
 
     <div class="carte">
-      <h3>Faire vérifier mon identité</h3>
+      <h3>2. Faites vérifier votre identité</h3>
       <p class="discret">
-        Envoyez votre pièce d'identité et votre extrait de casier judiciaire.
+        Votre pièce d'identité et votre extrait de casier judiciaire.
         Sans cette vérification, aucun employeur ne peut vous retenir.
       </p>
-      <p class="actions"><a class="bouton bouton-secondaire" href="/verification">Envoyer mes documents</a></p>
+      <div class="actions">
+        <a class="bouton bouton-secondaire" href="/verification">
+          <%- include("partiels/icone", { nom: "envoi" }) %>
+          Envoyer mes documents
+        </a>
+      </div>
     </div>
 
     <div class="carte">
-      <h3>Répondre aux annonces</h3>
+      <h3>3. Répondez aux demandes</h3>
       <p class="discret">
-        Consultez les demandes publiées par les employeurs et postulez
-        à celles qui correspondent à votre métier.
+        Les employeurs indiquent quand ils ont besoin de quelqu'un.
+        Si l'horaire vous arrange, vous répondez.
       </p>
-      <p class="actions"><a class="bouton bouton-secondaire" href="/annonces">Voir les annonces</a></p>
+      <div class="actions">
+        <a class="bouton bouton-secondaire" href="/annonces">
+          <%- include("partiels/icone", { nom: "document" }) %>
+          Voir les demandes
+        </a>
+      </div>
     </div>
   </div>
 
   <div class="carte confiance">
-    <h3>Que deviennent vos documents ?</h3>
+    <h3>
+      <%- include("partiels/icone", { nom: "verifie", taille: 22 }) %>
+      Que deviennent vos documents ?
+    </h3>
     <p>
-      Ils sont consultables uniquement par l'équipe qui effectue la vérification —
-      ni les employeurs, ni les autres prestataires n'y ont accès. Ils sont
-      <strong>définitivement supprimés dès que votre dossier est traité</strong> :
-      seule la mention « identité vérifiée » et sa date sont conservées.
+      Ils sont vus uniquement par l'équipe qui fait la vérification.
+      Ni les employeurs, ni les autres personnes inscrites n'y ont accès.
+      <strong>Ils sont supprimés dès que votre dossier est traité</strong> :
+      il ne reste que la mention « identité vérifiée » et sa date.
     </p>
   </div>
 

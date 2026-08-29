@@ -39,26 +39,34 @@
               <span><strong><%= annonce.metier %></strong></span>
             </li>
             <li>
+              <%- include("partiels/icone", { nom: "calendrier" }) %>
+              <span><strong><%= annonce.horaire || "Horaire non précisé" %></strong></span>
+            </li>
+            <li>
               <%- include("partiels/icone", { nom: "lieu" }) %>
               <span><%= annonce.arrondissement %></span>
             </li>
           </ul>
 
           <% if (role === "prestataire") { %>
+            <%# Avant de repondre, la personne revoit ce qu'elle touchera
+                reellement : aucun montant ne doit etre une surprise. %>
+            <%- include("partiels/detail-tarif", { tarif: moi.tarif }) %>
+
             <div class="actions">
               <form action="/candidatures" method="POST">
                 <button type="submit">
                   <%- include("partiels/icone", { nom: "valider" }) %>
-                  Postuler
+                  Je suis disponible
                 </button>
                 <input type="hidden" name="annonceId" value="<%= annonce.id %>">
               </form>
             </div>
           <% } else if (role === "employeur") { %>
-            <p class="aide">Seuls les prestataires peuvent répondre à une annonce.</p>
+            <p class="aide">Seules les personnes qui proposent leurs services peuvent répondre.</p>
           <% } else { %>
             <p class="aide">
-              <a href="/connexion">Connectez-vous en tant que prestataire</a> pour postuler.
+              <a href="/connexion">Connectez-vous</a> pour répondre à cette demande.
             </p>
           <% } %>
         </div>

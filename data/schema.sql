@@ -75,6 +75,13 @@ CREATE TABLE IF NOT EXISTS annonces (
   description     TEXT,
   metier          TEXT    NOT NULL,
   arrondissement  TEXT,
+
+  -- Quand l'employeur a besoin de quelqu'un. C'est le critere sur
+  -- lequel une candidate decide de repondre ou non a l'annonce.
+  -- Texte libre : "Lundi et jeudi, 8h a 12h" est plus parlant
+  -- qu'un calendrier a remplir, et bien plus rapide a saisir.
+  horaire         TEXT,
+
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
