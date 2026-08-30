@@ -19,6 +19,13 @@ app.set("views", path.join(__dirname, "views"));
 const lireFormulaire = express.urlencoded({ extended: false });
 
 const PORT = 3000;
+
+// Les sessions ouvertes, en memoire vive : { jeton -> identifiant }.
+//
+// LIMITE CONNUE : cet objet disparait a chaque redemarrage du serveur.
+// Tout le monde est alors deconnecte et doit se reconnecter. C'est sans
+// consequence en developpement ; une mise en production demanderait de
+// stocker les sessions en base de donnees.
 const sessions = {};
 
 // ============================================================
@@ -571,6 +578,11 @@ app.get("/mon-profil/modifier", exigerConnexion, (req, res) => {
 });
 
 // --- Modifier son profil : l'enregistrement ------------------------
+//
+// LIMITE CONNUE : le role d'un compte ne peut pas etre change.
+// Un employeur a des demandes publiees, une aide-menagere a des
+// candidatures envoyees : basculer de l'un a l'autre laisserait ces
+// lignes sans proprietaire. Il faut creer un second compte.
 app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => {
   const donnees = req.body;
   const moi = req.utilisateur;
@@ -622,6 +634,11 @@ app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => 
 // L'adresse sert a se connecter : la changer, c'est changer sa cle.
 // On exige donc le mot de passe actuel, exactement comme pour le
 // changement de mot de passe. Un ordinateur laisse ouvert ne suffit pas.
+//
+// LIMITE CONNUE : la nouvelle adresse n'est jamais verifiee, car la
+// plateforme n'envoie aucun email. Ce n'est pas genant ici : l'adresse
+// sert uniquement a se connecter, elle ne recoit rien. Cela le
+// deviendrait le jour ou la plateforme enverrait des notifications.
 app.post("/mon-profil/email", exigerConnexion, lireFormulaire, (req, res) => {
   const moi = req.utilisateur;
   const nouvelEmail = String(req.body.nouveau || "").trim().toLowerCase();
@@ -688,6 +705,21 @@ app.post("/mon-profil/email", exigerConnexion, lireFormulaire, (req, res) => {
 });
 
 // --- Changer son mot de passe --------------------------------------
+//
+// LIMITE CONNUE : on ne peut changer son mot de passe qu'en connaissant
+// l'ancien. Il n'existe AUCUNE recuperation : un mot de passe oublie
+// signifie un compte perdu, et pour une aide-menagere, la perte de son
+// statut verifie.
+//
+// La solution correcte est l'envoi d'un lien de reinitialisation que la
+// personne complete elle-meme : le support ne connait alors jamais le
+// mot de passe. Elle suppose un service d'envoi d'emails.
+//
+// Nous avons volontairement ECARTE la solution consistant a permettre a
+// l'equipe de reinitialiser un mot de passe : elle lui donnerait la
+// capacite de se connecter a la place de n'importe qui. Principe du
+// moindre privilege - l'equipe verifie des documents, elle n'a pas a
+// pouvoir agir au nom des utilisateurs.
 app.post("/mon-profil/mot-de-passe", exigerConnexion, lireFormulaire, (req, res) => {
   const donnees = req.body;
   const moi = req.utilisateur;
@@ -1042,6 +1074,17 @@ app.get("/admin/document/:id/:type", exigerAdmin, (req, res) => {
 });
 
 // --- Espace equipe : valider ou refuser ----------------------------
+//
+// LIMITE CONNUE : ce que la plateforme organise ici est un controle
+// HUMAIN DE COHERENCE - le nom du casier judiciaire doit etre identique
+// a celui de la piece d'identite, les documents doivent etre lisibles,
+// valides et recents. Elle ne detecte PAS un faux document.
+//
+// Le controle d'un extrait de casier aupres du service emetteur reste a
+// definir avec l'encadrement : il conditionne le delai d'inscription.
+//
+// La grille suivie par l'equipe est un document a part, annexe au
+// rapport de projet.
 app.post("/admin/verification", exigerAdmin, lireFormulaire, (req, res) => {
   const dossier = requetes.dossierEnAttenteParId.get(Number(req.body.utilisateurId));
 
