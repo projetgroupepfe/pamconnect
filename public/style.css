@@ -424,16 +424,17 @@ button:hover, .bouton:hover {
 .etapes p  { color: var(--encre-douce); font-size: .95rem; }
 
 .metiers { list-style: none; margin: 0 0 2.5rem; padding: 0; display: grid; gap: .7rem; grid-template-columns: 1fr 1fr; }
+/* Ces elements ne sont pas cliquables : ils ne doivent donc pas
+   ressembler a des boutons. Ni cadre, ni fond, ni ombre - une simple
+   liste a icones. Une forme qui promet une action qu'elle ne tient
+   pas est ce qu'on appelle une affordance trompeuse. */
 .metiers li {
   display: flex;
   align-items: center;
   gap: .6rem;
-  background-color: var(--surface);
-  border: 1px solid var(--trait);
-  border-radius: var(--rayon);
-  padding: .9rem;
-  font-size: .95rem;
-  font-weight: 500;
+  padding: .45rem 0;
+  font-size: .98rem;
+  color: var(--encre-douce);
 }
 .metiers .icone { color: var(--bleu); }
 
@@ -576,3 +577,18 @@ button:hover, .bouton:hover {
   color: var(--encre);
 }
 .exemple strong { color: var(--orange); }
+
+/* Mention discrete du modele economique, sur la page d'accueil. */
+.mention-tarif {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin: 0 0 2.5rem;
+  padding: .9rem 1.1rem;
+  background-color: var(--bleu-clair);
+  border-radius: 10px;
+  font-size: .95rem;
+  color: var(--encre-douce);
+}
+.mention-tarif .icone { color: var(--bleu); }
