@@ -926,16 +926,16 @@ app.post("/verification", exigerConnexion, (req, res) => {
   });
 });
 
-// --- Administration : les dossiers a verifier ----------------------
+// --- Espace equipe : les dossiers a verifier -----------------------
 app.get("/admin", exigerAdmin, (req, res) => {
   res.render("admin", {
-    titre: "Administration",
+    titre: "Espace équipe",
     dossiers: requetes.dossiersEnAttente.all(),
     statistiques: requetes.statistiquesVerification.all(),
   });
 });
 
-// --- Administration : consulter un document ------------------------
+// --- Espace equipe : consulter un document -------------------------
 // C'est la SEULE facon d'atteindre un fichier de data/documents/.
 // L'adresse ne contient jamais le nom du fichier, seulement
 // l'identifiant du prestataire et le type de piece demande.
@@ -946,7 +946,7 @@ app.get("/admin/document/:id/:type", exigerAdmin, (req, res) => {
     return res.status(404).render("message", {
       titre: "Dossier introuvable",
       texte: "Ce dossier n'existe pas ou a deja ete traite.",
-      liens: [{ url: "/admin", texte: "Retour a l'administration" }],
+      liens: [{ url: "/admin", texte: "Retour à l'espace équipe" }],
     });
   }
 
@@ -961,14 +961,14 @@ app.get("/admin/document/:id/:type", exigerAdmin, (req, res) => {
     return res.status(404).render("message", {
       titre: "Document introuvable",
       texte: "Ce document n'est plus disponible.",
-      liens: [{ url: "/admin", texte: "Retour a l'administration" }],
+      liens: [{ url: "/admin", texte: "Retour à l'espace équipe" }],
     });
   }
 
   res.sendFile(path.join(DOSSIER_DOCUMENTS, nomFichier));
 });
 
-// --- Administration : valider ou refuser ---------------------------
+// --- Espace equipe : valider ou refuser ----------------------------
 app.post("/admin/verification", exigerAdmin, lireFormulaire, (req, res) => {
   const dossier = requetes.dossierEnAttenteParId.get(Number(req.body.utilisateurId));
 
@@ -976,7 +976,7 @@ app.post("/admin/verification", exigerAdmin, lireFormulaire, (req, res) => {
     return res.status(404).render("message", {
       titre: "Dossier introuvable",
       texte: "Ce dossier n'existe pas ou a deja ete traite.",
-      liens: [{ url: "/admin", texte: "Retour a l'administration" }],
+      liens: [{ url: "/admin", texte: "Retour à l'espace équipe" }],
     });
   }
 
