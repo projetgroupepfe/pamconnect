@@ -592,3 +592,13 @@ button:hover, .bouton:hover {
   color: var(--encre-douce);
 }
 .mention-tarif .icone { color: var(--bleu); }
+
+/* Un champ verrouille : la personne voit son information, mais elle
+   ne peut pas la changer. Le fond gris et le curseur barre le disent
+   sans qu'aucune phrase soit necessaire. */
+input:disabled, select:disabled, textarea:disabled {
+  background-color: var(--fond);
+  color: var(--encre-douce);
+  border-color: var(--trait);
+  cursor: not-allowed;
+}

@@ -12,6 +12,18 @@
                  autocomplete="name" required>
         </div>
 
+        <%# L'email est affiche parmi les autres champs, mais verrouille :
+            sans cela, on le cherche, on ne le trouve pas, et on croit a un
+            defaut. Le fond gris signale qu'il appartient bien a la personne
+            mais qu'il ne se modifie pas - c'est la convention partout.
+            "disabled" empeche aussi l'envoi du champ : le serveur ne peut
+            donc pas etre trompe par une valeur bricolee dans la page. %>
+        <div class="champ">
+          <label for="email">Votre adresse email</label>
+          <input type="email" id="email" value="<%= utilisateur.email %>" disabled>
+          <span class="aide">Cette adresse ne peut pas être modifiée : elle vous sert à vous connecter.</span>
+        </div>
+
         <div class="champ">
           <label for="arrondissement">Votre arrondissement</label>
           <select id="arrondissement" name="arrondissement">
@@ -103,24 +115,6 @@
           <button type="submit" class="bouton-secondaire">Changer mon mot de passe</button>
         </div>
       </form>
-    </div>
-
-    <div class="carte confiance">
-      <h3>
-        <%- include("partiels/icone", { nom: "info", taille: 22 }) %>
-        Ce qui ne peut pas être modifié
-      </h3>
-      <p>
-        <strong>Votre adresse email</strong> sert à vous connecter : la changer
-        demanderait de vérifier la nouvelle adresse, ce que la plateforme ne
-        sait pas encore faire.
-      </p>
-      <p>
-        <strong>Votre rôle</strong> non plus. Un employeur a des demandes
-        publiées, une aide-ménagère a des candidatures envoyées : basculer de
-        l'un à l'autre laisserait ces informations sans propriétaire.
-        Il faut créer un second compte.
-      </p>
     </div>
   </div>
 
