@@ -8,7 +8,9 @@
       <div>
         <h3><%= utilisateur.nom %></h3>
         <div class="metier">
-          <%= utilisateur.role === "employeur" ? "Employeur" : utilisateur.metier || "Prestataire" %><%= utilisateur.est_admin ? " · Équipe PamConnect" : "" %>
+          <%# Pour un membre de l'equipe, son role sur la plateforme n'a aucune
+            importance : ce qui compte est qu'il verifie des dossiers. %>
+        <% if (utilisateur.est_admin) { %>Équipe PamConnect<% } else { %><%= utilisateur.role === "employeur" ? "Employeur" : utilisateur.metier || "Prestataire" %><% } %>
         </div>
       </div>
     </div>
