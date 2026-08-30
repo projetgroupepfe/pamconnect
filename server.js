@@ -135,6 +135,10 @@ const requetes = {
     UPDATE utilisateurs SET latitude = ?, longitude = ? WHERE id = ?
   `),
 
+  majEmail: db.prepare(`
+    UPDATE utilisateurs SET email = ? WHERE id = ?
+  `),
+
   majMotDePasse: db.prepare(`
     UPDATE utilisateurs SET motdepasse = ? WHERE id = ?
   `),
@@ -610,6 +614,75 @@ app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => 
   res.render("message", {
     titre: "Profil mis à jour",
     texte: "Vos informations ont bien été enregistrées.",
+    liens: [{ url: "/mon-profil", texte: "Voir mon profil" }],
+  });
+});
+
+// --- Changer son adresse email -------------------------------------
+// L'adresse sert a se connecter : la changer, c'est changer sa cle.
+// On exige donc le mot de passe actuel, exactement comme pour le
+// changement de mot de passe. Un ordinateur laisse ouvert ne suffit pas.
+app.post("/mon-profil/email", exigerConnexion, lireFormulaire, (req, res) => {
+  const moi = req.utilisateur;
+  const nouvelEmail = String(req.body.nouveau || "").trim().toLowerCase();
+
+  const retour = [{ url: "/mon-profil/modifier", texte: "Réessayer" }];
+
+  if (!verifierMotDePasse(req.body.motdepasse || "", moi.motdepasse)) {
+    return res.status(403).render("message", {
+      titre: "Mot de passe incorrect",
+      texte: "Pour changer votre adresse, il faut saisir votre mot de passe actuel.",
+      liens: retour,
+    });
+  }
+
+  // Un controle volontairement minimal : une adresse doit contenir un @
+  // et un point apres. Trop strict, on refuserait des adresses valides.
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(nouvelEmail)) {
+    return res.status(400).render("message", {
+      titre: "Adresse invalide",
+      texte: "Vérifiez l'adresse saisie : il manque un @ ou le nom du site.",
+      liens: retour,
+    });
+  }
+
+  if (nouvelEmail === moi.email) {
+    return res.status(400).render("message", {
+      titre: "Adresse inchangée",
+      texte: "C'est déjà votre adresse actuelle.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  }
+
+  if (requetes.utilisateurParEmail.get(nouvelEmail)) {
+    return res.status(409).render("message", {
+      titre: "Adresse déjà utilisée",
+      texte: "Un autre compte utilise déjà cette adresse.",
+      liens: retour,
+    });
+  }
+
+  try {
+    requetes.majEmail.run(nouvelEmail, moi.id);
+  } catch (erreur) {
+    // La contrainte UNIQUE de la base est le dernier rempart, au cas ou
+    // deux personnes viseraient la meme adresse au meme instant.
+    if (String(erreur.message).includes("UNIQUE")) {
+      return res.status(409).render("message", {
+        titre: "Adresse déjà utilisée",
+        texte: "Un autre compte utilise déjà cette adresse.",
+        liens: retour,
+      });
+    }
+    throw erreur;
+  }
+
+  // La session retient l'identifiant, pas l'adresse : la personne
+  // reste connectee, elle n'a rien a refaire.
+  res.render("message", {
+    titre: "Adresse modifiée",
+    texte: "Votre nouvelle adresse est " + nouvelEmail +
+           ". C'est désormais celle-ci qu'il faudra saisir pour vous connecter.",
     liens: [{ url: "/mon-profil", texte: "Voir mon profil" }],
   });
 });

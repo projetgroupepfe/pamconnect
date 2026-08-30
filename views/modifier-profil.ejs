@@ -12,18 +12,6 @@
                  autocomplete="name" required>
         </div>
 
-        <%# L'email est affiche parmi les autres champs, mais verrouille :
-            sans cela, on le cherche, on ne le trouve pas, et on croit a un
-            defaut. Le fond gris signale qu'il appartient bien a la personne
-            mais qu'il ne se modifie pas - c'est la convention partout.
-            "disabled" empeche aussi l'envoi du champ : le serveur ne peut
-            donc pas etre trompe par une valeur bricolee dans la page. %>
-        <div class="champ">
-          <label for="email">Votre adresse email</label>
-          <input type="email" id="email" value="<%= utilisateur.email %>" disabled>
-          <span class="aide">Cette adresse ne peut pas être modifiée : elle vous sert à vous connecter.</span>
-        </div>
-
         <div class="champ">
           <label for="arrondissement">Votre arrondissement</label>
           <select id="arrondissement" name="arrondissement">
@@ -92,6 +80,34 @@
             Enregistrer
           </button>
           <a class="bouton bouton-secondaire" href="/mon-profil">Annuler</a>
+        </div>
+      </form>
+    </div>
+
+    <%# L'adresse et le mot de passe sont les deux cles du compte.
+        Chacune a sa propre section, et chacune exige le mot de passe
+        actuel : on ne change pas une cle par megarde. %>
+    <h2>Changer mon adresse email</h2>
+
+    <div class="carte">
+      <p class="discret">
+        Adresse actuelle : <strong><%= utilisateur.email %></strong>
+      </p>
+
+      <form action="/mon-profil/email" method="POST">
+        <div class="champ">
+          <label for="nouvelEmail">Nouvelle adresse</label>
+          <input type="email" id="nouvelEmail" name="nouveau"
+                 autocomplete="email" required>
+          <span class="aide">C'est cette adresse qu'il faudra saisir pour vous connecter.</span>
+        </div>
+        <div class="champ">
+          <label for="motdepasseEmail">Votre mot de passe</label>
+          <input type="password" id="motdepasseEmail" name="motdepasse"
+                 autocomplete="current-password" required>
+        </div>
+        <div class="actions">
+          <button type="submit" class="bouton-secondaire">Changer mon adresse</button>
         </div>
       </form>
     </div>
