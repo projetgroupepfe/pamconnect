@@ -419,6 +419,31 @@ function exigerAdmin(req, res, next) {
   next();
 }
 
+// Troisieme portier, qui ferme la porte dans l'autre sens.
+//
+// REGLE METIER : un membre de l'equipe n'embauche personne.
+// Son travail est de controler des pieces d'identite. S'il pouvait aussi
+// publier des annonces, il examinerait les papiers de ses propres
+// candidates : c'est un conflit d'interet.
+//
+// La regle est ecrite ICI, cote serveur. Retirer le bouton de la page ne
+// serait qu'une politesse : n'importe qui peut appeler l'adresse a la
+// main. Une regle n'existe que la ou le serveur la fait respecter.
+//
+// A placer APRES exigerConnexion, qui remplit req.utilisateur.
+function interdireALEquipe(req, res, next) {
+  if (req.utilisateur.est_admin) {
+    return res.status(403).render("message", {
+      titre: "Reserve aux employeurs",
+      texte: "Un compte de l'equipe PamConnect verifie les identites. " +
+             "Il ne publie pas d'annonce et n'embauche personne.",
+      liens: [{ url: "/admin", texte: "Aller a l'espace equipe" }],
+    });
+  }
+
+  next();
+}
+
 // ============================================================
 // PARTIE 1 - Les fichiers du dossier public/ (HTML, CSS, images)
 // ============================================================
@@ -754,7 +779,7 @@ app.post("/mon-profil/mot-de-passe", exigerConnexion, lireFormulaire, (req, res)
 });
 
 // --- Publier une annonce (le formulaire) ---------------------------
-app.get("/publier-annonce", exigerConnexion, (req, res) => {
+app.get("/publier-annonce", exigerConnexion, interdireALEquipe, (req, res) => {
   if (req.utilisateur.role !== "employeur") {
     return res.status(403).render("message", {
       titre: "Acces refuse",
@@ -767,7 +792,7 @@ app.get("/publier-annonce", exigerConnexion, (req, res) => {
 });
 
 // --- Enregistrer une annonce ---------------------------------------
-app.post("/annonces", exigerConnexion, lireFormulaire, (req, res) => {
+app.post("/annonces", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
   const donnees = req.body;
 
   // L'horaire est le critere sur lequel une personne decide de

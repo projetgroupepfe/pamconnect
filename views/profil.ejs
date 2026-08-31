@@ -8,9 +8,9 @@
       <div>
         <h3><%= utilisateur.nom %></h3>
         <div class="metier">
-          <%# Pour un membre de l'equipe, son role sur la plateforme n'a aucune
-            importance : ce qui compte est qu'il verifie des dossiers. %>
-        <% if (utilisateur.est_admin) { %>Équipe PamConnect<% } else { %><%= utilisateur.role === "employeur" ? "Employeur" : utilisateur.metier || "Prestataire" %><% } %>
+          <%# Pour un membre de l'equipe, on annonce sa FONCTION. Repeter
+            "Equipe PamConnect" juste sous le nom du compte n'apprenait rien. %>
+        <% if (utilisateur.est_admin) { %>Vérifie les dossiers d'identité<% } else { %><%= utilisateur.role === "employeur" ? "Employeur" : utilisateur.metier || "Prestataire" %><% } %>
         </div>
       </div>
     </div>
@@ -66,18 +66,37 @@
     <% } %>
   </div>
 
-  <%# ---- Cote employeur : ses annonces et les candidatures recues ---- %>
-  <% if (utilisateur.role === "employeur") { %>
+  <%# ---- Cote equipe : le compte ne sert qu'a verifier des dossiers ---- %>
+  <% if (utilisateur.est_admin) { %>
+    <div class="vide">
+      <p>Ce compte sert uniquement à vérifier les dossiers d'identité.</p>
+      <div class="actions">
+        <a class="bouton" href="/admin">
+          <%- include("partiels/icone", { nom: "equipe" }) %>
+          Ouvrir l'espace équipe
+        </a>
+      </div>
+    </div>
+  <% } %>
+
+  <%# ---- Cote employeur : ses annonces et les candidatures recues ----
+      Un membre de l'equipe est techniquement enregistre comme employeur,
+      mais il n'a pas le droit de publier : lui montrer "Mes annonces"
+      serait lui proposer une action que le serveur refuse. %>
+  <% if (utilisateur.role === "employeur" && !utilisateur.est_admin) { %>
     <h2>Mes annonces</h2>
 
-    <%# L'action principale d'un employeur reste accessible en permanence,
-        et non cachee dans un menu. %>
-    <div class="actions">
-      <a class="bouton" href="/publier-annonce">
-        <%- include("partiels/icone", { nom: "ajouter" }) %>
-        Publier une annonce
-      </a>
-    </div>
+    <%# L'action principale reste accessible en permanence, et non cachee
+        dans un menu. Mais une seule fois : quand la liste est vide, c'est
+        le bloc ci-dessous qui porte le bouton, et il est mieux place. %>
+    <% if (mesAnnonces.length > 0) { %>
+      <div class="actions">
+        <a class="bouton" href="/publier-annonce">
+          <%- include("partiels/icone", { nom: "ajouter" }) %>
+          Publier une annonce
+        </a>
+      </div>
+    <% } %>
 
     <% if (mesAnnonces.length === 0) { %>
       <div class="vide">
