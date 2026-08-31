@@ -27,10 +27,14 @@
     <% } %>
 
     <ul class="infos">
-      <li>
-        <%- include("partiels/icone", { nom: "lieu" }) %>
-        <span><%= utilisateur.arrondissement %><%= utilisateur.quartier ? ", " + utilisateur.quartier : "" %></span>
-      </li>
+      <%# Un compte d'equipe n'a pas d'adresse : personne ne se deplace
+          chez lui. On n'affiche pas une ligne vide pour autant. %>
+      <% if (!utilisateur.est_admin) { %>
+        <li>
+          <%- include("partiels/icone", { nom: "lieu" }) %>
+          <span><%= utilisateur.arrondissement %><%= utilisateur.quartier ? ", " + utilisateur.quartier : "" %></span>
+        </li>
+      <% } %>
       <li>
         <%- include("partiels/icone", { nom: "message" }) %>
         <span><%= utilisateur.email %></span>

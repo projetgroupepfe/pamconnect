@@ -296,6 +296,36 @@ function libelleCandidature(statut) {
   return "En attente";
 }
 
+// Apres une connexion, on dit a la personne ce qu'elle peut FAIRE,
+// jamais ce qu'elle EST. "employeur" et "prestataire" sont les mots de
+// la colonne role dans la base de donnees : ils n'ont rien a faire sous
+// les yeux d'un utilisateur, et pour un compte d'equipe le mot etait
+// carrement faux.
+//
+// Une seule fonction decide, pour les trois sortes de comptes, la phrase
+// ET la destination du bouton. Si demain une quatrieme apparait, c'est
+// ici et nulle part ailleurs qu'on l'ajoute.
+function apresConnexion(utilisateur) {
+  if (utilisateur.est_admin) {
+    return {
+      texte: "Vous pouvez vérifier les dossiers d'identité en attente.",
+      lien: { url: "/admin", texte: "Ouvrir l'espace équipe" },
+    };
+  }
+
+  if (utilisateur.role === "employeur") {
+    return {
+      texte: "Retrouvez vos annonces et les réponses que vous avez reçues.",
+      lien: { url: "/mon-profil", texte: "Voir mon profil" },
+    };
+  }
+
+  return {
+    texte: "Retrouvez les annonces qui correspondent à ce que vous faites.",
+    lien: { url: "/annonces", texte: "Voir les annonces" },
+  };
+}
+
 // app.locals : disponible dans TOUTES les vues .ejs sans le repasser.
 app.locals.formaterTarif = formaterTarif;
 app.locals.formaterMontant = formaterMontant;
@@ -534,8 +564,8 @@ app.post("/inscription", lireFormulaire, (req, res) => {
 
   res.render("message", {
     titre: `Merci ${donnees.nom} !`,
-    texte: `Ton inscription en tant que ${donnees.role} a bien été enregistrée.`,
-    liens: [{ url: "/index.html", texte: "Retour à l'accueil" }],
+    texte: "Votre compte est créé. Vous pouvez maintenant vous connecter.",
+    liens: [{ url: "/connexion", texte: "Se connecter" }],
   });
 });
 
@@ -553,10 +583,12 @@ app.post("/connexion", lireFormulaire, (req, res) => {
     // httpOnly : le JavaScript de la page ne peut pas lire ce cookie.
     res.cookie("session", token, { httpOnly: true, path: "/" });
 
+    const suite = apresConnexion(utilisateur);
+
     return res.render("message", {
       titre: `Bienvenue ${utilisateur.nom} !`,
-      texte: `Connexion réussie en tant que ${utilisateur.role}.`,
-      liens: [{ url: "/mon-profil", texte: "Voir mon profil" }],
+      texte: suite.texte,
+      liens: [suite.lien],
     });
   }
 
@@ -633,8 +665,11 @@ app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => 
   requetes.majProfil.run({
     id: moi.id,
     nom: String(donnees.nom).trim(),
-    arrondissement: donnees.arrondissement || null,
-    quartier: String(donnees.quartier || "").trim() || null,
+    // Un compte d'equipe ne rend visite a personne : son arrondissement
+    // et son quartier ne servent a rien, on ne les lui demande pas et on
+    // ne les conserve pas. Une donnee inutile est une donnee de trop.
+    arrondissement: moi.est_admin ? null : (donnees.arrondissement || null),
+    quartier: moi.est_admin ? null : (String(donnees.quartier || "").trim() || null),
     // Un employeur n'a ni metier ni tarif : on ne les invente pas.
     metier: moi.role === "prestataire" ? String(donnees.metier).trim() : null,
     tarif: moi.role === "prestataire" ? Math.round(Number(donnees.tarif)) : null,
@@ -829,7 +864,7 @@ app.post("/annonces", exigerConnexion, interdireALEquipe, lireFormulaire, (req, 
 
   res.render("message", {
     titre: "Annonce publiee !",
-    texte: `Ton annonce "${donnees.titre}" a bien ete enregistree.`,
+    texte: `Votre annonce "${donnees.titre}" a bien été enregistrée.`,
     liens: [{ url: "/index.html", texte: "Retour a l'accueil" }],
   });
 });
@@ -882,7 +917,7 @@ app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
 
   res.render("message", {
     titre: "Candidature envoyee !",
-    texte: "Ta candidature a bien ete enregistree.",
+    texte: "Votre candidature a bien été enregistrée.",
     liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
   });
 });
@@ -997,7 +1032,7 @@ app.post("/verification", exigerConnexion, (req, res) => {
   if (req.utilisateur.statut_verification === "verifie") {
     return res.status(409).render("message", {
       titre: "Deja verifie",
-      texte: "Ton identite a deja ete validee, il n'y a rien a renvoyer.",
+      texte: "Votre identité a déjà été validée, il n'y a rien à renvoyer.",
       liens: [{ url: "/mon-profil", texte: "Retour a mon profil" }],
     });
   }
@@ -1049,7 +1084,7 @@ app.post("/verification", exigerConnexion, (req, res) => {
 
     res.render("message", {
       titre: "Documents envoyes",
-      texte: "Ton dossier est en cours de verification par notre equipe. " +
+      texte: "Votre dossier est en cours de vérification par notre équipe. " +
              "Tu seras visible comme verifie des qu'il sera valide.",
       liens: [{ url: "/mon-profil", texte: "Retour a mon profil" }],
     });

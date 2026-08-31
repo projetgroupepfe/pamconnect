@@ -12,6 +12,11 @@
                  autocomplete="name" required>
         </div>
 
+        <%# Arrondissement et quartier servent a se rencontrer. Un compte
+            d'equipe ne rencontre personne : ces deux champs ne lui sont
+            pas demandes. %>
+        <% if (!utilisateur.est_admin) { %>
+
         <div class="champ">
           <label for="arrondissement">Votre arrondissement</label>
           <select id="arrondissement" name="arrondissement">
@@ -30,6 +35,8 @@
                  value="<%= utilisateur.quartier || "" %>"
                  placeholder="Bastos, Mvan, Nsam...">
         </div>
+
+        <% } %>
 
         <% if (utilisateur.role === "prestataire") { %>
 
@@ -67,12 +74,22 @@
 
         <% } %>
 
-        <input type="hidden" id="latitude" name="latitude">
-        <input type="hidden" id="longitude" name="longitude">
-        <p class="aide">
-          Si vous autorisez la localisation, votre position sera mise à jour
-          pour que les employeurs proches vous trouvent plus facilement.
-        </p>
+        <%# La position sert a calculer une distance. Elle n'a de sens que
+            pour les deux personnes qui vont se rencontrer, et la phrase
+            qui l'explique n'est pas la meme des deux cotes. %>
+        <% if (!utilisateur.est_admin) { %>
+          <input type="hidden" id="latitude" name="latitude">
+          <input type="hidden" id="longitude" name="longitude">
+          <p class="aide">
+            <% if (utilisateur.role === "employeur") { %>
+              Si vous autorisez la localisation, PamConnect pourra vous montrer
+              en premier les personnes qui travaillent près de chez vous.
+            <% } else { %>
+              Si vous autorisez la localisation, les familles proches de chez
+              vous vous trouveront plus facilement.
+            <% } %>
+          </p>
+        <% } %>
 
         <div class="actions">
           <button type="submit">
@@ -165,8 +182,11 @@
 </script>
 <% } %>
 
+<% if (!utilisateur.est_admin) { %>
 <script>
   // --- Position GPS, si la personne l'autorise ------------------------
+  // Inutile de reclamer la position d'un membre de l'equipe : le
+  // navigateur afficherait une demande d'autorisation sans aucune raison.
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       function (position) {
@@ -179,5 +199,6 @@
     );
   }
 </script>
+<% } %>
 
 <%- include("partiels/pied") %>
