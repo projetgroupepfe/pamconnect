@@ -420,7 +420,7 @@ function exigerConnexion(req, res, next) {
   const utilisateur = utilisateurConnecte(req);
 
   if (!utilisateur) {
-    return res.redirect("/connexion.html");
+    return res.redirect("/connexion");
   }
 
   // On accroche la personne a la requete : les routes qui suivent
@@ -434,14 +434,14 @@ function exigerAdmin(req, res, next) {
   const utilisateur = utilisateurConnecte(req);
 
   if (!utilisateur) {
-    return res.redirect("/connexion.html");
+    return res.redirect("/connexion");
   }
 
   if (!utilisateur.est_admin) {
     return res.status(403).render("message", {
       titre: "Acces refuse",
       texte: "Cette page est reservee a l'equipe de PamConnect.",
-      liens: [{ url: "/index.html", texte: "Retour a l'accueil" }],
+      liens: [{ url: "/", texte: "Retour a l'accueil" }],
     });
   }
 
@@ -530,8 +530,8 @@ app.post("/inscription", lireFormulaire, (req, res) => {
       titre: "Email deja utilise",
       texte: `Un compte existe deja avec l'adresse ${donnees.email}.`,
       liens: [
-        { url: "/connexion.html", texte: "Se connecter" },
-        { url: "/inscription.html", texte: "Reessayer" },
+        { url: "/connexion", texte: "Se connecter" },
+        { url: "/inscription", texte: "Reessayer" },
       ],
     });
   }
@@ -595,7 +595,7 @@ app.post("/connexion", lireFormulaire, (req, res) => {
   res.status(401).render("message", {
     titre: "Connexion échouée",
     texte: "Email ou mot de passe incorrect.",
-    liens: [{ url: "/connexion.html", texte: "Réessayer" }],
+    liens: [{ url: "/connexion", texte: "Réessayer" }],
   });
 });
 
@@ -819,7 +819,7 @@ app.get("/publier-annonce", exigerConnexion, interdireALEquipe, (req, res) => {
     return res.status(403).render("message", {
       titre: "Acces refuse",
       texte: "Seuls les employeurs peuvent publier une annonce.",
-      liens: [{ url: "/index.html", texte: "Retour a l'accueil" }],
+      liens: [{ url: "/", texte: "Retour a l'accueil" }],
     });
   }
 
@@ -865,7 +865,7 @@ app.post("/annonces", exigerConnexion, interdireALEquipe, lireFormulaire, (req, 
   res.render("message", {
     titre: "Annonce publiee !",
     texte: `Votre annonce "${donnees.titre}" a bien été enregistrée.`,
-    liens: [{ url: "/index.html", texte: "Retour a l'accueil" }],
+    liens: [{ url: "/", texte: "Retour a l'accueil" }],
   });
 });
 
@@ -1179,7 +1179,7 @@ app.use((req, res) => {
   res.status(404).render("message", {
     titre: "404 - Page introuvable",
     texte: "Cette page n'existe pas.",
-    liens: [{ url: "/index.html", texte: "Retour a l'accueil" }],
+    liens: [{ url: "/", texte: "Retour a l'accueil" }],
   });
 });
 
