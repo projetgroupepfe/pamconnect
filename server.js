@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const Database = require("better-sqlite3");
 const multer = require("multer");
 const fs = require("fs");
+const os = require("os");
 
 // "app" est notre application Express : c'est elle qui recoit
 // toutes les requetes et decide quelle route doit y repondre.
@@ -1185,4 +1186,27 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Serveur PamConnect démarré : http://localhost:${PORT}`);
+
+  // Les adresses par lesquelles un TELEPHONE peut atteindre ce serveur.
+  //
+  // localhost ne veut dire que "cet ordinateur-ci" : tape depuis un
+  // telephone, il chercherait le telephone lui-meme. Il faut l'adresse de
+  // l'ordinateur SUR LE RESEAU, et les deux appareils doivent etre sur le
+  // meme reseau - meme box, ou le partage de connexion du telephone.
+  //
+  // Aucune connexion internet n'est necessaire : seule compte la liaison
+  // locale entre les deux appareils. C'est ce qui rendra la demonstration
+  // possible le jour de la soutenance, meme sans internet dans la salle.
+  const adresses = Object.values(os.networkInterfaces())
+    .flat()
+    .filter((carte) => carte.family === "IPv4" && !carte.internal)
+    // 169.254.x.x : Windows attribue cette plage a une carte reseau qui
+    // n'a trouve aucun reseau. L'afficher n'induirait qu'en erreur.
+    .filter((carte) => !carte.address.startsWith("169.254."))
+    .map((carte) => carte.address);
+
+  if (adresses.length) {
+    console.log("Depuis un téléphone sur le même réseau :");
+    adresses.forEach((ip) => console.log(`   http://${ip}:${PORT}`));
+  }
 });
