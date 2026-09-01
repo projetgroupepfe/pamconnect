@@ -3,6 +3,22 @@
   <h1>Annonces disponibles</h1>
   <p class="chapeau">Les demandes publiées par les employeurs de Yaoundé.</p>
 
+  <%# La transparence sur ce que vous touchez est due AVANT de repondre.
+      Mais une seule fois : ce calcul est celui de votre profil, il est
+      le meme quelle que soit l'annonce a cote de laquelle il s'affiche.
+      Le repeter sur chaque carte n'ajoutait aucune information - il
+      poussait seulement les annonces vers le bas de l'ecran. %>
+  <% if (role === "prestataire") { %>
+    <div class="carte">
+      <h3>Ce que vous touchez</h3>
+      <%- include("partiels/detail-tarif", { tarif: moi.tarif }) %>
+      <p class="aide">
+        Votre tarif habituel. Vous pourrez proposer un autre montant à
+        l'employeur, dans la discussion, après avoir répondu.
+      </p>
+    </div>
+  <% } %>
+
   <% if (role === "employeur") { %>
     <div class="actions">
       <a class="bouton" href="/publier-annonce">
@@ -71,10 +87,6 @@
           </ul>
 
           <% if (role === "prestataire") { %>
-            <%# Avant de repondre, la personne revoit ce qu'elle touchera
-                reellement : aucun montant ne doit etre une surprise. %>
-            <%- include("partiels/detail-tarif", { tarif: moi.tarif }) %>
-
             <div class="actions">
               <form action="/candidatures" method="POST">
                 <button type="submit">
