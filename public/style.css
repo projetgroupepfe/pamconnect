@@ -228,6 +228,13 @@ a:hover { color: var(--bleu-fonce); }
 }
 .en-ligne { display: inline; }
 
+/* Ses propres messages, distingues sans couleur criarde : un liseré
+   du côté de la marge suffit à savoir qui parle d'un coup d'œil. */
+.message-mien {
+  border-left: 3px solid var(--bleu);
+  margin-left: 1.25rem;
+}
+
 .vide {
   color: var(--encre-douce);
   background-color: var(--surface);

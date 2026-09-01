@@ -51,6 +51,24 @@ db.pragma("foreign_keys = ON");
 // Maintenant, il lui suffit de lancer npm start.
 db.exec(fs.readFileSync(path.join(__dirname, "data", "schema.sql"), "utf-8"));
 
+// "CREATE TABLE IF NOT EXISTS" ne sert que pour une table ABSENTE. Si la
+// table existe deja et qu'on lui ajoute une colonne dans le schema, la
+// base d'une personne qui travaillait avant ne la recevrait jamais.
+//
+// SQLite ne sait pas dire "ajoute cette colonne si elle manque". On le
+// lui demande donc en deux temps : on lit la liste des colonnes
+// existantes (PRAGMA table_info), et on n'ajoute que ce qui manque.
+function ajouterColonneSiAbsente(table, colonne, definition) {
+  const colonnes = db.prepare(`PRAGMA table_info(${table})`).all();
+
+  if (!colonnes.some((c) => c.name === colonne)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${colonne} ${definition}`);
+    console.log(`Colonne ajoutee : ${table}.${colonne}`);
+  }
+}
+
+ajouterColonneSiAbsente("candidatures", "tarif_propose", "INTEGER");
+
 // ============================================================
 // LES REQUETES
 // ============================================================
@@ -107,7 +125,9 @@ const requetes = {
   candidaturesDeAnnonce: db.prepare(`
     SELECT c.id,
            c.statut,
+           c.tarif_propose,
            u.nom                 AS nomPrestataire,
+           u.tarif               AS tarifPrestataire,
            u.statut_verification AS verificationPrestataire
     FROM candidatures c
     JOIN utilisateurs u ON u.id = c.prestataire_id
@@ -116,7 +136,8 @@ const requetes = {
   `),
 
   candidaturesDePrestataire: db.prepare(`
-    SELECT c.id, c.statut, a.titre AS titreAnnonce, a.horaire AS horaireAnnonce
+    SELECT c.id, c.statut, c.tarif_propose,
+           a.titre AS titreAnnonce, a.horaire AS horaireAnnonce
     FROM candidatures c
     JOIN annonces a ON a.id = c.annonce_id
     WHERE c.prestataire_id = ?
@@ -139,6 +160,61 @@ const requetes = {
 
   changerStatutCandidature: db.prepare(`
     UPDATE candidatures SET statut = ? WHERE id = ?
+  `),
+
+  // --- La messagerie ---------------------------------------------
+  //
+  // Une conversation = une candidature. Cette requete ramene en UNE fois
+  // tout ce qu'il faut pour afficher la page : les deux personnes,
+  // l'annonce dont on parle, et le tarif en cours de discussion.
+  conversation: db.prepare(`
+    SELECT c.id,
+           c.statut,
+           c.tarif_propose,
+           a.titre           AS titreAnnonce,
+           a.horaire         AS horaireAnnonce,
+           a.quartier        AS quartierAnnonce,
+           a.arrondissement  AS arrondissementAnnonce,
+           e.id              AS employeurId,
+           e.nom             AS nomEmployeur,
+           p.id              AS prestataireId,
+           p.nom             AS nomPrestataire,
+           p.metier          AS metierPrestataire,
+           p.tarif           AS tarifPrestataire
+    FROM candidatures c
+    JOIN annonces     a ON a.id = c.annonce_id
+    JOIN utilisateurs e ON e.id = a.employeur_id
+    JOIN utilisateurs p ON p.id = c.prestataire_id
+    WHERE c.id = ?
+  `),
+
+  messagesDeConversation: db.prepare(`
+    SELECT m.id, m.texte, m.auteur_id, m.risque_paiement, m.signale, m.cree_le,
+           u.nom AS nomAuteur
+    FROM messages m
+    JOIN utilisateurs u ON u.id = m.auteur_id
+    WHERE m.candidature_id = ?
+    ORDER BY m.id
+  `),
+
+  creerMessage: db.prepare(`
+    INSERT INTO messages (candidature_id, auteur_id, texte, risque_paiement)
+    VALUES (@candidature_id, @auteur_id, @texte, @risque_paiement)
+  `),
+
+  // Le signalement ne touche qu'un message dont on N'EST PAS l'auteur :
+  // on signale ce qu'on recoit, pas ce qu'on ecrit.
+  signalerMessage: db.prepare(`
+    UPDATE messages SET signale = 1 WHERE id = ? AND auteur_id != ?
+  `),
+
+  proposerTarif: db.prepare(`
+    UPDATE candidatures SET tarif_propose = ? WHERE id = ?
+  `),
+
+  nombreMessagesNonLus: db.prepare(`
+    SELECT COUNT(*) AS n FROM messages
+    WHERE candidature_id = ? AND auteur_id != ?
   `),
 
   majProfil: db.prepare(`
@@ -354,12 +430,18 @@ function apresConnexion(utilisateur) {
 // sans tiret ni espace. "Cité Verte", "cite verte" et "CITEVERTE"
 // donnent tous "citeverte". C'est ainsi qu'on rattrape les fautes de
 // frappe les plus courantes.
-function normaliserNom(texte) {
+function sansAccent(texte) {
   return String(texte || "")
     .normalize("NFD")                  // sépare les lettres de leurs accents
     .replace(/[\u0300-\u036f]/g, "")  // supprime les accents
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");        // enlève espaces, tirets, apostrophes
+    .toLowerCase();
+}
+
+function normaliserNom(texte) {
+  // Le meme travail, plus la suppression des espaces, tirets et
+  // apostrophes : "Cité Verte", "cite verte" et "CITE-VERTE" donnent
+  // tous "citeverte".
+  return sansAccent(texte).replace(/[^a-z0-9]/g, "");
 }
 
 // La table est petite (60 lignes) et ne change presque jamais : on la lit
@@ -395,6 +477,51 @@ function resoudreLieu(donnees) {
     quartier: String(donnees.quartier || "").trim() || null,
     arrondissement: donnees.arrondissement || null,
   };
+}
+
+// ---------------------------------------------------------------
+// Les paiements en dehors de la plateforme
+// ---------------------------------------------------------------
+// Discuter du prix est NORMAL et autorise : c'est meme le but de la
+// messagerie. Ce qu'on surveille, c'est autre chose - la tentative de
+// payer directement, sans passer par la plateforme.
+//
+// Pourquoi c'est grave, et pas seulement pour notre commission :
+// un paiement de la main a la main sort du systeme. La personne n'a plus
+// aucune garantie d'etre payee apres son travail, l'employeur n'a plus
+// aucun recours si le travail n'est pas fait, et l'equipe n'a aucune
+// trace sur laquelle s'appuyer en cas de litige.
+//
+// On n'INTERDIT rien : un message n'est jamais bloque ni efface. On
+// affiche un avertissement aux deux personnes, et on garde une marque
+// sur le message pour que l'equipe puisse le retrouver.
+const EXPRESSIONS_RISQUE = [
+  /\bmomo\b/,
+  /mobile\s*money/,
+  /orange\s*money/,
+  /mtn\s*money/,
+  /\bom\b/,
+  /especes?/,
+  /\bcash\b/,
+  /main\s*a\s*main/,
+  /main\s*propre/,
+  /hors\s*(de\s*la\s*)?plateforme/,
+  /sans\s*passer\s*par/,
+  /western\s*union/,
+  /\bvirement\b/,
+  /envoi?[e-z]*\s*(moi\s*)?l\s*argent/,
+];
+
+// Un numero camerounais : un 6 suivi de huit chiffres, que la personne
+// l'ecrive colle, espace ou precede de +237.
+const TELEPHONE_CAMEROUNAIS = /(\+?\s*237)?\s*6(\s*\d){8}/;
+
+function risquePaiementHorsPlateforme(texte) {
+  const propre = sansAccent(texte);
+
+  if (TELEPHONE_CAMEROUNAIS.test(propre)) return true;
+
+  return EXPRESSIONS_RISQUE.some((expression) => expression.test(propre));
 }
 
 // app.locals : disponible dans TOUTES les vues .ejs sans le repasser.
@@ -1051,6 +1178,153 @@ app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => 
   requetes.changerStatutCandidature.run(nouveauStatut, candidatureId);
 
   res.redirect("/mon-profil");
+});
+
+// --- La messagerie -------------------------------------------------
+//
+// Qui peut lire une conversation ? UNIQUEMENT les deux personnes
+// concernees. Pas les autres candidats a la meme annonce, et pas
+// l'equipe.
+//
+// Ce dernier point est une decision, pas un oubli. L'equipe examine les
+// messages SIGNALES, dans un ecran a part. Lui donner l'acces libre a
+// toutes les conversations lui permettrait de lire les echanges prives
+// de n'importe qui sans raison - c'est le principe du moindre privilege,
+// le meme qui nous a fait refuser la reinitialisation des mots de passe.
+//
+// Renvoie la conversation si l'acces est permis, sinon null.
+function conversationDe(candidatureId, utilisateur) {
+  const conversation = requetes.conversation.get(candidatureId);
+
+  if (!conversation) return null;
+
+  const estConcerne = utilisateur.id === conversation.employeurId
+                   || utilisateur.id === conversation.prestataireId;
+
+  return estConcerne ? conversation : null;
+}
+
+app.get("/messages/:id", exigerConnexion, (req, res) => {
+  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+
+  if (!conversation) {
+    return res.status(403).render("message", {
+      titre: "Conversation introuvable",
+      texte: "Cette conversation n'existe pas, ou elle ne vous concerne pas.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  }
+
+  res.render("conversation", {
+    titre: "Discussion",
+    conversation,
+    messages: requetes.messagesDeConversation.all(conversation.id),
+    jeSuisEmployeur: req.utilisateur.id === conversation.employeurId,
+  });
+});
+
+app.post("/messages/:id", exigerConnexion, lireFormulaire, (req, res) => {
+  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+
+  if (!conversation) {
+    return res.status(403).render("message", {
+      titre: "Conversation introuvable",
+      texte: "Cette conversation n'existe pas, ou elle ne vous concerne pas.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  }
+
+  const texte = String(req.body.texte || "").trim();
+
+  if (!texte) {
+    return res.redirect(`/messages/${conversation.id}`);
+  }
+
+  // On refuse un message demesure : la base accepterait un roman entier,
+  // et la page deviendrait illisible.
+  if (texte.length > 2000) {
+    return res.status(400).render("message", {
+      titre: "Message trop long",
+      texte: "Un message ne peut pas dépasser 2000 caractères.",
+      liens: [{ url: `/messages/${conversation.id}`, texte: "Retour à la discussion" }],
+    });
+  }
+
+  requetes.creerMessage.run({
+    candidature_id: conversation.id,
+    auteur_id: req.utilisateur.id,
+    texte,
+    // Le calcul est fait UNE FOIS, a l'envoi, et son resultat conserve.
+    risque_paiement: risquePaiementHorsPlateforme(texte) ? 1 : 0,
+  });
+
+  res.redirect(`/messages/${conversation.id}`);
+});
+
+// --- Signaler un message a l'equipe ---------------------------------
+app.post("/messages/:id/signaler", exigerConnexion, lireFormulaire, (req, res) => {
+  const conversation = conversationDe(Number(req.body.candidatureId), req.utilisateur);
+
+  if (!conversation) {
+    return res.status(403).render("message", {
+      titre: "Action impossible",
+      texte: "Cette conversation ne vous concerne pas.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  }
+
+  // La requete elle-meme refuse de signaler un message dont on est
+  // l'auteur (voir "auteur_id != ?"). Une regle ecrite dans le SQL ne
+  // peut pas etre oubliee par une route.
+  requetes.signalerMessage.run(Number(req.params.id), req.utilisateur.id);
+
+  res.redirect(`/messages/${conversation.id}`);
+});
+
+// --- Proposer un autre tarif ----------------------------------------
+app.post("/messages/:id/tarif", exigerConnexion, lireFormulaire, (req, res) => {
+  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+
+  if (!conversation) {
+    return res.status(403).render("message", {
+      titre: "Action impossible",
+      texte: "Cette conversation ne vous concerne pas.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  }
+
+  // Une candidature deja tranchee ne se renegocie pas : le montant
+  // serait modifie apres la decision de l'employeur.
+  if (conversation.statut !== "en attente") {
+    return res.status(400).render("message", {
+      titre: "Trop tard pour changer le tarif",
+      texte: "Cette candidature a déjà reçu une réponse. Le montant ne peut plus être modifié.",
+      liens: [{ url: `/messages/${conversation.id}`, texte: "Retour à la discussion" }],
+    });
+  }
+
+  const montant = Math.round(Number(req.body.tarif));
+
+  if (!Number.isFinite(montant) || montant <= 0) {
+    return res.status(400).render("message", {
+      titre: "Montant invalide",
+      texte: "Indiquez un montant en francs CFA, supérieur à zéro.",
+      liens: [{ url: `/messages/${conversation.id}`, texte: "Retour à la discussion" }],
+    });
+  }
+
+  requetes.proposerTarif.run(montant, conversation.id);
+
+  // La proposition laisse une trace dans la conversation : sans cela,
+  // le montant changerait sans que personne ne sache qui l'a change.
+  requetes.creerMessage.run({
+    candidature_id: conversation.id,
+    auteur_id: req.utilisateur.id,
+    texte: `Proposition de tarif : ${formaterMontant(montant)}.`,
+    risque_paiement: 0,
+  });
+
+  res.redirect(`/messages/${conversation.id}`);
 });
 
 // --- Recherche de prestataires -------------------------------------

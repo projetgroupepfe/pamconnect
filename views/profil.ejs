@@ -155,6 +155,25 @@
                   </span>
                 </p>
 
+                <%# Le montant retenu pour CETTE candidature : celui du
+                    profil, ou celui convenu en discutant. %>
+                <ul class="infos">
+                  <li>
+                    <%- include("partiels/icone", { nom: "remuneration" }) %>
+                    <span>
+                      <%= formaterMontant(candidature.tarif_propose || candidature.tarifPrestataire) %>
+                      <% if (candidature.tarif_propose) { %><span class="aide">— convenu en discutant</span><% } %>
+                    </span>
+                  </li>
+                </ul>
+
+                <div class="actions">
+                  <a class="bouton bouton-secondaire" href="/messages/<%= candidature.id %>">
+                    <%- include("partiels/icone", { nom: "message" }) %>
+                    Discuter
+                  </a>
+                </div>
+
                 <% if (candidature.statut === "en attente") { %>
 
                   <%# On n'engage personne dont l'identite n'est pas verifiee. %>
@@ -221,7 +240,19 @@
                 <%- include("partiels/icone", { nom: "disponibilite" }) %>
                 <span><strong><%= libelleCandidature(candidature.statut) %></strong></span>
               </li>
+              <% if (candidature.tarif_propose) { %>
+                <li>
+                  <%- include("partiels/icone", { nom: "remuneration" }) %>
+                  <span><%= formaterMontant(candidature.tarif_propose) %> <span class="aide">— convenu en discutant</span></span>
+                </li>
+              <% } %>
             </ul>
+            <div class="actions">
+              <a class="bouton bouton-secondaire" href="/messages/<%= candidature.id %>">
+                <%- include("partiels/icone", { nom: "message" }) %>
+                Discuter
+              </a>
+            </div>
           </div>
         <% }); %>
       </div>

@@ -105,12 +105,62 @@ CREATE TABLE IF NOT EXISTS candidatures (
   statut          TEXT    NOT NULL DEFAULT 'en attente'
                           CHECK (statut IN ('en attente', 'acceptee', 'refusee')),
 
+  -- Le tarif finalement retenu pour cette candidature, en francs CFA.
+  --
+  -- La personne affiche un tarif sur son profil : c'est son point de
+  -- depart. Si l'employeur et elle s'entendent sur un autre montant en
+  -- discutant, c'est celui-ci qui compte, et il est ecrit ICI - jamais
+  -- dans le profil, qui doit rester valable pour les autres annonces.
+  --
+  -- NULL tant que personne n'a rien propose : on garde alors le tarif
+  -- du profil.
+  tarif_propose   INTEGER,
+
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now')),
 
   -- Un prestataire ne peut postuler qu'UNE SEULE FOIS a une annonce donnee.
   UNIQUE (annonce_id, prestataire_id)
 );
 
+
+-- ------------------------------------------------------------
+-- Table messages : la conversation entre un employeur et un candidat
+-- ------------------------------------------------------------
+-- Une conversation n'a pas de table a elle : c'est la CANDIDATURE qui
+-- en tient lieu. C'est logique - on ne discute pas dans le vide, on
+-- discute d'une annonce precise avec une personne precise. La
+-- candidature porte deja ces deux informations, et la contrainte
+-- UNIQUE (annonce_id, prestataire_id) garantit qu'il n'y a qu'une seule
+-- conversation par couple.
+--
+-- Consequence utile : quand une annonce disparait, ses candidatures
+-- disparaissent (ON DELETE CASCADE), et les messages avec elles. Aucune
+-- discussion orpheline ne subsiste en base.
+CREATE TABLE IF NOT EXISTS messages (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+
+  candidature_id  INTEGER NOT NULL REFERENCES candidatures(id) ON DELETE CASCADE,
+
+  -- Qui a ecrit. On ne stocke pas "employeur" ou "prestataire" : le role
+  -- se retrouve en comparant cet identifiant a ceux de la candidature.
+  -- Une information deduite ne peut pas se contredire.
+  auteur_id       INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+
+  texte           TEXT    NOT NULL,
+
+  -- Le message ressemble-t-il a une tentative de paiement en dehors de
+  -- la plateforme ? Calcule au moment de l'envoi et conserve, pour que
+  -- l'equipe puisse retrouver ces messages sans relire toute la base.
+  --
+  -- Le message n'est jamais bloque : discuter du prix est normal et
+  -- autorise. Seul un avertissement est affiche aux deux personnes.
+  risque_paiement INTEGER NOT NULL DEFAULT 0 CHECK (risque_paiement IN (0, 1)),
+
+  -- Signale par son destinataire, en attente d'examen par l'equipe.
+  signale         INTEGER NOT NULL DEFAULT 0 CHECK (signale IN (0, 1)),
+
+  cree_le         TEXT    NOT NULL DEFAULT (datetime('now'))
+);
 
 -- ------------------------------------------------------------
 -- Index : accelerent les recherches les plus frequentes
@@ -214,3 +264,5 @@ INSERT OR IGNORE INTO quartiers (nom, arrondissement) VALUES
   ('Ekoumdoum', 'Yaoundé 7');
 
 CREATE INDEX IF NOT EXISTS idx_quartiers_arrond ON quartiers (arrondissement);
+CREATE INDEX IF NOT EXISTS idx_messages_candidature ON messages (candidature_id);
+CREATE INDEX IF NOT EXISTS idx_messages_signale     ON messages (signale);

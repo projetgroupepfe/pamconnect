@@ -1,0 +1,151 @@
+<%- include("partiels/tete") %>
+
+  <div class="colonne">
+
+    <h1>Discussion</h1>
+
+    <%# Le rappel de ce dont on parle. Sans lui, on ouvre une conversation
+        sans savoir a quelle demande elle se rapporte. %>
+    <div class="carte">
+      <h3><%= conversation.titreAnnonce %></h3>
+      <ul class="infos">
+        <li>
+          <%- include("partiels/icone", { nom: "profil" }) %>
+          <span>
+            Avec
+            <strong><%= jeSuisEmployeur ? conversation.nomPrestataire : conversation.nomEmployeur %></strong><% if (jeSuisEmployeur && conversation.metierPrestataire) { %> — <%= conversation.metierPrestataire %><% } %>
+          </span>
+        </li>
+        <li>
+          <%- include("partiels/icone", { nom: "calendrier" }) %>
+          <span><%= conversation.horaireAnnonce || "Horaire non précisé" %></span>
+        </li>
+        <li>
+          <%- include("partiels/icone", { nom: "lieu" }) %>
+          <span>
+            <% if (conversation.quartierAnnonce) { %><%= conversation.quartierAnnonce %>, <% } %><%= conversation.arrondissementAnnonce %>
+          </span>
+        </li>
+        <li>
+          <%- include("partiels/icone", { nom: "disponibilite" }) %>
+          <span><strong><%= libelleCandidature(conversation.statut) %></strong></span>
+        </li>
+      </ul>
+    </div>
+
+    <%# ---- Le tarif en cours de discussion ---- %>
+    <%
+      // Le tarif du profil est le point de depart. S'il a ete renegocie
+      // pour CETTE demande, c'est le montant negocie qui compte - et il
+      // ne touche pas le profil, qui reste valable pour les autres.
+      const tarifRetenu = conversation.tarif_propose || conversation.tarifPrestataire;
+      const negocie = Boolean(conversation.tarif_propose);
+    %>
+    <h2>Le tarif</h2>
+    <div class="carte">
+      <% if (negocie) { %>
+        <p class="aide">
+          Tarif convenu pour cette demande.
+          Le tarif habituel de <%= conversation.nomPrestataire %> est
+          <%= formaterMontant(conversation.tarifPrestataire) %> ; il n'a pas changé.
+        </p>
+      <% } %>
+
+      <%# Le meme bloc que partout ailleurs : le calcul ne varie jamais. %>
+      <%- include("partiels/detail-tarif", { tarif: tarifRetenu }) %>
+
+      <% if (conversation.statut === "en attente") { %>
+        <form action="/messages/<%= conversation.id %>/tarif" method="POST">
+          <div class="champ">
+            <label for="tarif">Proposer un autre montant (FCFA)</label>
+            <input type="number" id="tarif" name="tarif" min="1" step="500"
+                   value="<%= tarifRetenu %>" required>
+          </div>
+          <div class="actions">
+            <button type="submit">
+              <%- include("partiels/icone", { nom: "valider" }) %>
+              Proposer ce montant
+            </button>
+          </div>
+        </form>
+      <% } else { %>
+        <p class="aide">
+          Cette candidature a reçu une réponse : le montant ne peut plus changer.
+        </p>
+      <% } %>
+    </div>
+
+    <%# ---- Les messages ---- %>
+    <h2>Les messages</h2>
+
+    <% if (messages.length === 0) { %>
+      <div class="vide">
+        <p>Aucun message pour l'instant. Écrivez le premier.</p>
+      </div>
+    <% } else { %>
+      <% messages.forEach(function (message) { %>
+        <%
+          // Le role de l'auteur n'est pas stocke : il se deduit en
+          // comparant son identifiant a ceux de la conversation.
+          const deMoi = (jeSuisEmployeur && message.auteur_id === conversation.employeurId)
+                     || (!jeSuisEmployeur && message.auteur_id === conversation.prestataireId);
+        %>
+        <div class="carte<%= deMoi ? " message-mien" : "" %>">
+          <p class="aide">
+            <strong><%= deMoi ? "Vous" : message.nomAuteur %></strong>
+            · <%= message.cree_le %>
+            <% if (message.signale) { %> · signalé à l'équipe<% } %>
+          </p>
+
+          <p><%= message.texte %></p>
+
+          <%# L'avertissement s'affiche aux DEUX personnes, pas seulement
+              a celle qui recoit : celle qui a ecrit doit savoir qu'elle
+              prend un risque, elle aussi. %>
+          <% if (message.risque_paiement) { %>
+            <p class="aide">
+              <strong>Pour votre sécurité, ne payez pas directement en dehors de
+              la plateforme.</strong> Le paiement doit passer par PamConnect pour que
+              la personne reçoive son argent après confirmation de la prestation.
+              En dehors, personne n'a de recours en cas de problème.
+            </p>
+          <% } %>
+
+          <% if (!deMoi && !message.signale) { %>
+            <div class="actions">
+              <form action="/messages/<%= message.id %>/signaler" method="POST">
+                <input type="hidden" name="candidatureId" value="<%= conversation.id %>">
+                <button type="submit" class="bouton-secondaire">Signaler ce message</button>
+              </form>
+            </div>
+          <% } %>
+        </div>
+      <% }); %>
+    <% } %>
+
+    <%# ---- Écrire ---- %>
+    <div class="carte">
+      <form action="/messages/<%= conversation.id %>" method="POST">
+        <div class="champ">
+          <label for="texte">Votre message</label>
+          <textarea id="texte" name="texte" rows="4" maxlength="2000" required
+                    placeholder="Le service, le tarif, les horaires, les consignes..."></textarea>
+          <p class="aide">
+            Parlez du service, du tarif et des horaires. N'indiquez pas
+            votre adresse exacte : elle sera transmise automatiquement
+            après le paiement.
+          </p>
+        </div>
+        <div class="actions">
+          <button type="submit">
+            <%- include("partiels/icone", { nom: "envoi" }) %>
+            Envoyer
+          </button>
+          <a class="bouton bouton-secondaire" href="/mon-profil">Retour</a>
+        </div>
+      </form>
+    </div>
+
+  </div>
+
+<%- include("partiels/pied") %>
