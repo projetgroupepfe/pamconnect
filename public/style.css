@@ -195,6 +195,17 @@ a:hover { color: var(--bleu-fonce); }
   cursor: pointer;
 }
 .menu a:hover, .menu button:hover { color: var(--bleu); background-color: var(--bleu-clair); }
+/* La page ouverte. Trois marques a la fois : la couleur, la graisse et
+   un trait au-dessus. Une seule ne suffirait pas - la couleur echappe a
+   qui distingue mal les teintes, et le trait se voit meme en plein
+   soleil sur un ecran de telephone. */
+.menu a.actif {
+  color: var(--bleu);
+  font-weight: 700;
+  box-shadow: inset 0 3px 0 var(--bleu);
+  background-color: var(--bleu-clair);
+}
+
 .menu form { display: contents; }
 .menu-separateur { display: none; }
 

@@ -1,0 +1,73 @@
+<%- include("partiels/tete") %>
+
+  <h1>Mes messages</h1>
+  <p class="chapeau">Vos discussions, la plus récente en premier.</p>
+
+  <% if (conversations.length === 0) { %>
+
+    <div class="vide">
+      <p>Aucune discussion pour le moment.</p>
+      <div class="actions">
+        <% if (jePeux.repondre) { %>
+          <a class="bouton" href="/annonces">
+            <%- include("partiels/icone", { nom: "document" }) %>
+            Voir les annonces
+          </a>
+        <% } else if (jePeux.publier) { %>
+          <a class="bouton" href="/publier-annonce">
+            <%- include("partiels/icone", { nom: "ajouter" }) %>
+            Publier une demande
+          </a>
+        <% } %>
+      </div>
+    </div>
+
+  <% } else { %>
+
+    <div class="grille">
+      <% conversations.forEach(function (c) { %>
+        <%
+          // Avec qui je parle : l'autre personne, jamais moi.
+          const jeSuisEmployeur = moi.id === c.employeurId;
+          const autre = jeSuisEmployeur ? c.nomPrestataire : c.nomEmployeur;
+        %>
+        <div class="carte">
+          <div class="fiche-tete">
+            <div class="portrait"><%= autre.charAt(0) %></div>
+            <div>
+              <h3><%= autre %></h3>
+              <div class="metier"><%= c.titreAnnonce %></div>
+            </div>
+          </div>
+
+          <ul class="infos">
+            <li>
+              <%- include("partiels/icone", { nom: "disponibilite" }) %>
+              <span><strong><%= libelleCandidature(c.statut) %></strong></span>
+            </li>
+            <li>
+              <%- include("partiels/icone", { nom: "message" }) %>
+              <span>
+                <% if (c.nbMessages === 0) { %>
+                  Aucun message échangé
+                <% } else { %>
+                  <%= c.nbMessages %> message<%= c.nbMessages > 1 ? "s" : "" %>
+                  <span class="aide">— dernier le <%= c.dernierMessage %></span>
+                <% } %>
+              </span>
+            </li>
+          </ul>
+
+          <div class="actions">
+            <a class="bouton bouton-secondaire" href="/messages/<%= c.id %>">
+              <%- include("partiels/icone", { nom: "message" }) %>
+              Ouvrir la discussion
+            </a>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+  <% } %>
+
+<%- include("partiels/pied") %>

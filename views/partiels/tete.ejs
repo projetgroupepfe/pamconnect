@@ -36,19 +36,53 @@
         </span>
       </div>
 
-      <nav class="menu" aria-label="Navigation principale">
-        <a href="/"><%- include("icone", { nom: "maison" }) %>Accueil</a>
-        <a href="/recherche"><%- include("icone", { nom: "recherche" }) %>Rechercher</a>
-        <a href="/annonces"><%- include("icone", { nom: "document" }) %>Annonces</a>
+      <%
+        /* Le menu ne montre a chacun que ce qui le concerne.
 
-        <% if (locals.moi) { %>
-          <a href="/mon-profil"><%- include("icone", { nom: "profil" }) %>Mon profil</a>
-          <% if (moi.est_admin) { %>
-            <a href="/admin"><%- include("icone", { nom: "equipe" }) %>Équipe</a>
-          <% } %>
-        <% } else { %>
-          <a href="/connexion"><%- include("icone", { nom: "profil" }) %>Connexion</a>
-        <% } %>
+           "Rechercher" sert a trouver une aide-menagere : c'est l'outil
+           de l'employeur, il n'a rien a faire chez la personne qui
+           propose ses services. Un membre de l'equipe, lui, ne cherche
+           personne et ne repond a rien : il verifie des dossiers.
+
+           Une barre de telephone supporte quatre ou cinq entrees. Au-dela
+           elles deviennent trop etroites pour etre touchees du pouce -
+           c'est pourquoi chaque role n'a que les siennes. */
+        const entrees = [{ url: "/", icone: "maison", texte: "Accueil" }];
+
+        if (!locals.moi || locals.jePeux.publier) {
+          entrees.push({ url: "/recherche", icone: "recherche", texte: "Rechercher" });
+        }
+        if (!locals.moi || !locals.jePeux.verifierDossiers) {
+          entrees.push({ url: "/annonces", icone: "document", texte: "Annonces" });
+        }
+        if (locals.moi && !locals.jePeux.verifierDossiers) {
+          entrees.push({ url: "/messages", icone: "message", texte: "Messages" });
+        }
+        if (locals.moi && locals.jePeux.verifierDossiers) {
+          entrees.push({ url: "/admin", icone: "equipe", texte: "Équipe" });
+        }
+        entrees.push(locals.moi
+          ? { url: "/mon-profil", icone: "profil", texte: "Mon profil" }
+          : { url: "/connexion", icone: "profil", texte: "Connexion" });
+      %>
+      <nav class="menu" aria-label="Navigation principale">
+        <% entrees.forEach(function (entree) { %>
+          <%# La page ouverte est marquee de deux facons : par la couleur,
+              et par aria-current que les lecteurs d'ecran annoncent. Une
+              couleur seule laisse de cote qui ne la distingue pas. %>
+          <% const active = entree.url === "/"
+               ? locals.chemin === "/"
+               : String(locals.chemin || "").startsWith(entree.url); %>
+          <a href="<%= entree.url %>"
+             class="<%= active ? "actif" : "" %>"
+             <%# La balise d affichage ordinaire echapperait les guillemets
+                 de l attribut, qui ne vaudrait plus rien. On ecrit donc
+                 le texte tel quel : sa valeur vient de nous, jamais d un
+                 utilisateur. %>
+             <%- active ? 'aria-current="page"' : "" %>>
+            <%- include("icone", { nom: entree.icone }) %><%= entree.texte %>
+          </a>
+        <% }); %>
       </nav>
 
       <div class="entete-actions">

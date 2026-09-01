@@ -234,6 +234,27 @@ const requetes = {
     UPDATE candidatures SET tarif_propose = ? WHERE id = ?
   `),
 
+  // Toutes les discussions d'une personne, quel que soit son cote.
+  // Une seule requete pour les deux roles : la condition finale accepte
+  // aussi bien l'employeur que la personne qui a postule.
+  mesConversations: db.prepare(`
+    SELECT c.id,
+           c.statut,
+           a.titre AS titreAnnonce,
+           e.id    AS employeurId,
+           e.nom   AS nomEmployeur,
+           p.id    AS prestataireId,
+           p.nom   AS nomPrestataire,
+           (SELECT COUNT(*)     FROM messages m WHERE m.candidature_id = c.id) AS nbMessages,
+           (SELECT MAX(cree_le) FROM messages m WHERE m.candidature_id = c.id) AS dernierMessage
+    FROM candidatures c
+    JOIN annonces     a ON a.id = c.annonce_id
+    JOIN utilisateurs e ON e.id = a.employeur_id
+    JOIN utilisateurs p ON p.id = c.prestataire_id
+    WHERE e.id = @moi OR p.id = @moi
+    ORDER BY dernierMessage DESC, c.id DESC
+  `),
+
   nombreMessagesNonLus: db.prepare(`
     SELECT COUNT(*) AS n FROM messages
     WHERE candidature_id = ? AND auteur_id != ?
@@ -819,6 +840,10 @@ app.use((req, res, next) => {
   // Ces valeurs doivent rester le REFLET des regles du serveur
   // (interdireALEquipe, les controles de role dans les routes). Elles ne
   // les remplacent pas : un ecran ne protege rien.
+  // Le chemin demande, pour que le menu puisse marquer la page ouverte.
+  // Sans ce reperage, on ne sait jamais ou l'on se trouve.
+  res.locals.chemin = req.path;
+
   res.locals.jePeux = {
     // Un membre de l'equipe est enregistre comme employeur pour une
     // raison technique, mais il n'embauche pas : il verifie des
@@ -1407,6 +1432,15 @@ function conversationDe(candidatureId, utilisateur) {
 
   return estConcerne ? conversation : null;
 }
+
+// La liste des discussions. Sans elle, retrouver une conversation
+// obligeait a passer par son profil et a chercher la bonne candidature.
+app.get("/messages", exigerConnexion, (req, res) => {
+  res.render("messages", {
+    titre: "Mes messages",
+    conversations: requetes.mesConversations.all({ moi: req.utilisateur.id }),
+  });
+});
 
 app.get("/messages/:id", exigerConnexion, (req, res) => {
   const conversation = conversationDe(Number(req.params.id), req.utilisateur);
