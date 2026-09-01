@@ -1,0 +1,70 @@
+<%#
+  Une demande publiee par un employeur, telle qu'elle s'affiche dans une
+  liste. Extraite ici parce qu'elle est desormais dessinee a deux
+  endroits : les demandes qui correspondent au metier de la personne, et
+  les autres. Recopier ces cinquante lignes serait s'assurer qu'elles
+  divergent un jour.
+
+  Appelee ainsi :  include("partiels/carte-annonce", { annonce: annonce })
+
+  ATTENTION : ne jamais ecrire la sequence de fermeture EJS dans ce
+  commentaire, elle terminerait le bloc au milieu d'une phrase.
+%>
+
+<div class="carte">
+  <h3><%= annonce.titre %></h3>
+
+  <ul class="infos">
+    <li>
+      <%- include("icone", { nom: "experience" }) %>
+      <span><strong><%= annonce.metier %></strong></span>
+    </li>
+    <li>
+      <%- include("icone", { nom: "calendrier" }) %>
+      <span><strong><%= annonce.horaire || "Horaire non précisé" %></strong></span>
+    </li>
+
+    <%# Le budget de l'employeur : le repere qui permet de decider si
+        cela vaut la peine de repondre. %>
+    <% if (budgetEnClair(annonce)) { %>
+      <li>
+        <%- include("icone", { nom: "remuneration" }) %>
+        <span>
+          Budget annoncé : <strong><%= budgetEnClair(annonce) %></strong>
+          <% if (annonce.duree_estimee) { %>
+            <span class="aide">— <%= annonce.duree_estimee %></span>
+          <% } %>
+        </span>
+      </li>
+    <% } %>
+
+    <% if (annonce.conditions) { %>
+      <li>
+        <%- include("icone", { nom: "info" }) %>
+        <span><%= annonce.conditions %></span>
+      </li>
+    <% } %>
+
+    <li>
+      <%- include("icone", { nom: "lieu" }) %>
+      <span>
+        <% if (annonce.quartier) { %><strong><%= annonce.quartier %></strong>, <% } %><%= annonce.arrondissement %>
+      </span>
+    </li>
+  </ul>
+
+  <% if (jePeux.repondre) { %>
+    <div class="actions">
+      <a class="bouton" href="/candidatures/nouvelle/<%= annonce.id %>">
+        <%- include("icone", { nom: "valider" }) %>
+        Je suis disponible
+      </a>
+    </div>
+  <% } else if (moi && moi.role === "employeur") { %>
+    <p class="aide">Seules les personnes qui proposent leurs services peuvent répondre.</p>
+  <% } else { %>
+    <p class="aide">
+      <a href="/connexion">Connectez-vous</a> pour répondre à cette demande.
+    </p>
+  <% } %>
+</div>

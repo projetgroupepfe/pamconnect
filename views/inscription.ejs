@@ -39,11 +39,8 @@
         <%# Ce bloc n'apparait que pour les personnes qui proposent
             leurs services (voir le script en bas de page). %>
         <div id="champsPrestataire">
-          <div class="champ">
-            <label for="metier">Ce que vous faites</label>
-            <input type="text" id="metier" name="metier" placeholder="ex : Ménage, garde d'enfants, jardinage...">
-            <span class="aide">Sans cette information, personne ne vous trouvera.</span>
-          </div>
+          <%- include("partiels/champ-metier", {
+                valeur: null, intitule: "Ce que vous faites", obligatoire: false }) %>
 
           <div class="champ">
             <label for="tarif">Le tarif que vous demandez (FCFA)</label>

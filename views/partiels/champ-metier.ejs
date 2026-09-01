@@ -1,0 +1,31 @@
+<%#
+  Le metier, ecrit UNE SEULE FOIS.
+
+  Appele ainsi depuis un formulaire :
+
+    include("partiels/champ-metier", {
+      valeur: utilisateur.metier,
+      intitule: "Ce que vous faites",
+      obligatoire: true
+    })
+
+  ATTENTION : ne jamais ecrire la sequence de fermeture EJS dans ce
+  commentaire, elle terminerait le bloc au milieu d'une phrase.
+%>
+
+<div class="champ">
+  <label for="metier"><%= intitule %></label>
+  <input type="text" id="metier" name="metier" list="listeMetiers"
+         value="<%= valeur || "" %>"
+         placeholder="ex : Ménage à domicile"
+         autocomplete="off"
+         <%= obligatoire ? "required" : "" %>>
+
+  <%# La personne choisit dans la liste, ou ecrit autre chose : notre
+      liste peut etre incomplete, elle ne doit bloquer personne. %>
+  <datalist id="listeMetiers">
+    <% metiers.forEach(function (m) { %>
+      <option value="<%= m.nom %>"></option>
+    <% }); %>
+  </datalist>
+</div>

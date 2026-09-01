@@ -26,13 +26,9 @@
 
         <% if (utilisateur.role === "prestataire") { %>
 
-          <div class="champ">
-            <label for="metier">Ce que vous faites</label>
-            <input type="text" id="metier" name="metier"
-                   value="<%= utilisateur.metier || "" %>"
-                   placeholder="ex : Ménage, garde d'enfants, jardinage..." required>
-            <span class="aide">Sans cette information, personne ne vous trouvera.</span>
-          </div>
+          <%- include("partiels/champ-metier", {
+                valeur: utilisateur.metier, intitule: "Ce que vous faites",
+                obligatoire: true }) %>
 
           <div class="champ">
             <label for="tarif">Le tarif que vous demandez (FCFA)</label>

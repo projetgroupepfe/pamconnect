@@ -188,6 +188,40 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 -- ------------------------------------------------------------
+-- Table metiers : les services proposes sur la plateforme
+-- ------------------------------------------------------------
+-- Le metier etait un texte libre, saisi a la main des deux cotes. La
+-- base contenait donc "menage", "Menage", "menagere", "nounou" et
+-- "nounous" - cinq ecritures pour trois metiers. Consequence : une
+-- nounou ne trouvait pas les demandes de "nounous", et la recherche de
+-- "menage" ratait les annonces de "menagere".
+--
+-- C'est le meme probleme que les quartiers, et la meme solution : une
+-- liste fermee, et le serveur qui ramene ce qui est saisi au nom
+-- officiel.
+CREATE TABLE IF NOT EXISTS metiers (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+
+  -- Le nom officiel, celui qui s'affiche partout.
+  nom         TEXT    NOT NULL UNIQUE,
+
+  -- Les autres facons d'ecrire le meme metier, separees par une barre
+  -- verticale. Elles ne sont jamais interrogees une par une : le serveur
+  -- lit la colonne entiere au demarrage pour construire son
+  -- dictionnaire. Une table separee n'apporterait qu'une jointure de
+  -- plus pour le meme resultat.
+  synonymes   TEXT    NOT NULL DEFAULT ''
+);
+
+INSERT OR IGNORE INTO metiers (nom, synonymes) VALUES
+  ('Ménage à domicile', 'menage|menagere|menageres|aide menagere|aide-menagere|femme de menage|entretien maison|menage a domicile'),
+  ('Nettoyage de bureaux', 'nettoyage de bureau|nettoyage bureau|technicienne de surface|technicien de surface|agent d entretien|entretien bureau'),
+  ('Garde d''enfants', 'nounou|nounous|garde enfant|garde d enfant|baby sitter|babysitter|gouvernante'),
+  ('Jardinage', 'jardinier|jardiniere|entretien jardin|jardin'),
+  ('Gardiennage', 'gardien|gardienne|vigile|veilleur|securite'),
+  ('Cuisine', 'cuisinier|cuisiniere|chef|preparation des repas');
+
+-- ------------------------------------------------------------
 -- Index : accelerent les recherches les plus frequentes
 -- ------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_utilisateurs_role   ON utilisateurs (role);

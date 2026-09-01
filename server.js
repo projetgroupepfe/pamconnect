@@ -109,6 +109,14 @@ const requetes = {
     WHERE role = 'prestataire' AND LOWER(metier) LIKE ?
   `),
 
+  // Quand le mot cherche correspond a un metier de notre liste, on
+  // compare les noms officiels : plus fiable qu'un LIKE, qui ne
+  // rapproche ni les accents ni les variantes d'ecriture.
+  prestatairesDuMetier: db.prepare(`
+    SELECT * FROM utilisateurs
+    WHERE role = 'prestataire' AND metier = ?
+  `),
+
   toutesLesAnnonces: db.prepare(`
     SELECT * FROM annonces ORDER BY cree_le DESC, id DESC
   `),
@@ -490,6 +498,41 @@ function trouverQuartier(texte) {
   return quartiersParCle.get(normaliserNom(texte)) || null;
 }
 
+// ---------------------------------------------------------------
+// Les metiers
+// ---------------------------------------------------------------
+// Meme probleme que les quartiers, meme solution. Le metier etait un
+// texte libre : "menage", "Menage", "menagere", "nounou", "nounous".
+// Une nounou ne trouvait pas les demandes ecrites "nounous".
+const metiers = db.prepare("SELECT nom, synonymes FROM metiers ORDER BY nom").all();
+
+// Un dictionnaire qui accepte le nom officiel ET tous ses synonymes :
+//   "menagere" -> "Ménage à domicile"
+//   "MENAGE"   -> "Ménage à domicile"
+//   "nounous"  -> "Garde d'enfants"
+const metiersParCle = new Map();
+metiers.forEach((m) => {
+  metiersParCle.set(normaliserNom(m.nom), m.nom);
+  String(m.synonymes)
+    .split("|")
+    .filter(Boolean)
+    .forEach((synonyme) => metiersParCle.set(normaliserNom(synonyme), m.nom));
+});
+
+// Ramene ce qui a ete saisi au nom officiel. Renvoie null si le metier
+// est inconnu de notre liste.
+function trouverMetier(texte) {
+  return metiersParCle.get(normaliserNom(texte)) || null;
+}
+
+// La meme regle que pour le lieu : si le metier est reconnu, c'est le
+// nom officiel qui est enregistre. Sinon on garde ce que la personne a
+// ecrit - notre liste peut etre incomplete, cela ne doit bloquer
+// personne.
+function resoudreMetier(texte) {
+  return trouverMetier(texte) || String(texte || "").trim() || null;
+}
+
 // Le lieu d'une personne ou d'une annonce, decide a UN SEUL endroit.
 //
 // Regle : si le quartier est reconnu, c'est LUI qui commande - le serveur
@@ -612,6 +655,7 @@ app.locals.arrondissements = [...new Set(quartiers.map((q) => q.arrondissement))
 app.locals.carteQuartiers = Object.fromEntries(
   quartiers.map((q) => [normaliserNom(q.nom), q.arrondissement])
 );
+app.locals.metiers = metiers;
 
 // ============================================================
 // RECEPTION DES DOCUMENTS DE VERIFICATION
@@ -857,7 +901,7 @@ app.post("/inscription", lireFormulaire, (req, res) => {
     motdepasse: hacherMotDePasse(donnees.motdepasse),
     arrondissement: lieu.arrondissement,
     quartier: lieu.quartier,
-    metier: donnees.metier || null,
+    metier: resoudreMetier(donnees.metier),
     tarif: donnees.tarif ? Number(donnees.tarif) : null,
     latitude: donnees.latitude ? Number(donnees.latitude) : null,
     longitude: donnees.longitude ? Number(donnees.longitude) : null,
@@ -976,7 +1020,7 @@ app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => 
     arrondissement: moi.est_admin ? null : lieu.arrondissement,
     quartier: moi.est_admin ? null : lieu.quartier,
     // Un employeur n'a ni metier ni tarif : on ne les invente pas.
-    metier: moi.role === "prestataire" ? String(donnees.metier).trim() : null,
+    metier: moi.role === "prestataire" ? resoudreMetier(donnees.metier) : null,
     tarif: moi.role === "prestataire" ? Math.round(Number(donnees.tarif)) : null,
   });
 
@@ -1181,7 +1225,7 @@ app.post("/annonces", exigerConnexion, interdireALEquipe, lireFormulaire, (req, 
   requetes.creerAnnonce.run({
     employeur_id: req.utilisateur.id,
     titre: donnees.titre,
-    metier: donnees.metier,
+    metier: resoudreMetier(donnees.metier),
     arrondissement: lieu.arrondissement,
     quartier: lieu.quartier,
     horaire: String(donnees.horaire).trim(),
@@ -1202,10 +1246,25 @@ app.post("/annonces", exigerConnexion, interdireALEquipe, lireFormulaire, (req, 
 app.get("/annonces", (req, res) => {
   const utilisateur = utilisateurConnecte(req);
 
+  const toutes = requetes.toutesLesAnnonces.all();
+
+  // Les demandes qui correspondent au metier de la personne passent
+  // devant. Elles ne sont pas les seules montrees : masquer les autres
+  // enfermerait quelqu'un dans un metier, alors qu'une aide-menagere
+  // peut tres bien repondre a une demande de garde d'enfants.
+  //
+  // Ce tri n'est possible que depuis que le metier est une valeur de
+  // notre liste : tant que c'etait un texte libre, "menage" et
+  // "menagere" ne se rencontraient jamais.
+  const monMetier = utilisateur && utilisateur.role === "prestataire"
+    ? utilisateur.metier
+    : null;
+
   res.render("annonces", {
     titre: "Annonces",
-    annonces: requetes.toutesLesAnnonces.all(),
-    role: utilisateur ? utilisateur.role : null,
+    pourMoi: monMetier ? toutes.filter((a) => a.metier === monMetier) : [],
+    autres: monMetier ? toutes.filter((a) => a.metier !== monMetier) : toutes,
+    monMetier,
   });
 });
 
@@ -1508,14 +1567,29 @@ app.post("/messages/:id/tarif", exigerConnexion, lireFormulaire, (req, res) => {
 app.get("/recherche", (req, res) => {
   // req.query contient deja les parametres de l'adresse :
   // /recherche?metier=menage&latitude=3.8  ->  { metier: "menage", latitude: "3.8" }
-  const metierRecherche = (req.query.metier || "").trim().toLowerCase();
+  const motCherche = String(req.query.metier || "").trim();
+
+  // "menage", "menagere", "MENAGE" et "technicienne de surface" designent
+  // des metiers de notre liste : on les ramene au nom officiel avant de
+  // chercher. Sans cela, une recherche de "menage" ratait les profils
+  // enregistres sous "Menage a domicile" - l'accent suffisait a les
+  // rendre invisibles.
+  const metierOfficiel = trouverMetier(motCherche);
   const latEmployeur = parseFloat(req.query.latitude);
   const lonEmployeur = parseFloat(req.query.longitude);
 
   // C'est la base qui filtre par metier, pas JavaScript.
-  let prestataires = metierRecherche
-    ? requetes.prestatairesParMetier.all(`%${metierRecherche}%`)
-    : requetes.tousLesPrestataires.all();
+  let prestataires;
+
+  if (metierOfficiel) {
+    prestataires = requetes.prestatairesDuMetier.all(metierOfficiel);
+  } else if (motCherche) {
+    // Un mot inconnu de notre liste : on retombe sur la recherche
+    // approximative, plutot que de ne rien renvoyer.
+    prestataires = requetes.prestatairesParMetier.all(`%${motCherche.toLowerCase()}%`);
+  } else {
+    prestataires = requetes.tousLesPrestataires.all();
+  }
 
   if (!isNaN(latEmployeur) && !isNaN(lonEmployeur)) {
     prestataires = prestataires

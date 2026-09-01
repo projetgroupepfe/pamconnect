@@ -13,7 +13,7 @@
     </div>
   <% } %>
 
-  <% if (annonces.length === 0) { %>
+  <% if (pourMoi.length === 0 && autres.length === 0) { %>
 
     <%# ILLUSTRATION 3 sur 3 : un etat vide. %>
     <div class="vide">
@@ -28,66 +28,36 @@
 
   <% } else { %>
 
-    <div class="grille">
-      <% annonces.forEach(function (annonce) { %>
-        <div class="carte">
-          <h3><%= annonce.titre %></h3>
-
-          <ul class="infos">
-            <li>
-              <%- include("partiels/icone", { nom: "experience" }) %>
-              <span><strong><%= annonce.metier %></strong></span>
-            </li>
-            <li>
-              <%- include("partiels/icone", { nom: "calendrier" }) %>
-              <span><strong><%= annonce.horaire || "Horaire non précisé" %></strong></span>
-            </li>
-            <%# Le budget de l'employeur : le repere qui permet de decider
-                si cela vaut la peine de repondre. %>
-            <% if (budgetEnClair(annonce)) { %>
-              <li>
-                <%- include("partiels/icone", { nom: "remuneration" }) %>
-                <span>
-                  Budget annoncé : <strong><%= budgetEnClair(annonce) %></strong>
-                  <% if (annonce.duree_estimee) { %>
-                    <span class="aide">— <%= annonce.duree_estimee %></span>
-                  <% } %>
-                </span>
-              </li>
-            <% } %>
-
-            <% if (annonce.conditions) { %>
-              <li>
-                <%- include("partiels/icone", { nom: "info" }) %>
-                <span><%= annonce.conditions %></span>
-              </li>
-            <% } %>
-
-            <li>
-              <%- include("partiels/icone", { nom: "lieu" }) %>
-              <span>
-                <% if (annonce.quartier) { %><strong><%= annonce.quartier %></strong>, <% } %><%= annonce.arrondissement %>
-              </span>
-            </li>
-          </ul>
-
-          <% if (jePeux.repondre) { %>
-            <div class="actions">
-              <a class="bouton" href="/candidatures/nouvelle/<%= annonce.id %>">
-                <%- include("partiels/icone", { nom: "valider" }) %>
-                Je suis disponible
-              </a>
-            </div>
-          <% } else if (moi && moi.role === "employeur") { %>
-            <p class="aide">Seules les personnes qui proposent leurs services peuvent répondre.</p>
-          <% } else { %>
-            <p class="aide">
-              <a href="/connexion">Connectez-vous</a> pour répondre à cette demande.
-            </p>
-          <% } %>
+    <% if (monMetier) { %>
+      <h2>Pour vous — <%= monMetier %></h2>
+      <% if (pourMoi.length === 0) { %>
+        <div class="vide">
+          <p>Aucune demande de <%= monMetier %> pour le moment.</p>
         </div>
-      <% }); %>
-    </div>
+      <% } else { %>
+        <div class="grille">
+          <% pourMoi.forEach(function (annonce) { %>
+            <%- include("partiels/carte-annonce", { annonce: annonce }) %>
+          <% }); %>
+        </div>
+      <% } %>
+
+      <% if (autres.length > 0) { %>
+        <h2>Les autres demandes</h2>
+        <p class="aide">
+          Elles ne correspondent pas à ce que vous avez indiqué, mais rien
+          ne vous empêche d'y répondre.
+        </p>
+      <% } %>
+    <% } %>
+
+    <% if (autres.length > 0) { %>
+      <div class="grille">
+        <% autres.forEach(function (annonce) { %>
+          <%- include("partiels/carte-annonce", { annonce: annonce }) %>
+        <% }); %>
+      </div>
+    <% } %>
 
   <% } %>
 
