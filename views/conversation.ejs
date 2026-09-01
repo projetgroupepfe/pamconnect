@@ -57,7 +57,19 @@
              pourEmployeur: jeSuisEmployeur,
              beneficiaire: conversation.nomPrestataire }) %>
 
-      <% if (conversation.statut === "en attente") { %>
+      <%# Proposer un montant appartient a la personne qui travaille.
+          L'employeur voit le montant, et repond par Accepter ou Refuser
+          depuis son profil : ce sont ses leviers a lui. %>
+      <% if (jeSuisEmployeur) { %>
+        <p class="aide">
+          <% if (conversation.statut === "en attente") { %>
+            C'est <%= conversation.nomPrestataire %> qui fixe son montant. S'il vous
+            convient, acceptez sa candidature depuis votre profil.
+          <% } else { %>
+            Cette candidature a reçu une réponse : le montant ne peut plus changer.
+          <% } %>
+        </p>
+      <% } else if (conversation.statut === "en attente") { %>
         <form action="/messages/<%= conversation.id %>/tarif" method="POST">
           <div class="champ">
             <label for="tarif">Proposer un autre montant (FCFA)</label>
@@ -73,9 +85,7 @@
           <div class="champ">
             <label for="raison">Pourquoi ce montant ? <span class="aide">(facultatif)</span></label>
             <input type="text" id="raison" name="raison" maxlength="200"
-                   placeholder="<%= jeSuisEmployeur
-                     ? "C'est le budget que j'avais prévu pour trois matinées."
-                     : "C'est trois matinées par semaine, et le quartier est loin de chez moi." %>">
+                   placeholder="<%= exempleRaison %>">
             <p class="aide">
               Un montant seul se refuse ; un montant expliqué se discute.
               Votre phrase apparaîtra avec la proposition.
@@ -149,9 +159,7 @@
         <div class="champ">
           <label for="texte">Votre message</label>
           <textarea id="texte" name="texte" rows="4" maxlength="2000" required
-                    placeholder="<%= jeSuisEmployeur
-                      ? "Bonjour, j'ai besoin de quelqu'un lundi, mercredi et samedi de 8h à 12h. Êtes-vous disponible ?"
-                      : "Bonjour, je suis disponible ces trois matinées. Je travaille dans le quartier depuis quatre ans." %>"></textarea>
+                    placeholder="<%= exempleMessage %>"></textarea>
           <p class="aide">
             Parlez du service, du tarif et des horaires. N'indiquez pas
             votre adresse exacte : elle sera transmise automatiquement

@@ -524,6 +524,40 @@ function risquePaiementHorsPlateforme(texte) {
   return EXPRESSIONS_RISQUE.some((expression) => expression.test(propre));
 }
 
+// Les phrases proposees dans les cadres de saisie.
+//
+// Ce sont des EXEMPLES, pas du contenu de la plateforme : ils montrent
+// comment commencer a quelqu'un qui n'a jamais ecrit dans une
+// application. Ils sont tires au hasard a chaque affichage, pour deux
+// raisons : personne ne recopie mot pour mot la phrase qu'on lui souffle,
+// et une phrase unique repetee des mois finit par ressembler a une
+// consigne officielle.
+//
+// Ils sont rassembles ICI pour pouvoir etre corriges ou completes sans
+// toucher aux ecrans - et ils ne sont pas les memes des deux cotes.
+const EXEMPLES_MESSAGE = {
+  employeur: [
+    "Bonjour, j'ai besoin de quelqu'un lundi, mercredi et samedi de 8h à 12h. Êtes-vous disponible ?",
+    "Bonjour, est-ce que vous travaillez aussi le samedi matin ?",
+    "Bonjour, la maison a trois chambres et un salon. Cela vous convient-il ?",
+  ],
+  prestataire: [
+    "Bonjour, je suis disponible ces trois matinées. Je travaille dans le quartier depuis quatre ans.",
+    "Bonjour, votre horaire me convient. Puis-je commencer lundi prochain ?",
+    "Bonjour, je peux venir le matin. Combien de pièces faut-il faire ?",
+  ],
+};
+
+const EXEMPLES_RAISON = [
+  "C'est trois matinées par semaine, et le quartier est loin de chez moi.",
+  "Le logement est grand, cela me prendra plus de temps que d'habitude.",
+  "Je peux baisser un peu si vous me prenez toutes les semaines.",
+];
+
+function auHasard(liste) {
+  return liste[Math.floor(Math.random() * liste.length)];
+}
+
 // app.locals : disponible dans TOUTES les vues .ejs sans le repasser.
 app.locals.formaterTarif = formaterTarif;
 app.locals.formaterMontant = formaterMontant;
@@ -1215,11 +1249,15 @@ app.get("/messages/:id", exigerConnexion, (req, res) => {
     });
   }
 
+  const jeSuisEmployeur = req.utilisateur.id === conversation.employeurId;
+
   res.render("conversation", {
     titre: "Discussion",
     conversation,
     messages: requetes.messagesDeConversation.all(conversation.id),
-    jeSuisEmployeur: req.utilisateur.id === conversation.employeurId,
+    jeSuisEmployeur,
+    exempleMessage: auHasard(EXEMPLES_MESSAGE[jeSuisEmployeur ? "employeur" : "prestataire"]),
+    exempleRaison: auHasard(EXEMPLES_RAISON),
   });
 });
 
@@ -1290,6 +1328,23 @@ app.post("/messages/:id/tarif", exigerConnexion, lireFormulaire, (req, res) => {
       titre: "Action impossible",
       texte: "Cette conversation ne vous concerne pas.",
       liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  }
+
+  // Proposer un montant est l'action de la personne qui travaille.
+  // L'employeur, lui, a deja ses deux leviers : le budget qu'il annonce
+  // dans sa demande, et le bouton Accepter ou Refuser. Chaque role garde
+  // ce qui le concerne - une fonctionnalite prevue pour l'un n'a rien a
+  // faire chez l'autre.
+  //
+  // Le formulaire est masque chez l'employeur, mais un ecran ne fait
+  // respecter aucune regle : c'est ici qu'elle tient.
+  if (req.utilisateur.id !== conversation.prestataireId) {
+    return res.status(403).render("message", {
+      titre: "Ce n'est pas à vous de fixer le montant",
+      texte: "C'est la personne qui travaille qui indique son tarif. " +
+             "Vous pouvez accepter sa proposition ou refuser sa candidature.",
+      liens: [{ url: `/messages/${conversation.id}`, texte: "Retour à la discussion" }],
     });
   }
 
