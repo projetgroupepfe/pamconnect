@@ -120,3 +120,97 @@ CREATE INDEX IF NOT EXISTS idx_utilisateurs_metier ON utilisateurs (metier);
 CREATE INDEX IF NOT EXISTS idx_annonces_employeur  ON annonces (employeur_id);
 CREATE INDEX IF NOT EXISTS idx_candid_annonce      ON candidatures (annonce_id);
 CREATE INDEX IF NOT EXISTS idx_candid_prestataire  ON candidatures (prestataire_id);
+
+-- ------------------------------------------------------------
+-- Table quartiers : la liste normalisee des quartiers de Yaounde
+-- ------------------------------------------------------------
+-- Avant, l'arrondissement etait saisi a la main dans trois formulaires
+-- differents, et le quartier etait un texte libre. Resultat : "cite vert",
+-- "biyemassi", "ngoussso" - des orthographes qu'aucune recherche ne
+-- rapproche, et des arrondissements parfois faux.
+--
+-- Desormais la personne choisit son QUARTIER, et le serveur en DEDUIT
+-- l'arrondissement. Une seule information saisie, une seule verite.
+--
+-- ATTENTION : cette table est modifiable. Le rattachement d'un quartier a
+-- son arrondissement doit etre verifie par l'equipe : c'est une donnee de
+-- terrain, pas une donnee technique.
+CREATE TABLE IF NOT EXISTS quartiers (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+
+  -- UNIQUE : un quartier n'est ecrit qu'une fois dans la table.
+  nom             TEXT    NOT NULL UNIQUE,
+
+  arrondissement  TEXT    NOT NULL,
+
+  -- La premiere version ne couvre que Yaounde. La colonne existe deja
+  -- pour qu'une autre ville puisse etre ajoutee sans refaire la table.
+  ville           TEXT    NOT NULL DEFAULT 'Yaoundé'
+);
+
+-- INSERT OR IGNORE : si le quartier existe deja, la ligne est ignoree
+-- au lieu de provoquer une erreur. On peut donc relancer ce fichier
+-- autant de fois qu'on veut sans rien casser.
+INSERT OR IGNORE INTO quartiers (nom, arrondissement) VALUES
+  ('Bastos', 'Yaoundé 1'),
+  ('Nlongkak', 'Yaoundé 1'),
+  ('Elig-Essono', 'Yaoundé 1'),
+  ('Djoungolo', 'Yaoundé 1'),
+  ('Etoa-Meki', 'Yaoundé 1'),
+  ('Emana', 'Yaoundé 1'),
+  ('Nkolmesseng', 'Yaoundé 1'),
+  ('Ekoudou', 'Yaoundé 1'),
+  ('Manguier', 'Yaoundé 1'),
+  ('Tsinga', 'Yaoundé 2'),
+  ('Briqueterie', 'Yaoundé 2'),
+  ('Madagascar', 'Yaoundé 2'),
+  ('Mokolo', 'Yaoundé 2'),
+  ('Messa', 'Yaoundé 2'),
+  ('Cité Verte', 'Yaoundé 2'),
+  ('Nkomkana', 'Yaoundé 2'),
+  ('Carrière', 'Yaoundé 2'),
+  ('Oliga', 'Yaoundé 2'),
+  ('Efoulan', 'Yaoundé 3'),
+  ('Nsimeyong', 'Yaoundé 3'),
+  ('Mvog-Betsi', 'Yaoundé 3'),
+  ('Obili', 'Yaoundé 3'),
+  ('Ngoa-Ekellé', 'Yaoundé 3'),
+  ('Mvolyé', 'Yaoundé 3'),
+  ('Simbock', 'Yaoundé 3'),
+  ('Ahala', 'Yaoundé 3'),
+  ('Nsam', 'Yaoundé 3'),
+  ('Damas', 'Yaoundé 3'),
+  ('Kondengui', 'Yaoundé 4'),
+  ('Mvog-Ada', 'Yaoundé 4'),
+  ('Mimboman', 'Yaoundé 4'),
+  ('Nkolndongo', 'Yaoundé 4'),
+  ('Ekounou', 'Yaoundé 4'),
+  ('Awae', 'Yaoundé 4'),
+  ('Mvan', 'Yaoundé 4'),
+  ('Odza', 'Yaoundé 4'),
+  ('Ekié', 'Yaoundé 4'),
+  ('Nkolfoulou', 'Yaoundé 4'),
+  ('Essos', 'Yaoundé 5'),
+  ('Mfandena', 'Yaoundé 5'),
+  ('Omnisport', 'Yaoundé 5'),
+  ('Ngousso', 'Yaoundé 5'),
+  ('Emombo', 'Yaoundé 5'),
+  ('Mvog-Mbi', 'Yaoundé 5'),
+  ('Santa Barbara', 'Yaoundé 5'),
+  ('Nkoabang', 'Yaoundé 5'),
+  ('Biyem-Assi', 'Yaoundé 6'),
+  ('Mendong', 'Yaoundé 6'),
+  ('Etoug-Ebe', 'Yaoundé 6'),
+  ('Melen', 'Yaoundé 6'),
+  ('Nkolbikok', 'Yaoundé 6'),
+  ('Etetak', 'Yaoundé 6'),
+  ('Obobogo', 'Yaoundé 6'),
+  ('Mendong-Village', 'Yaoundé 6'),
+  ('Nkolbisson', 'Yaoundé 7'),
+  ('Oyom-Abang', 'Yaoundé 7'),
+  ('Nkolso', 'Yaoundé 7'),
+  ('Minkoameyos', 'Yaoundé 7'),
+  ('Nomayos', 'Yaoundé 7'),
+  ('Ekoumdoum', 'Yaoundé 7');
+
+CREATE INDEX IF NOT EXISTS idx_quartiers_arrond ON quartiers (arrondissement);

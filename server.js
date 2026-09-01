@@ -39,6 +39,18 @@ const db = new Database(path.join(__dirname, "data", "pamconnect.db"));
 // Sans cette ligne, on pourrait creer une annonce sans employeur.
 db.pragma("foreign_keys = ON");
 
+// Le fichier data/schema.sql est rejoue a CHAQUE demarrage.
+//
+// Ce n'est pas dangereux : toutes ses instructions disent
+// "CREATE ... IF NOT EXISTS" ou "INSERT OR IGNORE". Une table qui existe
+// deja est laissee telle quelle, une ligne deja presente est ignoree.
+//
+// Pourquoi c'est important : le fichier .db n'est PAS dans le depot Git
+// (il contient des donnees personnelles). Sans cette ligne, un coequipier
+// qui clone le projet n'aurait aucune base et l'application planterait.
+// Maintenant, il lui suffit de lancer npm start.
+db.exec(fs.readFileSync(path.join(__dirname, "data", "schema.sql"), "utf-8"));
+
 // ============================================================
 // LES REQUETES
 // ============================================================
@@ -327,6 +339,64 @@ function apresConnexion(utilisateur) {
   };
 }
 
+// ---------------------------------------------------------------
+// Les quartiers de Yaounde
+// ---------------------------------------------------------------
+// Avant, la personne choisissait son arrondissement dans une liste ET
+// tapait son quartier a la main. Deux informations a saisir, dont une
+// qu'elle ne connait pas forcement : beaucoup de gens vivent a Bastos
+// sans savoir que c'est Yaounde 1.
+//
+// Maintenant elle ne saisit QUE son quartier, et le serveur en deduit
+// l'arrondissement. Une seule saisie, et plus d'incoherence possible.
+
+// Met un nom sous une forme comparable : sans accent, sans majuscule,
+// sans tiret ni espace. "Cité Verte", "cite verte" et "CITEVERTE"
+// donnent tous "citeverte". C'est ainsi qu'on rattrape les fautes de
+// frappe les plus courantes.
+function normaliserNom(texte) {
+  return String(texte || "")
+    .normalize("NFD")                  // sépare les lettres de leurs accents
+    .replace(/[\u0300-\u036f]/g, "")  // supprime les accents
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");        // enlève espaces, tirets, apostrophes
+}
+
+// La table est petite (60 lignes) et ne change presque jamais : on la lit
+// UNE FOIS au demarrage plutot qu'a chaque formulaire affiche.
+const quartiers = db.prepare("SELECT nom, arrondissement FROM quartiers ORDER BY nom").all();
+
+// Un dictionnaire : "citeverte" -> { nom: "Cité Verte", arrondissement: "Yaoundé 2" }
+const quartiersParCle = new Map(quartiers.map((q) => [normaliserNom(q.nom), q]));
+
+// Retrouve un quartier ecrit n'importe comment. Renvoie null si inconnu.
+function trouverQuartier(texte) {
+  return quartiersParCle.get(normaliserNom(texte)) || null;
+}
+
+// Le lieu d'une personne ou d'une annonce, decide a UN SEUL endroit.
+//
+// Regle : si le quartier est reconnu, c'est LUI qui commande - le serveur
+// ecrit le nom officiel et l'arrondissement correspondant, et ignore
+// l'arrondissement envoye par le navigateur. On ne fait pas confiance a
+// ce qui arrive du formulaire.
+//
+// Si le quartier est inconnu (un quartier oublie dans notre liste), on
+// garde ce que la personne a ecrit et l'arrondissement qu'elle a choisi :
+// elle n'est jamais bloquee par une lacune de notre table.
+function resoudreLieu(donnees) {
+  const connu = trouverQuartier(donnees.quartier);
+
+  if (connu) {
+    return { quartier: connu.nom, arrondissement: connu.arrondissement };
+  }
+
+  return {
+    quartier: String(donnees.quartier || "").trim() || null,
+    arrondissement: donnees.arrondissement || null,
+  };
+}
+
 // app.locals : disponible dans TOUTES les vues .ejs sans le repasser.
 app.locals.formaterTarif = formaterTarif;
 app.locals.formaterMontant = formaterMontant;
@@ -334,6 +404,16 @@ app.locals.detaillerTarif = detaillerTarif;
 app.locals.pourcentageCommission = Math.round(TAUX_COMMISSION * 100);
 app.locals.libelleVerification = libelleVerification;
 app.locals.libelleCandidature = libelleCandidature;
+app.locals.quartiers = quartiers;
+// La liste des arrondissements se DEDUIT des quartiers : elle n'est plus
+// recopiee dans chaque formulaire, ou elle finissait par diverger.
+app.locals.arrondissements = [...new Set(quartiers.map((q) => q.arrondissement))].sort();
+// La meme correspondance, mise a la disposition du navigateur, pour que
+// l'arrondissement s'affiche AVANT l'envoi du formulaire. C'est un
+// confort d'affichage : la decision reste celle du serveur.
+app.locals.carteQuartiers = Object.fromEntries(
+  quartiers.map((q) => [normaliserNom(q.nom), q.arrondissement])
+);
 
 // ============================================================
 // RECEPTION DES DOCUMENTS DE VERIFICATION
@@ -548,13 +628,16 @@ app.post("/inscription", lireFormulaire, (req, res) => {
     }
   }
 
+  // Le quartier commande : l'arrondissement en est deduit (voir resoudreLieu).
+  const lieu = resoudreLieu(donnees);
+
   requetes.creerUtilisateur.run({
     role: donnees.role,
     nom: donnees.nom,
     email,
     motdepasse: hacherMotDePasse(donnees.motdepasse),
-    arrondissement: donnees.arrondissement || null,
-    quartier: donnees.quartier || null,
+    arrondissement: lieu.arrondissement,
+    quartier: lieu.quartier,
     metier: donnees.metier || null,
     tarif: donnees.tarif ? Number(donnees.tarif) : null,
     latitude: donnees.latitude ? Number(donnees.latitude) : null,
@@ -663,14 +746,16 @@ app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => 
     }
   }
 
+  const lieu = resoudreLieu(donnees);
+
   requetes.majProfil.run({
     id: moi.id,
     nom: String(donnees.nom).trim(),
     // Un compte d'equipe ne rend visite a personne : son arrondissement
     // et son quartier ne servent a rien, on ne les lui demande pas et on
     // ne les conserve pas. Une donnee inutile est une donnee de trop.
-    arrondissement: moi.est_admin ? null : (donnees.arrondissement || null),
-    quartier: moi.est_admin ? null : (String(donnees.quartier || "").trim() || null),
+    arrondissement: moi.est_admin ? null : lieu.arrondissement,
+    quartier: moi.est_admin ? null : lieu.quartier,
     // Un employeur n'a ni metier ni tarif : on ne les invente pas.
     metier: moi.role === "prestataire" ? String(donnees.metier).trim() : null,
     tarif: moi.role === "prestataire" ? Math.round(Number(donnees.tarif)) : null,
@@ -854,12 +939,14 @@ app.post("/annonces", exigerConnexion, interdireALEquipe, lireFormulaire, (req, 
     });
   }
 
+  const lieu = resoudreLieu(donnees);
+
   requetes.creerAnnonce.run({
     employeur_id: req.utilisateur.id,
     titre: donnees.titre,
     metier: donnees.metier,
-    arrondissement: donnees.arrondissement || null,
-    quartier: String(donnees.quartier).trim(),
+    arrondissement: lieu.arrondissement,
+    quartier: lieu.quartier,
     horaire: String(donnees.horaire).trim(),
   });
 

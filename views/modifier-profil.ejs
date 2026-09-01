@@ -17,24 +17,10 @@
             pas demandes. %>
         <% if (!utilisateur.est_admin) { %>
 
-        <div class="champ">
-          <label for="arrondissement">Votre arrondissement</label>
-          <select id="arrondissement" name="arrondissement">
-            <% for (let numero = 1; numero <= 7; numero++) { %>
-              <% const valeur = "Yaoundé " + numero; %>
-              <option value="<%= valeur %>" <%= utilisateur.arrondissement === valeur ? "selected" : "" %>>
-                <%= valeur %>
-              </option>
-            <% } %>
-          </select>
-        </div>
-
-        <div class="champ">
-          <label for="quartier">Votre quartier</label>
-          <input type="text" id="quartier" name="quartier"
-                 value="<%= utilisateur.quartier || "" %>"
-                 placeholder="Bastos, Mvan, Nsam...">
-        </div>
+        <%- include("partiels/champ-lieu", {
+              quartier: utilisateur.quartier,
+              arrondissement: utilisateur.arrondissement,
+              obligatoire: false }) %>
 
         <% } %>
 

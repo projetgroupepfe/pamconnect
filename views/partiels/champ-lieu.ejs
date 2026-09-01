@@ -1,0 +1,93 @@
+<%#
+  Le quartier et l'arrondissement, ecrits UNE SEULE FOIS.
+
+  Avant, la liste des sept arrondissements etait recopiee dans
+  inscription.ejs, modifier-profil.ejs et publier-annonce.ejs - trois
+  fois, de trois facons differentes. Une correction en oubliait toujours
+  une.
+
+  Ce bloc est appele ainsi depuis un formulaire :
+
+    include("partiels/champ-lieu", {
+      quartier: utilisateur.quartier,
+      arrondissement: utilisateur.arrondissement,
+      obligatoire: true
+    })
+
+  ATTENTION : ne jamais ecrire la sequence de fermeture EJS dans ce
+  commentaire, elle terminerait le bloc au milieu d'une phrase.
+%>
+
+<div class="champ">
+  <label for="quartier">Votre quartier</label>
+  <input type="text" id="quartier" name="quartier" list="listeQuartiers"
+         value="<%= quartier || "" %>"
+         placeholder="Bastos, Mvan, Biyem-Assi..."
+         autocomplete="off"
+         <%= obligatoire ? "required" : "" %>>
+
+  <%# datalist : la liste de suggestions du navigateur. La personne peut
+      choisir dans la liste OU ecrire un quartier absent de nos donnees. %>
+  <datalist id="listeQuartiers">
+    <% quartiers.forEach(function (q) { %>
+      <option value="<%= q.nom %>"></option>
+    <% }); %>
+  </datalist>
+
+  <p class="aide">Beaucoup de gens connaissent leur quartier sans connaître
+     leur arrondissement. Indiquez le quartier, nous trouvons le reste.</p>
+</div>
+
+<div class="champ">
+  <label for="arrondissement">Arrondissement</label>
+  <select id="arrondissement" name="arrondissement">
+    <option value="">—</option>
+    <% arrondissements.forEach(function (a) { %>
+      <option value="<%= a %>" <%= arrondissement === a ? "selected" : "" %>><%= a %></option>
+    <% }); %>
+  </select>
+  <p class="aide" id="aideArrondissement">Rempli automatiquement d'après votre quartier.</p>
+</div>
+
+<script>
+  // Ce script ne fait que MONTRER la reponse tout de suite. Il ne decide
+  // rien : au moment de l'envoi, le serveur refait le meme calcul et
+  // c'est le sien qui est enregistre.
+  //
+  // C'est le principe qu'on applique partout : le navigateur guide la
+  // personne honnete, le serveur ne fait confiance a personne.
+  (function () {
+    var CARTE = <%- JSON.stringify(carteQuartiers) %>;
+    var champQuartier = document.getElementById("quartier");
+    var champArrondissement = document.getElementById("arrondissement");
+    var aide = document.getElementById("aideArrondissement");
+
+    // La meme mise en forme que normaliserNom() cote serveur : sans
+    // accent, sans majuscule, sans tiret. "Cité Verte" et "cite verte"
+    // aboutissent au meme resultat.
+    function normaliser(texte) {
+      return String(texte || "")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+    }
+
+    function ajuster() {
+      var trouve = CARTE[normaliser(champQuartier.value)];
+
+      if (trouve) {
+        champArrondissement.value = trouve;
+        aide.textContent = "Trouvé d'après votre quartier.";
+      } else if (champQuartier.value.trim()) {
+        aide.textContent = "Ce quartier n'est pas encore dans notre liste : "
+                         + "choisissez vous-même l'arrondissement.";
+      } else {
+        aide.textContent = "Rempli automatiquement d'après votre quartier.";
+      }
+    }
+
+    champQuartier.addEventListener("input", ajuster);
+    ajuster();
+  })();
+</script>

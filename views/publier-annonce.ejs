@@ -32,29 +32,9 @@
           </span>
         </div>
 
-        <div class="champ">
-          <label for="quartier">Dans quel quartier ?</label>
-          <input type="text" id="quartier" name="quartier"
-                 placeholder="Bastos, Mvan, Nsam, Mokolo..." required>
-          <span class="aide">
-            Le nom du quartier suffit — n'indiquez pas votre adresse exacte.
-            Beaucoup de candidates connaissent le quartier sans connaître
-            le numéro de l'arrondissement.
-          </span>
-        </div>
-
-        <div class="champ">
-          <label for="arrondissement">Arrondissement</label>
-          <select id="arrondissement" name="arrondissement" required>
-            <option value="Yaoundé 1">Yaoundé 1</option>
-            <option value="Yaoundé 2">Yaoundé 2</option>
-            <option value="Yaoundé 3">Yaoundé 3</option>
-            <option value="Yaoundé 4">Yaoundé 4</option>
-            <option value="Yaoundé 5">Yaoundé 5</option>
-            <option value="Yaoundé 6">Yaoundé 6</option>
-            <option value="Yaoundé 7">Yaoundé 7</option>
-          </select>
-        </div>
+        <%# Le nom du quartier suffit : jamais l'adresse exacte. %>
+        <%- include("partiels/champ-lieu", {
+              quartier: null, arrondissement: null, obligatoire: true }) %>
 
         <div class="actions">
           <button type="submit">Publier ma demande</button>
