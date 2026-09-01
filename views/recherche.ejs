@@ -76,6 +76,36 @@
           </p>
 
           <ul class="infos">
+            <%# Ce qu'un employeur regarde avant tout : quand la personne
+                peut venir, et depuis combien de temps elle exerce. %>
+            <% const creneaux = disponibilitesLisibles(prestataire.disponibilites); %>
+            <% if (creneaux.length > 0) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "calendrier" }) %>
+                <span>
+                  Disponible
+                  <strong><%= creneaux.map(function (c) { return c.jour; }).join(", ") %></strong>
+                </span>
+              </li>
+            <% } %>
+
+            <% if (prestataire.experience_annees > 0) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "experience" }) %>
+                <span>
+                  <strong><%= prestataire.experience_annees %></strong>
+                  an<%= prestataire.experience_annees > 1 ? "s" : "" %> d'expérience
+                </span>
+              </li>
+            <% } %>
+
+            <% if (trancheAge(prestataire.date_naissance)) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "profil" }) %>
+                <span><%= trancheAge(prestataire.date_naissance) %></span>
+              </li>
+            <% } %>
+
             <li>
               <%- include("partiels/icone", { nom: "lieu" }) %>
               <span><%= prestataire.arrondissement %><%= prestataire.quartier ? ", " + prestataire.quartier : "" %></span>

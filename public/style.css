@@ -206,6 +206,26 @@ a:hover { color: var(--bleu-fonce); }
   background-color: var(--bleu-clair);
 }
 
+/* La grille des disponibilites : sept jours, trois moments. Un tableau
+   plutot qu'une liste de cases, parce que l'information EST un croisement
+   entre un jour et un moment - et parce qu'un lecteur d'ecran annonce
+   alors "Samedi, Matin" au lieu d'un intitule isole. */
+.creneaux { border: 1px solid var(--trait); border-radius: var(--rayon); padding: 1rem; }
+.creneaux legend { font-weight: 600; padding: 0 .4rem; }
+
+.creneaux-table { width: 100%; border-collapse: collapse; margin-top: .5rem; }
+.creneaux-table th {
+  font-size: .8rem; font-weight: 600; color: var(--encre-douce);
+  text-align: center; padding: .35rem .2rem;
+}
+.creneaux-table th[scope="row"] { text-align: left; font-weight: 500; color: var(--encre); }
+.creneaux-table td { text-align: center; padding: .3rem .2rem; }
+.creneaux-table input[type="checkbox"] {
+  width: 1.35rem; height: 1.35rem; margin: 0; cursor: pointer;
+  accent-color: var(--bleu);
+}
+.creneaux-table tbody tr:nth-child(odd) { background-color: var(--fond); }
+
 .menu form { display: contents; }
 .menu-separateur { display: none; }
 
@@ -408,6 +428,11 @@ button:hover, .bouton:hover {
 .badge-en-attente { background-color: var(--ambre-fond); color: var(--ambre); }
 .badge-refuse     { background-color: var(--rouge-fond); color: var(--rouge); }
 .badge-non-soumis { background-color: var(--bleu-clair); color: var(--encre-douce); }
+
+/* Une information declaree par la personne, pas une verification de la
+   plateforme : le bleu neutre la distingue du vert, reserve a ce que
+   nous avons reellement controle. */
+.badge-info       { background-color: var(--bleu-clair); color: var(--bleu); }
 
 
 /* ---------- 11. Page d'accueil ---------------------------- */

@@ -42,6 +42,8 @@
           <%- include("partiels/champ-metier", {
                 valeur: null, intitule: "Ce que vous faites", obligatoire: false }) %>
 
+          <%- include("partiels/champ-disponibilites", { utilisateur: null }) %>
+
           <div class="champ">
             <label for="tarif">Le tarif que vous demandez (FCFA)</label>
             <input type="number" id="tarif" name="tarif" placeholder="ex : 10000" min="500" step="500">

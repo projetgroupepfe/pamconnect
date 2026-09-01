@@ -1,0 +1,74 @@
+<%#
+  Les informations qui permettent a un employeur de se decider :
+  l'age, l'experience et les moments ou la personne peut travailler.
+
+  Appele ainsi :
+
+    include("partiels/champ-disponibilites", { utilisateur: utilisateur })
+    include("partiels/champ-disponibilites", { utilisateur: null })
+
+  ATTENTION : ne jamais ecrire la sequence de fermeture EJS dans ce
+  commentaire, elle terminerait le bloc au milieu d'une phrase.
+%>
+<%
+  const u = locals.utilisateur || {};
+  const dejaCoches = new Set(String(u.disponibilites || "").split("|"));
+%>
+
+<div class="champ">
+  <label for="date_naissance">Votre date de naissance</label>
+  <input type="date" id="date_naissance" name="date_naissance"
+         value="<%= u.date_naissance || "" %>" max="<%= new Date().toISOString().slice(0, 10) %>">
+  <span class="aide">
+    Elle n'est jamais affichée. Les employeurs ne voient qu'une tranche
+    d'âge, par exemple « 25 - 34 ans ».
+  </span>
+</div>
+
+<div class="champ">
+  <label for="experience_annees">Depuis combien d'années faites-vous ce travail ?</label>
+  <input type="number" id="experience_annees" name="experience_annees"
+         min="0" max="60" step="1" placeholder="ex : 4"
+         value="<%= u.experience_annees != null ? u.experience_annees : "" %>">
+</div>
+
+<fieldset class="champ creneaux">
+  <legend>Quand pouvez-vous travailler ?</legend>
+
+  <%# Une liste fermee de sept jours et trois moments. Un texte libre
+      comme "les matins sauf le mercredi" est lisible par un humain mais
+      illisible par la machine : impossible d'y chercher qui est libre le
+      samedi matin. %>
+  <table class="creneaux-table">
+    <thead>
+      <tr>
+        <th><span class="lecture-ecran">Jour</span></th>
+        <% moments.forEach(function (m) { %>
+          <th scope="col"><%= m.libelle %></th>
+        <% }); %>
+      </tr>
+    </thead>
+    <tbody>
+      <% jours.forEach(function (jour) { %>
+        <tr>
+          <th scope="row"><%= jour.charAt(0).toUpperCase() + jour.slice(1) %></th>
+          <% moments.forEach(function (m) { %>
+            <%
+              const valeur = jour + "-" + m.cle;
+              const id = "creneau-" + valeur;
+            %>
+            <td>
+              <input type="checkbox" id="<%= id %>" name="disponibilites"
+                     value="<%= valeur %>" <%= dejaCoches.has(valeur) ? "checked" : "" %>>
+              <label for="<%= id %>" class="lecture-ecran">
+                <%= jour %> <%= m.libelle %>
+              </label>
+            </td>
+          <% }); %>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+
+  <span class="aide">Cochez tous les moments qui vous conviennent.</span>
+</fieldset>

@@ -30,6 +30,8 @@
                 valeur: utilisateur.metier, intitule: "Ce que vous faites",
                 obligatoire: true }) %>
 
+          <%- include("partiels/champ-disponibilites", { utilisateur: utilisateur }) %>
+
           <div class="champ">
             <label for="tarif">Le tarif que vous demandez (FCFA)</label>
             <input type="number" id="tarif" name="tarif"

@@ -74,6 +74,9 @@ ajouterColonneSiAbsente("annonces", "budget", "INTEGER");
 ajouterColonneSiAbsente("annonces", "unite_tarif", "TEXT NOT NULL DEFAULT 'forfaitaire'");
 ajouterColonneSiAbsente("annonces", "duree_estimee", "TEXT");
 ajouterColonneSiAbsente("annonces", "conditions", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "date_naissance", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "experience_annees", "INTEGER");
+ajouterColonneSiAbsente("utilisateurs", "disponibilites", "TEXT");
 
 // ============================================================
 // LES REQUETES
@@ -95,9 +98,11 @@ const requetes = {
 
   creerUtilisateur: db.prepare(`
     INSERT INTO utilisateurs
-      (role, nom, email, motdepasse, arrondissement, quartier, metier, tarif, latitude, longitude)
+      (role, nom, email, motdepasse, arrondissement, quartier, metier, tarif,
+       latitude, longitude, date_naissance, experience_annees, disponibilites)
     VALUES
-      (@role, @nom, @email, @motdepasse, @arrondissement, @quartier, @metier, @tarif, @latitude, @longitude)
+      (@role, @nom, @email, @motdepasse, @arrondissement, @quartier, @metier, @tarif,
+       @latitude, @longitude, @date_naissance, @experience_annees, @disponibilites)
   `),
 
   tousLesPrestataires: db.prepare(`
@@ -266,7 +271,10 @@ const requetes = {
         arrondissement = @arrondissement,
         quartier = @quartier,
         metier = @metier,
-        tarif = @tarif
+        tarif = @tarif,
+        date_naissance = @date_naissance,
+        experience_annees = @experience_annees,
+        disponibilites = @disponibilites
     WHERE id = @id
   `),
 
@@ -405,6 +413,17 @@ function verifierProfilPrestataire(donnees) {
       titre: "Tarif obligatoire",
       texte: "Indiquez le tarif que vous demandez pour une prestation. " +
              "C'est ce montant que l'employeur paiera.",
+    };
+  }
+
+  // La date de naissance est facultative, mais si elle est donnee elle
+  // doit correspondre a une personne majeure : la plateforme donne acces
+  // au domicile de familles.
+  if (donnees.date_naissance && !ageValide(donnees.date_naissance)) {
+    return {
+      titre: "Date de naissance invalide",
+      texte: "La plateforme est réservée aux personnes majeures. " +
+             "Vérifiez la date que vous avez saisie.",
     };
   }
 
@@ -554,6 +573,124 @@ function resoudreMetier(texte) {
   return trouverMetier(texte) || String(texte || "").trim() || null;
 }
 
+// ---------------------------------------------------------------
+// L'age, l'experience, les disponibilites
+// ---------------------------------------------------------------
+
+// La date de naissance est conservee, jamais affichee. Une date complete
+// avec un nom et un quartier suffit a identifier quelqu'un ; une tranche
+// d'age dit ce qu'un employeur a besoin de savoir sans rien reveler de
+// plus.
+const TRANCHES = [
+  { jusqua: 24, libelle: "18 - 24 ans" },
+  { jusqua: 34, libelle: "25 - 34 ans" },
+  { jusqua: 44, libelle: "35 - 44 ans" },
+  { jusqua: 54, libelle: "45 - 54 ans" },
+  { jusqua: 200, libelle: "55 ans et plus" },
+];
+
+function trancheAge(dateNaissance) {
+  if (!dateNaissance) return null;
+
+  const naissance = new Date(dateNaissance);
+  if (isNaN(naissance.getTime())) return null;
+
+  const aujourdhui = new Date();
+  let age = aujourdhui.getFullYear() - naissance.getFullYear();
+
+  // L'anniversaire n'est pas encore passe cette annee : un an de moins.
+  const moisEcoule = aujourdhui.getMonth() - naissance.getMonth();
+  if (moisEcoule < 0 || (moisEcoule === 0 && aujourdhui.getDate() < naissance.getDate())) {
+    age--;
+  }
+
+  if (age < 18 || age > 120) return null;
+
+  return TRANCHES.find((t) => age <= t.jusqua).libelle;
+}
+
+// La plateforme est reservee aux personnes majeures : le serveur refuse
+// une date qui donnerait moins de 18 ans.
+function ageValide(dateNaissance) {
+  return trancheAge(dateNaissance) !== null;
+}
+
+// Les creneaux possibles. Liste fermee : le serveur refuse tout ce qui
+// n'en fait pas partie, meme si le formulaire est contourne.
+const JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
+const MOMENTS = [
+  { cle: "matin",      libelle: "Matin" },
+  { cle: "apresmidi",  libelle: "Après-midi" },
+  { cle: "soir",       libelle: "Soir" },
+];
+
+const CRENEAUX_VALIDES = new Set(
+  JOURS.flatMap((jour) => MOMENTS.map((m) => `${jour}-${m.cle}`))
+);
+
+// Ce qui arrive du formulaire est une liste de cases cochees. On ne garde
+// que les creneaux connus, dans l'ordre de la semaine - sans quoi
+// l'affichage dependrait de l'ordre de cochage.
+function resoudreDisponibilites(donnees) {
+  const brut = donnees.disponibilites;
+  const liste = Array.isArray(brut) ? brut : (brut ? [brut] : []);
+
+  const retenus = [...CRENEAUX_VALIDES].filter((creneau) => liste.includes(creneau));
+
+  return retenus.length ? retenus.join("|") : null;
+}
+
+// Pour l'affichage : "lundi-matin|samedi-matin" devient
+// { lundi: ["Matin"], samedi: ["Matin"] }
+function disponibilitesLisibles(texte) {
+  if (!texte) return [];
+
+  const creneaux = new Set(String(texte).split("|"));
+
+  return JOURS
+    .map((jour) => ({
+      jour,
+      moments: MOMENTS.filter((m) => creneaux.has(`${jour}-${m.cle}`)).map((m) => m.libelle),
+    }))
+    .filter((j) => j.moments.length > 0);
+}
+
+// Les badges affiches sur un profil.
+//
+// REGLE : on n'affiche que ce que la plateforme a REELLEMENT verifie.
+// Le cahier des charges prevoit aussi "Telephone verifie" et "E-mail
+// verifie" ; nous ne les affichons PAS, parce que nous n'envoyons ni SMS
+// ni email. Un badge qui affirme une verification qui n'a pas eu lieu est
+// pire que pas de badge du tout : il transforme une limite technique en
+// mensonge envers les familles.
+function badgesDe(utilisateur) {
+  const badges = [];
+
+  if (utilisateur.statut_verification === "verifie") {
+    badges.push({ cle: "verifie", texte: "Identité et casier vérifiés", icone: "verifie" });
+  }
+
+  if (utilisateur.experience_annees > 0) {
+    const n = utilisateur.experience_annees;
+    badges.push({
+      cle: "experience",
+      texte: n === 1 ? "1 an d'expérience" : `${n} ans d'expérience`,
+      icone: "experience",
+    });
+  }
+
+  if (utilisateur.disponibilites) {
+    const jours = disponibilitesLisibles(utilisateur.disponibilites).length;
+    badges.push({
+      cle: "disponibilite",
+      texte: jours === 1 ? "Disponible 1 jour par semaine" : `Disponible ${jours} jours par semaine`,
+      icone: "disponibilite",
+    });
+  }
+
+  return badges;
+}
+
 // Le lieu d'une personne ou d'une annonce, decide a UN SEUL endroit.
 //
 // Regle : si le quartier est reconnu, c'est LUI qui commande - le serveur
@@ -677,6 +814,11 @@ app.locals.carteQuartiers = Object.fromEntries(
   quartiers.map((q) => [normaliserNom(q.nom), q.arrondissement])
 );
 app.locals.metiers = metiers;
+app.locals.trancheAge = trancheAge;
+app.locals.disponibilitesLisibles = disponibilitesLisibles;
+app.locals.badgesDe = badgesDe;
+app.locals.jours = JOURS;
+app.locals.moments = MOMENTS;
 
 // ============================================================
 // RECEPTION DES DOCUMENTS DE VERIFICATION
@@ -928,6 +1070,9 @@ app.post("/inscription", lireFormulaire, (req, res) => {
     quartier: lieu.quartier,
     metier: resoudreMetier(donnees.metier),
     tarif: donnees.tarif ? Number(donnees.tarif) : null,
+    date_naissance: donnees.date_naissance || null,
+    experience_annees: donnees.experience_annees ? Math.round(Number(donnees.experience_annees)) : null,
+    disponibilites: resoudreDisponibilites(donnees),
     latitude: donnees.latitude ? Number(donnees.latitude) : null,
     longitude: donnees.longitude ? Number(donnees.longitude) : null,
   });
@@ -1045,8 +1190,15 @@ app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => 
     arrondissement: moi.est_admin ? null : lieu.arrondissement,
     quartier: moi.est_admin ? null : lieu.quartier,
     // Un employeur n'a ni metier ni tarif : on ne les invente pas.
+    // Ces trois informations ne concernent que les personnes qui
+    // proposent leurs services : un employeur n'a ni experience ni
+    // disponibilites a declarer, et son age ne regarde personne.
     metier: moi.role === "prestataire" ? resoudreMetier(donnees.metier) : null,
     tarif: moi.role === "prestataire" ? Math.round(Number(donnees.tarif)) : null,
+    date_naissance: moi.role === "prestataire" ? (donnees.date_naissance || null) : null,
+    experience_annees: moi.role === "prestataire" && donnees.experience_annees
+      ? Math.round(Number(donnees.experience_annees)) : null,
+    disponibilites: moi.role === "prestataire" ? resoudreDisponibilites(donnees) : null,
   });
 
   // La position n'est mise a jour que si le navigateur l'a fournie :

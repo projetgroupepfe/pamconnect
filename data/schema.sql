@@ -38,6 +38,26 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
   metier          TEXT,
   tarif           INTEGER,
 
+  -- --- Ce qui permet a un employeur de se decider ---
+
+  -- La date complete est CONSERVEE mais n'est JAMAIS affichee : les
+  -- ecrans ne montrent qu'une tranche ("25 - 34 ans"). Une date de
+  -- naissance complete, associee a un nom et a un quartier, suffit a
+  -- identifier quelqu'un - c'est une donnee qu'on ne diffuse pas.
+  date_naissance  TEXT,
+
+  -- Depuis combien d'annees la personne exerce ce metier.
+  experience_annees INTEGER,
+
+  -- Les moments ou la personne peut travailler, sous forme de liste :
+  --   lundi-matin|lundi-apresmidi|samedi-matin
+  --
+  -- Ce n'est pas du texte libre : chaque valeur vient d'une liste fermee
+  -- de 7 jours x 3 moments, verifiee par le serveur. Une seule colonne
+  -- suffit parce qu'on lit toujours la liste entiere, jamais un creneau
+  -- isole - exactement comme les synonymes des metiers.
+  disponibilites  TEXT,
+
   -- Position GPS, renseignee si l'utilisateur a accepte la geolocalisation.
   latitude        REAL,
   longitude       REAL,

@@ -42,6 +42,50 @@
     </ul>
 
     <% if (utilisateur.role === "prestataire") { %>
+
+      <%# Les badges ne disent QUE ce que la plateforme a reellement
+          verifie ou ce que la personne a declare. Aucun badge
+          "telephone verifie" ou "email verifie" : nous n'envoyons ni SMS
+          ni email, l'afficher serait mentir. %>
+      <% const badges = badgesDe(utilisateur); %>
+      <% if (badges.length > 0) { %>
+        <p class="confiance">
+          <% badges.forEach(function (b) { %>
+            <span class="badge badge-<%= b.cle === "verifie" ? "verifie" : "info" %>">
+              <%- include("partiels/icone", { nom: b.icone }) %>
+              <%= b.texte %>
+            </span>
+          <% }); %>
+        </p>
+      <% } %>
+
+      <% if (trancheAge(utilisateur.date_naissance)) { %>
+        <ul class="infos">
+          <li>
+            <%- include("partiels/icone", { nom: "profil" }) %>
+            <span><%= trancheAge(utilisateur.date_naissance) %></span>
+          </li>
+        </ul>
+      <% } %>
+
+      <%# Les moments ou la personne peut travailler. C'est ce qu'un
+          employeur regarde en premier, avant meme le tarif. %>
+      <% const creneaux = disponibilitesLisibles(utilisateur.disponibilites); %>
+      <% if (creneaux.length > 0) { %>
+        <h4>Vos disponibilités</h4>
+        <ul class="infos">
+          <% creneaux.forEach(function (c) { %>
+            <li>
+              <%- include("partiels/icone", { nom: "calendrier" }) %>
+              <span>
+                <strong><%= c.jour.charAt(0).toUpperCase() + c.jour.slice(1) %></strong>
+                — <%= c.moments.join(", ") %>
+              </span>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+
       <%- include("partiels/detail-tarif", { tarif: utilisateur.tarif }) %>
     <% } %>
 
