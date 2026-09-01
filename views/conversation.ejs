@@ -169,13 +169,15 @@
             </p>
           <% } %>
 
+          <%# Signaler reste attache au message : l'equipe doit savoir
+              LEQUEL. Mais c'est une action rare, alors qu'ecrire est une
+              action quotidienne - son poids a l'ecran suit sa frequence,
+              pas son importance. %>
           <% if (!deMoi && !message.signale) { %>
-            <div class="actions">
-              <form action="/messages/<%= message.id %>/signaler" method="POST">
-                <input type="hidden" name="candidatureId" value="<%= conversation.id %>">
-                <button type="submit" class="bouton-secondaire">Signaler ce message</button>
-              </form>
-            </div>
+            <form action="/messages/<%= message.id %>/signaler" method="POST">
+              <input type="hidden" name="candidatureId" value="<%= conversation.id %>">
+              <button type="submit" class="lien-discret">Signaler ce message</button>
+            </form>
           <% } %>
         </div>
       <% }); %>

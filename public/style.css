@@ -226,6 +226,22 @@ a:hover { color: var(--bleu-fonce); }
 }
 .creneaux-table tbody tr:nth-child(odd) { background-color: var(--fond); }
 
+/* Une action rare, qui doit rester atteignable sans attirer l'oeil.
+   Elle garde une zone de clic confortable au doigt malgre son
+   apparence de simple lien. */
+.lien-discret {
+  background: none;
+  border: none;
+  padding: .5rem 0 0;
+  font-family: inherit;
+  font-size: .85rem;
+  color: var(--encre-douce);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.lien-discret:hover,
+.lien-discret:focus-visible { color: var(--rouge); }
+
 .menu form { display: contents; }
 .menu-separateur { display: none; }
 
