@@ -1189,6 +1189,37 @@ app.get("/annonces", (req, res) => {
 });
 
 // --- Postuler a une annonce ----------------------------------------
+// --- Repondre a une annonce : l'ecran de confirmation ---------------
+//
+// La transparence sur ce qu'on touchera est due AVANT de s'engager. Elle
+// etait affichee en haut de la liste des annonces : le meme calcul,
+// identique pour toutes les demandes, donc inutile pour choisir - et il
+// occupait le tiers de l'ecran.
+//
+// Elle est desormais ici : au moment de repondre, et pour CETTE demande.
+// On y voit aussi le budget de l'employeur, ce qui permet de comparer.
+app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, (req, res) => {
+  if (req.utilisateur.role !== "prestataire") {
+    return res.status(403).render("message", {
+      titre: "Acces refuse",
+      texte: "Seules les personnes qui proposent leurs services peuvent répondre.",
+      liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
+    });
+  }
+
+  const annonce = requetes.annonceParId.get(Number(req.params.annonceId));
+
+  if (!annonce) {
+    return res.status(404).render("message", {
+      titre: "Annonce introuvable",
+      texte: "Cette annonce n'existe plus.",
+      liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
+    });
+  }
+
+  res.render("repondre", { titre: "Répondre à cette demande", annonce });
+});
+
 app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
   if (req.utilisateur.role !== "prestataire") {
     return res.status(403).render("message", {
@@ -1216,7 +1247,7 @@ app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
     if (String(erreur.message).includes("UNIQUE")) {
       return res.status(409).render("message", {
         titre: "Candidature deja envoyee",
-        texte: "Tu as deja postule a cette annonce.",
+        texte: "Vous avez déjà répondu à cette annonce.",
         liens: [{ url: "/mon-profil", texte: "Voir mes candidatures" }],
       });
     }

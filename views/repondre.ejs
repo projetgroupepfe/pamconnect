@@ -1,0 +1,76 @@
+<%- include("partiels/tete") %>
+
+  <div class="colonne">
+
+    <h1>Répondre à cette demande</h1>
+    <p class="chapeau">Vérifiez les informations avant d'envoyer votre réponse.</p>
+
+    <div class="carte">
+      <h3><%= annonce.titre %></h3>
+      <ul class="infos">
+        <li>
+          <%- include("partiels/icone", { nom: "experience" }) %>
+          <span><strong><%= annonce.metier %></strong></span>
+        </li>
+        <li>
+          <%- include("partiels/icone", { nom: "calendrier" }) %>
+          <span><%= annonce.horaire || "Horaire non précisé" %></span>
+        </li>
+        <li>
+          <%- include("partiels/icone", { nom: "lieu" }) %>
+          <span>
+            <% if (annonce.quartier) { %><strong><%= annonce.quartier %></strong>, <% } %><%= annonce.arrondissement %>
+          </span>
+        </li>
+        <% if (annonce.conditions) { %>
+          <li>
+            <%- include("partiels/icone", { nom: "info" }) %>
+            <span><%= annonce.conditions %></span>
+          </li>
+        <% } %>
+      </ul>
+    </div>
+
+    <%# C'est ICI que la transparence est due : au moment de s'engager, et
+        pour cette demande-la. Sur la liste des annonces, le meme calcul
+        s'affichait a l'identique pour toutes - il ne servait a rien
+        choisir. %>
+    <h2>Ce que vous toucherez</h2>
+    <div class="carte">
+      <% if (budgetEnClair(annonce)) { %>
+        <ul class="infos">
+          <li>
+            <%- include("partiels/icone", { nom: "document" }) %>
+            <span>
+              Budget annoncé par l'employeur :
+              <strong><%= budgetEnClair(annonce) %></strong>
+              <% if (annonce.duree_estimee) { %>
+                <span class="aide">— <%= annonce.duree_estimee %></span>
+              <% } %>
+            </span>
+          </li>
+        </ul>
+      <% } %>
+
+      <%- include("partiels/detail-tarif", { tarif: moi.tarif }) %>
+
+      <p class="aide">
+        C'est votre tarif habituel qui s'applique. Vous pourrez proposer un
+        autre montant à l'employeur dans la discussion, après avoir répondu.
+      </p>
+    </div>
+
+    <div class="actions">
+      <form action="/candidatures" method="POST">
+        <input type="hidden" name="annonceId" value="<%= annonce.id %>">
+        <button type="submit">
+          <%- include("partiels/icone", { nom: "valider" }) %>
+          Confirmer ma réponse
+        </button>
+      </form>
+      <a class="bouton bouton-secondaire" href="/annonces">Annuler</a>
+    </div>
+
+  </div>
+
+<%- include("partiels/pied") %>

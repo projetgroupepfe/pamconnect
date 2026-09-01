@@ -3,23 +3,6 @@
   <h1>Annonces disponibles</h1>
   <p class="chapeau">Les demandes publiées par les employeurs de Yaoundé.</p>
 
-  <%# La transparence sur ce que vous touchez est due AVANT de repondre.
-      Mais c'est un RAPPEL, pas une transaction : le tableau brut /
-      commission / net a la forme d'une facture, et on cherche alors a
-      quelle annonce elle se rapporte - il n'y en a aucune. Une phrase
-      dit la meme chose sans induire en erreur, et sans repousser les
-      annonces hors de l'ecran. %>
-  <% if (role === "prestataire" && moi.tarif) { %>
-    <%
-      const monTarif = detaillerTarif(moi.tarif);
-    %>
-    <p class="chapeau">
-      Votre tarif est de <strong><%= formaterMontant(monTarif.brut) %></strong> ;
-      après la commission de <%= pourcentageCommission %> %, vous recevez
-      <strong><%= formaterMontant(monTarif.net) %></strong>.
-      <a href="/mon-profil/modifier">Changer mon tarif</a>
-    </p>
-  <% } %>
 
   <% if (role === "employeur") { %>
     <div class="actions">
@@ -90,13 +73,10 @@
 
           <% if (role === "prestataire") { %>
             <div class="actions">
-              <form action="/candidatures" method="POST">
-                <button type="submit">
-                  <%- include("partiels/icone", { nom: "valider" }) %>
-                  Je suis disponible
-                </button>
-                <input type="hidden" name="annonceId" value="<%= annonce.id %>">
-              </form>
+              <a class="bouton" href="/candidatures/nouvelle/<%= annonce.id %>">
+                <%- include("partiels/icone", { nom: "valider" }) %>
+                Je suis disponible
+              </a>
             </div>
           <% } else if (role === "employeur") { %>
             <p class="aide">Seules les personnes qui proposent leurs services peuvent répondre.</p>
