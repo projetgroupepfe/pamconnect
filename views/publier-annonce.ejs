@@ -19,17 +19,12 @@
         <div class="champ">
           <label for="metier">Qui cherchez-vous ?</label>
           <input type="text" id="metier" name="metier" placeholder="ex : Ménage, nounou, jardinage..." required>
-          <span class="aide">Ce mot sert aux candidates pour retrouver votre demande.</span>
         </div>
 
         <div class="champ">
           <label for="horaire">Quand avez-vous besoin de quelqu'un ?</label>
           <input type="text" id="horaire" name="horaire"
                  placeholder="ex : Lundi et jeudi, 8h à 12h" required>
-          <span class="aide">
-            C'est la première chose que les candidates regardent : indiquez
-            les jours et les heures aussi précisément que possible.
-          </span>
         </div>
 
         <%# Le nom du quartier suffit : jamais l'adresse exacte. %>
@@ -38,9 +33,7 @@
 
         <h2>Ce que vous êtes prêt à payer</h2>
         <p class="aide">
-          Facultatif, mais très utile : sans repère, une candidate propose
-          son montant à l'aveugle. Elle reste libre de proposer autre chose,
-          et vous restez libre de refuser.
+          Facultatif. Sans repère, une candidate propose son montant à l'aveugle.
         </p>
 
         <div class="champ">
@@ -60,17 +53,12 @@
               </option>
             <% }); %>
           </select>
-          <span class="aide">
-            3 000 FCFA de l'heure et 3 000 FCFA pour la prestation ne veulent
-            pas dire la même chose.
-          </span>
         </div>
 
         <div class="champ">
           <label for="duree_estimee">Combien de temps, à votre avis ? <span class="aide">(facultatif)</span></label>
           <input type="text" id="duree_estimee" name="duree_estimee"
                  placeholder="ex : Environ 3 heures">
-          <span class="aide">C'est ce qui rend votre budget compréhensible.</span>
         </div>
 
         <div class="champ">
