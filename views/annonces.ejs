@@ -41,6 +41,27 @@
               <%- include("partiels/icone", { nom: "calendrier" }) %>
               <span><strong><%= annonce.horaire || "Horaire non précisé" %></strong></span>
             </li>
+            <%# Le budget de l'employeur : le repere qui permet de decider
+                si cela vaut la peine de repondre. %>
+            <% if (budgetEnClair(annonce)) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "remuneration" }) %>
+                <span>
+                  Budget annoncé : <strong><%= budgetEnClair(annonce) %></strong>
+                  <% if (annonce.duree_estimee) { %>
+                    <span class="aide">— <%= annonce.duree_estimee %></span>
+                  <% } %>
+                </span>
+              </li>
+            <% } %>
+
+            <% if (annonce.conditions) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "info" }) %>
+                <span><%= annonce.conditions %></span>
+              </li>
+            <% } %>
+
             <li>
               <%- include("partiels/icone", { nom: "lieu" }) %>
               <span>

@@ -36,6 +36,49 @@
         <%- include("partiels/champ-lieu", {
               quartier: null, arrondissement: null, obligatoire: true }) %>
 
+        <h2>Ce que vous êtes prêt à payer</h2>
+        <p class="aide">
+          Facultatif, mais très utile : sans repère, une candidate propose
+          son montant à l'aveugle. Elle reste libre de proposer autre chose,
+          et vous restez libre de refuser.
+        </p>
+
+        <div class="champ">
+          <label for="budget">Votre budget (FCFA)</label>
+          <input type="number" id="budget" name="budget" min="500" step="500"
+                 placeholder="10000">
+        </div>
+
+        <div class="champ">
+          <label for="unite_tarif">Ce montant, c'est…</label>
+          <select id="unite_tarif" name="unite_tarif">
+            <%# La liste vient du serveur : ajouter une facon de compter ne
+                demandera pas de retoucher cet ecran. %>
+            <% Object.keys(unitesTarif).forEach(function (cle) { %>
+              <option value="<%= cle %>" <%= cle === "forfaitaire" ? "selected" : "" %>>
+                <%= unitesTarif[cle] %>
+              </option>
+            <% }); %>
+          </select>
+          <span class="aide">
+            3 000 FCFA de l'heure et 3 000 FCFA pour la prestation ne veulent
+            pas dire la même chose.
+          </span>
+        </div>
+
+        <div class="champ">
+          <label for="duree_estimee">Combien de temps, à votre avis ? <span class="aide">(facultatif)</span></label>
+          <input type="text" id="duree_estimee" name="duree_estimee"
+                 placeholder="Environ 3 heures">
+          <span class="aide">C'est ce qui rend votre budget compréhensible.</span>
+        </div>
+
+        <div class="champ">
+          <label for="conditions">Quelque chose à savoir avant de venir ? <span class="aide">(facultatif)</span></label>
+          <input type="text" id="conditions" name="conditions" maxlength="300"
+                 placeholder="Il y a un chien. Deuxième étage sans ascenseur.">
+        </div>
+
         <div class="actions">
           <button type="submit">Publier ma demande</button>
           <a class="bouton bouton-secondaire" href="/mon-profil">Annuler</a>

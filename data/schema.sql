@@ -89,6 +89,31 @@ CREATE TABLE IF NOT EXISTS annonces (
   -- l'horaire, et les employeurs le remplissaient au hasard.
   horaire         TEXT,
 
+  -- --- Ce que l'employeur est pret a payer ---
+  --
+  -- Sans ce montant, une candidate propose son tarif a l'aveugle : elle
+  -- ne sait pas si elle est dans le budget ou tres au-dessus. C'est le
+  -- point de depart de la discussion, et le pendant de la proposition
+  -- qu'elle fera de son cote.
+  --
+  -- NULL est accepte : un employeur qui ne sait pas encore combien coute
+  -- une prestation ne doit pas etre empeche de publier sa demande.
+  budget          INTEGER,
+
+  -- Un meme chiffre n'a pas le meme sens selon ce qu'il mesure :
+  -- 3 000 FCFA de l'heure et 3 000 FCFA pour la journee sont deux
+  -- propositions tres differentes. Le CHECK empeche toute autre valeur.
+  unite_tarif     TEXT    NOT NULL DEFAULT 'forfaitaire'
+                          CHECK (unite_tarif IN ('horaire', 'journalier', 'forfaitaire')),
+
+  -- Combien de temps la prestation devrait durer. Texte libre : "environ
+  -- 3 heures", "une matinee". C'est ce qui rend le budget comprehensible.
+  duree_estimee   TEXT,
+
+  -- Ce qu'il faut savoir avant d'accepter : un chien dans la maison, un
+  -- etage sans ascenseur, du materiel a apporter.
+  conditions      TEXT,
+
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 

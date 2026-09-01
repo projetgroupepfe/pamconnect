@@ -26,6 +26,12 @@
             <% if (conversation.quartierAnnonce) { %><%= conversation.quartierAnnonce %>, <% } %><%= conversation.arrondissementAnnonce %>
           </span>
         </li>
+        <% if (conversation.conditionsAnnonce) { %>
+          <li>
+            <%- include("partiels/icone", { nom: "info" }) %>
+            <span><%= conversation.conditionsAnnonce %></span>
+          </li>
+        <% } %>
         <li>
           <%- include("partiels/icone", { nom: "disponibilite" }) %>
           <span><strong><%= libelleCandidature(conversation.statut) %></strong></span>
@@ -43,6 +49,24 @@
     %>
     <h2>Le tarif</h2>
     <div class="carte">
+      <%# Le budget annonce par l'employeur est le point de depart de la
+          discussion. Sans lui, la candidate propose un montant a
+          l'aveugle - et l'employeur ne sait pas d'ou vient l'ecart. %>
+      <% if (conversation.budgetAnnonce) { %>
+        <ul class="infos">
+          <li>
+            <%- include("partiels/icone", { nom: "document" }) %>
+            <span>
+              Budget annoncé par <%= jeSuisEmployeur ? "vous" : conversation.nomEmployeur %> :
+              <strong><%= formaterMontant(conversation.budgetAnnonce) %> <%= libelleUnite(conversation.uniteAnnonce) %></strong>
+              <% if (conversation.dureeAnnonce) { %>
+                <span class="aide">— <%= conversation.dureeAnnonce %></span>
+              <% } %>
+            </span>
+          </li>
+        </ul>
+      <% } %>
+
       <% if (negocie) { %>
         <p class="aide">
           Tarif convenu pour cette demande.

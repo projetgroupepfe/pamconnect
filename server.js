@@ -68,6 +68,12 @@ function ajouterColonneSiAbsente(table, colonne, definition) {
 }
 
 ajouterColonneSiAbsente("candidatures", "tarif_propose", "INTEGER");
+ajouterColonneSiAbsente("annonces", "budget", "INTEGER");
+// Une colonne ajoutee apres coup ne peut pas porter de contrainte CHECK
+// dans SQLite : c'est le serveur qui verifie la valeur avant d'ecrire.
+ajouterColonneSiAbsente("annonces", "unite_tarif", "TEXT NOT NULL DEFAULT 'forfaitaire'");
+ajouterColonneSiAbsente("annonces", "duree_estimee", "TEXT");
+ajouterColonneSiAbsente("annonces", "conditions", "TEXT");
 
 // ============================================================
 // LES REQUETES
@@ -116,8 +122,12 @@ const requetes = {
   `),
 
   creerAnnonce: db.prepare(`
-    INSERT INTO annonces (employeur_id, titre, metier, arrondissement, quartier, horaire)
-    VALUES (@employeur_id, @titre, @metier, @arrondissement, @quartier, @horaire)
+    INSERT INTO annonces
+      (employeur_id, titre, metier, arrondissement, quartier, horaire,
+       budget, unite_tarif, duree_estimee, conditions)
+    VALUES
+      (@employeur_id, @titre, @metier, @arrondissement, @quartier, @horaire,
+       @budget, @unite_tarif, @duree_estimee, @conditions)
   `),
 
   // JOIN : on recupere la candidature ET le nom du prestataire
@@ -173,6 +183,10 @@ const requetes = {
            c.tarif_propose,
            a.titre           AS titreAnnonce,
            a.horaire         AS horaireAnnonce,
+           a.budget          AS budgetAnnonce,
+           a.unite_tarif     AS uniteAnnonce,
+           a.duree_estimee   AS dureeAnnonce,
+           a.conditions      AS conditionsAnnonce,
            a.quartier        AS quartierAnnonce,
            a.arrondissement  AS arrondissementAnnonce,
            e.id              AS employeurId,
@@ -379,6 +393,26 @@ function libelleVerification(statut) {
 // Meme principe pour le statut d'une candidature : la base stocke une
 // valeur technique sans accent (comparaisons simples, contrainte CHECK),
 // et c'est l'affichage qui la traduit en francais correct.
+// Les trois facons de compter un montant, et la phrase qui va avec.
+// Ecrite ici pour que "de l'heure" ne devienne pas "par heure" d'un
+// ecran a l'autre.
+const UNITES_TARIF = {
+  horaire:     "de l'heure",
+  journalier:  "par jour",
+  forfaitaire: "pour la prestation",
+};
+
+function libelleUnite(unite) {
+  return UNITES_TARIF[unite] || UNITES_TARIF.forfaitaire;
+}
+
+// Le budget d'une annonce, ecrit en toutes lettres : "12 000 FCFA par
+// jour". Renvoie null quand l'employeur n'a pas indique de budget.
+function budgetEnClair(annonce) {
+  if (!annonce.budget) return null;
+  return `${formaterMontant(annonce.budget)} ${libelleUnite(annonce.unite_tarif)}`;
+}
+
 function libelleCandidature(statut) {
   if (statut === "acceptee") return "Acceptée";
   if (statut === "refusee") return "Refusée";
@@ -565,6 +599,9 @@ app.locals.detaillerTarif = detaillerTarif;
 app.locals.pourcentageCommission = Math.round(TAUX_COMMISSION * 100);
 app.locals.libelleVerification = libelleVerification;
 app.locals.libelleCandidature = libelleCandidature;
+app.locals.libelleUnite = libelleUnite;
+app.locals.budgetEnClair = budgetEnClair;
+app.locals.unitesTarif = UNITES_TARIF;
 app.locals.quartiers = quartiers;
 // La liste des arrondissements se DEDUIT des quartiers : elle n'est plus
 // recopiee dans chaque formulaire, ou elle finissait par diverger.
@@ -1100,6 +1137,24 @@ app.post("/annonces", exigerConnexion, interdireALEquipe, lireFormulaire, (req, 
     });
   }
 
+  // Le budget est facultatif, mais s'il est indique il doit avoir un
+  // sens : un montant negatif ou nul n'aide personne a se decider.
+  const budgetSaisi = String(donnees.budget || "").trim();
+  const budget = budgetSaisi ? Math.round(Number(budgetSaisi)) : null;
+
+  if (budgetSaisi && !(Number.isFinite(budget) && budget > 0)) {
+    return res.status(400).render("message", {
+      titre: "Budget invalide",
+      texte: "Indiquez un montant en francs CFA, ou laissez le champ vide.",
+      liens: [{ url: "/publier-annonce", texte: "Retour au formulaire" }],
+    });
+  }
+
+  // L'unite vient d'une liste fermee. On ne fait pas confiance au
+  // navigateur : une valeur inconnue serait refusee par la base, autant
+  // la ramener nous-memes a la valeur par defaut.
+  const unite = UNITES_TARIF[donnees.unite_tarif] ? donnees.unite_tarif : "forfaitaire";
+
   const lieu = resoudreLieu(donnees);
 
   requetes.creerAnnonce.run({
@@ -1109,6 +1164,10 @@ app.post("/annonces", exigerConnexion, interdireALEquipe, lireFormulaire, (req, 
     arrondissement: lieu.arrondissement,
     quartier: lieu.quartier,
     horaire: String(donnees.horaire).trim(),
+    budget,
+    unite_tarif: unite,
+    duree_estimee: String(donnees.duree_estimee || "").trim() || null,
+    conditions: String(donnees.conditions || "").trim() || null,
   });
 
   res.render("message", {

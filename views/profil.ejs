@@ -125,6 +125,17 @@
               <%- include("partiels/icone", { nom: "calendrier" }) %>
               <span><%= annonce.horaire || "Horaire non précisé" %></span>
             </li>
+            <% if (budgetEnClair(annonce)) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "remuneration" }) %>
+                <span>
+                  Budget annoncé : <%= budgetEnClair(annonce) %>
+                  <% if (annonce.duree_estimee) { %>
+                    <span class="aide">— <%= annonce.duree_estimee %></span>
+                  <% } %>
+                </span>
+              </li>
+            <% } %>
             <li>
               <%- include("partiels/icone", { nom: "lieu" }) %>
               <span>
