@@ -67,11 +67,15 @@
         </ul>
       <% } %>
 
-      <% if (negocie) { %>
+      <%# Cette phrase repond a une inquietude precise : "si j'accepte
+          12 000 ici, est-ce que mon profil affiche 12 000 pour tout le
+          monde ?". Elle ne concerne donc QUE la personne qui travaille.
+          L'employeur n'a pas cette question, et le titre "Le tarif" avec
+          le montant juste en dessous lui suffit. %>
+      <% if (negocie && !jeSuisEmployeur) { %>
         <p class="aide">
-          Tarif convenu pour cette demande.
-          Le tarif habituel de <%= conversation.nomPrestataire %> est
-          <%= formaterMontant(conversation.tarifPrestataire) %> ; il n'a pas changé.
+          Votre tarif habituel de <%= formaterMontant(conversation.tarifPrestataire) %>
+          n'a pas changé : ce montant ne vaut que pour cette demande.
         </p>
       <% } %>
 
