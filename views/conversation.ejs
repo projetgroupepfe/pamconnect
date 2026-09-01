@@ -52,7 +52,10 @@
       <% } %>
 
       <%# Le meme bloc que partout ailleurs : le calcul ne varie jamais. %>
-      <%- include("partiels/detail-tarif", { tarif: tarifRetenu }) %>
+      <%- include("partiels/detail-tarif", {
+             tarif: tarifRetenu,
+             pourEmployeur: jeSuisEmployeur,
+             beneficiaire: conversation.nomPrestataire }) %>
 
       <% if (conversation.statut === "en attente") { %>
         <form action="/messages/<%= conversation.id %>/tarif" method="POST">

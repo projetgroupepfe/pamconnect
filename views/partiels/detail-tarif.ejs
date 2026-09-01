@@ -4,24 +4,43 @@
    repondre a une demande. Ecrit une seule fois pour que le montant
    annonce ne varie jamais d'un ecran a l'autre. */
 const detail = detaillerTarif(locals.tarif);
+
+/* Le CALCUL est le meme pour tout le monde - c'est le but de ce bloc.
+   Ce qui change, ce sont les PHRASES : la personne qui travaille demande
+   un montant et en recoit un autre ; l'employeur, lui, paie. Lui
+   afficher "Vous demandez" etait une erreur.
+
+   Par defaut on s'adresse a la personne qui travaille : c'est le cas le
+   plus frequent (son inscription, son profil, la liste des annonces). */
+const pourEmployeur = locals.pourEmployeur === true;
+const beneficiaire  = locals.beneficiaire || "La personne";
 %>
 <% if (detail.brut <= 0) { %>
 
   <%# Cas des comptes crees avant que le tarif ne devienne obligatoire. %>
   <div class="detail-tarif">
-    <div class="ligne-tarif">
-      <span>Vous n'avez pas encore indiqué votre tarif.</span>
-    </div>
-    <div class="ligne-tarif">
-      <span class="aide">Sans tarif, aucun employeur ne peut vous payer.</span>
-    </div>
+    <% if (pourEmployeur) { %>
+      <div class="ligne-tarif">
+        <span><%= beneficiaire %> n'a pas encore indiqué de tarif.</span>
+      </div>
+      <div class="ligne-tarif">
+        <span class="aide">Demandez-lui son montant dans la discussion.</span>
+      </div>
+    <% } else { %>
+      <div class="ligne-tarif">
+        <span>Vous n'avez pas encore indiqué votre tarif.</span>
+      </div>
+      <div class="ligne-tarif">
+        <span class="aide">Sans tarif, aucun employeur ne peut vous payer.</span>
+      </div>
+    <% } %>
   </div>
 
 <% } else { %>
 
   <div class="detail-tarif">
     <div class="ligne-tarif">
-      <span>Vous demandez</span>
+      <span><%= pourEmployeur ? "Vous payez" : "Vous demandez" %></span>
       <strong><%= formaterMontant(detail.brut) %></strong>
     </div>
     <div class="ligne-tarif">
@@ -29,7 +48,7 @@ const detail = detaillerTarif(locals.tarif);
       <span class="retenue">− <%= formaterMontant(detail.commission) %></span>
     </div>
     <div class="ligne-tarif total">
-      <span>Vous recevez</span>
+      <span><%= pourEmployeur ? beneficiaire + " reçoit" : "Vous recevez" %></span>
       <strong><%= formaterMontant(detail.net) %></strong>
     </div>
   </div>
