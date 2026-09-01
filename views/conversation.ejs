@@ -61,7 +61,12 @@
         <form action="/messages/<%= conversation.id %>/tarif" method="POST">
           <div class="champ">
             <label for="tarif">Proposer un autre montant (FCFA)</label>
-            <input type="number" id="tarif" name="tarif" min="1" step="500"
+            <%# min et step doivent aller ensemble : le navigateur calcule
+                les valeurs acceptees a partir du MINIMUM, pas de zero.
+                Avec min="1" et step="500", il n'acceptait que 1, 501,
+                1001... et refusait 12000. Les memes valeurs que les deux
+                autres formulaires : des multiples de 500 a partir de 500. %>
+            <input type="number" id="tarif" name="tarif" min="500" step="500"
                    value="<%= tarifRetenu %>" required>
           </div>
           <div class="actions">
