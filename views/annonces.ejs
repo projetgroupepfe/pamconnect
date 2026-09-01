@@ -4,7 +4,7 @@
   <p class="chapeau">Les demandes publiées par les employeurs de Yaoundé.</p>
 
 
-  <% if (role === "employeur") { %>
+  <% if (jePeux.publier) { %>
     <div class="actions">
       <a class="bouton" href="/publier-annonce">
         <%- include("partiels/icone", { nom: "ajouter" }) %>
@@ -71,14 +71,14 @@
             </li>
           </ul>
 
-          <% if (role === "prestataire") { %>
+          <% if (jePeux.repondre) { %>
             <div class="actions">
               <a class="bouton" href="/candidatures/nouvelle/<%= annonce.id %>">
                 <%- include("partiels/icone", { nom: "valider" }) %>
                 Je suis disponible
               </a>
             </div>
-          <% } else if (role === "employeur") { %>
+          <% } else if (moi && moi.role === "employeur") { %>
             <p class="aide">Seules les personnes qui proposent leurs services peuvent répondre.</p>
           <% } else { %>
             <p class="aide">

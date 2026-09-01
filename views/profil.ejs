@@ -87,7 +87,7 @@
       Un membre de l'equipe est techniquement enregistre comme employeur,
       mais il n'a pas le droit de publier : lui montrer "Mes annonces"
       serait lui proposer une action que le serveur refuse. %>
-  <% if (utilisateur.role === "employeur" && !utilisateur.est_admin) { %>
+  <% if (jePeux.publier) { %>
     <h2>Mes annonces</h2>
 
     <%# L'action principale reste accessible en permanence, et non cachee

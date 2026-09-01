@@ -762,7 +762,28 @@ app.use(express.static(path.join(__dirname, "public")));
 // le menu puisse s'adapter. Place apres express.static : inutile de
 // consulter la base pour servir une feuille de style.
 app.use((req, res, next) => {
-  res.locals.moi = utilisateurConnecte(req);
+  const moi = utilisateurConnecte(req);
+  res.locals.moi = moi;
+
+  // Ce que la personne connectee a le droit de FAIRE.
+  //
+  // Les ecrans demandaient jusqu'ici "quel est ton role ?" et en
+  // deduisaient eux-memes les droits. Resultat : la meme regle etait
+  // reecrite dans chaque vue, et un oubli suffisait a proposer un bouton
+  // que le serveur refuse. Une seule regle, un seul endroit.
+  //
+  // Ces valeurs doivent rester le REFLET des regles du serveur
+  // (interdireALEquipe, les controles de role dans les routes). Elles ne
+  // les remplacent pas : un ecran ne protege rien.
+  res.locals.jePeux = {
+    // Un membre de l'equipe est enregistre comme employeur pour une
+    // raison technique, mais il n'embauche pas : il verifie des
+    // identites. Lui proposer de publier serait un conflit d'interet.
+    publier:          Boolean(moi && moi.role === "employeur" && !moi.est_admin),
+    repondre:         Boolean(moi && moi.role === "prestataire"),
+    verifierDossiers: Boolean(moi && moi.est_admin),
+  };
+
   next();
 });
 
