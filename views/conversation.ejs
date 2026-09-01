@@ -69,6 +69,18 @@
             <input type="number" id="tarif" name="tarif" min="500" step="500"
                    value="<%= tarifRetenu %>" required>
           </div>
+
+          <div class="champ">
+            <label for="raison">Pourquoi ce montant ? <span class="aide">(facultatif)</span></label>
+            <input type="text" id="raison" name="raison" maxlength="200"
+                   placeholder="<%= jeSuisEmployeur
+                     ? "C'est le budget que j'avais prévu pour trois matinées."
+                     : "C'est trois matinées par semaine, et le quartier est loin de chez moi." %>">
+            <p class="aide">
+              Un montant seul se refuse ; un montant expliqué se discute.
+              Votre phrase apparaîtra avec la proposition.
+            </p>
+          </div>
           <div class="actions">
             <button type="submit">
               <%- include("partiels/icone", { nom: "valider" }) %>
@@ -137,7 +149,9 @@
         <div class="champ">
           <label for="texte">Votre message</label>
           <textarea id="texte" name="texte" rows="4" maxlength="2000" required
-                    placeholder="Le service, le tarif, les horaires, les consignes..."></textarea>
+                    placeholder="<%= jeSuisEmployeur
+                      ? "Bonjour, j'ai besoin de quelqu'un lundi, mercredi et samedi de 8h à 12h. Êtes-vous disponible ?"
+                      : "Bonjour, je suis disponible ces trois matinées. Je travaille dans le quartier depuis quatre ans." %>"></textarea>
           <p class="aide">
             Parlez du service, du tarif et des horaires. N'indiquez pas
             votre adresse exacte : elle sera transmise automatiquement

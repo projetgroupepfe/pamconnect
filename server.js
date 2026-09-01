@@ -1315,13 +1315,24 @@ app.post("/messages/:id/tarif", exigerConnexion, lireFormulaire, (req, res) => {
 
   requetes.proposerTarif.run(montant, conversation.id);
 
-  // La proposition laisse une trace dans la conversation : sans cela,
-  // le montant changerait sans que personne ne sache qui l'a change.
+  // La proposition laisse une trace dans la conversation : sans cela, le
+  // montant changerait sans que personne ne sache qui l'a change.
+  //
+  // La raison est facultative mais fortement encouragee : un montant seul
+  // se refuse, un montant explique se discute.
+  const raison = String(req.body.raison || "").trim().slice(0, 200);
+  const trace = raison
+    ? `Proposition de tarif : ${formaterMontant(montant)} — ${raison}`
+    : `Proposition de tarif : ${formaterMontant(montant)}.`;
+
   requetes.creerMessage.run({
     candidature_id: conversation.id,
     auteur_id: req.utilisateur.id,
-    texte: `Proposition de tarif : ${formaterMontant(montant)}.`,
-    risque_paiement: 0,
+    texte: trace,
+    // La raison est du texte libre : elle passe par le meme controle que
+    // n'importe quel message. Sans cela, ce champ serait le trou par
+    // lequel on ferait passer "envoie-moi l'argent par MoMo".
+    risque_paiement: risquePaiementHorsPlateforme(raison) ? 1 : 0,
   });
 
   res.redirect(`/messages/${conversation.id}`);
