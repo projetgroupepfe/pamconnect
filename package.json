@@ -4,7 +4,8 @@
   "description": "Plateforme de mise en relation entre employeurs et prestataires de services a la personne - Yaounde",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
   "license": "MIT",
   "dependencies": {
