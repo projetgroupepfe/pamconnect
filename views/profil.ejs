@@ -188,10 +188,16 @@
             </li>
           </ul>
 
+          <%# Une demande fermee l'est pour deux raisons differentes : soit
+              quelqu'un a ete choisi, soit l'employeur l'a retiree. On le
+              DEDUIT des candidatures plutot que de le stocker : une
+              information deduite ne peut pas se contredire. %>
+          <% const pourvue = annonce.candidatures.some(function (c) { return c.statut === "acceptee"; }); %>
           <% if (annonce.annulee) { %>
             <p class="aide">
-              <strong>Demande retirée.</strong> Elle n'apparaît plus dans les annonces
-              et n'accepte plus de réponse. Vos discussions restent accessibles.
+              <strong><%= pourvue ? "Demande pourvue." : "Demande retirée." %></strong>
+              Elle n'apparaît plus dans les annonces et n'accepte plus de réponse.
+              Vos discussions restent accessibles.
             </p>
           <% } else { %>
             <div class="actions">

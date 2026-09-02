@@ -181,6 +181,25 @@ const requetes = {
     SELECT * FROM annonces WHERE annulee = 0 ORDER BY cree_le DESC, id DESC
   `),
 
+  // Les autres personnes qui attendaient encore une reponse sur cette
+  // demande. Une fois quelqu'un choisi, les faire patienter serait leur
+  // voler du temps : elles pourraient repondre ailleurs.
+  refuserLesAutres: db.prepare(`
+    UPDATE candidatures SET statut = 'refusee'
+    WHERE annonce_id = @annonce AND id != @choisie AND statut = 'en attente'
+  `),
+
+  autresEnAttente: db.prepare(`
+    SELECT COUNT(*) AS n FROM candidatures
+    WHERE annonce_id = @annonce AND id != @choisie AND statut = 'en attente'
+  `),
+
+  annonceDeCandidature: db.prepare(`
+    SELECT a.id FROM annonces a
+    JOIN candidatures c ON c.annonce_id = a.id
+    WHERE c.id = ?
+  `),
+
   annulerAnnonce: db.prepare(`
     UPDATE annonces SET annulee = 1, annulee_le = datetime('now')
     WHERE id = @id AND annulee = 0
@@ -1898,7 +1917,15 @@ app.get("/candidatures/:id/confirmer", exigerConnexion, (req, res) => {
     });
   }
 
-  res.render("confirmer-embauche", { titre: "Confirmer votre choix", c });
+  // On dit AVANT ce qui va se passer : la demande sera retiree, et les
+  // autres personnes recevront un refus. Une consequence decouverte
+  // apres coup est une mauvaise surprise.
+  const autres = requetes.autresEnAttente.get({
+    annonce: requetes.annonceDeCandidature.get(c.id).id,
+    choisie: c.id,
+  }).n;
+
+  res.render("confirmer-embauche", { titre: "Confirmer votre choix", c, autres });
 });
 
 app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => {
@@ -1939,6 +1966,26 @@ app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => 
   }
 
   requetes.changerStatutCandidature.run(nouveauStatut, candidatureId);
+
+  // Choisir quelqu'un POURVOIT la demande. Deux consequences, et elles
+  // protegent les memes personnes :
+  //
+  //   - la demande quitte la liste publique : sans cela, d'autres
+  //     continueraient de repondre a une place deja prise ;
+  //   - les candidatures encore en attente sont refusees : les laisser
+  //     patienter reviendrait a leur voler du temps, alors qu'elles
+  //     pourraient repondre ailleurs.
+  //
+  // C'est ce que demande le cahier des charges : "les autres candidats
+  // recoivent une notification respectueuse de refus". La plateforme
+  // n'envoie pas encore de notification, mais le statut change - et
+  // chacune le voit sur son profil.
+  if (nouveauStatut === "acceptee") {
+    const annonce = requetes.annonceDeCandidature.get(candidatureId);
+
+    requetes.refuserLesAutres.run({ annonce: annonce.id, choisie: candidatureId });
+    requetes.annulerAnnonce.run({ id: annonce.id });
+  }
 
   res.redirect("/mon-profil");
 });

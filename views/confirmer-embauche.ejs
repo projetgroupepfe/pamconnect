@@ -122,6 +122,32 @@
       </p>
     </div>
 
+    <%# Ce qui va se passer, dit AVANT de cliquer. Une consequence
+        decouverte apres coup est une mauvaise surprise. %>
+    <div class="carte">
+      <h3>Ce qui se passera ensuite</h3>
+      <ul class="infos">
+        <li>
+          <%- include("partiels/icone", { nom: "document" }) %>
+          <span>Votre demande sera <strong>retirée des annonces</strong> : elle est pourvue.</span>
+        </li>
+        <% if (autres > 0) { %>
+          <li>
+            <%- include("partiels/icone", { nom: "refuser" }) %>
+            <span>
+              <strong><%= autres %></strong>
+              autre<%= autres > 1 ? "s personnes qui attendaient recevront" : " personne qui attendait recevra" %>
+              un refus.
+            </span>
+          </li>
+        <% } %>
+        <li>
+          <%- include("partiels/icone", { nom: "message" }) %>
+          <span>Vos discussions restent accessibles, y compris avec les autres candidates.</span>
+        </li>
+      </ul>
+    </div>
+
     <div class="actions">
       <form action="/candidatures/statut" method="POST">
         <input type="hidden" name="candidatureId" value="<%= c.id %>">
