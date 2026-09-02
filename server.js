@@ -111,6 +111,21 @@ const requetes = {
        @latitude, @longitude, @date_naissance, @experience_annees, @disponibilites)
   `),
 
+  // La fiche publique d'une personne.
+  //
+  // On enumere les colonnes une par une au lieu d'ecrire SELECT * : ainsi
+  // une colonne ajoutee plus tard - un numero de telephone, une adresse -
+  // ne devient pas publique par accident. Ce qui sort d'ici a ete choisi.
+  //
+  // Absents volontairement : l'email, la date de naissance complete, les
+  // noms des fichiers d'identite, la position GPS exacte.
+  fichePublique: db.prepare(`
+    SELECT id, nom, metier, tarif, quartier, arrondissement,
+           statut_verification, date_naissance, experience_annees, disponibilites
+    FROM utilisateurs
+    WHERE id = ? AND role = 'prestataire' AND est_admin = 0 AND suspendu = 0
+  `),
+
   tousLesPrestataires: db.prepare(`
     SELECT * FROM utilisateurs WHERE role = 'prestataire'
   `),
@@ -155,8 +170,11 @@ const requetes = {
     SELECT c.id,
            c.statut,
            c.tarif_propose,
+           u.id                  AS prestataireId,
            u.nom                 AS nomPrestataire,
            u.tarif               AS tarifPrestataire,
+           u.experience_annees   AS experiencePrestataire,
+           u.disponibilites      AS disponibilitesPrestataire,
            u.statut_verification AS verificationPrestataire
     FROM candidatures c
     JOIN utilisateurs u ON u.id = c.prestataire_id
@@ -717,6 +735,14 @@ function disponibilitesLisibles(texte) {
 // ni email. Un badge qui affirme une verification qui n'a pas eu lieu est
 // pire que pas de badge du tout : il transforme une limite technique en
 // mensonge envers les familles.
+// "6 ans d'expérience" s'ecrivait dans les badges, dans la recherche et
+// sur la carte de candidature - trois endroits, trois facons de gerer le
+// pluriel. Une seule phrase, un seul endroit.
+function libelleExperience(annees) {
+  if (!annees || annees < 1) return null;
+  return annees === 1 ? "1 an d'expérience" : `${annees} ans d'expérience`;
+}
+
 function badgesDe(utilisateur) {
   const badges = [];
 
@@ -724,11 +750,10 @@ function badgesDe(utilisateur) {
     badges.push({ cle: "verifie", texte: "Identité et casier vérifiés", icone: "verifie" });
   }
 
-  if (utilisateur.experience_annees > 0) {
-    const n = utilisateur.experience_annees;
+  if (libelleExperience(utilisateur.experience_annees)) {
     badges.push({
       cle: "experience",
-      texte: n === 1 ? "1 an d'expérience" : `${n} ans d'expérience`,
+      texte: libelleExperience(utilisateur.experience_annees),
       icone: "experience",
     });
   }
@@ -871,6 +896,7 @@ app.locals.metiers = metiers;
 app.locals.trancheAge = trancheAge;
 app.locals.disponibilitesLisibles = disponibilitesLisibles;
 app.locals.badgesDe = badgesDe;
+app.locals.libelleExperience = libelleExperience;
 app.locals.jours = JOURS;
 app.locals.moments = MOMENTS;
 
@@ -1815,6 +1841,30 @@ app.post("/messages/:id/tarif", exigerConnexion, lireFormulaire, (req, res) => {
   });
 
   res.redirect(`/messages/${conversation.id}`);
+});
+
+// --- La fiche publique d'une personne ------------------------------
+//
+// Le cahier des charges demande qu'un employeur puisse consulter une
+// fiche complete avant de choisir. Jusqu'ici, la recherche affichait des
+// cartes qui ne menaient nulle part.
+//
+// La page est ouverte a tous, y compris aux visiteurs non connectes :
+// c'est ce qui permet de decouvrir la plateforme avant de s'inscrire.
+// Elle ne montre que des informations choisies une par une (voir la
+// requete fichePublique).
+app.get("/personnes/:id", (req, res) => {
+  const personne = requetes.fichePublique.get(Number(req.params.id));
+
+  if (!personne) {
+    return res.status(404).render("message", {
+      titre: "Profil introuvable",
+      texte: "Ce profil n'existe pas, ou il n'est plus disponible.",
+      liens: [{ url: "/recherche", texte: "Retour à la recherche" }],
+    });
+  }
+
+  res.render("fiche", { titre: personne.nom, personne });
 });
 
 // --- Recherche de prestataires -------------------------------------

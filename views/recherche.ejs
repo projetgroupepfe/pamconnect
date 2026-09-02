@@ -89,13 +89,10 @@
               </li>
             <% } %>
 
-            <% if (prestataire.experience_annees > 0) { %>
+            <% if (libelleExperience(prestataire.experience_annees)) { %>
               <li>
                 <%- include("partiels/icone", { nom: "experience" }) %>
-                <span>
-                  <strong><%= prestataire.experience_annees %></strong>
-                  an<%= prestataire.experience_annees > 1 ? "s" : "" %> d'expérience
-                </span>
+                <span><%= libelleExperience(prestataire.experience_annees) %></span>
               </li>
             <% } %>
 
@@ -119,6 +116,13 @@
               <span><%= prestataire.distanceTexte %></span>
             </li>
           </ul>
+
+          <div class="actions">
+            <a class="bouton bouton-secondaire" href="/personnes/<%= prestataire.id %>">
+              <%- include("partiels/icone", { nom: "profil" }) %>
+              Voir le profil
+            </a>
+          </div>
 
         </div>
       <% }); %>

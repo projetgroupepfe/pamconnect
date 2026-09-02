@@ -1,0 +1,92 @@
+<%- include("partiels/tete") %>
+
+  <div class="colonne">
+
+    <div class="carte">
+      <div class="fiche-tete">
+        <div class="portrait"><%= personne.nom.charAt(0) %></div>
+        <div>
+          <h1><%= personne.nom %></h1>
+          <div class="metier"><%= personne.metier %></div>
+        </div>
+      </div>
+
+      <%# Les badges : le vert pour ce que l'equipe a controle, le bleu
+          pour ce que la personne declare. La nuance compte - un employeur
+          doit savoir ce qui a ete verifie et ce qui ne l'a pas ete. %>
+      <p class="confiance">
+        <% if (personne.statut_verification === "verifie") { %>
+          <span class="badge badge-verifie">
+            <%- include("partiels/icone", { nom: "verifie" }) %>
+            Identité et casier vérifiés
+          </span>
+        <% } else { %>
+          <span class="badge badge-non-soumis">Identité non vérifiée</span>
+        <% } %>
+
+        <% badgesDe(personne).filter(function (b) { return b.cle !== "verifie"; })
+             .forEach(function (b) { %>
+          <span class="badge badge-info">
+            <%- include("partiels/icone", { nom: b.icone }) %>
+            <%= b.texte %>
+          </span>
+        <% }); %>
+      </p>
+
+      <ul class="infos">
+        <% if (trancheAge(personne.date_naissance)) { %>
+          <li>
+            <%- include("partiels/icone", { nom: "profil" }) %>
+            <span><%= trancheAge(personne.date_naissance) %></span>
+          </li>
+        <% } %>
+        <li>
+          <%- include("partiels/icone", { nom: "lieu" }) %>
+          <span>
+            <% if (personne.quartier) { %><strong><%= personne.quartier %></strong>, <% } %><%= personne.arrondissement %>
+          </span>
+        </li>
+      </ul>
+    </div>
+
+    <% const creneaux = disponibilitesLisibles(personne.disponibilites); %>
+    <% if (creneaux.length > 0) { %>
+      <h2>Ses disponibilités</h2>
+      <div class="carte">
+        <ul class="infos">
+          <% creneaux.forEach(function (c) { %>
+            <li>
+              <%- include("partiels/icone", { nom: "calendrier" }) %>
+              <span>
+                <strong><%= c.jour.charAt(0).toUpperCase() + c.jour.slice(1) %></strong>
+                — <%= c.moments.join(", ") %>
+              </span>
+            </li>
+          <% }); %>
+        </ul>
+      </div>
+    <% } %>
+
+    <h2>Son tarif</h2>
+    <div class="carte">
+      <%# Vu par un employeur : c'est ce qu'il paie, pas ce qu'il demande. %>
+      <%- include("partiels/detail-tarif", {
+            tarif: personne.tarif,
+            pourEmployeur: true,
+            beneficiaire: personne.nom }) %>
+    </div>
+
+    <%# Ce que la plateforme ne sait pas encore dire. L'annoncer vaut mieux
+        que laisser croire qu'il n'y a rien a savoir. %>
+    <p class="aide">
+      Les avis et le nombre de prestations terminées ne sont pas encore
+      disponibles sur PamConnect.
+    </p>
+
+    <div class="actions">
+      <a class="bouton bouton-secondaire" href="/recherche">Retour à la recherche</a>
+    </div>
+
+  </div>
+
+<%- include("partiels/pied") %>

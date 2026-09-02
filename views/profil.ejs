@@ -222,7 +222,33 @@
                   </li>
                 </ul>
 
+                <% if (libelleExperience(candidature.experiencePrestataire)) { %>
+                  <ul class="infos">
+                    <li>
+                      <%- include("partiels/icone", { nom: "experience" }) %>
+                      <span><%= libelleExperience(candidature.experiencePrestataire) %></span>
+                    </li>
+                  </ul>
+                <% } %>
+
+                <% const dispos = disponibilitesLisibles(candidature.disponibilitesPrestataire); %>
+                <% if (dispos.length > 0) { %>
+                  <ul class="infos">
+                    <li>
+                      <%- include("partiels/icone", { nom: "calendrier" }) %>
+                      <span>
+                        Disponible
+                        <strong><%= dispos.map(function (d) { return d.jour; }).join(", ") %></strong>
+                      </span>
+                    </li>
+                  </ul>
+                <% } %>
+
                 <div class="actions">
+                  <a class="bouton bouton-secondaire" href="/personnes/<%= candidature.prestataireId %>">
+                    <%- include("partiels/icone", { nom: "profil" }) %>
+                    Voir le profil
+                  </a>
                   <a class="bouton bouton-secondaire" href="/messages/<%= candidature.id %>">
                     <%- include("partiels/icone", { nom: "message" }) %>
                     Discuter
