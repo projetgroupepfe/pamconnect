@@ -96,12 +96,9 @@
               </li>
             <% } %>
 
-            <% if (trancheAge(prestataire.date_naissance)) { %>
-              <li>
-                <%- include("partiels/icone", { nom: "profil" }) %>
-                <span><%= trancheAge(prestataire.date_naissance) %></span>
-              </li>
-            <% } %>
+            <%# Aucune tranche d'age dans une liste : c'est une donnee
+                personnelle, et elle n'aide pas a choisir. Elle n'apparait
+                que sur la fiche, et seulement apres une embauche. %>
 
             <li>
               <%- include("partiels/icone", { nom: "lieu" }) %>

@@ -34,7 +34,11 @@
       </p>
 
       <ul class="infos">
-        <% if (trancheAge(personne.date_naissance)) { %>
+        <%# La tranche d'age n'est pas une information publique. Elle
+            n'apparait qu'a l'employeur qui a deja embauche cette
+            personne : a ce moment-la, ils se connaissent. Avant, la
+            montrer serait exposer une donnee personnelle sans raison. %>
+        <% if (peutVoirAge && trancheAge(personne.date_naissance)) { %>
           <li>
             <%- include("partiels/icone", { nom: "profil" }) %>
             <span><%= trancheAge(personne.date_naissance) %></span>

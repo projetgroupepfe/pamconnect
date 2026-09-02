@@ -93,6 +93,8 @@ ajouterColonneSiAbsente("utilisateurs", "suspendu", "INTEGER NOT NULL DEFAULT 0"
 ajouterColonneSiAbsente("utilisateurs", "suspendu_le", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "suspendu_motif", "TEXT");
 ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
+ajouterColonneSiAbsente("annonces", "annulee", "INTEGER NOT NULL DEFAULT 0");
+ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
 
 // Le schema arrive ensuite : il cree ce qui manque et met a jour les
 // donnees de reference (quartiers, metiers).
@@ -133,6 +135,22 @@ const requetes = {
   //
   // Absents volontairement : l'email, la date de naissance complete, les
   // noms des fichiers d'identite, la position GPS exacte.
+  // Cet employeur a-t-il deja embauche cette personne ?
+  //
+  // C'est la condition qui ouvre l'acces a sa tranche d'age. Tant que la
+  // candidature n'est pas acceptee, l'age reste une donnee personnelle
+  // que rien n'oblige a divulguer - ni au public, ni meme a l'employeur
+  // qui hesite encore.
+  embaucheEntre: db.prepare(`
+    SELECT 1 AS oui
+    FROM candidatures c
+    JOIN annonces a ON a.id = c.annonce_id
+    WHERE c.prestataire_id = @personne
+      AND a.employeur_id = @employeur
+      AND c.statut = 'acceptee'
+    LIMIT 1
+  `),
+
   fichePublique: db.prepare(`
     SELECT id, nom, metier, tarif, quartier, arrondissement,
            statut_verification, date_naissance, experience_annees, disponibilites
@@ -157,8 +175,15 @@ const requetes = {
     WHERE role = 'prestataire' AND metier = ?
   `),
 
+  // La liste publique ignore les demandes retirees. L'employeur, lui,
+  // continue de voir les siennes sur son profil : ce sont ses archives.
   toutesLesAnnonces: db.prepare(`
-    SELECT * FROM annonces ORDER BY cree_le DESC, id DESC
+    SELECT * FROM annonces WHERE annulee = 0 ORDER BY cree_le DESC, id DESC
+  `),
+
+  annulerAnnonce: db.prepare(`
+    UPDATE annonces SET annulee = 1, annulee_le = datetime('now')
+    WHERE id = @id AND annulee = 0
   `),
 
   annonceParId: db.prepare(`
@@ -1673,6 +1698,37 @@ app.post("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, lireFormu
   });
 });
 
+// --- Retirer une demande -------------------------------------------
+//
+// On ne SUPPRIME pas. Une demande retiree disparait de la liste publique
+// et n'accepte plus de reponse, mais elle reste sur le profil de son
+// employeur, et les candidatures et discussions qu'elle porte subsistent.
+//
+// Supprimer effacerait des conversations que des gens ont reellement
+// eues, et la trace de ce qui avait ete convenu. Une personne qui a
+// discute pendant une semaine ne doit pas voir l'echange disparaitre
+// parce que l'autre a change d'avis.
+app.post("/annonces/:id/annuler", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
+  const annonce = chargerMonAnnonce(req, res);
+
+  if (!annonce) {
+    return res.status(404).render("message", {
+      titre: "Demande introuvable",
+      texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+    });
+  }
+
+  requetes.annulerAnnonce.run({ id: annonce.id });
+
+  res.render("message", {
+    titre: "Demande retirée",
+    texte: "Elle n'apparaît plus dans les annonces et n'accepte plus de réponse. " +
+           "Les personnes qui vous avaient déjà répondu gardent accès à votre discussion.",
+    liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+  });
+});
+
 app.get("/annonces", (req, res) => {
   const utilisateur = utilisateurConnecte(req);
 
@@ -1708,6 +1764,12 @@ app.get("/annonces", (req, res) => {
 //
 // Elle est desormais ici : au moment de repondre, et pour CETTE demande.
 // On y voit aussi le budget de l'employeur, ce qui permet de comparer.
+// Une demande retiree n'accepte plus de reponse. La verification est
+// faite ici ET a l'enregistrement : l'ecran ne protege rien tout seul.
+function annonceFermee(annonce) {
+  return Boolean(annonce && annonce.annulee);
+}
+
 app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, (req, res) => {
   if (req.utilisateur.role !== "prestataire") {
     return res.status(403).render("message", {
@@ -1724,6 +1786,16 @@ app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, (req, res) => {
       titre: "Annonce introuvable",
       texte: "Cette annonce n'existe plus.",
       liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
+    });
+  }
+
+  // La demande a ete retiree par son employeur. Elle n'apparait plus dans
+  // la liste, mais quelqu'un peut avoir garde l'adresse ouverte.
+  if (annonceFermee(annonce)) {
+    return res.status(410).render("message", {
+      titre: "Demande retirée",
+      texte: "Cette personne a retiré sa demande. Elle n'accepte plus de réponse.",
+      liens: [{ url: "/annonces", texte: "Voir les autres demandes" }],
     });
   }
 
@@ -1746,6 +1818,16 @@ app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
       titre: "Annonce introuvable",
       texte: "Cette annonce n'existe plus.",
       liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
+    });
+  }
+
+  // La demande a ete retiree par son employeur. Elle n'apparait plus dans
+  // la liste, mais quelqu'un peut avoir garde l'adresse ouverte.
+  if (annonceFermee(annonce)) {
+    return res.status(410).render("message", {
+      titre: "Demande retirée",
+      texte: "Cette personne a retiré sa demande. Elle n'accepte plus de réponse.",
+      liens: [{ url: "/annonces", texte: "Voir les autres demandes" }],
     });
   }
 
@@ -2070,7 +2152,15 @@ app.get("/personnes/:id", (req, res) => {
     });
   }
 
-  res.render("fiche", { titre: personne.nom, personne });
+  // La tranche d'age n'est PAS une information publique. Elle n'apparait
+  // que pour l'employeur qui a deja embauche cette personne : a ce
+  // moment-la, ils se connaissent et travaillent ensemble. Avant, la
+  // divulguer serait exposer une donnee personnelle sans necessite.
+  const moi = res.locals.moi;
+  const peutVoirAge = Boolean(moi && moi.role === "employeur" && !moi.est_admin &&
+    requetes.embaucheEntre.get({ personne: personne.id, employeur: moi.id }));
+
+  res.render("fiche", { titre: personne.nom, personne, peutVoirAge });
 });
 
 // --- Recherche de prestataires -------------------------------------

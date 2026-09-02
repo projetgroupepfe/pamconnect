@@ -188,12 +188,27 @@
             </li>
           </ul>
 
-          <div class="actions">
-            <a class="bouton bouton-secondaire" href="/annonces/<%= annonce.id %>/modifier">
-              <%- include("partiels/icone", { nom: "profil" }) %>
-              Modifier cette demande
-            </a>
-          </div>
+          <% if (annonce.annulee) { %>
+            <p class="aide">
+              <strong>Demande retirée.</strong> Elle n'apparaît plus dans les annonces
+              et n'accepte plus de réponse. Vos discussions restent accessibles.
+            </p>
+          <% } else { %>
+            <div class="actions">
+              <a class="bouton bouton-secondaire" href="/annonces/<%= annonce.id %>/modifier">
+                <%- include("partiels/icone", { nom: "profil" }) %>
+                Modifier cette demande
+              </a>
+              <%# Retirer n'efface rien : la demande sort de la liste
+                  publique, les discussions restent. %>
+              <form action="/annonces/<%= annonce.id %>/annuler" method="POST">
+                <button type="submit" class="bouton-danger">
+                  <%- include("partiels/icone", { nom: "refuser" }) %>
+                  Retirer cette demande
+                </button>
+              </form>
+            </div>
+          <% } %>
 
           <% if (annonce.candidatures.length === 0) { %>
             <p class="aide" style="margin-top:1rem">Personne n'a encore répondu.</p>

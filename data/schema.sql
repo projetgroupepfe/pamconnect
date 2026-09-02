@@ -143,6 +143,16 @@ CREATE TABLE IF NOT EXISTS annonces (
   -- etage sans ascenseur, du materiel a apporter.
   conditions      TEXT,
 
+  -- --- Annulation ---
+  -- Une demande retiree n'est PAS supprimee. Elle disparait de la liste
+  -- publique et n'accepte plus de reponse, mais elle reste visible de son
+  -- employeur, et les candidatures et discussions qu'elle porte
+  -- subsistent : les effacer priverait les deux parties de la trace de ce
+  -- qui a ete convenu, et ferait disparaitre des conversations que des
+  -- gens ont eues.
+  annulee         INTEGER NOT NULL DEFAULT 0 CHECK (annulee IN (0, 1)),
+  annulee_le      TEXT,
+
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
