@@ -295,6 +295,13 @@ CREATE TABLE IF NOT EXISTS quartiers (
 
   arrondissement  TEXT    NOT NULL,
 
+  -- Les autres facons d'ecrire le meme quartier, separees par une barre
+  -- verticale. La mise en forme du serveur rattrape les accents, les
+  -- majuscules et les tirets - mais pas une lettre en trop : "ngoussso"
+  -- avec trois s, ou "cite vert" sans le e final, ne se rapprochaient de
+  -- rien. Ces orthographes-la se declarent ici, une fois rencontrees.
+  synonymes       TEXT    NOT NULL DEFAULT '',
+
   -- La premiere version ne couvre que Yaounde. La colonne existe deja
   -- pour qu'une autre ville puisse etre ajoutee sans refaire la table.
   ville           TEXT    NOT NULL DEFAULT 'Yaoundé'
@@ -364,6 +371,20 @@ INSERT OR IGNORE INTO quartiers (nom, arrondissement) VALUES
   ('Minkoameyos', 'Yaoundé 7'),
   ('Nomayos', 'Yaoundé 7'),
   ('Ekoumdoum', 'Yaoundé 7');
+
+-- Quartiers rencontres dans les saisies reelles et absents de la liste
+-- initiale. A faire relire par l'equipe : le rattachement d'un quartier a
+-- son arrondissement est une donnee de terrain.
+INSERT OR IGNORE INTO quartiers (nom, arrondissement) VALUES
+  ('École de Poste', 'Yaoundé 1'),
+  ('Cradat', 'Yaoundé 1');
+
+-- Les orthographes rencontrees qui ne se rapprochaient d'aucun quartier.
+UPDATE quartiers SET synonymes = 'cite vert|citeverte|cité vert'  WHERE nom = 'Cité Verte';
+UPDATE quartiers SET synonymes = 'ngoussso|ngousso|ngoussou'      WHERE nom = 'Ngousso';
+UPDATE quartiers SET synonymes = 'ngoaekele|ngoa ekele|ngoa-ekele' WHERE nom = 'Ngoa-Ekellé';
+UPDATE quartiers SET synonymes = 'biyemassi|biyem assi'           WHERE nom = 'Biyem-Assi';
+UPDATE quartiers SET synonymes = 'ecole de poste|ecole poste'     WHERE nom = 'École de Poste';
 
 CREATE INDEX IF NOT EXISTS idx_quartiers_arrond ON quartiers (arrondissement);
 CREATE INDEX IF NOT EXISTS idx_messages_candidature ON messages (candidature_id);

@@ -49,17 +49,27 @@ db.pragma("foreign_keys = ON");
 // (il contient des donnees personnelles). Sans cette ligne, un coequipier
 // qui clone le projet n'aurait aucune base et l'application planterait.
 // Maintenant, il lui suffit de lancer npm start.
-db.exec(fs.readFileSync(path.join(__dirname, "data", "schema.sql"), "utf-8"));
-
-// "CREATE TABLE IF NOT EXISTS" ne sert que pour une table ABSENTE. Si la
-// table existe deja et qu'on lui ajoute une colonne dans le schema, la
-// base d'une personne qui travaillait avant ne la recevrait jamais.
+// Les colonnes ajoutees APRES la creation d'une base.
 //
-// SQLite ne sait pas dire "ajoute cette colonne si elle manque". On le
-// lui demande donc en deux temps : on lit la liste des colonnes
-// existantes (PRAGMA table_info), et on n'ajoute que ce qui manque.
+// "CREATE TABLE IF NOT EXISTS" ne sert que pour une table ABSENTE : si la
+// table existe deja, une colonne ajoutee au schema ne l'atteindrait
+// jamais. SQLite ne sait pas dire "ajoute cette colonne si elle manque" -
+// on le lui demande en deux temps, en lisant d'abord la liste des
+// colonnes existantes.
+//
+// CES APPELS PASSENT AVANT LE FICHIER DE SCHEMA, et c'est important :
+// schema.sql peut utiliser une colonne recente dans un UPDATE. Sur une
+// base qui ne l'a pas encore, il echouerait et le serveur ne demarrerait
+// plus. Dans l'autre sens, les deux cas fonctionnent :
+//   base existante -> la migration ajoute la colonne, puis le schema s'en sert
+//   base neuve     -> la table n'existe pas, la migration passe son tour,
+//                     et le schema la cree deja complete
 function ajouterColonneSiAbsente(table, colonne, definition) {
   const colonnes = db.prepare(`PRAGMA table_info(${table})`).all();
+
+  // Table absente : base neuve. schema.sql va la creer complete, il n'y a
+  // rien a rattraper.
+  if (colonnes.length === 0) return;
 
   if (!colonnes.some((c) => c.name === colonne)) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${colonne} ${definition}`);
@@ -70,7 +80,6 @@ function ajouterColonneSiAbsente(table, colonne, definition) {
 ajouterColonneSiAbsente("candidatures", "tarif_propose", "INTEGER");
 ajouterColonneSiAbsente("annonces", "budget", "INTEGER");
 // Une colonne ajoutee apres coup ne peut pas porter de contrainte CHECK
-// dans SQLite : c'est le serveur qui verifie la valeur avant d'ecrire.
 ajouterColonneSiAbsente("annonces", "unite_tarif", "TEXT NOT NULL DEFAULT 'forfaitaire'");
 ajouterColonneSiAbsente("annonces", "duree_estimee", "TEXT");
 ajouterColonneSiAbsente("annonces", "conditions", "TEXT");
@@ -83,6 +92,11 @@ ajouterColonneSiAbsente("messages", "signalement_traite_le", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "suspendu", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("utilisateurs", "suspendu_le", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "suspendu_motif", "TEXT");
+ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
+
+// Le schema arrive ensuite : il cree ce qui manque et met a jour les
+// donnees de reference (quartiers, metiers).
+db.exec(fs.readFileSync(path.join(__dirname, "data", "schema.sql"), "utf-8"));
 
 // ============================================================
 // LES REQUETES
@@ -628,10 +642,22 @@ function normaliserNom(texte) {
 
 // La table est petite (60 lignes) et ne change presque jamais : on la lit
 // UNE FOIS au demarrage plutot qu'a chaque formulaire affiche.
-const quartiers = db.prepare("SELECT nom, arrondissement FROM quartiers ORDER BY nom").all();
+const quartiers = db.prepare("SELECT nom, arrondissement, synonymes FROM quartiers ORDER BY nom").all();
 
 // Un dictionnaire : "citeverte" -> { nom: "Cité Verte", arrondissement: "Yaoundé 2" }
-const quartiersParCle = new Map(quartiers.map((q) => [normaliserNom(q.nom), q]));
+//
+// Il accepte aussi les orthographes declarees dans la colonne synonymes.
+// La mise en forme rattrape les accents, les majuscules et les tirets,
+// mais pas une lettre en trop : "ngoussso" avec trois s ne se rapproche
+// de rien tout seul. Ces cas se declarent, une fois rencontres.
+const quartiersParCle = new Map();
+quartiers.forEach((q) => {
+  quartiersParCle.set(normaliserNom(q.nom), q);
+  String(q.synonymes || "")
+    .split("|")
+    .filter(Boolean)
+    .forEach((autre) => quartiersParCle.set(normaliserNom(autre), q));
+});
 
 // Retrouve un quartier ecrit n'importe comment. Renvoie null si inconnu.
 function trouverQuartier(texte) {
