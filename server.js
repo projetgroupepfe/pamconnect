@@ -224,7 +224,9 @@ const requetes = {
            a.quartier            AS quartierAnnonce,
            a.arrondissement      AS arrondissementAnnonce,
            a.duree_estimee       AS dureeAnnonce,
-           a.conditions          AS conditionsAnnonce
+           a.conditions          AS conditionsAnnonce,
+           a.budget              AS budgetAnnonce,
+           a.unite_tarif         AS uniteAnnonce
     FROM candidatures c
     JOIN annonces     a ON a.id = c.annonce_id
     JOIN utilisateurs p ON p.id = c.prestataire_id
