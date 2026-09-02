@@ -14,6 +14,15 @@
     <% }); %>
   </p>
 
+  <%# L'autre travail de l'equipe, sur sa propre page. Le compte affiche
+      ici evite d'avoir a aller voir pour savoir s'il y a du travail. %>
+  <p class="actions">
+    <a class="bouton bouton-secondaire" href="/admin/signalements">
+      <%- include("partiels/icone", { nom: "message" }) %>
+      Messages signalés<% if (signalementsOuverts > 0) { %> (<%= signalementsOuverts %>)<% } %>
+    </a>
+  </p>
+
   <h2>Dossiers à vérifier</h2>
 
   <% if (dossiers.length === 0) { %>

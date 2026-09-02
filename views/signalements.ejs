@@ -1,0 +1,96 @@
+<%- include("partiels/tete") %>
+
+  <h1>Messages signalés</h1>
+  <p class="chapeau">
+    Les messages qu'une personne a signalés et que l'équipe n'a pas encore examinés.
+  </p>
+
+  <p class="actions">
+    <a class="bouton bouton-secondaire" href="/admin">
+      <%- include("partiels/icone", { nom: "document" }) %>
+      Dossiers à vérifier
+    </a>
+  </p>
+
+  <% if (signalements.length === 0) { %>
+
+    <div class="vide">
+      <p>Aucun signalement en attente.</p>
+    </div>
+
+  <% } else { %>
+
+    <% signalements.forEach(function (s) { %>
+      <div class="carte">
+
+        <div class="fiche-tete">
+          <div class="portrait"><%= s.nomAuteur.charAt(0) %></div>
+          <div>
+            <h3><%= s.nomAuteur %></h3>
+            <div class="metier"><%= s.emailAuteur %></div>
+          </div>
+        </div>
+
+        <ul class="infos">
+          <li>
+            <%- include("partiels/icone", { nom: "document" }) %>
+            <span>Discussion : <strong><%= s.titreAnnonce %></strong></span>
+          </li>
+          <li>
+            <%- include("partiels/icone", { nom: "calendrier" }) %>
+            <span>Écrit le <%= s.cree_le %></span>
+          </li>
+          <% if (s.auteurSuspendu) { %>
+            <li>
+              <%- include("partiels/icone", { nom: "info" }) %>
+              <span><strong>Ce compte est déjà suspendu.</strong></span>
+            </li>
+          <% } %>
+        </ul>
+
+        <%# Le message tel qu'il a ete ecrit. On ne le resume pas et on ne
+            le coupe pas : une decision se prend sur le texte entier. %>
+        <blockquote class="message-signale"><%= s.texte %></blockquote>
+
+        <% if (s.risque_paiement) { %>
+          <p class="aide">
+            La plateforme avait déjà repéré dans ce message une tentative
+            possible de paiement en dehors du site.
+          </p>
+        <% } %>
+
+        <%# Deux decisions, jamais melangees : classer sans suite, ou
+            suspendre. Chacune est enregistree avec son auteur et sa date. %>
+        <div class="actions">
+          <form action="/admin/signalements/<%= s.id %>" method="POST">
+            <input type="hidden" name="decision" value="rien">
+            <button type="submit" class="bouton-secondaire">
+              <%- include("partiels/icone", { nom: "valider" }) %>
+              Rien à signaler
+            </button>
+          </form>
+        </div>
+
+        <% if (!s.auteurSuspendu) { %>
+          <form action="/admin/signalements/<%= s.id %>" method="POST">
+            <input type="hidden" name="decision" value="sanction">
+            <div class="champ">
+              <label for="motif-<%= s.id %>">Motif de la suspension</label>
+              <input type="text" id="motif-<%= s.id %>" name="motif" maxlength="200"
+                     placeholder="ex : tentative de paiement hors plateforme">
+            </div>
+            <div class="actions">
+              <button type="submit" class="bouton-danger">
+                <%- include("partiels/icone", { nom: "refuser" }) %>
+                Suspendre ce compte
+              </button>
+            </div>
+          </form>
+        <% } %>
+
+      </div>
+    <% }); %>
+
+  <% } %>
+
+<%- include("partiels/pied") %>

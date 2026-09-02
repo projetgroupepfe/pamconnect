@@ -257,6 +257,17 @@ a:hover { color: var(--bleu-fonce); }
   border-color: transparent;
 }
 
+/* Le message signale, cite tel qu'il a ete ecrit. Il doit se distinguer
+   du reste de la fiche : c'est la piece sur laquelle porte la decision. */
+.message-signale {
+  margin: 1rem 0;
+  padding: .9rem 1.1rem;
+  background-color: var(--fond);
+  border-left: 3px solid var(--ambre);
+  font-style: italic;
+  color: var(--encre);
+}
+
 .menu form { display: contents; }
 .menu-separateur { display: none; }
 

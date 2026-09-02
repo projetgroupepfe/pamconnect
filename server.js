@@ -77,6 +77,12 @@ ajouterColonneSiAbsente("annonces", "conditions", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "date_naissance", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "experience_annees", "INTEGER");
 ajouterColonneSiAbsente("utilisateurs", "disponibilites", "TEXT");
+ajouterColonneSiAbsente("messages", "signalement_decision", "TEXT");
+ajouterColonneSiAbsente("messages", "signalement_traite_par", "INTEGER");
+ajouterColonneSiAbsente("messages", "signalement_traite_le", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "suspendu", "INTEGER NOT NULL DEFAULT 0");
+ajouterColonneSiAbsente("utilisateurs", "suspendu_le", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "suspendu_motif", "TEXT");
 
 // ============================================================
 // LES REQUETES
@@ -242,6 +248,54 @@ const requetes = {
   // Toutes les discussions d'une personne, quel que soit son cote.
   // Une seule requete pour les deux roles : la condition finale accepte
   // aussi bien l'employeur que la personne qui a postule.
+  // --- La moderation ---------------------------------------------
+  //
+  // Les signalements que l'equipe n'a pas encore examines. Un message
+  // traite disparait de la liste : ce qui reste affiche est ce qui
+  // attend une decision.
+  signalementsOuverts: db.prepare(`
+    SELECT m.id,
+           m.texte,
+           m.cree_le,
+           m.risque_paiement,
+           auteur.id     AS auteurId,
+           auteur.nom    AS nomAuteur,
+           auteur.email  AS emailAuteur,
+           auteur.suspendu AS auteurSuspendu,
+           a.titre       AS titreAnnonce,
+           c.id          AS candidatureId
+    FROM messages m
+    JOIN utilisateurs auteur ON auteur.id = m.auteur_id
+    JOIN candidatures c      ON c.id = m.candidature_id
+    JOIN annonces a          ON a.id = c.annonce_id
+    WHERE m.signale = 1 AND m.signalement_decision IS NULL
+    ORDER BY m.cree_le DESC, m.id DESC
+  `),
+
+  messageSignale: db.prepare(`
+    SELECT m.id, m.auteur_id, m.signale, m.signalement_decision
+    FROM messages m WHERE m.id = ?
+  `),
+
+  classerSignalement: db.prepare(`
+    UPDATE messages
+    SET signalement_decision   = @decision,
+        signalement_traite_par = @par,
+        signalement_traite_le  = datetime('now')
+    WHERE id = @id AND signale = 1 AND signalement_decision IS NULL
+  `),
+
+  suspendreCompte: db.prepare(`
+    UPDATE utilisateurs
+    SET suspendu = 1, suspendu_le = datetime('now'), suspendu_motif = @motif
+    WHERE id = @id AND est_admin = 0
+  `),
+
+  nombreSignalementsOuverts: db.prepare(`
+    SELECT COUNT(*) AS n FROM messages
+    WHERE signale = 1 AND signalement_decision IS NULL
+  `),
+
   mesConversations: db.prepare(`
     SELECT c.id,
            c.statut,
@@ -1092,6 +1146,20 @@ app.post("/connexion", lireFormulaire, (req, res) => {
   const email = (donnees.email || "").trim().toLowerCase();
   const utilisateur = requetes.utilisateurParEmail.get(email);
 
+  // Un compte suspendu garde son mot de passe valide, mais la porte
+  // reste fermee. On le dit clairement plutot que d'afficher "email ou
+  // mot de passe incorrect" : la personne doit savoir qu'elle est
+  // sanctionnee, sinon elle croit a une panne et recommence.
+  if (utilisateur && utilisateur.suspendu &&
+      verifierMotDePasse(donnees.motdepasse, utilisateur.motdepasse)) {
+    return res.status(403).render("message", {
+      titre: "Compte suspendu",
+      texte: "Votre compte a été suspendu par l'équipe PamConnect" +
+             (utilisateur.suspendu_motif ? " : " + utilisateur.suspendu_motif : "") + ".",
+      liens: [{ url: "/", texte: "Retour à l'accueil" }],
+    });
+  }
+
   if (utilisateur && verifierMotDePasse(donnees.motdepasse, utilisateur.motdepasse)) {
     const token = genererToken();
     sessions[token] = utilisateur.id;
@@ -1896,7 +1964,71 @@ app.get("/admin", exigerAdmin, (req, res) => {
     titre: "Espace équipe",
     dossiers: requetes.dossiersEnAttente.all(),
     statistiques: requetes.statistiquesVerification.all(),
+    signalementsOuverts: requetes.nombreSignalementsOuverts.get().n,
   });
+});
+
+// --- Espace equipe : les messages signales -------------------------
+//
+// Une page a part, et non une section de plus dans les dossiers a
+// verifier. Ce sont deux metiers differents : controler l'identite d'une
+// personne, et juger un message. Les melanger sur un meme ecran ferait
+// hesiter sur ce qu'on est en train de faire.
+app.get("/admin/signalements", exigerAdmin, (req, res) => {
+  res.render("signalements", {
+    titre: "Messages signalés",
+    signalements: requetes.signalementsOuverts.all(),
+  });
+});
+
+app.post("/admin/signalements/:id", exigerAdmin, lireFormulaire, (req, res) => {
+  const message = requetes.messageSignale.get(Number(req.params.id));
+
+  if (!message || !message.signale) {
+    return res.status(404).render("message", {
+      titre: "Signalement introuvable",
+      texte: "Ce message n'existe pas, ou il n'a pas été signalé.",
+      liens: [{ url: "/admin/signalements", texte: "Retour aux signalements" }],
+    });
+  }
+
+  // Deja tranche : on ne rejuge pas une decision prise, sinon la trace
+  // du premier examen disparaitrait.
+  if (message.signalement_decision) {
+    return res.status(409).render("message", {
+      titre: "Signalement déjà examiné",
+      texte: "Une décision a déjà été prise sur ce message.",
+      liens: [{ url: "/admin/signalements", texte: "Retour aux signalements" }],
+    });
+  }
+
+  const decision = req.body.decision === "sanction" ? "sanction" : "rien";
+
+  if (decision === "sanction") {
+    const motif = String(req.body.motif || "").trim().slice(0, 200);
+
+    if (!motif) {
+      return res.status(400).render("message", {
+        titre: "Motif obligatoire",
+        texte: "Une suspension doit être motivée. Sans motif écrit, personne " +
+               "ne pourra expliquer cette décision plus tard.",
+        liens: [{ url: "/admin/signalements", texte: "Retour aux signalements" }],
+      });
+    }
+
+    // Le compte n'est pas SUPPRIME : ses annonces, ses candidatures et
+    // ses messages doivent rester consultables en cas de litige.
+    // La requete refuse par ailleurs de suspendre un compte d'equipe.
+    requetes.suspendreCompte.run({ id: message.auteur_id, motif });
+  }
+
+  requetes.classerSignalement.run({
+    id: message.id,
+    decision,
+    par: req.utilisateur.id,
+  });
+
+  res.redirect("/admin/signalements");
 });
 
 // --- Espace equipe : consulter un document -------------------------

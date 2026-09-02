@@ -76,6 +76,15 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
   -- Membre de l'equipe projet, autorise a valider les dossiers.
   est_admin       INTEGER NOT NULL DEFAULT 0 CHECK (est_admin IN (0, 1)),
 
+  -- --- Suspension ---
+  -- Un compte suspendu ne peut plus se connecter. On ne SUPPRIME pas le
+  -- compte : les annonces, les candidatures et les messages doivent
+  -- rester consultables en cas de litige, et une suppression effacerait
+  -- la preuve de ce qui a justifie la sanction.
+  suspendu        INTEGER NOT NULL DEFAULT 0 CHECK (suspendu IN (0, 1)),
+  suspendu_le     TEXT,
+  suspendu_motif  TEXT,
+
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -203,6 +212,20 @@ CREATE TABLE IF NOT EXISTS messages (
 
   -- Signale par son destinataire, en attente d'examen par l'equipe.
   signale         INTEGER NOT NULL DEFAULT 0 CHECK (signale IN (0, 1)),
+
+  -- La decision de l'equipe, une fois le signalement examine.
+  -- NULL tant que personne ne l'a regarde : c'est ce qui fait qu'un
+  -- signalement APPARAIT dans la liste de l'equipe, et en disparait une
+  -- fois traite.
+  --   'rien'     : examine, aucun probleme constate
+  --   'sanction' : le compte de l'auteur a ete suspendu
+  signalement_decision TEXT,
+
+  -- Qui a decide, et quand. Le cahier des charges demande que chaque
+  -- decision sensible laisse une trace : sans elle, personne ne peut
+  -- repondre a "qui a suspendu ce compte, et pourquoi ?".
+  signalement_traite_par INTEGER REFERENCES utilisateurs(id),
+  signalement_traite_le  TEXT,
 
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now'))
 );
