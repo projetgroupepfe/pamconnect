@@ -260,14 +260,12 @@
                   <%# On n'engage personne dont l'identite n'est pas verifiee. %>
                   <% if (candidature.verificationPrestataire === "verifie") { %>
                     <div class="actions">
-                      <form action="/candidatures/statut" method="POST">
-                        <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
-                        <input type="hidden" name="statut" value="acceptee">
-                        <button type="submit">
-                          <%- include("partiels/icone", { nom: "valider" }) %>
-                          Accepter
-                        </button>
-                      </form>
+                      <%# Choisir quelqu'un est un engagement : on passe par
+                          un ecran de confirmation. Refuser ne l'est pas. %>
+                      <a class="bouton" href="/candidatures/<%= candidature.id %>/confirmer">
+                        <%- include("partiels/icone", { nom: "valider" }) %>
+                        Choisir cette personne
+                      </a>
                       <form action="/candidatures/statut" method="POST">
                         <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
                         <input type="hidden" name="statut" value="refusee">

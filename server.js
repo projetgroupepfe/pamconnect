@@ -205,6 +205,32 @@ const requetes = {
     WHERE c.id = ? AND a.employeur_id = ?
   `),
 
+  // Tout ce que l'employeur doit relire avant de s'engager, ramene en une
+  // seule requete. La condition finale est la garde d'acces : l'annonce
+  // doit lui appartenir. Une candidate ne peut donc rien obtenir ici,
+  // meme en tapant l'adresse a la main.
+  candidatureAConfirmer: db.prepare(`
+    SELECT c.id,
+           c.statut,
+           c.tarif_propose,
+           p.id                  AS prestataireId,
+           p.nom                 AS nomPrestataire,
+           p.metier              AS metierPrestataire,
+           p.tarif               AS tarifPrestataire,
+           p.experience_annees   AS experiencePrestataire,
+           p.statut_verification AS verificationPrestataire,
+           a.metier              AS metierAnnonce,
+           a.horaire             AS horaireAnnonce,
+           a.quartier            AS quartierAnnonce,
+           a.arrondissement      AS arrondissementAnnonce,
+           a.duree_estimee       AS dureeAnnonce,
+           a.conditions          AS conditionsAnnonce
+    FROM candidatures c
+    JOIN annonces     a ON a.id = c.annonce_id
+    JOIN utilisateurs p ON p.id = c.prestataire_id
+    WHERE c.id = ? AND a.employeur_id = ?
+  `),
+
   changerStatutCandidature: db.prepare(`
     UPDATE candidatures SET statut = ? WHERE id = ?
   `),
@@ -1613,6 +1639,53 @@ app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
 });
 
 // --- Accepter ou refuser une candidature ---------------------------
+// --- Confirmer avant d'embaucher -----------------------------------
+//
+// Accepter une candidature engageait jusqu'ici d'un seul clic, sans que
+// l'employeur relise ce sur quoi il s'engage. Le cahier des charges
+// demande qu'il confirme le service, le lieu, l'horaire, la duree, le
+// tarif final, la commission et le montant net.
+//
+// CET ECRAN EST CELUI DE L'EMPLOYEUR. La requete n'accepte que
+// l'employeur PROPRIETAIRE de l'annonce : une candidate qui taperait
+// l'adresse a la main recoit 404, meme sur sa propre candidature. Elle
+// n'a rien a faire ici - la decision ne lui appartient pas.
+//
+// Refuser, en revanche, reste immediat : on ne s'engage a rien en
+// refusant, et faire confirmer un refus ne protegerait personne.
+app.get("/candidatures/:id/confirmer", exigerConnexion, (req, res) => {
+  const c = requetes.candidatureAConfirmer.get(Number(req.params.id), req.utilisateur.id);
+
+  if (!c) {
+    return res.status(404).render("message", {
+      titre: "Candidature introuvable",
+      texte: "Cette candidature n'existe pas, ou elle ne concerne aucune de vos demandes.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+    });
+  }
+
+  if (c.statut !== "en attente") {
+    return res.status(409).render("message", {
+      titre: "Décision déjà prise",
+      texte: "Cette candidature a déjà reçu une réponse.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+    });
+  }
+
+  // La meme regle qu'a l'acceptation, verifiee ici aussi : sans quoi
+  // l'ecran promettrait une action que le serveur refusera ensuite.
+  if (c.verificationPrestataire !== "verifie") {
+    return res.status(403).render("message", {
+      titre: "Vérification requise",
+      texte: "L'identité de cette personne n'a pas encore été vérifiée par PamConnect. " +
+             "Vous pourrez la choisir dès que son dossier sera validé.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+    });
+  }
+
+  res.render("confirmer-embauche", { titre: "Confirmer votre choix", c });
+});
+
 app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => {
   const candidatureId = Number(req.body.candidatureId);
   const nouveauStatut = req.body.statut;

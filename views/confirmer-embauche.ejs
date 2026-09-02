@@ -1,0 +1,113 @@
+<%- include("partiels/tete") %>
+
+  <div class="colonne">
+
+    <h1>Confirmer votre choix</h1>
+    <p class="chapeau">
+      Relisez ce sur quoi vous vous engagez. Rien n'est décidé tant que vous
+      n'avez pas confirmé.
+    </p>
+
+    <h2>La personne que vous choisissez</h2>
+    <div class="carte">
+      <div class="fiche-tete">
+        <div class="portrait"><%= c.nomPrestataire.charAt(0) %></div>
+        <div>
+          <h3><%= c.nomPrestataire %></h3>
+          <div class="metier"><%= c.metierPrestataire %></div>
+        </div>
+      </div>
+
+      <p class="confiance">
+        <span class="badge badge-verifie">
+          <%- include("partiels/icone", { nom: "verifie" }) %>
+          Identité et casier vérifiés
+        </span>
+        <% if (libelleExperience(c.experiencePrestataire)) { %>
+          <span class="badge badge-info">
+            <%- include("partiels/icone", { nom: "experience" }) %>
+            <%= libelleExperience(c.experiencePrestataire) %>
+          </span>
+        <% } %>
+      </p>
+
+      <div class="actions">
+        <a class="bouton bouton-secondaire" href="/personnes/<%= c.prestataireId %>">
+          <%- include("partiels/icone", { nom: "profil" }) %>
+          Voir son profil
+        </a>
+      </div>
+    </div>
+
+    <h2>La prestation</h2>
+    <div class="carte">
+      <ul class="infos">
+        <li>
+          <%- include("partiels/icone", { nom: "experience" }) %>
+          <span>Service : <strong><%= c.metierAnnonce %></strong></span>
+        </li>
+        <li>
+          <%- include("partiels/icone", { nom: "calendrier" }) %>
+          <span>Horaire : <strong><%= c.horaireAnnonce || "non précisé" %></strong></span>
+        </li>
+        <% if (c.dureeAnnonce) { %>
+          <li>
+            <%- include("partiels/icone", { nom: "disponibilite" }) %>
+            <span>Durée estimée : <strong><%= c.dureeAnnonce %></strong></span>
+          </li>
+        <% } %>
+        <li>
+          <%- include("partiels/icone", { nom: "lieu" }) %>
+          <%# Le LIEU GENERAL, jamais l'adresse exacte : elle ne sera
+              transmise qu'apres confirmation du paiement. %>
+          <span>
+            Lieu :
+            <strong><% if (c.quartierAnnonce) { %><%= c.quartierAnnonce %>, <% } %><%= c.arrondissementAnnonce %></strong>
+          </span>
+        </li>
+        <% if (c.conditionsAnnonce) { %>
+          <li>
+            <%- include("partiels/icone", { nom: "info" }) %>
+            <span><%= c.conditionsAnnonce %></span>
+          </li>
+        <% } %>
+      </ul>
+    </div>
+
+    <h2>Ce que vous payez</h2>
+    <div class="carte">
+      <%# Le meme bloc que partout ailleurs, du point de vue de
+          l'employeur : le calcul ne varie jamais d'un ecran a l'autre. %>
+      <%- include("partiels/detail-tarif", {
+            tarif: c.tarif_propose || c.tarifPrestataire,
+            pourEmployeur: true,
+            beneficiaire: c.nomPrestataire }) %>
+
+      <% if (c.tarif_propose) { %>
+        <p class="aide">
+          Montant convenu dans votre discussion. Le tarif habituel de
+          <%= c.nomPrestataire %> est <%= formaterMontant(c.tarifPrestataire) %>.
+        </p>
+      <% } %>
+
+      <p class="aide">
+        Aucun autre frais ne s'ajoute : l'employeur paie le montant affiché,
+        rien de plus. La commission est retenue sur la part de la personne.
+      </p>
+    </div>
+
+    <div class="actions">
+      <form action="/candidatures/statut" method="POST">
+        <input type="hidden" name="candidatureId" value="<%= c.id %>">
+        <input type="hidden" name="statut" value="acceptee">
+        <button type="submit">
+          <%- include("partiels/icone", { nom: "valider" }) %>
+          Confirmer et choisir <%= c.nomPrestataire %>
+        </button>
+      </form>
+      <a class="bouton bouton-secondaire" href="/mon-profil">Annuler</a>
+    </div>
+
+  </div>
+
+<%- include("partiels/pied") %>
