@@ -67,15 +67,37 @@
         </ul>
       <% } %>
 
-      <%# Cette phrase repond a une inquietude precise : "si j'accepte
-          12 000 ici, est-ce que mon profil affiche 12 000 pour tout le
-          monde ?". Elle ne concerne donc QUE la personne qui travaille.
-          L'employeur n'a pas cette question, et le titre "Le tarif" avec
-          le montant juste en dessous lui suffit. %>
-      <% if (negocie && !jeSuisEmployeur) { %>
+      <%# Un montant affiche sans dire QUI l'a propose n'apprend rien.
+          Personne ne fixe le prix sauf la personne qui travaille : ni
+          l'employeur, ni la plateforme. Le dire evite de croire a un
+          tarif impose.
+
+          Chaque cote lit la meme information dans ses mots : elle lit
+          "vous avez propose", il lit "elle propose". %>
+      <% if (negocie) { %>
         <p class="aide">
-          Votre tarif habituel de <%= formaterMontant(conversation.tarifPrestataire) %>
-          n'a pas changé : ce montant ne vaut que pour cette demande.
+          <% if (jeSuisEmployeur) { %>
+            <strong><%= conversation.nomPrestataire %> propose
+            <%= formaterMontant(conversation.tarif_propose) %></strong>
+            pour cette demande. Son tarif habituel est
+            <%= formaterMontant(conversation.tarifPrestataire) %>.
+          <% } else { %>
+            <strong>Vous avez proposé <%= formaterMontant(conversation.tarif_propose) %></strong>
+            pour cette demande. Votre tarif habituel de
+            <%= formaterMontant(conversation.tarifPrestataire) %> n'a pas changé.
+          <% } %>
+        </p>
+      <% } else { %>
+        <p class="aide">
+          <% if (jeSuisEmployeur) { %>
+            C'est le tarif habituel de <%= conversation.nomPrestataire %>.
+            <% if (conversation.statut === "en attente") { %>
+              Elle peut vous en proposer un autre pour cette demande.
+            <% } %>
+          <% } else { %>
+            C'est votre tarif habituel. Vous pouvez en proposer un autre
+            pour cette demande seulement.
+          <% } %>
         </p>
       <% } %>
 
