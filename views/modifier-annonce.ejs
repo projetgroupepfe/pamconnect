@@ -1,0 +1,44 @@
+<%- include("partiels/tete") %>
+
+  <div class="colonne">
+    <h1>Modifier ma demande</h1>
+    <p class="discret">
+      Corrigez ce qui doit l'être. Les personnes qui consultent vos annonces
+      verront la nouvelle version.
+    </p>
+
+    <%# Une demande a laquelle des gens ont deja repondu n'est plus tout a
+        fait la votre : ils se sont decides sur ce qui etait ecrit. On ne
+        l'interdit pas - un horaire faux doit pouvoir etre corrige - mais on
+        le dit, et on rappelle qu'il faut les prevenir. %>
+    <% if (candidatures > 0) { %>
+      <div class="carte">
+        <p>
+          <strong><%= candidatures %></strong>
+          personne<%= candidatures > 1 ? "s ont" : " a" %> déjà répondu à cette demande.
+          Elle<%= candidatures > 1 ? "s se sont décidées" : " s'est décidée" %>
+          sur ce qui est écrit aujourd'hui.
+        </p>
+        <p class="aide">
+          Si vous changez l'horaire, le lieu ou le budget, prévenez-<%= candidatures > 1 ? "les" : "la" %>
+          dans la discussion : la plateforme ne le fait pas à votre place.
+        </p>
+      </div>
+    <% } %>
+
+    <div class="carte">
+      <form action="/annonces/<%= annonce.id %>/modifier" method="POST">
+        <%- include("partiels/champs-annonce", { annonce: annonce }) %>
+
+        <div class="actions">
+          <button type="submit">
+            <%- include("partiels/icone", { nom: "valider" }) %>
+            Enregistrer les modifications
+          </button>
+          <a class="bouton bouton-secondaire" href="/mon-profil">Annuler</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<%- include("partiels/pied") %>

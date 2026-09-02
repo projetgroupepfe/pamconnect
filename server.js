@@ -165,6 +165,29 @@ const requetes = {
     SELECT * FROM annonces WHERE id = ?
   `),
 
+  // Une demande ET son proprietaire, en une seule condition. C'est la
+  // garde d'acces de la modification : une personne qui n'est pas
+  // l'employeur de cette annonce n'obtient rien, meme en tapant
+  // l'adresse a la main.
+  monAnnonce: db.prepare(`
+    SELECT * FROM annonces WHERE id = ? AND employeur_id = ?
+  `),
+
+  // Combien de personnes ont deja repondu. Elles se sont decidees sur ce
+  // qui etait ecrit : l'employeur doit le savoir avant de corriger.
+  nombreCandidatures: db.prepare(`
+    SELECT COUNT(*) AS n FROM candidatures WHERE annonce_id = ?
+  `),
+
+  majAnnonce: db.prepare(`
+    UPDATE annonces
+    SET titre = @titre, metier = @metier,
+        arrondissement = @arrondissement, quartier = @quartier,
+        horaire = @horaire, budget = @budget, unite_tarif = @unite_tarif,
+        duree_estimee = @duree_estimee, conditions = @conditions
+    WHERE id = @id
+  `),
+
   annoncesDeEmployeur: db.prepare(`
     SELECT * FROM annonces WHERE employeur_id = ? ORDER BY cree_le DESC, id DESC
   `),
@@ -514,6 +537,71 @@ function formaterTarif(tarif) {
 // modifie. Elles sont ecrites ICI, une seule fois : impossible qu'elles
 // finissent par dire deux choses differentes selon l'ecran.
 // Renvoie null si tout va bien, sinon le message a afficher.
+// Les regles d'une demande, rassemblees. Elles servent a la publication
+// ET a la modification : ecrites deux fois, elles finiraient par
+// diverger, et l'un des deux formulaires accepterait ce que l'autre
+// refuse.
+//
+// Renvoie null si tout va bien, sinon de quoi afficher le probleme.
+function verifierAnnonce(donnees) {
+  // L'horaire est le critere sur lequel une personne decide de repondre
+  // ou non : il est donc obligatoire.
+  if (!String(donnees.horaire || "").trim()) {
+    return {
+      titre: "Horaire obligatoire",
+      texte: "Indiquez quand vous avez besoin de quelqu'un. " +
+             "C'est la première chose que les candidates regardent.",
+    };
+  }
+
+  // Le quartier aussi : beaucoup de gens connaissent "Bastos" sans
+  // savoir que c'est Yaounde 1. Sans ce repere, une candidate ne peut
+  // pas juger si le lieu lui est accessible.
+  if (!String(donnees.quartier || "").trim()) {
+    return {
+      titre: "Quartier obligatoire",
+      texte: "Indiquez votre quartier. C'est ce qui permet aux candidates " +
+             "de savoir si elles peuvent s'y rendre.",
+    };
+  }
+
+  // Le budget est facultatif, mais s'il est indique il doit avoir un
+  // sens : un montant negatif ou nul n'aide personne a se decider.
+  const budgetSaisi = String(donnees.budget || "").trim();
+  if (budgetSaisi) {
+    const budget = Math.round(Number(budgetSaisi));
+    if (!(Number.isFinite(budget) && budget > 0)) {
+      return {
+        titre: "Budget invalide",
+        texte: "Indiquez un montant en francs CFA, ou laissez le champ vide.",
+      };
+    }
+  }
+
+  return null;
+}
+
+// Les valeurs d'une demande, mises en forme pour la base. Le meme
+// traitement a la publication et a la modification.
+function champsAnnonce(donnees) {
+  const lieu = resoudreLieu(donnees);
+  const budgetSaisi = String(donnees.budget || "").trim();
+
+  return {
+    titre: String(donnees.titre || "").trim(),
+    metier: resoudreMetier(donnees.metier),
+    arrondissement: lieu.arrondissement,
+    quartier: lieu.quartier,
+    horaire: String(donnees.horaire).trim(),
+    budget: budgetSaisi ? Math.round(Number(budgetSaisi)) : null,
+    // L'unite vient d'une liste fermee. On ne fait pas confiance au
+    // navigateur : une valeur inconnue est ramenee a celle par defaut.
+    unite_tarif: UNITES_TARIF[donnees.unite_tarif] ? donnees.unite_tarif : "forfaitaire",
+    duree_estimee: String(donnees.duree_estimee || "").trim() || null,
+    conditions: String(donnees.conditions || "").trim() || null,
+  };
+}
+
 function verifierProfilPrestataire(donnees) {
   if (!String(donnees.metier || "").trim()) {
     return {
@@ -1504,61 +1592,15 @@ app.get("/publier-annonce", exigerConnexion, interdireALEquipe, (req, res) => {
 app.post("/annonces", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
   const donnees = req.body;
 
-  // L'horaire est le critere sur lequel une personne decide de
-  // repondre ou non a l'annonce : il est donc obligatoire.
-  if (!String(donnees.horaire || "").trim()) {
-    return res.status(400).render("message", {
-      titre: "Horaire obligatoire",
-      texte: "Indiquez quand vous avez besoin de quelqu'un. " +
-             "C'est la première chose que les candidates regardent.",
+  const probleme = verifierAnnonce(donnees);
+  if (probleme) {
+    return res.status(400).render("message", Object.assign({}, probleme, {
       liens: [{ url: "/publier-annonce", texte: "Retour au formulaire" }],
-    });
+    }));
   }
 
-  // Le quartier aussi : beaucoup de gens connaissent "Bastos" sans
-  // savoir que c'est Yaounde 2. Sans ce repere, une candidate ne peut
-  // pas juger si le lieu est accessible pour elle.
-  if (!String(donnees.quartier || "").trim()) {
-    return res.status(400).render("message", {
-      titre: "Quartier obligatoire",
-      texte: "Indiquez votre quartier. C'est ce qui permet aux candidates " +
-             "de savoir si elles peuvent s'y rendre.",
-      liens: [{ url: "/publier-annonce", texte: "Retour au formulaire" }],
-    });
-  }
-
-  // Le budget est facultatif, mais s'il est indique il doit avoir un
-  // sens : un montant negatif ou nul n'aide personne a se decider.
-  const budgetSaisi = String(donnees.budget || "").trim();
-  const budget = budgetSaisi ? Math.round(Number(budgetSaisi)) : null;
-
-  if (budgetSaisi && !(Number.isFinite(budget) && budget > 0)) {
-    return res.status(400).render("message", {
-      titre: "Budget invalide",
-      texte: "Indiquez un montant en francs CFA, ou laissez le champ vide.",
-      liens: [{ url: "/publier-annonce", texte: "Retour au formulaire" }],
-    });
-  }
-
-  // L'unite vient d'une liste fermee. On ne fait pas confiance au
-  // navigateur : une valeur inconnue serait refusee par la base, autant
-  // la ramener nous-memes a la valeur par defaut.
-  const unite = UNITES_TARIF[donnees.unite_tarif] ? donnees.unite_tarif : "forfaitaire";
-
-  const lieu = resoudreLieu(donnees);
-
-  requetes.creerAnnonce.run({
-    employeur_id: req.utilisateur.id,
-    titre: donnees.titre,
-    metier: resoudreMetier(donnees.metier),
-    arrondissement: lieu.arrondissement,
-    quartier: lieu.quartier,
-    horaire: String(donnees.horaire).trim(),
-    budget,
-    unite_tarif: unite,
-    duree_estimee: String(donnees.duree_estimee || "").trim() || null,
-    conditions: String(donnees.conditions || "").trim() || null,
-  });
+  requetes.creerAnnonce.run(Object.assign(
+    { employeur_id: req.utilisateur.id }, champsAnnonce(donnees)));
 
   res.render("message", {
     titre: "Annonce publiee !",
@@ -1568,6 +1610,69 @@ app.post("/annonces", exigerConnexion, interdireALEquipe, lireFormulaire, (req, 
 });
 
 // --- Liste des annonces --------------------------------------------
+// --- Modifier une demande ------------------------------------------
+//
+// Une demande publiee etait definitive : un employeur qui se trompait
+// d'horaire ou de budget ne pouvait rien corriger, et sa demande erronee
+// restait visible pour toujours.
+//
+// CES DEUX PAGES SONT CELLES DE L'EMPLOYEUR PROPRIETAIRE. La requete
+// monAnnonce porte la garde : elle exige l'identifiant de l'annonce ET
+// celui de son employeur. Une candidate, un autre employeur ou un membre
+// de l'equipe recoivent 404 - on ne leur dit meme pas que la page existe.
+function chargerMonAnnonce(req, res) {
+  if (req.utilisateur.role !== "employeur") return null;
+
+  return requetes.monAnnonce.get(Number(req.params.id), req.utilisateur.id) || null;
+}
+
+app.get("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, (req, res) => {
+  const annonce = chargerMonAnnonce(req, res);
+
+  if (!annonce) {
+    return res.status(404).render("message", {
+      titre: "Demande introuvable",
+      texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+    });
+  }
+
+  res.render("modifier-annonce", {
+    titre: "Modifier ma demande",
+    annonce,
+    candidatures: requetes.nombreCandidatures.get(annonce.id).n,
+  });
+});
+
+app.post("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
+  const annonce = chargerMonAnnonce(req, res);
+
+  if (!annonce) {
+    return res.status(404).render("message", {
+      titre: "Demande introuvable",
+      texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+    });
+  }
+
+  // Les memes regles qu'a la publication, appelees au meme endroit :
+  // ce que l'un refuse, l'autre le refuse aussi.
+  const probleme = verifierAnnonce(req.body);
+  if (probleme) {
+    return res.status(400).render("message", Object.assign({}, probleme, {
+      liens: [{ url: `/annonces/${annonce.id}/modifier`, texte: "Retour au formulaire" }],
+    }));
+  }
+
+  requetes.majAnnonce.run(Object.assign({ id: annonce.id }, champsAnnonce(req.body)));
+
+  res.render("message", {
+    titre: "Demande mise à jour",
+    texte: "Les personnes qui consultent vos annonces voient la nouvelle version.",
+    liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+  });
+});
+
 app.get("/annonces", (req, res) => {
   const utilisateur = utilisateurConnecte(req);
 

@@ -188,6 +188,13 @@
             </li>
           </ul>
 
+          <div class="actions">
+            <a class="bouton bouton-secondaire" href="/annonces/<%= annonce.id %>/modifier">
+              <%- include("partiels/icone", { nom: "profil" }) %>
+              Modifier cette demande
+            </a>
+          </div>
+
           <% if (annonce.candidatures.length === 0) { %>
             <p class="aide" style="margin-top:1rem">Personne n'a encore répondu.</p>
           <% } else { %>

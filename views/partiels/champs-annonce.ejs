@@ -1,0 +1,80 @@
+<%#
+  Les champs d'une demande, ecrits UNE SEULE FOIS.
+
+  Ils servent a la publier et a la modifier. Recopies dans deux ecrans,
+  ils finiraient par diverger : un champ ajoute d'un cote et oublie de
+  l'autre, et l'employeur ne pourrait plus corriger ce qu'il vient de
+  saisir.
+
+  Appele ainsi :
+
+    include("partiels/champs-annonce", { annonce: null })       pour publier
+    include("partiels/champs-annonce", { annonce: annonce })    pour modifier
+
+  ATTENTION : ne jamais ecrire la sequence de fermeture EJS dans ce
+  commentaire, elle terminerait le bloc au milieu d'une phrase.
+%>
+<% const a = locals.annonce || {}; %>
+
+<div class="champ">
+  <label for="titre">Votre demande en une phrase</label>
+  <input type="text" id="titre" name="titre"
+         value="<%= a.titre || "" %>"
+         placeholder="ex : Ménage deux fois par semaine" required>
+</div>
+
+<%- include("champ-metier", {
+      valeur: a.metier || null, intitule: "Qui cherchez-vous ?", obligatoire: true }) %>
+
+<div class="champ">
+  <label for="horaire">Quand avez-vous besoin de quelqu'un ?</label>
+  <input type="text" id="horaire" name="horaire"
+         value="<%= a.horaire || "" %>"
+         placeholder="ex : Lundi et jeudi, 8h à 12h" required>
+</div>
+
+<%# Le nom du quartier suffit : jamais l'adresse exacte. %>
+<%- include("champ-lieu", {
+      quartier: a.quartier || null,
+      arrondissement: a.arrondissement || null,
+      obligatoire: true }) %>
+
+<h2>Ce que vous êtes prêt à payer</h2>
+<p class="aide">
+  Facultatif. Sans repère, une candidate propose son montant à l'aveugle.
+</p>
+
+<div class="champ">
+  <label for="budget">Votre budget (FCFA)</label>
+  <input type="number" id="budget" name="budget" min="500" step="500"
+         value="<%= a.budget != null ? a.budget : "" %>"
+         placeholder="ex : 10000">
+</div>
+
+<div class="champ">
+  <label for="unite_tarif">Ce montant, c'est…</label>
+  <select id="unite_tarif" name="unite_tarif">
+    <%# La liste vient du serveur : ajouter une facon de compter ne
+        demandera pas de retoucher cet ecran. %>
+    <% const choisi = a.unite_tarif || "forfaitaire"; %>
+    <% Object.keys(unitesTarif).forEach(function (cle) { %>
+      <option value="<%= cle %>" <%= cle === choisi ? "selected" : "" %>>
+        <%= unitesTarif[cle] %>
+      </option>
+    <% }); %>
+  </select>
+</div>
+
+<div class="champ">
+  <label for="duree_estimee">Combien de temps, à votre avis ? <span class="aide">(facultatif)</span></label>
+  <input type="text" id="duree_estimee" name="duree_estimee"
+         value="<%= a.duree_estimee || "" %>"
+         placeholder="ex : Environ 3 heures">
+</div>
+
+<div class="champ">
+  <label for="conditions">Quelque chose à savoir avant de venir ? <span class="aide">(facultatif)</span></label>
+  <input type="text" id="conditions" name="conditions" maxlength="300"
+         value="<%= a.conditions || "" %>"
+         placeholder="ex : Il y a un chien. Deuxième étage sans ascenseur.">
+</div>
