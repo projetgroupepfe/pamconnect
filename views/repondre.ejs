@@ -54,10 +54,22 @@
           </span>
         </li>
       </ul>
-      <p class="aide">
-        Vous vous déplacerez chez cette personne. PamConnect a contrôlé sa
-        pièce d'identité et son casier judiciaire, comme les vôtres.
-      </p>
+      <%# La phrase doit suivre le badge. Sinon l'ecran affiche
+          "Identite non verifiee" et, juste en dessous, "PamConnect a
+          controle sa piece d'identite" : deux affirmations contraires,
+          et c'est la fausse que la personne retient. %>
+      <% if (annonce.verificationEmployeur === "verifie") { %>
+        <p class="aide">
+          Vous vous déplacerez chez cette personne. PamConnect a contrôlé sa
+          pièce d'identité et son casier judiciaire, comme les vôtres.
+        </p>
+      <% } else { %>
+        <p class="aide">
+          Vous vous déplacerez chez cette personne. Son identité n'a pas
+          encore été vérifiée par PamConnect. À vous de décider si vous
+          souhaitez répondre à cette demande.
+        </p>
+      <% } %>
     </div>
 
     <h2>Ce que vous toucherez</h2>
