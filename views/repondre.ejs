@@ -37,26 +37,28 @@
         choisir. %>
     <h2>Ce que vous toucherez</h2>
     <div class="carte">
-      <% if (budgetEnClair(annonce)) { %>
-        <ul class="infos">
+      <%# Le prix de l'annonce, et ce qu'il en restera. C'est le moment ou
+          la personne s'engage : elle doit voir le montant exact, avec son
+          unite - 10 000 FCFA par jour et 10 000 FCFA pour la prestation ne
+          sont pas la meme proposition. %>
+      <ul class="infos">
+        <li>
+          <%- include("partiels/icone", { nom: "remuneration" }) %>
+          <span>Prix annoncé : <strong><%= prixEnClair(annonce) %></strong></span>
+        </li>
+        <% if (annonce.duree_estimee) { %>
           <li>
-            <%- include("partiels/icone", { nom: "document" }) %>
-            <span>
-              Budget annoncé par l'employeur :
-              <strong><%= budgetEnClair(annonce) %></strong>
-              <% if (annonce.duree_estimee) { %>
-                <span class="aide">— <%= annonce.duree_estimee %></span>
-              <% } %>
-            </span>
+            <%- include("partiels/icone", { nom: "disponibilite" }) %>
+            <span>Durée estimée : <strong><%= annonce.duree_estimee %></strong></span>
           </li>
-        </ul>
-      <% } %>
+        <% } %>
+      </ul>
 
-      <%- include("partiels/detail-tarif", { tarif: moi.tarif }) %>
+      <%- include("partiels/detail-tarif", { tarif: annonce.prix }) %>
 
       <p class="aide">
-        C'est votre tarif habituel qui s'applique. Vous pourrez proposer un
-        autre montant à l'employeur dans la discussion, après avoir répondu.
+        C'est le prix fixé par l'employeur pour ce service.
+        Si ce montant ne vous convient pas, vous pouvez répondre à une autre demande.
       </p>
     </div>
 

@@ -64,6 +64,33 @@ db.pragma("foreign_keys = ON");
 //   base existante -> la migration ajoute la colonne, puis le schema s'en sert
 //   base neuve     -> la table n'existe pas, la migration passe son tour,
 //                     et le schema la cree deja complete
+// Renomme une colonne d'une base existante. Sur une base neuve, la table
+// n'existe pas encore : schema.sql la creera deja au bon nom.
+function renommerColonneSiPresente(table, avant, apres) {
+  const colonnes = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (colonnes.length === 0) return;
+
+  const aAncien = colonnes.some((c) => c.name === avant);
+  const aNouveau = colonnes.some((c) => c.name === apres);
+
+  if (aAncien && !aNouveau) {
+    db.exec(`ALTER TABLE ${table} RENAME COLUMN ${avant} TO ${apres}`);
+    console.log(`Colonne renommee : ${table}.${avant} -> ${apres}`);
+  }
+}
+
+// Retire une colonne devenue inutile. On ne la garde pas "au cas ou" :
+// une colonne morte finit toujours par etre relue par erreur.
+function retirerColonneSiPresente(table, colonne) {
+  const colonnes = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (colonnes.length === 0) return;
+
+  if (colonnes.some((c) => c.name === colonne)) {
+    db.exec(`ALTER TABLE ${table} DROP COLUMN ${colonne}`);
+    console.log(`Colonne retiree : ${table}.${colonne}`);
+  }
+}
+
 function ajouterColonneSiAbsente(table, colonne, definition) {
   const colonnes = db.prepare(`PRAGMA table_info(${table})`).all();
 
@@ -77,8 +104,7 @@ function ajouterColonneSiAbsente(table, colonne, definition) {
   }
 }
 
-ajouterColonneSiAbsente("candidatures", "tarif_propose", "INTEGER");
-ajouterColonneSiAbsente("annonces", "budget", "INTEGER");
+ajouterColonneSiAbsente("annonces", "prix", "INTEGER");
 // Une colonne ajoutee apres coup ne peut pas porter de contrainte CHECK
 ajouterColonneSiAbsente("annonces", "unite_tarif", "TEXT NOT NULL DEFAULT 'forfaitaire'");
 ajouterColonneSiAbsente("annonces", "duree_estimee", "TEXT");
@@ -95,6 +121,16 @@ ajouterColonneSiAbsente("utilisateurs", "suspendu_motif", "TEXT");
 ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
 ajouterColonneSiAbsente("annonces", "annulee", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
+
+// CHANGEMENT DE MODELE : le montant d'une annonce n'est plus une
+// indication mais LE PRIX que l'employeur paiera. Le nom de la colonne
+// suit, sinon le code continuerait de parler de "budget" en manipulant
+// un prix ferme.
+renommerColonneSiPresente("annonces", "budget", "prix");
+
+// La negociation disparait avec ce modele : le prix est celui de
+// l'annonce, la personne postule ou repond ailleurs.
+retirerColonneSiPresente("candidatures", "tarif_propose");
 
 // Le schema arrive ensuite : il cree ce qui manque et met a jour les
 // donnees de reference (quartiers, metiers).
@@ -227,7 +263,7 @@ const requetes = {
     UPDATE annonces
     SET titre = @titre, metier = @metier,
         arrondissement = @arrondissement, quartier = @quartier,
-        horaire = @horaire, budget = @budget, unite_tarif = @unite_tarif,
+        horaire = @horaire, prix = @prix, unite_tarif = @unite_tarif,
         duree_estimee = @duree_estimee, conditions = @conditions
     WHERE id = @id
   `),
@@ -239,10 +275,10 @@ const requetes = {
   creerAnnonce: db.prepare(`
     INSERT INTO annonces
       (employeur_id, titre, metier, arrondissement, quartier, horaire,
-       budget, unite_tarif, duree_estimee, conditions)
+       prix, unite_tarif, duree_estimee, conditions)
     VALUES
       (@employeur_id, @titre, @metier, @arrondissement, @quartier, @horaire,
-       @budget, @unite_tarif, @duree_estimee, @conditions)
+       @prix, @unite_tarif, @duree_estimee, @conditions)
   `),
 
   // JOIN : on recupere la candidature ET le nom du prestataire
@@ -250,10 +286,8 @@ const requetes = {
   candidaturesDeAnnonce: db.prepare(`
     SELECT c.id,
            c.statut,
-           c.tarif_propose,
            u.id                  AS prestataireId,
            u.nom                 AS nomPrestataire,
-           u.tarif               AS tarifPrestataire,
            u.experience_annees   AS experiencePrestataire,
            u.disponibilites      AS disponibilitesPrestataire,
            u.statut_verification AS verificationPrestataire
@@ -264,7 +298,7 @@ const requetes = {
   `),
 
   candidaturesDePrestataire: db.prepare(`
-    SELECT c.id, c.statut, c.tarif_propose,
+    SELECT c.id, c.statut,
            a.titre AS titreAnnonce, a.horaire AS horaireAnnonce
     FROM candidatures c
     JOIN annonces a ON a.id = c.annonce_id
@@ -293,11 +327,9 @@ const requetes = {
   candidatureAConfirmer: db.prepare(`
     SELECT c.id,
            c.statut,
-           c.tarif_propose,
            p.id                  AS prestataireId,
            p.nom                 AS nomPrestataire,
            p.metier              AS metierPrestataire,
-           p.tarif               AS tarifPrestataire,
            p.experience_annees   AS experiencePrestataire,
            p.statut_verification AS verificationPrestataire,
            a.metier              AS metierAnnonce,
@@ -306,7 +338,7 @@ const requetes = {
            a.arrondissement      AS arrondissementAnnonce,
            a.duree_estimee       AS dureeAnnonce,
            a.conditions          AS conditionsAnnonce,
-           a.budget              AS budgetAnnonce,
+           a.prix                AS prixAnnonce,
            a.unite_tarif         AS uniteAnnonce
     FROM candidatures c
     JOIN annonces     a ON a.id = c.annonce_id
@@ -326,10 +358,9 @@ const requetes = {
   conversation: db.prepare(`
     SELECT c.id,
            c.statut,
-           c.tarif_propose,
            a.titre           AS titreAnnonce,
            a.horaire         AS horaireAnnonce,
-           a.budget          AS budgetAnnonce,
+           a.prix            AS prixAnnonce,
            a.unite_tarif     AS uniteAnnonce,
            a.duree_estimee   AS dureeAnnonce,
            a.conditions      AS conditionsAnnonce,
@@ -339,8 +370,7 @@ const requetes = {
            e.nom             AS nomEmployeur,
            p.id              AS prestataireId,
            p.nom             AS nomPrestataire,
-           p.metier          AS metierPrestataire,
-           p.tarif           AS tarifPrestataire
+           p.metier          AS metierPrestataire
     FROM candidatures c
     JOIN annonces     a ON a.id = c.annonce_id
     JOIN utilisateurs e ON e.id = a.employeur_id
@@ -366,10 +396,6 @@ const requetes = {
   // on signale ce qu'on recoit, pas ce qu'on ecrit.
   signalerMessage: db.prepare(`
     UPDATE messages SET signale = 1 WHERE id = ? AND auteur_id != ?
-  `),
-
-  proposerTarif: db.prepare(`
-    UPDATE candidatures SET tarif_propose = ? WHERE id = ?
   `),
 
   // Toutes les discussions d'une personne, quel que soit son cote.
@@ -609,17 +635,18 @@ function verifierAnnonce(donnees) {
     };
   }
 
-  // Le budget est facultatif, mais s'il est indique il doit avoir un
-  // sens : un montant negatif ou nul n'aide personne a se decider.
-  const budgetSaisi = String(donnees.budget || "").trim();
-  if (budgetSaisi) {
-    const budget = Math.round(Number(budgetSaisi));
-    if (!(Number.isFinite(budget) && budget > 0)) {
-      return {
-        titre: "Budget invalide",
-        texte: "Indiquez un montant en francs CFA, ou laissez le champ vide.",
-      };
-    }
+  // Le prix est OBLIGATOIRE. C'est l'employeur qui annonce ce qu'il
+  // paiera : sans ce montant, une personne devrait postuler sans savoir
+  // ce qu'elle touchera, et il faudrait negocier - ce que cette
+  // plateforme ne fait pas.
+  const prix = Math.round(Number(String(donnees.prix || "").trim()));
+
+  if (!(Number.isFinite(prix) && prix > 0)) {
+    return {
+      titre: "Prix obligatoire",
+      texte: "Indiquez le montant que vous paierez pour ce service. " +
+             "C'est sur lui que les candidates décideront de répondre.",
+    };
   }
 
   return null;
@@ -629,7 +656,6 @@ function verifierAnnonce(donnees) {
 // traitement a la publication et a la modification.
 function champsAnnonce(donnees) {
   const lieu = resoudreLieu(donnees);
-  const budgetSaisi = String(donnees.budget || "").trim();
 
   return {
     titre: String(donnees.titre || "").trim(),
@@ -637,7 +663,7 @@ function champsAnnonce(donnees) {
     arrondissement: lieu.arrondissement,
     quartier: lieu.quartier,
     horaire: String(donnees.horaire).trim(),
-    budget: budgetSaisi ? Math.round(Number(budgetSaisi)) : null,
+    prix: Math.round(Number(String(donnees.prix || "").trim())) || null,
     // L'unite vient d'une liste fermee. On ne fait pas confiance au
     // navigateur : une valeur inconnue est ramenee a celle par defaut.
     unite_tarif: UNITES_TARIF[donnees.unite_tarif] ? donnees.unite_tarif : "forfaitaire",
@@ -700,11 +726,12 @@ function libelleUnite(unite) {
   return UNITES_TARIF[unite] || UNITES_TARIF.forfaitaire;
 }
 
-// Le budget d'une annonce, ecrit en toutes lettres : "12 000 FCFA par
-// jour". Renvoie null quand l'employeur n'a pas indique de budget.
-function budgetEnClair(annonce) {
-  if (!annonce.budget) return null;
-  return `${formaterMontant(annonce.budget)} ${libelleUnite(annonce.unite_tarif)}`;
+// Le prix d'une annonce, ecrit en toutes lettres : "12 000 FCFA par
+// jour". Renvoie null pour les demandes publiees avant que le prix ne
+// devienne obligatoire : on ne reecrit pas le passe.
+function prixEnClair(annonce) {
+  if (!annonce.prix) return null;
+  return `${formaterMontant(annonce.prix)} ${libelleUnite(annonce.unite_tarif)}`;
 }
 
 function libelleCandidature(statut) {
@@ -1066,7 +1093,7 @@ app.locals.pourcentageCommission = Math.round(TAUX_COMMISSION * 100);
 app.locals.libelleVerification = libelleVerification;
 app.locals.libelleCandidature = libelleCandidature;
 app.locals.libelleUnite = libelleUnite;
-app.locals.budgetEnClair = budgetEnClair;
+app.locals.prixEnClair = prixEnClair;
 app.locals.unitesTarif = UNITES_TARIF;
 app.locals.quartiers = quartiers;
 // La liste des arrondissements se DEDUIT des quartiers : elle n'est plus
@@ -1657,7 +1684,7 @@ app.post("/annonces", exigerConnexion, interdireALEquipe, lireFormulaire, (req, 
 // --- Modifier une demande ------------------------------------------
 //
 // Une demande publiee etait definitive : un employeur qui se trompait
-// d'horaire ou de budget ne pouvait rien corriger, et sa demande erronee
+// d'horaire ou de prix ne pouvait rien corriger, et sa demande erronee
 // restait visible pour toujours.
 //
 // CES DEUX PAGES SONT CELLES DE L'EMPLOYEUR PROPRIETAIRE. La requete
@@ -1782,7 +1809,7 @@ app.get("/annonces", (req, res) => {
 // occupait le tiers de l'ecran.
 //
 // Elle est desormais ici : au moment de repondre, et pour CETTE demande.
-// On y voit aussi le budget de l'employeur, ce qui permet de comparer.
+// On y voit le prix annonce et ce qu'il restera apres la commission.
 // Une demande retiree n'accepte plus de reponse. La verification est
 // faite ici ET a l'enregistrement : l'ecran ne protege rien tout seul.
 function annonceFermee(annonce) {
@@ -2100,80 +2127,6 @@ app.post("/messages/:id/signaler", exigerConnexion, lireFormulaire, (req, res) =
   // l'auteur (voir "auteur_id != ?"). Une regle ecrite dans le SQL ne
   // peut pas etre oubliee par une route.
   requetes.signalerMessage.run(Number(req.params.id), req.utilisateur.id);
-
-  res.redirect(`/messages/${conversation.id}`);
-});
-
-// --- Proposer un autre tarif ----------------------------------------
-app.post("/messages/:id/tarif", exigerConnexion, lireFormulaire, (req, res) => {
-  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
-
-  if (!conversation) {
-    return res.status(403).render("message", {
-      titre: "Action impossible",
-      texte: "Cette conversation ne vous concerne pas.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
-    });
-  }
-
-  // Proposer un montant est l'action de la personne qui travaille.
-  // L'employeur, lui, a deja ses deux leviers : le budget qu'il annonce
-  // dans sa demande, et le bouton Accepter ou Refuser. Chaque role garde
-  // ce qui le concerne - une fonctionnalite prevue pour l'un n'a rien a
-  // faire chez l'autre.
-  //
-  // Le formulaire est masque chez l'employeur, mais un ecran ne fait
-  // respecter aucune regle : c'est ici qu'elle tient.
-  if (req.utilisateur.id !== conversation.prestataireId) {
-    return res.status(403).render("message", {
-      titre: "Ce n'est pas à vous de fixer le montant",
-      texte: "C'est la personne qui travaille qui indique son tarif. " +
-             "Vous pouvez accepter sa proposition ou refuser sa candidature.",
-      liens: [{ url: `/messages/${conversation.id}`, texte: "Retour à la discussion" }],
-    });
-  }
-
-  // Une candidature deja tranchee ne se renegocie pas : le montant
-  // serait modifie apres la decision de l'employeur.
-  if (conversation.statut !== "en attente") {
-    return res.status(400).render("message", {
-      titre: "Trop tard pour changer le tarif",
-      texte: "Cette candidature a déjà reçu une réponse. Le montant ne peut plus être modifié.",
-      liens: [{ url: `/messages/${conversation.id}`, texte: "Retour à la discussion" }],
-    });
-  }
-
-  const montant = Math.round(Number(req.body.tarif));
-
-  if (!Number.isFinite(montant) || montant <= 0) {
-    return res.status(400).render("message", {
-      titre: "Montant invalide",
-      texte: "Indiquez un montant en francs CFA, supérieur à zéro.",
-      liens: [{ url: `/messages/${conversation.id}`, texte: "Retour à la discussion" }],
-    });
-  }
-
-  requetes.proposerTarif.run(montant, conversation.id);
-
-  // La proposition laisse une trace dans la conversation : sans cela, le
-  // montant changerait sans que personne ne sache qui l'a change.
-  //
-  // La raison est facultative mais fortement encouragee : un montant seul
-  // se refuse, un montant explique se discute.
-  const raison = String(req.body.raison || "").trim().slice(0, 200);
-  const trace = raison
-    ? `Proposition de tarif : ${formaterMontant(montant)} — ${raison}`
-    : `Proposition de tarif : ${formaterMontant(montant)}.`;
-
-  requetes.creerMessage.run({
-    candidature_id: conversation.id,
-    auteur_id: req.utilisateur.id,
-    texte: trace,
-    // La raison est du texte libre : elle passe par le meme controle que
-    // n'importe quel message. Sans cela, ce champ serait le trou par
-    // lequel on ferait passer "envoie-moi l'argent par MoMo".
-    risque_paiement: risquePaiementHorsPlateforme(raison) ? 1 : 0,
-  });
 
   res.redirect(`/messages/${conversation.id}`);
 });

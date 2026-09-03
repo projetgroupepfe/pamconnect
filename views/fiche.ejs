@@ -71,13 +71,19 @@
       </div>
     <% } %>
 
-    <h2>Son tarif</h2>
+    <h2>Le tarif qu'elle demande</h2>
     <div class="carte">
-      <%# Vu par un employeur : c'est ce qu'il paie, pas ce qu'il demande. %>
-      <%- include("partiels/detail-tarif", {
-            tarif: personne.tarif,
-            pourEmployeur: true,
-            beneficiaire: personne.nom }) %>
+      <%# ATTENTION au sens : ce montant n'est PAS ce qui sera paye. Sur
+          cette plateforme, c'est l'employeur qui fixe le prix de sa
+          demande. Ce tarif-ci dit ce que la personne souhaite pour ses
+          services - il sert a la trouver et a se faire une idee, pas a
+          calculer une facture. %>
+      <p><strong><%= formaterTarif(personne.tarif) %></strong> pour une prestation.</p>
+      <p class="aide">
+        C'est le montant qu'elle souhaite pour ses services. Le prix
+        réellement payé est celui que vous annoncez dans votre demande —
+        elle y répond si cela lui convient.
+      </p>
     </div>
 
     <%# Ce que la plateforme ne sait pas encore dire. L'annoncer vaut mieux

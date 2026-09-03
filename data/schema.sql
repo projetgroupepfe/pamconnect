@@ -118,16 +118,17 @@ CREATE TABLE IF NOT EXISTS annonces (
   -- l'horaire, et les employeurs le remplissaient au hasard.
   horaire         TEXT,
 
-  -- --- Ce que l'employeur est pret a payer ---
+  -- --- LE PRIX ---
   --
-  -- Sans ce montant, une candidate propose son tarif a l'aveugle : elle
-  -- ne sait pas si elle est dans le budget ou tres au-dessus. C'est le
-  -- point de depart de la discussion, et le pendant de la proposition
-  -- qu'elle fera de son cote.
+  -- Ce n'est pas une indication : c'est le montant que l'employeur
+  -- PAIERA. Sur cette plateforme, c'est lui qui annonce le prix du
+  -- service qu'il demande ; la personne postule si cela lui convient, ou
+  -- repond a une autre annonce.
   --
-  -- NULL est accepte : un employeur qui ne sait pas encore combien coute
-  -- une prestation ne doit pas etre empeche de publier sa demande.
-  budget          INTEGER,
+  -- Il est obligatoire depuis ce changement de modele. Les demandes
+  -- publiees avant peuvent encore l'avoir vide : le serveur l'exige a la
+  -- publication, il ne reecrit pas le passe.
+  prix            INTEGER,
 
   -- Un meme chiffre n'a pas le meme sens selon ce qu'il mesure :
   -- 3 000 FCFA de l'heure et 3 000 FCFA pour la journee sont deux
@@ -168,17 +169,6 @@ CREATE TABLE IF NOT EXISTS candidatures (
 
   statut          TEXT    NOT NULL DEFAULT 'en attente'
                           CHECK (statut IN ('en attente', 'acceptee', 'refusee')),
-
-  -- Le tarif finalement retenu pour cette candidature, en francs CFA.
-  --
-  -- La personne affiche un tarif sur son profil : c'est son point de
-  -- depart. Si l'employeur et elle s'entendent sur un autre montant en
-  -- discutant, c'est celui-ci qui compte, et il est ecrit ICI - jamais
-  -- dans le profil, qui doit rester valable pour les autres annonces.
-  --
-  -- NULL tant que personne n'a rien propose : on garde alors le tarif
-  -- du profil.
-  tarif_propose   INTEGER,
 
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now')),
 

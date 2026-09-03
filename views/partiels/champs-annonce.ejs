@@ -39,16 +39,17 @@
       arrondissement: a.arrondissement || null,
       obligatoire: true }) %>
 
-<h2>Ce que vous êtes prêt à payer</h2>
+<h2>Le prix que vous payez</h2>
 <p class="aide">
-  Facultatif. Sans repère, une candidate propose son montant à l'aveugle.
+  C'est vous qui fixez le prix de ce service. Les candidates répondront
+  si ce montant leur convient.
 </p>
 
 <div class="champ">
-  <label for="budget">Votre budget (FCFA)</label>
-  <input type="number" id="budget" name="budget" min="500" step="500"
-         value="<%= a.budget != null ? a.budget : "" %>"
-         placeholder="ex : 10000">
+  <label for="prix">Le prix (FCFA)</label>
+  <input type="number" id="prix" name="prix" min="500" step="500"
+         value="<%= a.prix != null ? a.prix : "" %>"
+         placeholder="ex : 10000" required>
 </div>
 
 <div class="champ">

@@ -79,42 +79,14 @@
       <%# Le meme bloc que partout ailleurs, du point de vue de
           l'employeur : le calcul ne varie jamais d'un ecran a l'autre. %>
       <%- include("partiels/detail-tarif", {
-            tarif: c.tarif_propose || c.tarifPrestataire,
+            tarif: c.prixAnnonce,
             pourEmployeur: true,
             beneficiaire: c.nomPrestataire }) %>
 
-      <%
-        // Trois montants existent, et on les confond facilement :
-        //   - le budget que l'employeur avait ANNONCE dans sa demande
-        //   - le tarif HABITUEL de la personne, celui de son profil
-        //   - le montant CONVENU pour cette demande, s'il y a eu discussion
-        // Un seul est paye : le convenu s'il existe, sinon l'habituel.
-        // Le budget, lui, n'est qu'un repere - mais l'employeur doit le
-        // revoir ici, sinon il confirme sans mesurer l'ecart.
-        const aPayer = c.tarif_propose || c.tarifPrestataire;
-        const ecart = c.budgetAnnonce ? aPayer - c.budgetAnnonce : 0;
-      %>
-
-      <% if (c.tarif_propose) { %>
-        <p class="aide">
-          Montant convenu dans votre discussion. Le tarif habituel de
-          <%= c.nomPrestataire %> est <%= formaterMontant(c.tarifPrestataire) %>.
-        </p>
-      <% } %>
-
-      <% if (c.budgetAnnonce) { %>
-        <p class="aide">
-          Vous aviez annoncé un budget de
-          <strong><%= formaterMontant(c.budgetAnnonce) %> <%= libelleUnite(c.uniteAnnonce) %></strong>.
-          <% if (ecart > 0) { %>
-            Ce montant est <strong><%= formaterMontant(ecart) %> au-dessus</strong>.
-          <% } else if (ecart < 0) { %>
-            Ce montant est <strong><%= formaterMontant(-ecart) %> en dessous</strong>.
-          <% } else { %>
-            Ce montant y correspond exactement.
-          <% } %>
-        </p>
-      <% } %>
+      <p class="aide">
+        C'est le prix que vous avez annoncé dans votre demande.
+        <%= c.nomPrestataire %> a répondu en le connaissant.
+      </p>
 
       <p class="aide">
         Aucun autre frais ne s'ajoute : l'employeur paie le montant affiché,

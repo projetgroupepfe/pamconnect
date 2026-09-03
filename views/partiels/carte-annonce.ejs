@@ -24,13 +24,13 @@
       <span><strong><%= annonce.horaire || "Horaire non précisé" %></strong></span>
     </li>
 
-    <%# Le budget de l'employeur : le repere qui permet de decider si
-        cela vaut la peine de repondre. %>
-    <% if (budgetEnClair(annonce)) { %>
+    <%# Le prix annonce : c'est sur lui que la personne decide de
+        repondre ou d'aller voir ailleurs. %>
+    <% if (prixEnClair(annonce)) { %>
       <li>
         <%- include("icone", { nom: "remuneration" }) %>
         <span>
-          Budget annoncé : <strong><%= budgetEnClair(annonce) %></strong>
+          <strong><%= prixEnClair(annonce) %></strong>
           <% if (annonce.duree_estimee) { %>
             <span class="aide">— <%= annonce.duree_estimee %></span>
           <% } %>

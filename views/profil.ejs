@@ -169,11 +169,11 @@
               <%- include("partiels/icone", { nom: "calendrier" }) %>
               <span><%= annonce.horaire || "Horaire non précisé" %></span>
             </li>
-            <% if (budgetEnClair(annonce)) { %>
+            <% if (prixEnClair(annonce)) { %>
               <li>
                 <%- include("partiels/icone", { nom: "remuneration" }) %>
                 <span>
-                  Budget annoncé : <%= budgetEnClair(annonce) %>
+                  <%= prixEnClair(annonce) %>
                   <% if (annonce.duree_estimee) { %>
                     <span class="aide">— <%= annonce.duree_estimee %></span>
                   <% } %>
@@ -244,8 +244,7 @@
                   <li>
                     <%- include("partiels/icone", { nom: "remuneration" }) %>
                     <span>
-                      <%= formaterMontant(candidature.tarif_propose || candidature.tarifPrestataire) %>
-                      <% if (candidature.tarif_propose) { %><span class="aide">— convenu en discutant</span><% } %>
+                      <%= prixEnClair(annonce) %>
                     </span>
                   </li>
                 </ul>
@@ -347,12 +346,6 @@
                 <%- include("partiels/icone", { nom: "disponibilite" }) %>
                 <span><strong><%= libelleCandidature(candidature.statut) %></strong></span>
               </li>
-              <% if (candidature.tarif_propose) { %>
-                <li>
-                  <%- include("partiels/icone", { nom: "remuneration" }) %>
-                  <span><%= formaterMontant(candidature.tarif_propose) %> <span class="aide">— convenu en discutant</span></span>
-                </li>
-              <% } %>
             </ul>
             <div class="actions">
               <a class="bouton bouton-secondaire" href="/messages/<%= candidature.id %>">

@@ -39,118 +39,29 @@
       </ul>
     </div>
 
-    <%# ---- Le tarif en cours de discussion ---- %>
-    <%
-      // Le tarif du profil est le point de depart. S'il a ete renegocie
-      // pour CETTE demande, c'est le montant negocie qui compte - et il
-      // ne touche pas le profil, qui reste valable pour les autres.
-      const tarifRetenu = conversation.tarif_propose || conversation.tarifPrestataire;
-      const negocie = Boolean(conversation.tarif_propose);
-    %>
-    <h2>Le tarif</h2>
+    <%# ---- Le prix de la demande ---- %>
+    <h2>Le prix</h2>
     <div class="carte">
-      <%# Le budget annonce par l'employeur est le point de depart de la
-          discussion. Sans lui, la candidate propose un montant a
-          l'aveugle - et l'employeur ne sait pas d'ou vient l'ecart. %>
-      <% if (conversation.budgetAnnonce) { %>
-        <ul class="infos">
-          <li>
-            <%- include("partiels/icone", { nom: "document" }) %>
-            <span>
-              Budget annoncé par <%= jeSuisEmployeur ? "vous" : conversation.nomEmployeur %> :
-              <strong><%= formaterMontant(conversation.budgetAnnonce) %> <%= libelleUnite(conversation.uniteAnnonce) %></strong>
-              <% if (conversation.dureeAnnonce) { %>
-                <span class="aide">— <%= conversation.dureeAnnonce %></span>
-              <% } %>
-            </span>
-          </li>
-        </ul>
-      <% } %>
+      <%# Un seul montant compte : celui que l'employeur a annonce. La
+          personne a postule en le connaissant. On le rappelle ici avec la
+          commission, pour que le calcul soit le meme partout. %>
+      <% if (conversation.prixAnnonce) { %>
+        <%- include("partiels/detail-tarif", {
+              tarif: conversation.prixAnnonce,
+              pourEmployeur: jeSuisEmployeur,
+              beneficiaire: conversation.nomPrestataire }) %>
 
-      <%# Un montant affiche sans dire QUI l'a propose n'apprend rien.
-          Personne ne fixe le prix sauf la personne qui travaille : ni
-          l'employeur, ni la plateforme. Le dire evite de croire a un
-          tarif impose.
-
-          Chaque cote lit la meme information dans ses mots : elle lit
-          "vous avez propose", il lit "elle propose". %>
-      <% if (negocie) { %>
         <p class="aide">
           <% if (jeSuisEmployeur) { %>
-            <strong><%= conversation.nomPrestataire %> propose
-            <%= formaterMontant(conversation.tarif_propose) %></strong>
-            pour cette demande. Son tarif habituel est
-            <%= formaterMontant(conversation.tarifPrestataire) %>.
+            C'est le prix que vous avez annoncé dans votre demande.
           <% } else { %>
-            <strong>Vous avez proposé <%= formaterMontant(conversation.tarif_propose) %></strong>
-            pour cette demande. Votre tarif habituel de
-            <%= formaterMontant(conversation.tarifPrestataire) %> n'a pas changé.
+            C'est le prix annoncé par <%= conversation.nomEmployeur %> dans sa demande.
           <% } %>
         </p>
       <% } else { %>
         <p class="aide">
-          <% if (jeSuisEmployeur) { %>
-            C'est le tarif habituel de <%= conversation.nomPrestataire %>.
-            <% if (conversation.statut === "en attente") { %>
-              Elle peut vous en proposer un autre pour cette demande.
-            <% } %>
-          <% } else { %>
-            C'est votre tarif habituel. Vous pouvez en proposer un autre
-            pour cette demande seulement.
-          <% } %>
-        </p>
-      <% } %>
-
-      <%# Le meme bloc que partout ailleurs : le calcul ne varie jamais. %>
-      <%- include("partiels/detail-tarif", {
-             tarif: tarifRetenu,
-             pourEmployeur: jeSuisEmployeur,
-             beneficiaire: conversation.nomPrestataire }) %>
-
-      <%# Proposer un montant appartient a la personne qui travaille.
-          L'employeur voit le montant, et repond par Accepter ou Refuser
-          depuis son profil : ce sont ses leviers a lui. %>
-      <% if (jeSuisEmployeur) { %>
-        <p class="aide">
-          <% if (conversation.statut === "en attente") { %>
-            C'est <%= conversation.nomPrestataire %> qui fixe son montant. S'il vous
-            convient, acceptez sa candidature depuis votre profil.
-          <% } else { %>
-            Cette candidature a reçu une réponse : le montant ne peut plus changer.
-          <% } %>
-        </p>
-      <% } else if (conversation.statut === "en attente") { %>
-        <form action="/messages/<%= conversation.id %>/tarif" method="POST">
-          <div class="champ">
-            <label for="tarif">Proposer un autre montant (FCFA)</label>
-            <%# min et step doivent aller ensemble : le navigateur calcule
-                les valeurs acceptees a partir du MINIMUM, pas de zero.
-                Avec min="1" et step="500", il n'acceptait que 1, 501,
-                1001... et refusait 12000. Les memes valeurs que les deux
-                autres formulaires : des multiples de 500 a partir de 500. %>
-            <input type="number" id="tarif" name="tarif" min="500" step="500"
-                   value="<%= tarifRetenu %>" required>
-          </div>
-
-          <div class="champ">
-            <label for="raison">Pourquoi ce montant ? <span class="aide">(facultatif)</span></label>
-            <input type="text" id="raison" name="raison" maxlength="200"
-                   placeholder="ex : <%= exempleRaison %>">
-            <p class="aide">
-              Un montant seul se refuse ; un montant expliqué se discute.
-              Votre phrase apparaîtra avec la proposition.
-            </p>
-          </div>
-          <div class="actions">
-            <button type="submit">
-              <%- include("partiels/icone", { nom: "valider" }) %>
-              Proposer ce montant
-            </button>
-          </div>
-        </form>
-      <% } else { %>
-        <p class="aide">
-          Cette candidature a reçu une réponse : le montant ne peut plus changer.
+          Cette demande a été publiée avant que le prix ne devienne obligatoire :
+          elle n'en porte pas.
         </p>
       <% } %>
     </div>
