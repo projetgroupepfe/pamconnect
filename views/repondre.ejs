@@ -35,6 +35,31 @@
         pour cette demande-la. Sur la liste des annonces, le meme calcul
         s'affichait a l'identique pour toutes - il ne servait a rien
         choisir. %>
+    <%# Chez qui vous allez, et ce que la plateforme a verifie de lui. %>
+    <h2>Chez qui vous allez</h2>
+    <div class="carte">
+      <ul class="infos">
+        <li>
+          <%- include("partiels/icone", { nom: "profil" }) %>
+          <span>
+            <strong><%= annonce.nomEmployeur %></strong>
+            <% if (annonce.verificationEmployeur === "verifie") { %>
+              <span class="badge badge-verifie">
+                <%- include("partiels/icone", { nom: "verifie" }) %>
+                Identité et casier vérifiés
+              </span>
+            <% } else { %>
+              <span class="badge badge-non-soumis">Identité non vérifiée</span>
+            <% } %>
+          </span>
+        </li>
+      </ul>
+      <p class="aide">
+        Vous vous déplacerez chez cette personne. PamConnect a contrôlé sa
+        pièce d'identité et son casier judiciaire, comme les vôtres.
+      </p>
+    </div>
+
     <h2>Ce que vous toucherez</h2>
     <div class="carte">
       <%# Le prix de l'annonce, et ce qu'il en restera. C'est le moment ou

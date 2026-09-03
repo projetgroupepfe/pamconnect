@@ -214,7 +214,13 @@ const requetes = {
   // La liste publique ignore les demandes retirees. L'employeur, lui,
   // continue de voir les siennes sur son profil : ce sont ses archives.
   toutesLesAnnonces: db.prepare(`
-    SELECT * FROM annonces WHERE annulee = 0 ORDER BY cree_le DESC, id DESC
+    SELECT a.*,
+           e.nom                 AS nomEmployeur,
+           e.statut_verification AS verificationEmployeur
+    FROM annonces a
+    JOIN utilisateurs e ON e.id = a.employeur_id
+    WHERE a.annulee = 0
+    ORDER BY a.cree_le DESC, a.id DESC
   `),
 
   // Les autres personnes qui attendaient encore une reponse sur cette
@@ -242,7 +248,12 @@ const requetes = {
   `),
 
   annonceParId: db.prepare(`
-    SELECT * FROM annonces WHERE id = ?
+    SELECT a.*,
+           e.nom                 AS nomEmployeur,
+           e.statut_verification AS verificationEmployeur
+    FROM annonces a
+    JOIN utilisateurs e ON e.id = a.employeur_id
+    WHERE a.id = ?
   `),
 
   // Une demande ET son proprietaire, en une seule condition. C'est la
@@ -508,7 +519,7 @@ const requetes = {
   `),
 
   dossiersEnAttente: db.prepare(`
-    SELECT id, nom, email, metier, arrondissement, quartier
+    SELECT id, nom, email, role, metier, arrondissement, quartier
     FROM utilisateurs
     WHERE statut_verification = 'en attente'
     ORDER BY id
@@ -1647,7 +1658,30 @@ app.post("/mon-profil/mot-de-passe", exigerConnexion, lireFormulaire, (req, res)
 });
 
 // --- Publier une annonce (le formulaire) ---------------------------
-app.get("/publier-annonce", exigerConnexion, interdireALEquipe, (req, res) => {
+// REGLE METIER : un employeur ne publie pas avant que son identite ait
+// ete verifiee.
+//
+// C'est la symetrie exacte de la regle qui empeche d'embaucher quelqu'un
+// de non verifie. Une personne qui repond a une annonce se deplace chez
+// un inconnu, seule, souvent tot le matin : elle a le droit de savoir
+// que la plateforme a controle qui il est.
+//
+// A placer APRES exigerConnexion, qui remplit req.utilisateur.
+function exigerVerification(req, res, next) {
+  if (req.utilisateur.statut_verification !== "verifie") {
+    return res.status(403).render("message", {
+      titre: "Vérification requise",
+      texte: "Avant de publier une demande, votre identité doit être vérifiée par " +
+             "PamConnect. Les personnes qui vous répondront se déplaceront chez vous : " +
+             "elles ont le droit de savoir qui vous êtes.",
+      liens: [{ url: "/verification", texte: "Faire vérifier mon identité" }],
+    });
+  }
+
+  next();
+}
+
+app.get("/publier-annonce", exigerConnexion, interdireALEquipe, exigerVerification, (req, res) => {
   if (req.utilisateur.role !== "employeur") {
     return res.status(403).render("message", {
       titre: "Acces refuse",
@@ -1660,7 +1694,7 @@ app.get("/publier-annonce", exigerConnexion, interdireALEquipe, (req, res) => {
 });
 
 // --- Enregistrer une annonce ---------------------------------------
-app.post("/annonces", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
+app.post("/annonces", exigerConnexion, interdireALEquipe, exigerVerification, lireFormulaire, (req, res) => {
   const donnees = req.body;
 
   const probleme = verifierAnnonce(donnees);
@@ -1852,7 +1886,7 @@ app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
   if (req.utilisateur.role !== "prestataire") {
     return res.status(403).render("message", {
       titre: "Acces refuse",
-      texte: "Seuls les prestataires peuvent postuler.",
+      texte: "Seules les personnes qui proposent leurs services peuvent répondre à une demande.",
       liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
     });
   }
@@ -1986,8 +2020,8 @@ app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => 
   if (nouveauStatut === "acceptee" && candidature.verificationPrestataire !== "verifie") {
     return res.status(403).render("message", {
       titre: "Verification requise",
-      texte: "L'identite de ce prestataire n'a pas encore ete verifiee par PamConnect. " +
-             "Tu pourras accepter sa candidature des que son dossier sera valide.",
+      texte: "L'identité de cette personne n'a pas encore été vérifiée par PamConnect. " +
+             "Vous pourrez la choisir dès que son dossier sera validé.",
       liens: [{ url: "/mon-profil", texte: "Retour a mes annonces" }],
     });
   }
@@ -2215,14 +2249,14 @@ app.get("/recherche", (req, res) => {
 });
 
 // --- Verification d'identite : le formulaire -----------------------
-app.get("/verification", exigerConnexion, (req, res) => {
-  if (req.utilisateur.role !== "prestataire") {
-    return res.status(403).render("message", {
-      titre: "Acces refuse",
-      texte: "Seuls les prestataires ont besoin d'une verification d'identite.",
-      liens: [{ url: "/mon-profil", texte: "Retour a mon profil" }],
-    });
-  }
+//
+// ELLE CONCERNE LES DEUX COTES. Un employeur fait entrer quelqu'un chez
+// lui : il veut savoir qui vient. Mais la personne qui vient entre chez
+// un inconnu, seule, souvent tot le matin. La protection ne peut pas
+// aller dans un seul sens.
+//
+// Seul un compte d'equipe en est dispense : il ne rencontre personne.
+app.get("/verification", exigerConnexion, interdireALEquipe, (req, res) => {
 
   res.render("verification", {
     titre: "Vérification d'identité",
@@ -2233,14 +2267,9 @@ app.get("/verification", exigerConnexion, (req, res) => {
 });
 
 // --- Verification d'identite : l'envoi des documents ---------------
-app.post("/verification", exigerConnexion, (req, res) => {
-  if (req.utilisateur.role !== "prestataire") {
-    return res.status(403).render("message", {
-      titre: "Acces refuse",
-      texte: "Seuls les prestataires peuvent envoyer ces documents.",
-      liens: [{ url: "/mon-profil", texte: "Retour a mon profil" }],
-    });
-  }
+// Les deux cotes deposent les memes documents : la protection ne va pas
+// dans un seul sens.
+app.post("/verification", exigerConnexion, interdireALEquipe, (req, res) => {
 
   if (req.utilisateur.statut_verification === "verifie") {
     return res.status(409).render("message", {
