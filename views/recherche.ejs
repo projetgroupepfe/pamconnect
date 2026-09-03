@@ -50,6 +50,10 @@
 
   <% } else { %>
 
+    <%# Une seule fois, en haut : la phrase vaut pour toute la liste.
+        La repeter sous chaque fiche la rendrait invisible. %>
+    <%- include("partiels/portee-verification", { court: true }) %>
+
     <div class="grille">
       <% prestataires.forEach(function (prestataire) { %>
         <div class="carte">

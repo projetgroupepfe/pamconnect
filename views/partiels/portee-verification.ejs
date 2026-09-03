@@ -1,0 +1,52 @@
+<%#
+  Ce que la verification couvre, et ce qu'elle ne couvre pas.
+
+  Ecrit UNE SEULE FOIS, et affiche partout ou le badge "Identite et
+  casier verifies" apparait. Une famille qui lit ce badge a cote du mot
+  "Jardinage" peut croire que le jardinage aussi a ete controle. Il ne
+  l'a pas ete, et le silence sur ce point serait plus grave qu'une
+  limite annoncee.
+
+  Deux formats :
+
+    include("partiels/portee-verification", { court: true })
+        une ligne, pour une liste ou un espace serre
+
+    include("partiels/portee-verification", { court: false })
+        le paragraphe complet, la ou l'on decide
+
+  ATTENTION : ne jamais ecrire la sequence de fermeture EJS dans ce
+  commentaire, elle terminerait le bloc au milieu d'une phrase.
+%>
+<% if (locals.court) { %>
+
+  <p class="aide">
+    Identité vérifiée ne veut pas dire compétences vérifiées : le métier
+    est déclaré par la personne.
+  </p>
+
+<% } else { %>
+
+  <div class="carte confiance">
+    <h3>
+      <%- include("icone", { nom: "info", taille: 22 }) %>
+      Ce que nous vérifions, et ce que nous ne vérifions pas
+    </h3>
+    <p>
+      Notre équipe contrôle <strong>la pièce d'identité et le casier
+      judiciaire</strong>. C'est ce que signifie le badge vert, et rien
+      de plus.
+    </p>
+    <p>
+      Elle ne contrôle <strong>pas les compétences</strong>. Une personne
+      qui indique « jardinage » ou « cuisine » le déclare elle-même :
+      aucun document ne l'atteste, et PamConnect ne le vérifie pas.
+      Nous mettons en relation, nous ne certifions pas un savoir-faire.
+    </p>
+    <p class="aide">
+      C'est pourquoi la discussion existe avant de choisir : posez vos
+      questions, demandez son expérience, parlez de ce que vous attendez.
+    </p>
+  </div>
+
+<% } %>
