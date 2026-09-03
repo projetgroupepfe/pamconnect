@@ -296,7 +296,10 @@
                       <form action="/candidatures/statut" method="POST">
                         <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
                         <input type="hidden" name="statut" value="refusee">
-                        <button type="submit" class="bouton-danger">Refuser</button>
+                        <button type="submit" class="bouton-danger">
+                          <%- include("partiels/icone", { nom: "refuser" }) %>
+                          Refuser cette candidature
+                        </button>
                       </form>
                     </div>
                   <% } else { %>
@@ -308,10 +311,21 @@
                       <form action="/candidatures/statut" method="POST">
                         <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
                         <input type="hidden" name="statut" value="refusee">
-                        <button type="submit" class="bouton-danger">Refuser</button>
+                        <button type="submit" class="bouton-danger">
+                          <%- include("partiels/icone", { nom: "refuser" }) %>
+                          Refuser cette candidature
+                        </button>
                       </form>
                     </div>
                   <% } %>
+
+                  <%# La question se pose exactement ici : refuser ferme-t-il la
+                      demande ? Non - seul un choix la pourvoit. On le dit plutot
+                      que de laisser deviner. %>
+                  <p class="aide">
+                    Refuser ne retire pas votre demande : elle reste visible,
+                    et d'autres personnes peuvent encore y répondre.
+                  </p>
 
                 <% } %>
               </div>
