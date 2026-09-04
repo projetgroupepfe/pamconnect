@@ -118,6 +118,10 @@ ajouterColonneSiAbsente("messages", "signalement_traite_le", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "suspendu", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("utilisateurs", "suspendu_le", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "suspendu_motif", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "avertissements", "INTEGER NOT NULL DEFAULT 0");
+ajouterColonneSiAbsente("utilisateurs", "avertissement_motif", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "avertissement_le", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "avertissement_lu", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
 ajouterColonneSiAbsente("annonces", "annulee", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
@@ -426,6 +430,7 @@ const requetes = {
            auteur.nom    AS nomAuteur,
            auteur.email  AS emailAuteur,
            auteur.suspendu AS auteurSuspendu,
+           auteur.avertissements AS auteurAvertissements,
            a.titre       AS titreAnnonce,
            c.id          AS candidatureId
     FROM messages m
@@ -447,6 +452,21 @@ const requetes = {
         signalement_traite_par = @par,
         signalement_traite_le  = datetime('now')
     WHERE id = @id AND signale = 1 AND signalement_decision IS NULL
+  `),
+
+  // Avertir n'enleve aucun droit : le compte fonctionne comme avant.
+  // Ce qui change, c'est que la personne devra lire le reproche.
+  avertirCompte: db.prepare(`
+    UPDATE utilisateurs
+    SET avertissements      = avertissements + 1,
+        avertissement_motif = @motif,
+        avertissement_le    = datetime('now'),
+        avertissement_lu    = 0
+    WHERE id = @id AND est_admin = 0
+  `),
+
+  marquerAvertissementLu: db.prepare(`
+    UPDATE utilisateurs SET avertissement_lu = 1 WHERE id = ?
   `),
 
   suspendreCompte: db.prepare(`
@@ -745,10 +765,28 @@ function prixEnClair(annonce) {
   return `${formaterMontant(annonce.prix)} ${libelleUnite(annonce.unite_tarif)}`;
 }
 
-function libelleCandidature(statut) {
-  if (statut === "acceptee") return "Acceptée";
-  if (statut === "refusee") return "Refusée";
-  return "En attente";
+// Un statut brut ne dit pas QUI a decide. Affiche sous le nom de
+// l'autre personne, "Refusee" se lisait comme si c'etait ELLE qui avait
+// ete refusee, alors qu'il s'agit de la candidature de celui qui lit.
+//
+// La phrase nomme donc l'auteur de la decision, et elle change selon le
+// cote depuis lequel on regarde la meme candidature.
+function phraseCandidature(statut, jeSuisEmployeur) {
+  if (statut === "acceptee") {
+    return jeSuisEmployeur
+      ? "Vous avez accepté cette candidature"
+      : "Votre candidature a été acceptée";
+  }
+
+  if (statut === "refusee") {
+    return jeSuisEmployeur
+      ? "Vous avez refusé cette candidature"
+      : "L'employeur a refusé votre candidature";
+  }
+
+  return jeSuisEmployeur
+    ? "En attente de votre décision"
+    : "Votre candidature est en attente";
 }
 
 // Apres une connexion, on dit a la personne ce qu'elle peut FAIRE,
@@ -1102,7 +1140,7 @@ app.locals.formaterMontant = formaterMontant;
 app.locals.detaillerTarif = detaillerTarif;
 app.locals.pourcentageCommission = Math.round(TAUX_COMMISSION * 100);
 app.locals.libelleVerification = libelleVerification;
-app.locals.libelleCandidature = libelleCandidature;
+app.locals.phraseCandidature = phraseCandidature;
 app.locals.libelleUnite = libelleUnite;
 app.locals.prixEnClair = prixEnClair;
 app.locals.unitesTarif = UNITES_TARIF;
@@ -2377,24 +2415,35 @@ app.post("/admin/signalements/:id", exigerAdmin, lireFormulaire, (req, res) => {
     });
   }
 
-  const decision = req.body.decision === "sanction" ? "sanction" : "rien";
+  // TROIS decisions possibles, et non plus deux. Entre le classement
+  // sans suite et la suspension il manquait la reponse proportionnee :
+  // dire a la personne ce qui ne va pas, sans lui fermer la porte.
+  const decisions = ["rien", "avertissement", "sanction"];
+  const decision = decisions.includes(req.body.decision) ? req.body.decision : "rien";
 
-  if (decision === "sanction") {
+  if (decision !== "rien") {
     const motif = String(req.body.motif || "").trim().slice(0, 200);
 
     if (!motif) {
       return res.status(400).render("message", {
         titre: "Motif obligatoire",
-        texte: "Une suspension doit être motivée. Sans motif écrit, personne " +
-               "ne pourra expliquer cette décision plus tard.",
+        texte: decision === "sanction"
+          ? "Une suspension doit être motivée. Sans motif écrit, personne " +
+            "ne pourra expliquer cette décision plus tard."
+          : "Un avertissement sans motif n'apprend rien à la personne qui " +
+            "le reçoit. Écrivez ce que vous lui reprochez.",
         liens: [{ url: "/admin/signalements", texte: "Retour aux signalements" }],
       });
     }
 
-    // Le compte n'est pas SUPPRIME : ses annonces, ses candidatures et
-    // ses messages doivent rester consultables en cas de litige.
-    // La requete refuse par ailleurs de suspendre un compte d'equipe.
-    requetes.suspendreCompte.run({ id: message.auteur_id, motif });
+    if (decision === "sanction") {
+      // Le compte n'est pas SUPPRIME : ses annonces, ses candidatures et
+      // ses messages doivent rester consultables en cas de litige.
+      // La requete refuse par ailleurs de suspendre un compte d'equipe.
+      requetes.suspendreCompte.run({ id: message.auteur_id, motif });
+    } else {
+      requetes.avertirCompte.run({ id: message.auteur_id, motif });
+    }
   }
 
   requetes.classerSignalement.run({
@@ -2404,6 +2453,14 @@ app.post("/admin/signalements/:id", exigerAdmin, lireFormulaire, (req, res) => {
   });
 
   res.redirect("/admin/signalements");
+});
+
+// Un avertissement reste affiche tant que la personne ne l'a pas
+// reconnu. Ce n'est pas une formalite : c'est ce qui permet a l'equipe
+// d'affirmer, au signalement suivant, que la regle avait ete rappelee.
+app.post("/avertissement/lu", exigerConnexion, (req, res) => {
+  requetes.marquerAvertissementLu.run(req.utilisateur.id);
+  res.redirect("/mon-profil");
 });
 
 // --- Espace equipe : consulter un document -------------------------

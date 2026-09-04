@@ -34,7 +34,7 @@
         <% } %>
         <li>
           <%- include("partiels/icone", { nom: "disponibilite" }) %>
-          <span><strong><%= libelleCandidature(conversation.statut) %></strong></span>
+          <span><strong><%= phraseCandidature(conversation.statut, jeSuisEmployeur) %></strong></span>
         </li>
       </ul>
     </div>

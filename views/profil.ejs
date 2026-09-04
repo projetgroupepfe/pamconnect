@@ -2,6 +2,34 @@
 
   <h1>Mon profil</h1>
 
+  <%# Un avertissement se lit avant tout le reste, et ne disparait que
+      lorsque la personne l'a reconnu. Le compte, lui, fonctionne
+      normalement : ce n'est pas une suspension. %>
+  <% if (utilisateur.avertissement_motif && !utilisateur.avertissement_lu) { %>
+    <div class="carte avertissement">
+      <h3>Un avertissement de l'équipe PamConnect</h3>
+      <p>
+        L'équipe a examiné un message signalé le
+        <strong><%= utilisateur.avertissement_le %></strong> et vous adresse
+        cet avertissement :
+      </p>
+      <blockquote class="message-signale"><%= utilisateur.avertissement_motif %></blockquote>
+      <p class="aide">
+        Votre compte fonctionne normalement. Cet avertissement est conservé :
+        si un nouveau message est signalé, l'équipe saura que la règle vous
+        avait déjà été rappelée.
+      </p>
+      <div class="actions">
+        <form action="/avertissement/lu" method="POST">
+          <button type="submit" class="bouton">
+            <%- include("partiels/icone", { nom: "valider" }) %>
+            J'ai lu cet avertissement
+          </button>
+        </form>
+      </div>
+    </div>
+  <% } %>
+
   <div class="carte">
     <div class="fiche-tete">
       <div class="portrait"><%= utilisateur.nom.charAt(0) %></div>
@@ -225,7 +253,7 @@
                   <div class="portrait"><%= candidature.nomPrestataire.charAt(0) %></div>
                   <div>
                     <h3><%= candidature.nomPrestataire %></h3>
-                    <div class="metier"><%= libelleCandidature(candidature.statut) %></div>
+                    <div class="metier"><%= phraseCandidature(candidature.statut, true) %></div>
                   </div>
                 </div>
 
@@ -358,7 +386,7 @@
             <ul class="infos">
               <li>
                 <%- include("partiels/icone", { nom: "disponibilite" }) %>
-                <span><strong><%= libelleCandidature(candidature.statut) %></strong></span>
+                <span><strong><%= phraseCandidature(candidature.statut, false) %></strong></span>
               </li>
             </ul>
             <div class="actions">

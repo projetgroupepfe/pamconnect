@@ -531,6 +531,17 @@ button:hover, .bouton:hover {
 .confiance h3 { display: flex; align-items: center; gap: .5rem; }
 .confiance p  { color: var(--encre-douce); }
 
+/* Un avertissement n'est pas une suspension : la carte doit attirer
+   l'oeil sans avoir l'air d'une porte fermee. L'ambre, deja utilise
+   pour "en attente" et pour les messages signales, dit exactement
+   cela. */
+.avertissement {
+  background-color: var(--ambre-fond);
+  border-color: transparent;
+  box-shadow: none;
+}
+.avertissement h3 { color: var(--ambre); }
+
 
 /* ---------- 12. Grands ecrans ----------------------------- */
 @media (min-width: 760px) {

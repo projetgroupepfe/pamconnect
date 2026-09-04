@@ -85,6 +85,19 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
   suspendu_le     TEXT,
   suspendu_motif  TEXT,
 
+  -- Un avertissement se situe entre le classement sans suite et la
+  -- suspension. Le compte continue de fonctionner, mais la personne lit
+  -- ce que l'equipe lui reproche la prochaine fois qu'elle ouvre son
+  -- profil, et ne peut pas le faire disparaitre sans l'avoir vu.
+  --
+  -- Le COMPTEUR est garde separement du dernier motif : au signalement
+  -- suivant, l'equipe doit savoir si cette personne en est a son premier
+  -- ecart ou a son troisieme.
+  avertissements      INTEGER NOT NULL DEFAULT 0,
+  avertissement_motif TEXT,
+  avertissement_le    TEXT,
+  avertissement_lu    INTEGER NOT NULL DEFAULT 0 CHECK (avertissement_lu IN (0, 1)),
+
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 

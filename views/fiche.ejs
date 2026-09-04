@@ -71,7 +71,7 @@
       </div>
     <% } %>
 
-    <h2>Le tarif qu'elle demande</h2>
+    <h2>Le tarif demandé</h2>
     <div class="carte">
       <%# ATTENTION au sens : ce montant n'est PAS ce qui sera paye. Sur
           cette plateforme, c'est l'employeur qui fixe le prix de sa
@@ -80,9 +80,9 @@
           calculer une facture. %>
       <p><strong><%= formaterTarif(personne.tarif) %></strong> pour une prestation.</p>
       <p class="aide">
-        C'est le montant qu'elle souhaite pour ses services. Le prix
-        réellement payé est celui que vous annoncez dans votre demande —
-        elle y répond si cela lui convient.
+        C'est le montant souhaité pour ses services. Le prix réellement
+        payé est celui que vous annoncez dans votre demande. Cette personne
+        y répond si cela lui convient.
       </p>
     </div>
 

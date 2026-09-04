@@ -49,7 +49,7 @@
           <ul class="infos">
             <li>
               <%- include("partiels/icone", { nom: "disponibilite" }) %>
-              <span><strong><%= libelleCandidature(c.statut) %></strong></span>
+              <span><strong><%= phraseCandidature(c.statut, jeSuisEmployeur) %></strong></span>
             </li>
             <li>
               <%- include("partiels/icone", { nom: "message" }) %>
