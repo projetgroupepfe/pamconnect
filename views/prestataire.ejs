@@ -19,20 +19,25 @@
       laquelle vous répondez.
     </p>
 
+    <%# L'ORDRE DE LECTURE COMPTE. Annoncer "PamConnect retient une
+        commission de 10 %" comme premiere phrase se lit comme une
+        retenue sur un salaire : la personne s'arrete la. Le meme chiffre,
+        pose a l'interieur d'un exemple chiffre, se lit comme un calcul
+        qu'elle peut verifier elle-meme. %>
     <p>
-      PamConnect retient une commission de
-      <strong><%= pourcentageCommission %> %</strong> sur ce montant, et vous
-      verse le reste dès que l'employeur a payé.
+      PamConnect y retient une commission et vous verse le reste dès que
+      l'employeur a payé.
     </p>
 
     <p class="exemple">
-      Pour une demande à <strong>10 000 FCFA</strong>,
-      la commission est de <strong>1 000 FCFA</strong>.
-      Vous recevrez <strong>9 000 FCFA</strong>.
+      Par exemple : pour une demande à <strong>10 000 FCFA</strong>, la
+      commission de <strong><%= pourcentageCommission %> %</strong> est de
+      <strong>1 000 FCFA</strong>, et vous recevez
+      <strong>9 000 FCFA</strong>.
     </p>
 
     <p class="aide">
-      Vous voyez ce calcul au moment de saisir votre tarif, puis sur votre profil.
+      Vous voyez ce calcul avant de répondre à une demande, jamais après.
       Aucun montant ne change en cours de route.
     </p>
   </div>
