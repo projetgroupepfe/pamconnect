@@ -30,8 +30,17 @@
 
   <% } else { %>
 
+    <%# Ce qui est en cours et ce qui appartient au passe ne se lisent
+        pas au meme moment. Les melanger obligeait a trier de l'oeil. %>
+    <% const enCours = conversations.filter(function (c) { return !c.terminee_le; }); %>
+    <% const terminees = conversations.filter(function (c) { return c.terminee_le; }); %>
+
+    <% if (enCours.length === 0) { %>
+      <p class="vide">Aucune discussion en cours.</p>
+    <% } %>
+
     <div class="grille">
-      <% conversations.forEach(function (c) { %>
+      <% enCours.forEach(function (c) { %>
         <%
           // Avec qui je parle : l'autre personne, jamais moi.
           const jeSuisEmployeur = moi.id === c.employeurId;
@@ -84,6 +93,53 @@
         </div>
       <% }); %>
     </div>
+
+    <% if (terminees.length > 0) { %>
+      <h2>Services terminés</h2>
+      <p class="chapeau">
+        Ces discussions sont archivées : vous pouvez les relire, mais plus
+        y écrire.
+      </p>
+      <div class="grille">
+        <% terminees.forEach(function (c) { %>
+          <% const jeSuisEmployeur = moi.id === c.employeurId; %>
+          <% const autre = jeSuisEmployeur ? c.nomPrestataire : c.nomEmployeur; %>
+          <div class="carte">
+            <div class="fiche-tete">
+              <div class="portrait"><%= autre.charAt(0) %></div>
+              <div>
+                <h3><%= autre %></h3>
+                <div class="metier"><%= c.titreAnnonce %></div>
+              </div>
+            </div>
+
+            <ul class="infos">
+              <li>
+                <%- include("partiels/icone", { nom: "valider" }) %>
+                <span>Service effectué le <strong><%= c.terminee_le %></strong></span>
+              </li>
+              <li>
+                <%- include("partiels/icone", { nom: "message" }) %>
+                <span>
+                  <% if (c.nbMessages === 0) { %>
+                    Aucun message échangé
+                  <% } else { %>
+                    <%= c.nbMessages %> message<%= c.nbMessages > 1 ? "s" : "" %> conservé<%= c.nbMessages > 1 ? "s" : "" %>
+                  <% } %>
+                </span>
+              </li>
+            </ul>
+
+            <div class="actions">
+              <a class="bouton bouton-secondaire" href="/messages/<%= c.id %>">
+                <%- include("partiels/icone", { nom: "document" }) %>
+                Relire la discussion
+              </a>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
 
   <% } %>
 

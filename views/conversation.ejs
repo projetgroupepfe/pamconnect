@@ -116,31 +116,71 @@
       <% }); %>
     <% } %>
 
-    <%# ---- Écrire ---- %>
-    <div class="carte">
-      <form action="/messages/<%= conversation.id %>" method="POST">
-        <div class="champ">
-          <%# "Votre message" ne disait pas A QUI on ecrit. Une discussion
+        <% if (conversation.terminee_le) { %>
+
+      <%# ---- Le service est fait : on relit, on n'ecrit plus ---- %>
+      <div class="carte confiance">
+        <h3>Service terminé</h3>
+        <p>
+          <%= conversation.nomEmployeur %> a déclaré ce service effectué le
+          <strong><%= conversation.terminee_le %></strong>.
+        </p>
+        <p class="aide">
+          Cette discussion est archivée. Vous pouvez la relire à tout
+          moment, mais plus y écrire.
+        </p>
+      </div>
+
+    <% } else { %>
+
+      <%# ---- Écrire ---- %>
+      <div class="carte">
+        <form action="/messages/<%= conversation.id %>" method="POST">
+          <div class="champ">
+            <%# "Votre message" ne disait pas A QUI on ecrit. Une discussion
                 n'a que deux personnes : nommer celle qui lira leve tout doute. %>
             <label for="texte">Écrire à <%= jeSuisEmployeur ? conversation.nomPrestataire : conversation.nomEmployeur %></label>
-          <textarea id="texte" name="texte" rows="4" maxlength="2000" required
-                    placeholder="ex : <%= exempleMessage %>"></textarea>
-          <p class="aide">
-            Parlez du service, du tarif et des horaires. N'indiquez pas
-            votre adresse exacte : elle sera transmise automatiquement
-            après le paiement.
-          </p>
-        </div>
-        <div class="actions">
-          <button type="submit">
-            <%- include("partiels/icone", { nom: "envoi" }) %>
-            Envoyer
-          </button>
-          <a class="bouton bouton-secondaire" href="/mon-profil">Retour</a>
-        </div>
-      </form>
+            <textarea id="texte" name="texte" rows="4" maxlength="2000" required
+                      placeholder="ex : <%= exempleMessage %>"></textarea>
+            <p class="aide">
+              Parlez du service, du tarif et des horaires. N'indiquez pas
+              votre adresse exacte : elle sera transmise automatiquement
+              après le paiement.
+            </p>
+          </div>
+          <div class="actions">
+            <button type="submit">
+              <%- include("partiels/icone", { nom: "envoi" }) %>
+              Envoyer
+            </button>
+            <a class="bouton bouton-secondaire" href="/mon-profil">Retour</a>
+          </div>
+        </form>
+      </div>
 
-      <%# Ecrire au support n'a pas besoin d'un message a montrer du
+      <%# Clore le service appartient a celui qui l'a RECU. La personne
+          qui a travaille ne le declare pas a sa place. %>
+      <% if (jeSuisEmployeur && conversation.statut === "acceptee") { %>
+        <div class="carte">
+          <h3>Le service a-t-il été effectué ?</h3>
+          <p class="aide">
+            En le déclarant, cette discussion rejoint vos services terminés :
+            vous pourrez la relire, mais plus y écrire.
+          </p>
+          <form action="/candidatures/<%= conversation.id %>/terminer" method="POST">
+            <div class="actions">
+              <button type="submit" class="bouton-secondaire">
+                <%- include("partiels/icone", { nom: "valider" }) %>
+                Déclarer le service effectué
+              </button>
+            </div>
+          </form>
+        </div>
+      <% } %>
+
+    <% } %>
+
+<%# Ecrire au support n'a pas besoin d'un message a montrer du
           doigt. Le bouton "Signaler ce message" ne couvrait que les
           problemes DANS la discussion ; les vrais problemes se passent
           souvent ailleurs - la personne n'est pas venue, les conditions

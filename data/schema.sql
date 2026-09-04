@@ -201,6 +201,16 @@ CREATE TABLE IF NOT EXISTS candidatures (
   vu_employeur_le    TEXT,
   vu_prestataire_le  TEXT,
 
+  -- Quand l'employeur a declare le service effectue. La discussion
+  -- passe alors dans l'historique : lisible des deux cotes, mais on n'y
+  -- ecrit plus.
+  --
+  -- Une colonne a part plutot qu'une quatrieme valeur de statut : SQLite
+  -- ne sait pas modifier une contrainte CHECK par un ALTER TABLE, il
+  -- faudrait reconstruire la table. Une candidature terminee reste donc
+  -- 'acceptee', avec une date de fin.
+  terminee_le        TEXT,
+
   -- Un prestataire ne peut postuler qu'UNE SEULE FOIS a une annonce donnee.
   UNIQUE (annonce_id, prestataire_id)
 );

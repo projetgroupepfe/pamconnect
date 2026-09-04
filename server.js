@@ -125,6 +125,7 @@ ajouterColonneSiAbsente("utilisateurs", "avertissement_lu", "INTEGER NOT NULL DE
 ajouterColonneSiAbsente("utilisateurs", "documents_envoyes_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "vu_employeur_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "vu_prestataire_le", "TEXT");
+ajouterColonneSiAbsente("candidatures", "terminee_le", "TEXT");
 ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
 ajouterColonneSiAbsente("annonces", "annulee", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
@@ -388,7 +389,8 @@ const requetes = {
            e.nom             AS nomEmployeur,
            p.id              AS prestataireId,
            p.nom             AS nomPrestataire,
-           p.metier          AS metierPrestataire
+           p.metier          AS metierPrestataire,
+           c.terminee_le
     FROM candidatures c
     JOIN annonces     a ON a.id = c.annonce_id
     JOIN utilisateurs e ON e.id = a.employeur_id
@@ -545,7 +547,8 @@ const requetes = {
                AND m.auteur_id != @moi
                AND m.cree_le > COALESCE(
                      CASE WHEN e.id = @moi THEN c.vu_employeur_le
-                          ELSE c.vu_prestataire_le END, '')) AS nonLus
+                          ELSE c.vu_prestataire_le END, '')) AS nonLus,
+           c.terminee_le
     FROM candidatures c
     JOIN annonces     a ON a.id = c.annonce_id
     JOIN utilisateurs e ON e.id = a.employeur_id
@@ -569,6 +572,16 @@ const requetes = {
       AND m.cree_le > COALESCE(
             CASE WHEN a.employeur_id = @moi THEN c.vu_employeur_le
                  ELSE c.vu_prestataire_le END, '')
+  `),
+
+  // Seule une candidature ACCEPTEE et pas encore close peut etre
+  // declaree effectuee. La condition est dans la requete, pas seulement
+  // dans la route : deux envois successifs ne changent rien la seconde
+  // fois.
+  terminerService: db.prepare(`
+    UPDATE candidatures
+    SET terminee_le = datetime('now')
+    WHERE id = @id AND statut = 'acceptee' AND terminee_le IS NULL
   `),
 
   marquerVuEmployeur: db.prepare(`
@@ -2292,6 +2305,18 @@ app.post("/messages/:id", exigerConnexion, lireFormulaire, (req, res) => {
     });
   }
 
+  // Une discussion terminee est un document d'archive. La regle est
+  // ici, pas seulement dans la vue : cacher un formulaire n'empeche
+  // personne d'envoyer la requete a la main.
+  if (conversation.terminee_le) {
+    return res.status(409).render("message", {
+      titre: "Ce service est terminé",
+      texte: "Cette discussion est archivée. Vous pouvez la relire, mais " +
+             "plus y écrire.",
+      liens: [{ url: "/messages/" + conversation.id, texte: "Relire la discussion" }],
+    });
+  }
+
   const texte = String(req.body.texte || "").trim();
 
   if (!texte) {
@@ -2506,6 +2531,46 @@ app.post("/verification", exigerConnexion, interdireALEquipe, (req, res) => {
       liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
     });
   });
+});
+
+// L'employeur declare le service effectue. C'est lui qui l'a recu :
+// c'est donc lui qui le clot. La discussion n'est pas supprimee, elle
+// passe dans l'historique - les deux personnes la relisent, personne n'y
+// ecrit plus.
+app.post("/candidatures/:id/terminer", exigerConnexion, lireFormulaire, (req, res) => {
+  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+
+  if (!conversation) {
+    return res.status(404).render("message", {
+      titre: "Discussion introuvable",
+      texte: "Cette discussion n'existe pas, ou elle ne vous concerne pas.",
+      liens: [{ url: "/messages", texte: "Mes messages" }],
+    });
+  }
+
+  // La personne qui a travaille ne clot pas le service a la place de
+  // celui qui l'a recu.
+  if (req.utilisateur.id !== conversation.employeurId) {
+    return res.status(403).render("message", {
+      titre: "Vous ne pouvez pas clore ce service",
+      texte: "Seule la personne qui a demandé le service peut déclarer " +
+             "qu'il a été effectué.",
+      liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
+    });
+  }
+
+  if (conversation.statut !== "acceptee") {
+    return res.status(409).render("message", {
+      titre: "Aucun service à clore",
+      texte: "Un service ne peut être déclaré effectué que si vous avez " +
+             "accepté la candidature de cette personne.",
+      liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
+    });
+  }
+
+  requetes.terminerService.run({ id: conversation.id });
+
+  res.redirect("/messages/" + conversation.id);
 });
 
 // SIGNALER UN PROBLEME AU SUPPORT.
