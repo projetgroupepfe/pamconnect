@@ -10,6 +10,10 @@
       <%- include("partiels/icone", { nom: "document" }) %>
       Dossiers à vérifier
     </a>
+    <a class="bouton bouton-secondaire" href="/admin/problemes">
+      <%- include("partiels/icone", { nom: "info" }) %>
+      Problèmes signalés
+    </a>
   </p>
 
   <% if (signalements.length === 0) { %>

@@ -21,6 +21,10 @@
       <%- include("partiels/icone", { nom: "message" }) %>
       Messages signalés<% if (signalementsOuverts > 0) { %> (<%= signalementsOuverts %>)<% } %>
     </a>
+    <a class="bouton bouton-secondaire" href="/admin/problemes">
+      <%- include("partiels/icone", { nom: "info" }) %>
+      Problèmes signalés<% if (problemesOuverts > 0) { %> (<%= problemesOuverts %>)<% } %>
+    </a>
   </p>
 
   <h2>Dossiers à vérifier</h2>

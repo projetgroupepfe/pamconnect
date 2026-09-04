@@ -406,6 +406,36 @@ UPDATE quartiers SET synonymes = 'ngoaekele|ngoa ekele|ngoa-ekele' WHERE nom = '
 UPDATE quartiers SET synonymes = 'biyemassi|biyem assi'           WHERE nom = 'Biyem-Assi';
 UPDATE quartiers SET synonymes = 'ecole de poste|ecole poste'     WHERE nom = 'École de Poste';
 
+-- ------------------------------------------------------------------
+-- Un probleme signale a l'equipe.
+--
+-- A ne pas confondre avec messages.signale, qui pointe UN message ecrit
+-- par quelqu'un d'autre. Ici, la personne ECRIT elle-meme ce qui ne va
+-- pas. Les vrais problemes n'ont souvent aucun message a montrer : la
+-- personne n'est pas venue, les conditions ont change sur place, on lui
+-- a propose de payer hors plateforme au telephone.
+--
+-- vise_id est l'AUTRE personne de la discussion. Le serveur la deduit,
+-- elle n'est jamais choisie dans le formulaire : on ne signale pas
+-- quelqu'un avec qui on n'a rien en cours.
+CREATE TABLE IF NOT EXISTS problemes (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  candidature_id INTEGER NOT NULL REFERENCES candidatures(id) ON DELETE CASCADE,
+  auteur_id      INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+  vise_id        INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+  texte          TEXT    NOT NULL,
+  cree_le        TEXT    NOT NULL DEFAULT (datetime('now')),
+
+  -- NULL tant que l'equipe n'a pas tranche. Les memes trois issues que
+  -- pour un message signale : on ne cree pas un second vocabulaire de
+  -- sanctions a cote du premier.
+  decision       TEXT CHECK (decision IN ('rien', 'avertissement', 'sanction')),
+  traite_par     INTEGER REFERENCES utilisateurs(id),
+  traite_le      TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_problemes_ouverts ON problemes (decision);
+
 CREATE INDEX IF NOT EXISTS idx_quartiers_arrond ON quartiers (arrondissement);
 CREATE INDEX IF NOT EXISTS idx_messages_candidature ON messages (candidature_id);
 CREATE INDEX IF NOT EXISTS idx_messages_signale     ON messages (signale);

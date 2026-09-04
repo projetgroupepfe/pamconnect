@@ -470,6 +470,53 @@ const requetes = {
     UPDATE utilisateurs SET avertissement_lu = 1 WHERE id = ?
   `),
 
+  signalerProbleme: db.prepare(`
+    INSERT INTO problemes (candidature_id, auteur_id, vise_id, texte)
+    VALUES (@candidature, @auteur, @vise, @texte)
+  `),
+
+  problemesOuverts: db.prepare(`
+    SELECT p.id, p.texte, p.cree_le, p.candidature_id,
+           auteur.nom   AS nomAuteur,
+           auteur.email AS emailAuteur,
+           vise.id      AS viseId,
+           vise.nom     AS nomVise,
+           vise.email   AS emailVise,
+           vise.suspendu       AS viseSuspendu,
+           vise.avertissements AS viseAvertissements,
+           a.titre AS titreAnnonce
+    FROM problemes p
+    JOIN utilisateurs auteur ON auteur.id = p.auteur_id
+    JOIN utilisateurs vise   ON vise.id   = p.vise_id
+    JOIN candidatures c      ON c.id      = p.candidature_id
+    JOIN annonces a          ON a.id      = c.annonce_id
+    WHERE p.decision IS NULL
+    ORDER BY p.cree_le, p.id
+  `),
+
+  nombreProblemesOuverts: db.prepare(`
+    SELECT COUNT(*) AS n FROM problemes WHERE decision IS NULL
+  `),
+
+  problemeParId: db.prepare(`
+    SELECT id, vise_id, decision FROM problemes WHERE id = ?
+  `),
+
+  classerProbleme: db.prepare(`
+    UPDATE problemes
+    SET decision   = @decision,
+        traite_par = @par,
+        traite_le  = datetime('now')
+    WHERE id = @id AND decision IS NULL
+  `),
+
+  // Un probleme deja signale et pas encore examine : inutile d'en
+  // accumuler dix sur la meme discussion, l'equipe traite le premier.
+  problemeOuvertPour: db.prepare(`
+    SELECT id FROM problemes
+    WHERE candidature_id = @candidature AND auteur_id = @auteur AND decision IS NULL
+  `),
+
   suspendreCompte: db.prepare(`
     UPDATE utilisateurs
     SET suspendu = 1, suspendu_le = datetime('now'), suspendu_motif = @motif
@@ -2418,6 +2465,155 @@ app.post("/verification", exigerConnexion, interdireALEquipe, (req, res) => {
   });
 });
 
+// SIGNALER UN PROBLEME AU SUPPORT.
+//
+// Different du signalement d'un message : ici, la personne ECRIT ce qui
+// ne va pas. Les vrais problemes n'ont souvent aucun message a montrer -
+// la personne n'est pas venue, les conditions ont change sur place, on
+// lui a propose de payer hors plateforme au telephone. Exiger de
+// designer un message pour alerter l'equipe n'avait pas de sens.
+//
+// L'acces passe par la meme regle que la discussion : seules les deux
+// personnes concernees y entrent.
+function autreCoteDe(conversation, utilisateur) {
+  return utilisateur.id === conversation.employeurId
+    ? { id: conversation.prestataireId, nom: conversation.nomPrestataire }
+    : { id: conversation.employeurId, nom: conversation.nomEmployeur };
+}
+
+app.get("/probleme/:id", exigerConnexion, (req, res) => {
+  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+
+  if (!conversation) {
+    return res.status(404).render("message", {
+      titre: "Discussion introuvable",
+      texte: "Cette discussion n'existe pas, ou elle ne vous concerne pas.",
+      liens: [{ url: "/messages", texte: "Mes messages" }],
+    });
+  }
+
+  res.render("probleme", {
+    titre: "Signaler un problème",
+    conversation,
+    autre: autreCoteDe(conversation, req.utilisateur),
+    dejaSignale: Boolean(requetes.problemeOuvertPour.get({
+      candidature: conversation.id, auteur: req.utilisateur.id,
+    })),
+  });
+});
+
+app.post("/probleme/:id", exigerConnexion, lireFormulaire, (req, res) => {
+  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+
+  if (!conversation) {
+    return res.status(404).render("message", {
+      titre: "Discussion introuvable",
+      texte: "Cette discussion n'existe pas, ou elle ne vous concerne pas.",
+      liens: [{ url: "/messages", texte: "Mes messages" }],
+    });
+  }
+
+  const texte = String(req.body.texte || "").trim().slice(0, 2000);
+
+  if (texte.length < 10) {
+    return res.status(400).render("message", {
+      titre: "Décrivez le problème",
+      texte: "Quelques mots suffisent, mais l'équipe doit comprendre ce qui " +
+             "s'est passé pour pouvoir agir.",
+      liens: [{ url: "/probleme/" + conversation.id, texte: "Revenir au formulaire" }],
+    });
+  }
+
+  // Un second signalement sur la meme discussion, avant que le premier
+  // ait ete examine, n'apprend rien de plus a l'equipe.
+  if (requetes.problemeOuvertPour.get({ candidature: conversation.id, auteur: req.utilisateur.id })) {
+    return res.status(409).render("message", {
+      titre: "Signalement déjà envoyé",
+      texte: "Vous avez déjà signalé un problème sur cette discussion. " +
+             "L'équipe ne l'a pas encore examiné.",
+      liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
+    });
+  }
+
+  requetes.signalerProbleme.run({
+    candidature: conversation.id,
+    auteur: req.utilisateur.id,
+    vise: autreCoteDe(conversation, req.utilisateur).id,
+    texte,
+  });
+
+  res.render("message", {
+    titre: "Signalement envoyé",
+    texte: "L'équipe PamConnect a reçu votre message et va l'examiner. " +
+           "Votre discussion reste ouverte : rien n'a changé pour vous.",
+    liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
+  });
+});
+
+// --- Espace equipe : les problemes signales ------------------------
+app.get("/admin/problemes", exigerAdmin, (req, res) => {
+  res.render("problemes", {
+    titre: "Problèmes signalés",
+    problemes: requetes.problemesOuverts.all(),
+  });
+});
+
+app.post("/admin/problemes/:id", exigerAdmin, lireFormulaire, (req, res) => {
+  const probleme = requetes.problemeParId.get(Number(req.params.id));
+
+  if (!probleme) {
+    return res.status(404).render("message", {
+      titre: "Signalement introuvable",
+      texte: "Ce signalement n'existe pas.",
+      liens: [{ url: "/admin/problemes", texte: "Retour aux problèmes" }],
+    });
+  }
+
+  if (probleme.decision) {
+    return res.status(409).render("message", {
+      titre: "Signalement déjà examiné",
+      texte: "Une décision a déjà été prise sur ce signalement.",
+      liens: [{ url: "/admin/problemes", texte: "Retour aux problèmes" }],
+    });
+  }
+
+  // Les memes trois issues que pour un message signale. Un second
+  // vocabulaire de sanctions a cote du premier ferait hesiter l'equipe
+  // sur ce qu'elle est en train de decider.
+  const decisions = ["rien", "avertissement", "sanction"];
+  const decision = decisions.includes(req.body.decision) ? req.body.decision : "rien";
+
+  if (decision !== "rien") {
+    const motif = String(req.body.motif || "").trim().slice(0, 200);
+
+    if (!motif) {
+      return res.status(400).render("message", {
+        titre: "Motif obligatoire",
+        texte: decision === "sanction"
+          ? "Une suspension doit être motivée. Sans motif écrit, personne " +
+            "ne pourra expliquer cette décision plus tard."
+          : "Un avertissement sans motif n'apprend rien à la personne qui " +
+            "le reçoit. Écrivez ce que vous lui reprochez.",
+        liens: [{ url: "/admin/problemes", texte: "Retour aux problèmes" }],
+      });
+    }
+
+    if (decision === "sanction") {
+      requetes.suspendreCompte.run({ id: probleme.vise_id, motif });
+    } else {
+      requetes.avertirCompte.run({ id: probleme.vise_id, motif });
+    }
+  }
+
+  requetes.classerProbleme.run({
+    id: probleme.id,
+    decision,
+    par: req.utilisateur.id,
+  });
+
+  res.redirect("/admin/problemes");
+});
+
 // --- Espace equipe : les dossiers a verifier -----------------------
 app.get("/admin", exigerAdmin, (req, res) => {
   res.render("admin", {
@@ -2425,6 +2621,7 @@ app.get("/admin", exigerAdmin, (req, res) => {
     dossiers: requetes.dossiersEnAttente.all(),
     statistiques: requetes.statistiquesVerification.all(),
     signalementsOuverts: requetes.nombreSignalementsOuverts.get().n,
+    problemesOuverts: requetes.nombreProblemesOuverts.get().n,
   });
 });
 

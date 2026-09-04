@@ -137,6 +137,16 @@
           <a class="bouton bouton-secondaire" href="/mon-profil">Retour</a>
         </div>
       </form>
+
+      <%# Ecrire au support n'a pas besoin d'un message a montrer du
+          doigt. Le bouton "Signaler ce message" ne couvrait que les
+          problemes DANS la discussion ; les vrais problemes se passent
+          souvent ailleurs - la personne n'est pas venue, les conditions
+          ont change sur place. %>
+      <p class="aide" style="margin-top:1rem">
+        Un problème avec cette personne ou avec ce service ?
+        <a class="lien-discret" href="/probleme/<%= conversation.id %>">Signaler à l'équipe PamConnect</a>
+      </p>
     </div>
 
   </div>

@@ -1,0 +1,79 @@
+<%- include("partiels/tete") %>
+
+  <div class="colonne">
+    <h1>Signaler un problème</h1>
+    <p class="chapeau">
+      Votre message part directement à l'équipe PamConnect. La personne
+      concernée n'en est pas informée.
+    </p>
+
+    <ul class="infos">
+      <li>
+        <%- include("partiels/icone", { nom: "document" }) %>
+        <span>Discussion : <strong><%= conversation.titreAnnonce %></strong></span>
+      </li>
+      <li>
+        <%- include("partiels/icone", { nom: "profil" }) %>
+        <span>Avec <strong><%= autre.nom %></strong></span>
+      </li>
+    </ul>
+
+    <% if (dejaSignale) { %>
+
+      <%# Un second signalement avant que le premier ait ete examine
+          n'apprend rien de plus a l'equipe. %>
+      <div class="carte">
+        <h3>Vous avez déjà signalé cette discussion</h3>
+        <p>L'équipe ne l'a pas encore examinée. Elle traite les signalements
+        dans l'ordre d'arrivée.</p>
+        <p class="actions">
+          <a class="bouton bouton-secondaire" href="/messages/<%= conversation.id %>">
+            <%- include("partiels/icone", { nom: "message" }) %>
+            Retour à la discussion
+          </a>
+        </p>
+      </div>
+
+    <% } else { %>
+
+      <div class="carte">
+        <form action="/probleme/<%= conversation.id %>" method="POST">
+          <div class="champ">
+            <label for="texte">Que s'est-il passé ?</label>
+            <textarea id="texte" name="texte" rows="6" maxlength="2000" required
+                      placeholder="Décrivez la situation avec vos mots."></textarea>
+            <p class="aide">
+              Vous n'avez pas besoin de montrer un message. Racontez ce qui
+              s'est passé : c'est ce que l'équipe lira.
+            </p>
+          </div>
+
+          <%# Ce que la plateforme fait de ce signalement, ecrit AVANT le
+              bouton. Une personne qui alerte le support doit savoir ce
+              qu'elle declenche, sinon elle n'ose pas le faire. %>
+          <div class="carte confiance">
+            <h3>Ce qui se passe ensuite</h3>
+            <p>
+              L'équipe lit votre message et décide : elle peut classer sans
+              suite, adresser un avertissement, ou suspendre un compte.
+            </p>
+            <p class="aide">
+              Votre discussion reste ouverte. Signaler ne retire pas votre
+              candidature et ne prévient pas <%= autre.nom %>.
+            </p>
+          </div>
+
+          <div class="actions">
+            <button type="submit">
+              <%- include("partiels/icone", { nom: "envoi" }) %>
+              Envoyer à l'équipe
+            </button>
+            <a class="bouton bouton-secondaire" href="/messages/<%= conversation.id %>">Annuler</a>
+          </div>
+        </form>
+      </div>
+
+    <% } %>
+  </div>
+
+<%- include("partiels/pied") %>
