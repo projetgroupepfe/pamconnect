@@ -9,6 +9,37 @@
       </span>
     </p>
 
+    <%# Un dossier envoye n'est pas un dossier oublie. Tant que la
+        personne ne sait pas combien de temps elle attend, chaque heure
+        ressemble a un abandon. %>
+    <% if (utilisateur.statut_verification === "en attente") { %>
+      <% const attente = attenteVerification(utilisateur.documents_envoyes_le); %>
+      <div class="carte confiance">
+        <h3>Votre dossier est entre les mains de l'équipe</h3>
+        <% if (attente === null) { %>
+          <p>
+            Notre équipe l'examine sous <strong><%= delaiVerificationHeures %> heures</strong>.
+          </p>
+          <p class="aide">La date d'envoi de ce dossier n'a pas été enregistrée.</p>
+        <% } else if (attente.depasse) { %>
+          <p>
+            Envoyé <strong><%= attenteLisible(utilisateur.documents_envoyes_le) %></strong>.
+            Le délai de <%= delaiVerificationHeures %> heures est dépassé.
+          </p>
+          <p class="aide">
+            Votre dossier n'a pas été perdu : il reste en tête de la liste
+            de l'équipe.
+          </p>
+        <% } else { %>
+          <p>
+            Envoyé <strong><%= attenteLisible(utilisateur.documents_envoyes_le) %></strong>.
+            Réponse attendue d'ici <strong><%= attente.restantes %> heure<%= attente.restantes > 1 ? "s" : "" %></strong>.
+          </p>
+          <p class="aide">Vous n'avez rien d'autre à faire.</p>
+        <% } %>
+      </div>
+    <% } %>
+
     <% if (utilisateur.statut_verification === "refuse" && utilisateur.motif_refus) { %>
       <div class="carte">
         <h3>Motif du refus</h3>
@@ -35,6 +66,14 @@
           Les employeurs confient l'accès à leur domicile. Pour que votre profil
           inspire confiance, deux documents sont demandés.
         <% } %>
+      </p>
+
+      <%# Le delai est annonce AVANT l'envoi, et il est le meme des deux
+          cotes. Une personne qui sait combien de temps elle attend ne
+          renvoie pas ses documents trois fois en croyant a une panne. %>
+      <p class="aide">
+        Notre équipe examine votre dossier sous
+        <strong><%= delaiVerificationHeures %> heures</strong>.
       </p>
 
       <div class="carte confiance">

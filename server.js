@@ -122,6 +122,7 @@ ajouterColonneSiAbsente("utilisateurs", "avertissements", "INTEGER NOT NULL DEFA
 ajouterColonneSiAbsente("utilisateurs", "avertissement_motif", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "avertissement_le", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "avertissement_lu", "INTEGER NOT NULL DEFAULT 0");
+ajouterColonneSiAbsente("utilisateurs", "documents_envoyes_le", "TEXT");
 ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
 ajouterColonneSiAbsente("annonces", "annulee", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
@@ -533,16 +534,20 @@ const requetes = {
     SET cni_fichier = @cni,
         casier_fichier = @casier,
         statut_verification = 'en attente',
+        documents_envoyes_le = datetime('now'),
         verifie_le = NULL,
         motif_refus = NULL
     WHERE id = @id
   `),
 
   dossiersEnAttente: db.prepare(`
-    SELECT id, nom, email, role, metier, arrondissement, quartier
+    SELECT id, nom, email, role, metier, arrondissement, quartier,
+           documents_envoyes_le
     FROM utilisateurs
     WHERE statut_verification = 'en attente'
-    ORDER BY id
+    -- Le plus ancien d'abord : c'est celui dont le delai risque de
+    -- passer en premier.
+    ORDER BY documents_envoyes_le IS NULL DESC, documents_envoyes_le, id
   `),
 
   dossierEnAttenteParId: db.prepare(`
@@ -734,6 +739,44 @@ function verifierProfilPrestataire(donnees) {
 }
 
 // Traduit le statut technique en texte lisible par un humain.
+// LE DELAI ANNONCE. Une seule valeur, ecrite une fois : les ecrans la
+// lisent au lieu d'ecrire "24" chacun de leur cote.
+const DELAI_VERIFICATION_HEURES = 24;
+
+// Depuis combien de temps ce dossier attend-il, et le delai est-il tenu ?
+//
+// SQLite enregistre datetime('now') en temps universel. Il faut le dire
+// a Date.parse : sans le "Z", il lit la date comme une heure locale et
+// se trompe d'une heure - assez pour qu'un dossier paraisse dans les
+// temps alors qu'il ne l'est plus.
+//
+// Renvoie null quand la date est inconnue. C'est le cas des dossiers
+// deposes avant l'existence de cette colonne : les ecrans doivent le
+// dire, pas inventer une date.
+function attenteVerification(envoyeLe) {
+  if (!envoyeLe) return null;
+
+  const depart = Date.parse(String(envoyeLe).replace(" ", "T") + "Z");
+  if (Number.isNaN(depart)) return null;
+
+  const heures = Math.floor((Date.now() - depart) / 3600000);
+
+  return {
+    heures,
+    restantes: Math.max(0, DELAI_VERIFICATION_HEURES - heures),
+    depasse: heures >= DELAI_VERIFICATION_HEURES,
+  };
+}
+
+// La meme chose en francais, pour les ecrans.
+function attenteLisible(envoyeLe) {
+  const a = attenteVerification(envoyeLe);
+  if (!a) return null;
+  if (a.heures < 1) return "il y a moins d'une heure";
+  if (a.heures === 1) return "il y a 1 heure";
+  return "il y a " + a.heures + " heures";
+}
+
 function libelleVerification(statut) {
   if (statut === "verifie") return "Identité vérifiée";
   if (statut === "en attente") return "Vérification en cours";
@@ -1141,6 +1184,9 @@ app.locals.detaillerTarif = detaillerTarif;
 app.locals.pourcentageCommission = Math.round(TAUX_COMMISSION * 100);
 app.locals.libelleVerification = libelleVerification;
 app.locals.phraseCandidature = phraseCandidature;
+app.locals.attenteVerification = attenteVerification;
+app.locals.attenteLisible = attenteLisible;
+app.locals.delaiVerificationHeures = DELAI_VERIFICATION_HEURES;
 app.locals.libelleUnite = libelleUnite;
 app.locals.prixEnClair = prixEnClair;
 app.locals.unitesTarif = UNITES_TARIF;
@@ -2363,10 +2409,11 @@ app.post("/verification", exigerConnexion, interdireALEquipe, (req, res) => {
     });
 
     res.render("message", {
-      titre: "Documents envoyes",
-      texte: "Votre dossier est en cours de vérification par notre équipe. " +
-             "Tu seras visible comme verifie des qu'il sera valide.",
-      liens: [{ url: "/mon-profil", texte: "Retour a mon profil" }],
+      titre: "Documents envoyés",
+      texte: "Votre dossier est arrivé. Notre équipe l'examine sous " +
+             DELAI_VERIFICATION_HEURES + " heures. Vous n'avez rien d'autre à " +
+             "faire : le résultat apparaîtra sur votre profil.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
     });
   });
 });

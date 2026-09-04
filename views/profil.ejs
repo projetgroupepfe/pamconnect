@@ -43,7 +43,11 @@
       </div>
     </div>
 
-    <% if (utilisateur.role === "prestataire") { %>
+    <%# LES DEUX COTES. L'employeur passe par la meme verification que
+        la personne qui vient travailler : son statut doit s'afficher sur
+        son profil comme celui de tout le monde. Seule l'equipe en est
+        dispensee, puisqu'elle ne rencontre personne. %>
+    <% if (!utilisateur.est_admin) { %>
       <p>
         <span class="badge badge-<%= utilisateur.statut_verification.replace(/ /g, "-") %>">
           <% if (utilisateur.statut_verification === "verifie") { %>
@@ -52,6 +56,22 @@
           <%= libelleVerification(utilisateur.statut_verification) %>
         </span>
       </p>
+
+      <% if (utilisateur.statut_verification === "en attente") { %>
+        <% const att = attenteVerification(utilisateur.documents_envoyes_le); %>
+        <p class="aide">
+          <% if (att === null) { %>
+            Notre équipe examine votre dossier sous <%= delaiVerificationHeures %> heures.
+          <% } else if (att.depasse) { %>
+            Envoyé <%= attenteLisible(utilisateur.documents_envoyes_le) %>.
+            Le délai de <%= delaiVerificationHeures %> heures est dépassé, votre
+            dossier reste en tête de la liste.
+          <% } else { %>
+            Envoyé <%= attenteLisible(utilisateur.documents_envoyes_le) %>.
+            Réponse attendue d'ici <%= att.restantes %> heure<%= att.restantes > 1 ? "s" : "" %>.
+          <% } %>
+        </p>
+      <% } %>
     <% } %>
 
     <ul class="infos">

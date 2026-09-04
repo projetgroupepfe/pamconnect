@@ -70,6 +70,13 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
                       CHECK (statut_verification IN ('non soumis', 'en attente', 'verifie', 'refuse')),
   cni_fichier     TEXT,
   casier_fichier  TEXT,
+  -- Quand les documents ont ete envoyes. Sans cette date, le delai de
+  -- 24 h annonce aux deux cotes ne serait qu'une phrase : rien ne
+  -- permettrait de dire si l'equipe le tient.
+  --
+  -- Elle reste NULL pour les dossiers deposes avant l'existence de cette
+  -- colonne. Les ecrans le disent plutot que d'afficher une date fausse.
+  documents_envoyes_le TEXT,
   verifie_le      TEXT,
   motif_refus     TEXT,
 

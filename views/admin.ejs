@@ -43,6 +43,25 @@
           <%= dossier.arrondissement %><%= dossier.quartier ? ", " + dossier.quartier : "" %>
         </p>
 
+        <%# Un delai annonce a la personne engage l'equipe. Encore faut-il
+            qu'elle voie lequel de ces dossiers est sur le point de le
+            depasser : la liste est triee du plus ancien au plus recent. %>
+        <% const att = attenteVerification(dossier.documents_envoyes_le); %>
+        <p>
+          <% if (att === null) { %>
+            <span class="badge badge-non-soumis">Date d'envoi inconnue</span>
+          <% } else if (att.depasse) { %>
+            <span class="badge badge-refuse">
+              Délai dépassé, reçu <%= attenteLisible(dossier.documents_envoyes_le) %>
+            </span>
+          <% } else { %>
+            <span class="badge badge-en-attente">
+              Reçu <%= attenteLisible(dossier.documents_envoyes_le) %>,
+              <%= att.restantes %> h restante<%= att.restantes > 1 ? "s" : "" %>
+            </span>
+          <% } %>
+        </p>
+
         <%# Ces liens passent par une route qui verifie que le demandeur est
             administrateur. Le nom du fichier n'apparait jamais dans l'adresse :
             on ne transmet que l'identifiant du prestataire. %>
