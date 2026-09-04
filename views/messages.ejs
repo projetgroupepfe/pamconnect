@@ -5,21 +5,27 @@
 
   <% if (conversations.length === 0) { %>
 
+    <%# Cet ecran n'est pas l'endroit ou l'on publie une demande. La
+        messagerie sert a s'accorder sur les horaires une fois qu'une
+        candidature existe. Un gros bouton "Publier une demande" ici
+        envoyait la personne ailleurs au lieu de lui expliquer pourquoi
+        elle ne voit rien. %>
     <div class="vide">
       <p>Aucune discussion pour le moment.</p>
-      <div class="actions">
-        <% if (jePeux.repondre) { %>
-          <a class="bouton" href="/annonces">
-            <%- include("partiels/icone", { nom: "document" }) %>
-            Voir les annonces
-          </a>
-        <% } else if (jePeux.publier) { %>
-          <a class="bouton" href="/publier-annonce">
-            <%- include("partiels/icone", { nom: "ajouter" }) %>
-            Publier une demande
-          </a>
-        <% } %>
-      </div>
+      <% if (jePeux.repondre) { %>
+        <p class="aide">
+          Une discussion s'ouvre lorsque vous répondez à une demande. Elle
+          sert à vous accorder sur les horaires avec l'employeur avant qu'il
+          fasse son choix.
+        </p>
+        <p><a class="lien-discret" href="/annonces">Voir les demandes publiées</a></p>
+      <% } else if (jePeux.publier) { %>
+        <p class="aide">
+          Une discussion s'ouvre lorsque quelqu'un répond à l'une de vos
+          demandes. Elle sert à vous accorder sur les horaires avant de
+          choisir la personne.
+        </p>
+      <% } %>
     </div>
 
   <% } else { %>
