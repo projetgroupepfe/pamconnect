@@ -192,6 +192,15 @@ CREATE TABLE IF NOT EXISTS candidatures (
 
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now')),
 
+  -- Quand chaque cote a ouvert la discussion pour la derniere fois.
+  -- Un message ecrit apres cette date n'a pas encore ete lu.
+  --
+  -- Deux colonnes plutot qu'un drapeau par message : ce qu'on veut
+  -- savoir, c'est "depuis quand n'ai-je pas regarde", et cela ne depend
+  -- pas du nombre de messages.
+  vu_employeur_le    TEXT,
+  vu_prestataire_le  TEXT,
+
   -- Un prestataire ne peut postuler qu'UNE SEULE FOIS a une annonce donnee.
   UNIQUE (annonce_id, prestataire_id)
 );

@@ -120,7 +120,9 @@
     <div class="carte">
       <form action="/messages/<%= conversation.id %>" method="POST">
         <div class="champ">
-          <label for="texte">Votre message</label>
+          <%# "Votre message" ne disait pas A QUI on ecrit. Une discussion
+                n'a que deux personnes : nommer celle qui lira leve tout doute. %>
+            <label for="texte">Écrire à <%= jeSuisEmployeur ? conversation.nomPrestataire : conversation.nomEmployeur %></label>
           <textarea id="texte" name="texte" rows="4" maxlength="2000" required
                     placeholder="ex : <%= exempleMessage %>"></textarea>
           <p class="aide">

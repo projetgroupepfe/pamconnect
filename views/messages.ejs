@@ -51,6 +51,17 @@
               <%- include("partiels/icone", { nom: "disponibilite" }) %>
               <span><strong><%= phraseCandidature(c.statut, jeSuisEmployeur) %></strong></span>
             </li>
+            <%# Ce qui attend d'etre lu passe AVANT le compte total :
+                c'est la seule ligne qui demande une action. %>
+            <% if (c.nonLus > 0) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "info" }) %>
+                <span>
+                  <strong><%= c.nonLus %> nouveau<%= c.nonLus > 1 ? "x" : "" %>
+                  message<%= c.nonLus > 1 ? "s" : "" %></strong>
+                </span>
+              </li>
+            <% } %>
             <li>
               <%- include("partiels/icone", { nom: "message" }) %>
               <span>

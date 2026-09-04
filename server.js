@@ -123,6 +123,8 @@ ajouterColonneSiAbsente("utilisateurs", "avertissement_motif", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "avertissement_le", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "avertissement_lu", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("utilisateurs", "documents_envoyes_le", "TEXT");
+ajouterColonneSiAbsente("candidatures", "vu_employeur_le", "TEXT");
+ajouterColonneSiAbsente("candidatures", "vu_prestataire_le", "TEXT");
 ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
 ajouterColonneSiAbsente("annonces", "annulee", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
@@ -537,7 +539,13 @@ const requetes = {
            p.id    AS prestataireId,
            p.nom   AS nomPrestataire,
            (SELECT COUNT(*)     FROM messages m WHERE m.candidature_id = c.id) AS nbMessages,
-           (SELECT MAX(cree_le) FROM messages m WHERE m.candidature_id = c.id) AS dernierMessage
+           (SELECT MAX(cree_le) FROM messages m WHERE m.candidature_id = c.id) AS dernierMessage,
+           (SELECT COUNT(*) FROM messages m
+             WHERE m.candidature_id = c.id
+               AND m.auteur_id != @moi
+               AND m.cree_le > COALESCE(
+                     CASE WHEN e.id = @moi THEN c.vu_employeur_le
+                          ELSE c.vu_prestataire_le END, '')) AS nonLus
     FROM candidatures c
     JOIN annonces     a ON a.id = c.annonce_id
     JOIN utilisateurs e ON e.id = a.employeur_id
@@ -546,9 +554,29 @@ const requetes = {
     ORDER BY dernierMessage DESC, c.id DESC
   `),
 
-  nombreMessagesNonLus: db.prepare(`
-    SELECT COUNT(*) AS n FROM messages
-    WHERE candidature_id = ? AND auteur_id != ?
+  // Combien de messages m'attendent, toutes discussions confondues.
+  //
+  // COALESCE(..., '') : une discussion jamais ouverte n'a pas de date de
+  // lecture, et toute date est superieure a la chaine vide. Ses messages
+  // comptent donc tous comme non lus - ce qui est exactement le cas.
+  messagesNonLus: db.prepare(`
+    SELECT COUNT(*) AS n
+    FROM messages m
+    JOIN candidatures c ON c.id = m.candidature_id
+    JOIN annonces     a ON a.id = c.annonce_id
+    WHERE m.auteur_id != @moi
+      AND (a.employeur_id = @moi OR c.prestataire_id = @moi)
+      AND m.cree_le > COALESCE(
+            CASE WHEN a.employeur_id = @moi THEN c.vu_employeur_le
+                 ELSE c.vu_prestataire_le END, '')
+  `),
+
+  marquerVuEmployeur: db.prepare(`
+    UPDATE candidatures SET vu_employeur_le = datetime('now') WHERE id = ?
+  `),
+
+  marquerVuPrestataire: db.prepare(`
+    UPDATE candidatures SET vu_prestataire_le = datetime('now') WHERE id = ?
   `),
 
   majProfil: db.prepare(`
@@ -1421,6 +1449,13 @@ app.use((req, res, next) => {
   // Sans ce reperage, on ne sait jamais ou l'on se trouve.
   res.locals.chemin = req.path;
 
+  // Combien de messages attendent cette personne. Calcule une fois
+  // ici, lu par le menu sur chaque page. Un membre de l'equipe n'a pas
+  // de discussion : on n'interroge pas la base pour rien.
+  res.locals.messagesNonLus = moi && !moi.est_admin
+    ? requetes.messagesNonLus.get({ moi: moi.id }).n
+    : 0;
+
   res.locals.jePeux = {
     // Un membre de l'equipe est enregistre comme employeur pour une
     // raison technique, mais il n'embauche pas : il verifie des
@@ -2227,6 +2262,14 @@ app.get("/messages/:id", exigerConnexion, (req, res) => {
   }
 
   const jeSuisEmployeur = req.utilisateur.id === conversation.employeurId;
+
+  // Ouvrir la discussion, c'est l'avoir lue. On enregistre le moment,
+  // puis on recalcule le compte du menu : sans cela, l'entete afficherait
+  // encore "1" sur la page meme qui vient d'etre lue.
+  if (jeSuisEmployeur) requetes.marquerVuEmployeur.run(conversation.id);
+  else requetes.marquerVuPrestataire.run(conversation.id);
+
+  res.locals.messagesNonLus = requetes.messagesNonLus.get({ moi: req.utilisateur.id }).n;
 
   res.render("conversation", {
     titre: "Discussion",

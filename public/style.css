@@ -542,6 +542,22 @@ button:hover, .bouton:hover {
 }
 .avertissement h3 { color: var(--ambre); }
 
+/* Le nombre de messages non lus, dans le menu. Assez visible pour etre
+   remarque en passant, assez petit pour ne pas deformer l'entree. */
+.pastille {
+  display: inline-block;
+  min-width: 1.25rem;
+  margin-left: .35rem;
+  padding: 0 .3rem;
+  border-radius: 999px;
+  background-color: var(--orange);
+  color: #FFF;
+  font-size: .7rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  text-align: center;
+}
+
 
 /* ---------- 12. Grands ecrans ----------------------------- */
 @media (min-width: 760px) {

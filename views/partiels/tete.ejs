@@ -56,7 +56,11 @@
           entrees.push({ url: "/annonces", icone: "document", texte: "Annonces" });
         }
         if (locals.moi && !locals.jePeux.verifierDossiers) {
-          entrees.push({ url: "/messages", icone: "message", texte: "Messages" });
+          /* La plateforme n'envoie ni email ni SMS. La seule notification
+             qu'elle peut donner, c'est celle-ci : le nombre de messages
+             qui attendent, la ou la personne regarde deja. */
+          entrees.push({ url: "/messages", icone: "message", texte: "Messages",
+                         pastille: locals.messagesNonLus });
         }
         if (locals.moi && locals.jePeux.verifierDossiers) {
           entrees.push({ url: "/admin", icone: "equipe", texte: "Équipe" });
@@ -80,7 +84,7 @@
                  le texte tel quel : sa valeur vient de nous, jamais d un
                  utilisateur. %>
              <%- active ? 'aria-current="page"' : "" %>>
-            <%- include("icone", { nom: entree.icone }) %><%= entree.texte %>
+            <%- include("icone", { nom: entree.icone }) %><%= entree.texte %><% if (entree.pastille > 0) { %><span class="pastille" aria-label="<%= entree.pastille %> message<%= entree.pastille > 1 ? "s" : "" %> non lu<%= entree.pastille > 1 ? "s" : "" %>"><%= entree.pastille %></span><% } %>
           </a>
         <% }); %>
       </nav>
