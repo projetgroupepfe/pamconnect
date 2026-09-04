@@ -9,15 +9,24 @@
   <h2>Ce que vous gagnez</h2>
 
   <div class="carte">
+    <%# ANCIEN MODELE : cette page affirmait que l'employeur paie le
+        tarif indique sur le profil. C'est lui qui annonce son prix ; le
+        tarif du profil sert a se faire connaitre, pas a facturer. %>
     <p>
-      Vous indiquez le tarif que vous demandez. C'est ce montant que l'employeur paie,
-      sans rien y ajouter. PamConnect retient une commission de
-      <strong><%= pourcentageCommission %> %</strong> sur ce montant, et vous verse le reste
-      dès que l'employeur a payé.
+      Vous indiquez le tarif que vous demandez pour vos services. Il est
+      <strong>indicatif</strong> : il aide les employeurs à vous trouver.
+      Le montant réellement payé est celui annoncé dans la demande à
+      laquelle vous répondez.
+    </p>
+
+    <p>
+      PamConnect retient une commission de
+      <strong><%= pourcentageCommission %> %</strong> sur ce montant, et vous
+      verse le reste dès que l'employeur a payé.
     </p>
 
     <p class="exemple">
-      Pour une prestation à <strong>10 000 FCFA</strong>,
+      Pour une demande à <strong>10 000 FCFA</strong>,
       la commission est de <strong>1 000 FCFA</strong>.
       Vous recevrez <strong>9 000 FCFA</strong>.
     </p>

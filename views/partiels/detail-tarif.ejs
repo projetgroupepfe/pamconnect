@@ -31,7 +31,7 @@ const beneficiaire  = locals.beneficiaire || "La personne";
         <span>Vous n'avez pas encore indiqué votre tarif.</span>
       </div>
       <div class="ligne-tarif">
-        <span class="aide">Sans tarif, aucun employeur ne peut vous payer.</span>
+        <span class="aide">Sans tarif, les employeurs ne savent pas ce que vous demandez.</span>
       </div>
     <% } %>
   </div>
@@ -52,5 +52,17 @@ const beneficiaire  = locals.beneficiaire || "La personne";
       <strong><%= formaterMontant(detail.net) %></strong>
     </div>
   </div>
+
+  <%# Sur SON profil, ce montant n'est qu'une indication : le prix
+      reellement paye est celui annonce dans la demande a laquelle elle
+      repond. Sans cette phrase, l'ecran promettait une somme qui n'a
+      aucune raison d'etre celle qu'elle touchera. %>
+  <% if (locals.indicatif && !pourEmployeur) { %>
+    <p class="aide">
+      Ce tarif est indicatif. Le montant réellement reçu dépend de la demande
+      à laquelle vous répondez : la commission de <%= pourcentageCommission %> %
+      s'applique au prix annoncé par l'employeur.
+    </p>
+  <% } %>
 
 <% } %>

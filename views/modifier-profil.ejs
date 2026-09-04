@@ -37,7 +37,7 @@
             <input type="number" id="tarif" name="tarif"
                    value="<%= utilisateur.tarif || "" %>"
                    placeholder="ex : 10000" min="500" step="500" required>
-            <span class="aide">C'est le montant que l'employeur paiera.</span>
+            <span class="aide">C'est ce que vous demandez pour vos services.</span>
           </div>
 
           <%# Le detail se recalcule pendant la saisie, comme a l'inscription. %>
@@ -54,6 +54,11 @@
               <span>Vous recevez</span>
               <strong id="montantNet">—</strong>
             </div>
+            <p class="aide">
+              Ce tarif est indicatif. Le montant réellement reçu dépend de la demande
+              à laquelle vous répondez : la commission de <%= pourcentageCommission %> %
+              s'applique au prix annoncé par l'employeur.
+            </p>
           </div>
 
         <% } %>
