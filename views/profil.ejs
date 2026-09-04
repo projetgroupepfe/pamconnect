@@ -271,6 +271,20 @@
                 </button>
               </form>
             </div>
+
+            <%# DEUX ACTIONS ROUGES SUR LE MEME ECRAN. "Retirer cette
+                demande" ferme l'offre pour tout le monde ; "Refuser cette
+                candidature", plus bas, ecarte UNE personne et laisse la
+                demande ouverte. Rien ne les distinguait a l'oeil : meme
+                couleur, meme icone. On dit donc ce que chacune fait. %>
+            <p class="aide">
+              <strong>Retirer ferme votre demande</strong> : elle disparaît
+              des annonces, personne ne peut plus y répondre, et la somme
+              bloquée vous est rendue.
+              Pour écarter une seule personne sans fermer votre demande,
+              utilisez <strong>Refuser cette candidature</strong> plus bas :
+              les autres pourront encore vous répondre.
+            </p>
           <% } %>
 
           <% if (annonce.candidatures.length === 0) { %>
