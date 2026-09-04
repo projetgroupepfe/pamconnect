@@ -86,7 +86,7 @@
         <% if (v.nomRetenu && att && att.depasse) { %>
           <p>
             <span class="badge badge-refuse">
-              Bloquée depuis <%= att.jours %> jours — le service n'a pas été déclaré
+              Bloquée depuis <%= att.lisible %>, le service n'a pas été déclaré
             </span>
           </p>
           <p class="aide">
@@ -95,7 +95,7 @@
         <% } else if (att) { %>
           <p>
             <span class="badge badge-en-attente">
-              Bloquée depuis <%= att.jours %> jour<%= att.jours > 1 ? "s" : "" %>
+              Bloquée depuis <%= att.lisible %>
             </span>
           </p>
         <% } %>

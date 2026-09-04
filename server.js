@@ -1032,7 +1032,13 @@ function attenteVersement(creeLe) {
 
   const jours = Math.floor((Date.now() - depart) / 86400000);
 
-  return { jours, depasse: jours >= DELAI_ALERTE_VERSEMENT_JOURS };
+  // "0 jour" est juste et illisible : une somme posee il y a deux heures
+  // n'attend pas depuis zero jour, elle attend depuis aujourd'hui.
+  const lisible = jours < 1 ? "aujourd'hui"
+                : jours === 1 ? "1 jour"
+                : jours + " jours";
+
+  return { jours, lisible, depasse: jours >= DELAI_ALERTE_VERSEMENT_JOURS };
 }
 
 function libelleVerification(statut) {
