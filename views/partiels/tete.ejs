@@ -57,10 +57,12 @@
         }
         if (locals.moi && !locals.jePeux.verifierDossiers) {
           /* La plateforme n'envoie ni email ni SMS. La seule notification
-             qu'elle peut donner, c'est celle-ci : le nombre de messages
-             qui attendent, la ou la personne regarde deja. */
+             qu'elle peut donner, c'est celle-ci : ce qui attend la
+             personne, la ou elle regarde deja.
+             Messages non lus ET decisions non vues : etre choisi sans que
+             rien ne s'allume revenait a ne pas etre prevenu. */
           entrees.push({ url: "/messages", icone: "message", texte: "Messages",
-                         pastille: locals.messagesNonLus });
+                         pastille: locals.aVoir });
         }
         if (locals.moi && locals.jePeux.verifierDossiers) {
           entrees.push({ url: "/admin", icone: "equipe", texte: "Équipe" });

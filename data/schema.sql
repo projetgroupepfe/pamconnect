@@ -201,6 +201,14 @@ CREATE TABLE IF NOT EXISTS candidatures (
   vu_employeur_le    TEXT,
   vu_prestataire_le  TEXT,
 
+  -- Quand l'employeur a accepte ou refuse. Comparee a vu_prestataire_le,
+  -- elle dit si la personne a DEJA VU la decision.
+  --
+  -- Sans cette date, une personne choisie ne l'apprenait qu'en revenant
+  -- regarder son profil : la pastille du menu ne comptait que les
+  -- messages, et accepter quelqu'un n'en cree aucun.
+  statut_change_le   TEXT,
+
   -- Quand l'employeur a declare le service effectue. La discussion
   -- passe alors dans l'historique : lisible des deux cotes, mais on n'y
   -- ecrit plus.

@@ -126,6 +126,7 @@ ajouterColonneSiAbsente("utilisateurs", "documents_envoyes_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "vu_employeur_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "vu_prestataire_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "terminee_le", "TEXT");
+ajouterColonneSiAbsente("candidatures", "statut_change_le", "TEXT");
 ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
 ajouterColonneSiAbsente("annonces", "annulee", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
@@ -294,7 +295,8 @@ const requetes = {
   // demande. Une fois quelqu'un choisi, les faire patienter serait leur
   // voler du temps : elles pourraient repondre ailleurs.
   refuserLesAutres: db.prepare(`
-    UPDATE candidatures SET statut = 'refusee'
+    UPDATE candidatures
+    SET statut = 'refusee', statut_change_le = datetime('now')
     WHERE annonce_id = @annonce AND id != @choisie AND statut = 'en attente'
   `),
 
@@ -425,7 +427,9 @@ const requetes = {
   `),
 
   changerStatutCandidature: db.prepare(`
-    UPDATE candidatures SET statut = ? WHERE id = ?
+    UPDATE candidatures
+    SET statut = ?, statut_change_le = datetime('now')
+    WHERE id = ?
   `),
 
   // --- La messagerie ---------------------------------------------
@@ -696,7 +700,12 @@ const requetes = {
                AND m.cree_le > COALESCE(
                      CASE WHEN e.id = @moi THEN c.vu_employeur_le
                           ELSE c.vu_prestataire_le END, '')) AS nonLus,
-           c.terminee_le
+           c.terminee_le,
+           CASE WHEN p.id = @moi
+                     AND c.statut != 'en attente'
+                     AND c.statut_change_le IS NOT NULL
+                     AND c.statut_change_le > COALESCE(c.vu_prestataire_le, '')
+                THEN 1 ELSE 0 END AS decisionNonVue
     FROM candidatures c
     JOIN annonces     a ON a.id = c.annonce_id
     JOIN utilisateurs e ON e.id = a.employeur_id
@@ -706,6 +715,13 @@ const requetes = {
   `),
 
   // Combien de messages m'attendent, toutes discussions confondues.
+  //
+  // LIMITE CONNUE : les dates sont enregistrees a la SECONDE pres. Un
+  // message ecrit dans la meme seconde que ma derniere visite ne sera
+  // pas compte comme non lu. Sans consequence en pratique - il faudrait
+  // ecrire a quelqu'un a l'instant precis ou il ouvre la discussion, et
+  // il l'a alors sous les yeux. La corriger demanderait des dates a la
+  // milliseconde partout, y compris la ou elles sont affichees.
   //
   // COALESCE(..., '') : une discussion jamais ouverte n'a pas de date de
   // lecture, et toute date est superieure a la chaine vide. Ses messages
@@ -730,6 +746,21 @@ const requetes = {
     UPDATE candidatures
     SET terminee_le = datetime('now')
     WHERE id = @id AND statut = 'acceptee' AND terminee_le IS NULL
+  `),
+
+  // Les decisions que la personne n'a pas encore vues. Meme lecture du
+  // temps que pour les messages : ce qui a change APRES sa derniere
+  // visite de la discussion.
+  //
+  // Seul le cote qui SUBIT la decision est concerne : celui qui l'a
+  // prise n'a pas a etre prevenu de son propre choix.
+  decisionsNonVues: db.prepare(`
+    SELECT COUNT(*) AS n
+    FROM candidatures c
+    WHERE c.prestataire_id = @moi
+      AND c.statut != 'en attente'
+      AND c.statut_change_le IS NOT NULL
+      AND c.statut_change_le > COALESCE(c.vu_prestataire_le, '')
   `),
 
   marquerVuEmployeur: db.prepare(`
@@ -1640,12 +1671,23 @@ app.use((req, res, next) => {
   // Sans ce reperage, on ne sait jamais ou l'on se trouve.
   res.locals.chemin = req.path;
 
-  // Combien de messages attendent cette personne. Calcule une fois
-  // ici, lu par le menu sur chaque page. Un membre de l'equipe n'a pas
-  // de discussion : on n'interroge pas la base pour rien.
+  // Ce qui attend cette personne : les messages qu'elle n'a pas lus, et
+  // les decisions prises sur ses candidatures qu'elle n'a pas encore
+  // vues. Une seule pastille pour les deux : ce qui compte, c'est
+  // "quelque chose vous attend", pas de quelle sorte.
+  //
+  // Calcule une fois ici, lu par le menu sur chaque page. Un membre de
+  // l'equipe n'a ni discussion ni candidature : on n'interroge pas la
+  // base pour rien.
   res.locals.messagesNonLus = moi && !moi.est_admin
     ? requetes.messagesNonLus.get({ moi: moi.id }).n
     : 0;
+
+  res.locals.decisionsNonVues = moi && !moi.est_admin
+    ? requetes.decisionsNonVues.get({ moi: moi.id }).n
+    : 0;
+
+  res.locals.aVoir = res.locals.messagesNonLus + res.locals.decisionsNonVues;
 
   res.locals.jePeux = {
     // Un membre de l'equipe est enregistre comme employeur pour une
@@ -2487,6 +2529,8 @@ app.get("/messages/:id", exigerConnexion, (req, res) => {
   else requetes.marquerVuPrestataire.run(conversation.id);
 
   res.locals.messagesNonLus = requetes.messagesNonLus.get({ moi: req.utilisateur.id }).n;
+  res.locals.decisionsNonVues = requetes.decisionsNonVues.get({ moi: req.utilisateur.id }).n;
+  res.locals.aVoir = res.locals.messagesNonLus + res.locals.decisionsNonVues;
 
   res.render("conversation", {
     titre: "Discussion",

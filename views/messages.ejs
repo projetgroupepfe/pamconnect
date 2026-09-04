@@ -60,6 +60,20 @@
               <%- include("partiels/icone", { nom: "disponibilite" }) %>
               <span><strong><%= phraseCandidature(c.statut, jeSuisEmployeur) %></strong></span>
             </li>
+            <%# LA DECISION D'ABORD. Un message non lu peut attendre ;
+                apprendre qu'on est choisi, non - c'est ce qui decide de
+                la suite. %>
+            <% if (c.decisionNonVue) { %>
+              <li>
+                <%- include("partiels/icone", { nom: c.statut === "acceptee" ? "valider" : "refuser" }) %>
+                <span>
+                  <strong><%= c.statut === "acceptee"
+                    ? "Votre candidature a été acceptée par " + autre
+                    : "Votre candidature n'a pas été retenue" %></strong>
+                </span>
+              </li>
+            <% } %>
+
             <%# Ce qui attend d'etre lu passe AVANT le compte total :
                 c'est la seule ligne qui demande une action. %>
             <% if (c.nonLus > 0) { %>
