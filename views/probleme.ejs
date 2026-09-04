@@ -12,9 +12,12 @@
         <%- include("partiels/icone", { nom: "document" }) %>
         <span>Discussion : <strong><%= conversation.titreAnnonce %></strong></span>
       </li>
+      <%# "Avec Nabila" decrit la discussion, pas la cible du
+          signalement. La personne qui ecrit doit savoir QUI l'equipe
+          pourra sanctionner : c'est ce qui rend son geste responsable. %>
       <li>
         <%- include("partiels/icone", { nom: "profil" }) %>
-        <span>Avec <strong><%= autre.nom %></strong></span>
+        <span>Personne concernée : <strong><%= autre.nom %></strong></span>
       </li>
     </ul>
 
@@ -55,11 +58,13 @@
             <h3>Ce qui se passe ensuite</h3>
             <p>
               L'équipe lit votre message et décide : elle peut classer sans
-              suite, adresser un avertissement, ou suspendre un compte.
+              suite, adresser un avertissement à <%= autre.nom %>, ou
+              suspendre son compte.
             </p>
             <p class="aide">
-              Votre discussion reste ouverte. Signaler ne retire pas votre
-              candidature et ne prévient pas <%= autre.nom %>.
+              Votre discussion reste ouverte. Signaler ne retire pas
+              <% if (jeSuisEmployeur) { %>votre demande<% } else { %>votre candidature<% } %>
+              et ne prévient pas <%= autre.nom %>.
             </p>
           </div>
 

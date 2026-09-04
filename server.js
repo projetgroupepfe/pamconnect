@@ -2496,6 +2496,10 @@ app.get("/probleme/:id", exigerConnexion, (req, res) => {
     titre: "Signaler un problème",
     conversation,
     autre: autreCoteDe(conversation, req.utilisateur),
+    // Un employeur n'a pas de candidature, il a une demande. Sans cette
+    // information, l'ecran parlait a tout le monde comme s'il ecrivait a
+    // une personne qui cherche du travail.
+    jeSuisEmployeur: req.utilisateur.id === conversation.employeurId,
     dejaSignale: Boolean(requetes.problemeOuvertPour.get({
       candidature: conversation.id, auteur: req.utilisateur.id,
     })),
