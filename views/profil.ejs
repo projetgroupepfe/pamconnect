@@ -142,6 +142,15 @@
         <%- include("partiels/icone", { nom: "profil" }) %>
         Modifier mon profil
       </a>
+      <%# Le compte n'entre pas dans le menu : une barre de telephone
+          supporte quatre ou cinq entrees, pas six. Il se rejoint depuis
+          le profil, la ou l'on regarde deja ses affaires. %>
+      <% if (!utilisateur.est_admin) { %>
+        <a class="bouton bouton-secondaire" href="/mon-compte">
+          <%- include("partiels/icone", { nom: "remuneration" }) %>
+          Mon compte
+        </a>
+      <% } %>
     </div>
 
     <% if (utilisateur.role === "prestataire" && utilisateur.statut_verification === "refuse" && utilisateur.motif_refus) { %>

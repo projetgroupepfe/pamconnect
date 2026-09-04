@@ -163,9 +163,19 @@
       <% if (jeSuisEmployeur && conversation.statut === "acceptee") { %>
         <div class="carte">
           <h3>Le service a-t-il été effectué ?</h3>
+          <%# CE N'EST PAS UNE FORMALITE. Cette declaration est le seul
+              chemin par lequel la somme bloquee arrive chez la personne
+              qui a travaille. Un employeur qui oublie la laisse impayee
+              et ouvre un litige que rien ne justifiait. %>
+          <p>
+            <strong>Déclarez-le obligatoirement après chaque service.</strong>
+            C'est cette déclaration qui verse la somme bloquée à
+            <%= conversation.nomPrestataire %>. Sans elle, elle n'est pas
+            payée, et un litige s'ouvre pour rien.
+          </p>
           <p class="aide">
-            En le déclarant, cette discussion rejoint vos services terminés :
-            vous pourrez la relire, mais plus y écrire.
+            Cette discussion rejoindra vos services terminés : vous pourrez
+            la relire, mais plus y écrire.
           </p>
           <form action="/candidatures/<%= conversation.id %>/terminer" method="POST">
             <div class="actions">

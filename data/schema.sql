@@ -455,6 +455,50 @@ CREATE TABLE IF NOT EXISTS problemes (
 
 CREATE INDEX IF NOT EXISTS idx_problemes_ouverts ON problemes (decision);
 
+
+-- ------------------------------------------------------------------
+-- Table versements : la somme annoncee, bloquee par la plateforme.
+--
+-- SIMULATION. Aucun argent reel ne circule. Encaisser la somme d'une
+-- personne pour la reverser a une autre est une activite d'intermediaire
+-- financier, reglementee par la COBAC dans la zone CEMAC : elle suppose
+-- une entite juridique, un agrement ou un partenariat avec un
+-- etablissement agree, et un contrat de production avec MTN et Orange.
+-- Aucun de ces prerequis n'est accessible ici. Les ecrans l'annoncent.
+--
+-- L'argent suit LA DEMANDE, jamais une candidature. Refuser quelqu'un ne
+-- libere donc rien : la demande reste ouverte, d'autres personnes
+-- peuvent encore y repondre, et la somme reste bloquee.
+--
+--   'bloque'    : la demande est ouverte, ou pourvue et pas encore faite
+--   'rembourse' : l'employeur a retire sa demande sans choisir personne
+--   'verse'     : le service a ete declare effectue
+--
+-- Le solde d'une personne n'a pas de table a lui : c'est la somme des
+-- versements dont elle est beneficiaire. Un total range a cote de ses
+-- lignes pourrait diverger d'elles ; calcule, il ne le peut pas.
+CREATE TABLE IF NOT EXISTS versements (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+
+  -- Une demande, un versement. C'est la publication qui le cree.
+  annonce_id      INTEGER NOT NULL UNIQUE REFERENCES annonces(id)     ON DELETE CASCADE,
+  employeur_id    INTEGER NOT NULL        REFERENCES utilisateurs(id) ON DELETE CASCADE,
+
+  montant         INTEGER NOT NULL,
+  cree_le         TEXT    NOT NULL DEFAULT (datetime('now')),
+
+  etat            TEXT    NOT NULL DEFAULT 'bloque'
+                          CHECK (etat IN ('bloque', 'rembourse', 'verse')),
+
+  -- Renseignes au denouement seulement.
+  denoue_le       TEXT,
+  beneficiaire_id INTEGER REFERENCES utilisateurs(id),
+  commission      INTEGER,
+  net             INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_versements_etat ON versements (etat);
+
 CREATE INDEX IF NOT EXISTS idx_quartiers_arrond ON quartiers (arrondissement);
 CREATE INDEX IF NOT EXISTS idx_messages_candidature ON messages (candidature_id);
 CREATE INDEX IF NOT EXISTS idx_messages_signale     ON messages (signale);

@@ -1,0 +1,152 @@
+<%- include("partiels/tete") %>
+
+  <h1>Mon compte</h1>
+
+  <%# CE QUE CETTE PAGE N'EST PAS. Elle n'affiche aucun numero Mobile
+      Money ni coordonnee bancaire : la plateforme n'en demande pas. Le
+      solde est un montant DU, pas un portefeuille. %>
+  <div class="carte confiance">
+    <h3>Comment l'argent circule sur PamConnect</h3>
+    <p>
+      Quand un employeur publie une demande, la somme qu'il annonce est
+      <strong>bloquée par PamConnect</strong>. Elle ne repart qu'à la fin :
+      chez la personne qui a travaillé une fois le service déclaré effectué,
+      ou chez l'employeur s'il retire sa demande sans avoir choisi personne.
+    </p>
+    <p class="aide">
+      Les montants affichés ici sont <strong>simulés</strong> : aucun argent
+      réel ne circule encore. Encaisser puis reverser une somme est une
+      activité d'intermédiaire financier, qui suppose un agrément et un
+      contrat avec les opérateurs.
+    </p>
+  </div>
+
+  <% if (jeSuisEmployeur) { %>
+
+    <h2>Vos versements</h2>
+
+    <% if (envoyes.length === 0) { %>
+      <div class="vide">
+        <p>Aucun versement pour le moment.</p>
+        <p class="aide">
+          Une somme est bloquée dès que vous publiez une demande.
+        </p>
+      </div>
+    <% } else { %>
+      <div class="grille">
+        <% envoyes.forEach(function (v) { %>
+          <div class="carte">
+            <h3><%= v.titreAnnonce %></h3>
+
+            <p>
+              <% if (v.etat === "bloque") { %>
+                <span class="badge badge-en-attente">Bloqué par PamConnect</span>
+              <% } else if (v.etat === "rembourse") { %>
+                <span class="badge badge-non-soumis">Rendu</span>
+              <% } else { %>
+                <span class="badge badge-verifie">Versé à <%= v.nomBeneficiaire %></span>
+              <% } %>
+            </p>
+
+            <ul class="infos">
+              <li>
+                <%- include("partiels/icone", { nom: "remuneration" }) %>
+                <span><strong><%= formaterMontant(v.montant) %></strong></span>
+              </li>
+              <li>
+                <%- include("partiels/icone", { nom: "calendrier" }) %>
+                <span>Bloqué le <%= v.cree_le %></span>
+              </li>
+              <% if (v.denoue_le) { %>
+                <li>
+                  <%- include("partiels/icone", { nom: "valider" }) %>
+                  <span><%= v.etat === "rembourse" ? "Rendu" : "Versé" %> le <%= v.denoue_le %></span>
+                </li>
+              <% } %>
+            </ul>
+
+            <% if (v.etat === "bloque") { %>
+              <%# L'OBLIGATION, ecrite la ou la somme est encore bloquee.
+                  Un employeur qui oublie de declarer laisse une personne
+                  sans paiement, et cree un litige que rien ne justifiait. %>
+              <p class="aide">
+                <strong>Après chaque service effectué, déclarez-le à PamConnect.</strong>
+                C'est ce qui déclenche le versement. Sans cette déclaration,
+                la personne qui a travaillé n'est pas payée, et un litige
+                s'ouvre pour rien.
+              </p>
+            <% } %>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+
+  <% } else { %>
+
+    <h2>Ce que vous avez reçu</h2>
+
+    <div class="carte">
+      <div class="detail-tarif">
+        <div class="ligne-tarif total">
+          <span>Total reçu</span>
+          <strong><%= formaterMontant(solde) %></strong>
+        </div>
+      </div>
+      <p class="aide">
+        Ce montant est la somme de vos services terminés, commission
+        déduite. Il ne contient aucune coordonnée : PamConnect ne demande
+        ni numéro Mobile Money, ni compte bancaire.
+      </p>
+    </div>
+
+    <% if (recus.length === 0) { %>
+      <div class="vide">
+        <p>Aucun versement pour le moment.</p>
+        <p class="aide">
+          Vous recevez la somme d'une demande lorsque l'employeur déclare
+          le service effectué.
+        </p>
+      </div>
+    <% } else { %>
+      <div class="grille">
+        <% recus.forEach(function (v) { %>
+          <div class="carte">
+            <h3><%= v.titreAnnonce %></h3>
+            <div class="metier">Chez <%= v.nomEmployeur %></div>
+
+            <div class="detail-tarif">
+              <div class="ligne-tarif">
+                <span>Somme annoncée</span>
+                <strong><%= formaterMontant(v.montant) %></strong>
+              </div>
+              <div class="ligne-tarif">
+                <span>Commission PamConnect (<%= pourcentageCommission %> %)</span>
+                <span class="retenue">− <%= formaterMontant(v.commission) %></span>
+              </div>
+              <div class="ligne-tarif total">
+                <span>Vous avez reçu</span>
+                <strong><%= formaterMontant(v.net) %></strong>
+              </div>
+            </div>
+
+            <ul class="infos">
+              <li>
+                <%- include("partiels/icone", { nom: "calendrier" }) %>
+                <span>Versé le <%= v.denoue_le %></span>
+              </li>
+            </ul>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+
+  <% } %>
+
+  <p class="actions">
+    <a class="bouton bouton-secondaire" href="/mon-profil">
+      <%- include("partiels/icone", { nom: "profil" }) %>
+      Retour à mon profil
+    </a>
+  </p>
+
+<%- include("partiels/pied") %>

@@ -144,6 +144,65 @@ retirerColonneSiPresente("candidatures", "tarif_propose");
 // donnees de reference (quartiers, metiers).
 db.exec(fs.readFileSync(path.join(__dirname, "data", "schema.sql"), "utf-8"));
 
+// RATTRAPAGE : les demandes publiees avant l'existence du sequestre n'ont
+// pas de versement. La regle veut que toute demande en porte un - sinon
+// l'ecran de l'equipe serait vide et les comptes des personnes aussi.
+//
+// Chaque versement manquant est reconstruit A PARTIR DE LA DEMANDE
+// elle-meme : son prix, son auteur, son etat. Aucun montant n'est
+// invente, et rien n'est ecrase : seules les demandes SANS versement
+// sont traitees.
+//
+// Place APRES db.exec : la table versements doit exister.
+{
+  const sans = db.prepare(`
+    SELECT a.id, a.employeur_id, a.prix, a.annulee,
+           (SELECT c.prestataire_id FROM candidatures c
+             WHERE c.annonce_id = a.id AND c.statut = 'acceptee'
+             ORDER BY c.id LIMIT 1) AS retenu,
+           (SELECT c.terminee_le FROM candidatures c
+             WHERE c.annonce_id = a.id AND c.statut = 'acceptee'
+             ORDER BY c.id LIMIT 1) AS termineeLe
+    FROM annonces a
+    WHERE a.prix > 0
+      AND NOT EXISTS (SELECT 1 FROM versements v WHERE v.annonce_id = a.id)
+  `).all();
+
+  if (sans.length > 0) {
+    const poser = db.prepare(`
+      INSERT INTO versements
+        (annonce_id, employeur_id, montant, etat, denoue_le, beneficiaire_id, commission, net)
+      VALUES (@annonce, @employeur, @montant, @etat, @denoue, @beneficiaire, @commission, @net)
+    `);
+
+    for (const a of sans) {
+      const commission = Math.round(a.prix * 0.10);
+
+      // Le service a eu lieu : la somme est deja partie.
+      if (a.retenu && a.termineeLe) {
+        poser.run({ annonce: a.id, employeur: a.employeur_id, montant: a.prix,
+          etat: "verse", denoue: a.termineeLe, beneficiaire: a.retenu,
+          commission, net: a.prix - commission });
+
+      // Demande retiree sans que personne n'ait ete choisi : rendue.
+      } else if (a.annulee === 1 && !a.retenu) {
+        poser.run({ annonce: a.id, employeur: a.employeur_id, montant: a.prix,
+          etat: "rembourse", denoue: null, beneficiaire: null,
+          commission: null, net: null });
+
+      // Tout le reste attend : demande ouverte, ou pourvue et pas encore
+      // declaree effectuee.
+      } else {
+        poser.run({ annonce: a.id, employeur: a.employeur_id, montant: a.prix,
+          etat: "bloque", denoue: null, beneficiaire: null,
+          commission: null, net: null });
+      }
+    }
+
+    console.log(`Versements reconstruits pour ${sans.length} demande(s) deja publiee(s)`);
+  }
+}
+
 // ============================================================
 // LES REQUETES
 // ============================================================
@@ -390,6 +449,7 @@ const requetes = {
            p.id              AS prestataireId,
            p.nom             AS nomPrestataire,
            p.metier          AS metierPrestataire,
+           a.id              AS annonceId,
            c.terminee_le
     FROM candidatures c
     JOIN annonces     a ON a.id = c.annonce_id
@@ -472,6 +532,94 @@ const requetes = {
 
   marquerAvertissementLu: db.prepare(`
     UPDATE utilisateurs SET avertissement_lu = 1 WHERE id = ?
+  `),
+
+  // La publication bloque la somme annoncee.
+  bloquerVersement: db.prepare(`
+    INSERT INTO versements (annonce_id, employeur_id, montant)
+    VALUES (@annonce, @employeur, @montant)
+  `),
+
+  // Le prix d'une demande peut changer tant que personne n'a repondu.
+  // La somme bloquee doit suivre, sinon les deux chiffres divergent.
+  ajusterVersement: db.prepare(`
+    UPDATE versements SET montant = @montant
+    WHERE annonce_id = @annonce AND etat = 'bloque'
+  `),
+
+  rembourserVersement: db.prepare(`
+    UPDATE versements
+    SET etat = 'rembourse', denoue_le = datetime('now')
+    WHERE annonce_id = @annonce AND etat = 'bloque'
+  `),
+
+  verserVersement: db.prepare(`
+    UPDATE versements
+    SET etat            = 'verse',
+        denoue_le       = datetime('now'),
+        beneficiaire_id = @beneficiaire,
+        commission      = @commission,
+        net             = @net
+    WHERE annonce_id = @annonce AND etat = 'bloque'
+  `),
+
+  versementDeLAnnonce: db.prepare(`
+    SELECT * FROM versements WHERE annonce_id = ?
+  `),
+
+  // Le solde n'est jamais range quelque part : il est recalcule. Un
+  // total garde a cote de ses lignes finit toujours par leur mentir.
+  soldeDe: db.prepare(`
+    SELECT COALESCE(SUM(net), 0) AS solde
+    FROM versements WHERE beneficiaire_id = ? AND etat = 'verse'
+  `),
+
+  mesVersementsRecus: db.prepare(`
+    SELECT v.montant, v.commission, v.net, v.denoue_le,
+           a.titre AS titreAnnonce,
+           e.nom   AS nomEmployeur
+    FROM versements v
+    JOIN annonces     a ON a.id = v.annonce_id
+    JOIN utilisateurs e ON e.id = v.employeur_id
+    WHERE v.beneficiaire_id = ? AND v.etat = 'verse'
+    ORDER BY v.denoue_le DESC, v.id DESC
+  `),
+
+  mesVersementsEnvoyes: db.prepare(`
+    SELECT v.montant, v.etat, v.cree_le, v.denoue_le, v.net,
+           a.titre   AS titreAnnonce,
+           a.annulee AS demandeFermee,
+           b.nom     AS nomBeneficiaire
+    FROM versements v
+    JOIN annonces a ON a.id = v.annonce_id
+    LEFT JOIN utilisateurs b ON b.id = v.beneficiaire_id
+    WHERE v.employeur_id = ?
+    ORDER BY v.cree_le DESC, v.id DESC
+  `),
+
+  // Ce que l'equipe doit voir : les sommes encore bloquees, la plus
+  // ancienne d'abord. Celles posees sur une demande POURVUE attendent
+  // une declaration de service qui ne vient peut-etre jamais.
+  versementsBloques: db.prepare(`
+    SELECT v.id, v.montant, v.cree_le,
+           a.id      AS annonceId,
+           a.titre   AS titreAnnonce,
+           a.annulee AS demandeFermee,
+           e.nom     AS nomEmployeur,
+           e.email   AS emailEmployeur,
+           (SELECT u.nom FROM candidatures c
+              JOIN utilisateurs u ON u.id = c.prestataire_id
+             WHERE c.annonce_id = a.id AND c.statut = 'acceptee'
+             LIMIT 1) AS nomRetenu
+    FROM versements v
+    JOIN annonces     a ON a.id = v.annonce_id
+    JOIN utilisateurs e ON e.id = v.employeur_id
+    WHERE v.etat = 'bloque'
+    ORDER BY v.cree_le, v.id
+  `),
+
+  nombreVersementsBloques: db.prepare(`
+    SELECT COUNT(*) AS n FROM versements WHERE etat = 'bloque'
   `),
 
   signalerProbleme: db.prepare(`
@@ -831,6 +979,14 @@ function verifierProfilPrestataire(donnees) {
 // lisent au lieu d'ecrire "24" chacun de leur cote.
 const DELAI_VERIFICATION_HEURES = 24;
 
+// Une somme bloquee sur une demande POURVUE attend que l'employeur
+// declare le service effectue. Passe ce delai, l'equipe doit la voir :
+// la personne a peut-etre travaille sans etre payee.
+//
+// CE NOMBRE EST UN CHOIX, pas une regle du metier. Il se change ici, en
+// une ligne.
+const DELAI_ALERTE_VERSEMENT_JOURS = 7;
+
 // Depuis combien de temps ce dossier attend-il, et le delai est-il tenu ?
 //
 // SQLite enregistre datetime('now') en temps universel. Il faut le dire
@@ -863,6 +1019,20 @@ function attenteLisible(envoyeLe) {
   if (a.heures < 1) return "il y a moins d'une heure";
   if (a.heures === 1) return "il y a 1 heure";
   return "il y a " + a.heures + " heures";
+}
+
+// Depuis combien de jours une somme est-elle bloquee, et faut-il que
+// l'equipe s'en inquiete ? Meme lecture du temps que pour les dossiers
+// d'identite : la date est en temps universel, on le dit a Date.parse.
+function attenteVersement(creeLe) {
+  if (!creeLe) return null;
+
+  const depart = Date.parse(String(creeLe).replace(" ", "T") + "Z");
+  if (Number.isNaN(depart)) return null;
+
+  const jours = Math.floor((Date.now() - depart) / 86400000);
+
+  return { jours, depasse: jours >= DELAI_ALERTE_VERSEMENT_JOURS };
 }
 
 function libelleVerification(statut) {
@@ -1273,6 +1443,8 @@ app.locals.pourcentageCommission = Math.round(TAUX_COMMISSION * 100);
 app.locals.libelleVerification = libelleVerification;
 app.locals.phraseCandidature = phraseCandidature;
 app.locals.attenteVerification = attenteVerification;
+app.locals.attenteVersement = attenteVersement;
+app.locals.delaiAlerteVersementJours = DELAI_ALERTE_VERSEMENT_JOURS;
 app.locals.attenteLisible = attenteLisible;
 app.locals.delaiVerificationHeures = DELAI_VERIFICATION_HEURES;
 app.locals.libelleUnite = libelleUnite;
@@ -1883,13 +2055,26 @@ app.post("/annonces", exigerConnexion, interdireALEquipe, exigerVerification, li
     }));
   }
 
-  requetes.creerAnnonce.run(Object.assign(
+  const creee = requetes.creerAnnonce.run(Object.assign(
     { employeur_id: req.utilisateur.id }, champsAnnonce(donnees)));
 
+  // L'employeur n'a pas publie par plaisir : la somme qu'il annonce est
+  // bloquee des maintenant. La personne qui repondra sait ainsi que
+  // l'argent existe avant de se deplacer.
+  //
+  // SIMULATION : rien n'est encaisse. La ligne enregistree dit ce qui
+  // DEVRAIT se passer, et les ecrans le precisent.
+  requetes.bloquerVersement.run({
+    annonce: Number(creee.lastInsertRowid),
+    employeur: req.utilisateur.id,
+    montant: Math.round(Number(donnees.prix) || 0),
+  });
+
   res.render("message", {
-    titre: "Annonce publiee !",
-    texte: `Votre annonce "${donnees.titre}" a bien été enregistrée.`,
-    liens: [{ url: "/", texte: "Retour a l'accueil" }],
+    titre: "Demande publiée",
+    texte: `Votre demande "${donnees.titre}" est en ligne. La somme annoncée ` +
+           `est bloquée par PamConnect jusqu'à la fin du service.`,
+    liens: [{ url: "/", texte: "Retour à l'accueil" }],
   });
 });
 
@@ -1950,6 +2135,13 @@ app.post("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, lireFormu
 
   requetes.majAnnonce.run(Object.assign({ id: annonce.id }, champsAnnonce(req.body)));
 
+  // Le prix a peut-etre change : la somme bloquee doit suivre, sinon les
+  // deux chiffres se contredisent d'un ecran a l'autre.
+  requetes.ajusterVersement.run({
+    annonce: annonce.id,
+    montant: Math.round(Number(req.body.prix) || 0),
+  });
+
   res.render("message", {
     titre: "Demande mise à jour",
     texte: "Les personnes qui consultent vos annonces voient la nouvelle version.",
@@ -1979,6 +2171,12 @@ app.post("/annonces/:id/annuler", exigerConnexion, interdireALEquipe, lireFormul
   }
 
   requetes.annulerAnnonce.run({ id: annonce.id });
+
+  // Retirer une demande que PERSONNE n'a obtenue libere la somme. Si
+  // quelqu'un avait ete accepte, la demande serait deja fermee et cette
+  // route ne s'executerait pas : on ne reprend pas son argent apres
+  // avoir embauche.
+  requetes.rembourserVersement.run({ annonce: annonce.id });
 
   res.render("message", {
     titre: "Demande retirée",
@@ -2570,6 +2768,21 @@ app.post("/candidatures/:id/terminer", exigerConnexion, lireFormulaire, (req, re
 
   requetes.terminerService.run({ id: conversation.id });
 
+  // Le service est fait : la somme bloquee part chez la personne qui a
+  // travaille, commission deduite. C'est le seul chemin par lequel elle
+  // y arrive - aucun bouton ne verse de l'argent directement.
+  const versement = requetes.versementDeLAnnonce.get(conversation.annonceId);
+
+  if (versement && versement.etat === "bloque") {
+    const detail = detaillerTarif(versement.montant);
+    requetes.verserVersement.run({
+      annonce: conversation.annonceId,
+      beneficiaire: conversation.prestataireId,
+      commission: detail.commission,
+      net: detail.net,
+    });
+  }
+
   res.redirect("/messages/" + conversation.id);
 });
 
@@ -2726,6 +2939,36 @@ app.post("/admin/problemes/:id", exigerAdmin, lireFormulaire, (req, res) => {
   res.redirect("/admin/problemes");
 });
 
+// MON COMPTE.
+//
+// Le compte d'une personne qui travaille : ce qu'elle a recu, et pour
+// quel service. Celui d'un employeur : ce qu'il a bloque, rembourse ou
+// verse.
+//
+// Aucune coordonnee bancaire ni Mobile Money n'y est stockee. Un numero
+// de telephone est une donnee personnelle et un moyen de contact direct,
+// et la plateforme n'en demande pas. Le solde est un montant du, pas un
+// portefeuille : le versement reel se ferait ailleurs.
+app.get("/mon-compte", exigerConnexion, interdireALEquipe, (req, res) => {
+  const jeSuisEmployeur = req.utilisateur.role === "employeur";
+
+  res.render("compte", {
+    titre: "Mon compte",
+    jeSuisEmployeur,
+    solde: jeSuisEmployeur ? 0 : requetes.soldeDe.get(req.utilisateur.id).solde,
+    recus: jeSuisEmployeur ? [] : requetes.mesVersementsRecus.all(req.utilisateur.id),
+    envoyes: jeSuisEmployeur ? requetes.mesVersementsEnvoyes.all(req.utilisateur.id) : [],
+  });
+});
+
+// --- Espace equipe : les sommes bloquees ---------------------------
+app.get("/admin/versements", exigerAdmin, (req, res) => {
+  res.render("versements", {
+    titre: "Versements",
+    versements: requetes.versementsBloques.all(),
+  });
+});
+
 // --- Espace equipe : les dossiers a verifier -----------------------
 app.get("/admin", exigerAdmin, (req, res) => {
   res.render("admin", {
@@ -2734,6 +2977,7 @@ app.get("/admin", exigerAdmin, (req, res) => {
     statistiques: requetes.statistiquesVerification.all(),
     signalementsOuverts: requetes.nombreSignalementsOuverts.get().n,
     problemesOuverts: requetes.nombreProblemesOuverts.get().n,
+    versementsBloques: requetes.nombreVersementsBloques.get().n,
   });
 });
 

@@ -1,0 +1,108 @@
+<%- include("partiels/tete") %>
+
+  <h1>Versements</h1>
+  <p class="chapeau">
+    Les sommes annoncées par les employeurs et bloquées par PamConnect.
+    Elles ne repartent qu'à la fin d'un service, ou lorsqu'une demande est
+    retirée.
+  </p>
+
+  <p class="actions">
+    <a class="bouton bouton-secondaire" href="/admin">
+      <%- include("partiels/icone", { nom: "document" }) %>
+      Dossiers à vérifier
+    </a>
+    <a class="bouton bouton-secondaire" href="/admin/problemes">
+      <%- include("partiels/icone", { nom: "info" }) %>
+      Problèmes signalés
+    </a>
+  </p>
+
+  <%# CE QUE L'EQUIPE NE PEUT PAS FAIRE ICI, et c'est voulu : aucun
+      bouton ne deplace de l'argent. Une somme part parce qu'un service a
+      ete declare effectue, ou parce qu'une demande a ete retiree - jamais
+      parce que quelqu'un a clique. %>
+  <div class="carte confiance">
+    <h3>Cette page se lit, elle n'agit pas</h3>
+    <p>
+      Aucun bouton ne déplace de l'argent. Une somme part parce qu'un
+      service a été déclaré effectué, ou parce qu'une demande a été
+      retirée sans que personne ait été choisi.
+    </p>
+    <p class="aide">
+      Quand une somme attend trop longtemps sur une demande pourvue, c'est
+      que l'employeur n'a pas déclaré le service. Contactez-le : la
+      personne qui a travaillé n'est pas payée tant qu'il ne l'a pas fait.
+    </p>
+  </div>
+
+  <% if (versements.length === 0) { %>
+
+    <div class="vide">
+      <p>Aucune somme bloquée.</p>
+    </div>
+
+  <% } else { %>
+
+    <% versements.forEach(function (v) { %>
+      <% const att = attenteVersement(v.cree_le); %>
+      <div class="carte">
+
+        <h3><%= v.titreAnnonce %></h3>
+
+        <div class="detail-tarif">
+          <div class="ligne-tarif total">
+            <span>Somme bloquée</span>
+            <strong><%= formaterMontant(v.montant) %></strong>
+          </div>
+        </div>
+
+        <ul class="infos">
+          <li>
+            <%- include("partiels/icone", { nom: "profil" }) %>
+            <span>Versée par <strong><%= v.nomEmployeur %></strong> (<%= v.emailEmployeur %>)</span>
+          </li>
+          <li>
+            <%- include("partiels/icone", { nom: "calendrier" }) %>
+            <span>Reçue le <%= v.cree_le %></span>
+          </li>
+          <li>
+            <%- include("partiels/icone", { nom: "document" }) %>
+            <span>
+              <% if (v.nomRetenu) { %>
+                Demande pourvue — <strong><%= v.nomRetenu %></strong> a été retenue
+              <% } else if (v.demandeFermee) { %>
+                Demande retirée
+              <% } else { %>
+                Demande ouverte, personne n'a encore été choisi
+              <% } %>
+            </span>
+          </li>
+        </ul>
+
+        <%# Une somme posee sur une demande POURVUE attend une declaration
+            de service qui ne vient peut-etre jamais. C'est le seul cas
+            ou quelqu'un peut rester impaye sans que rien ne le signale. %>
+        <% if (v.nomRetenu && att && att.depasse) { %>
+          <p>
+            <span class="badge badge-refuse">
+              Bloquée depuis <%= att.jours %> jours — le service n'a pas été déclaré
+            </span>
+          </p>
+          <p class="aide">
+            <%= v.nomRetenu %> a peut-être travaillé sans être payée.
+          </p>
+        <% } else if (att) { %>
+          <p>
+            <span class="badge badge-en-attente">
+              Bloquée depuis <%= att.jours %> jour<%= att.jours > 1 ? "s" : "" %>
+            </span>
+          </p>
+        <% } %>
+
+      </div>
+    <% }); %>
+
+  <% } %>
+
+<%- include("partiels/pied") %>
