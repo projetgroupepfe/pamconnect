@@ -219,6 +219,15 @@ CREATE TABLE IF NOT EXISTS candidatures (
   -- 'acceptee', avec une date de fin.
   terminee_le        TEXT,
 
+  -- Quand la personne qui a travaille a declare l'avoir fait.
+  --
+  -- CETTE DATE NE PAIE RIEN. Seule la declaration de l'employeur libere
+  -- l'argent, ou la decision de l'equipe : sinon il suffirait de mentir
+  -- pour toucher une somme. Elle sert de trace - l'employeur voit
+  -- qu'elle attend, et l'equipe lit un desaccord date plutot qu'un
+  -- silence.
+  declaree_par_elle_le TEXT,
+
   -- Un prestataire ne peut postuler qu'UNE SEULE FOIS a une annonce donnee.
   UNIQUE (annonce_id, prestataire_id)
 );

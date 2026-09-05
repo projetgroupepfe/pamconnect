@@ -158,6 +158,58 @@
         </form>
       </div>
 
+      <%# Elle a declare avoir travaille. L'employeur doit le savoir : c'est
+          lui qui detient la cle du paiement. %>
+      <% if (jeSuisEmployeur && conversation.declaree_par_elle_le && !conversation.terminee_le) { %>
+        <div class="carte confiance">
+          <h3><%= conversation.nomPrestataire %> indique avoir effectué le service</h3>
+          <p>
+            Elle l'a déclaré le <strong><%= conversation.declaree_par_elle_le %></strong>.
+            Si c'est exact, déclarez-le de votre côté : c'est ce qui la paie.
+          </p>
+          <p class="aide">
+            Si ce n'est pas exact, ne déclarez rien et signalez le problème à l'équipe.
+          </p>
+        </div>
+      <% } %>
+
+      <%# ELLE AUSSI PEUT LE DIRE. Sa declaration ne libere aucun argent -
+          sinon il suffirait de mentir pour toucher une somme. Elle pose une
+          trace datee, que l'employeur et l'equipe voient. %>
+      <% if (!jeSuisEmployeur && conversation.statut === "acceptee" && !conversation.terminee_le) { %>
+        <div class="carte">
+          <% if (conversation.declaree_par_elle_le) { %>
+            <h3>Vous avez déclaré avoir effectué ce service</h3>
+            <p>
+              Le <strong><%= conversation.declaree_par_elle_le %></strong>.
+              <%= conversation.nomEmployeur %> doit le confirmer de son côté pour que
+              la somme vous soit versée.
+            </p>
+            <p class="aide">
+              S'il ne le fait pas, signalez le problème à l'équipe : elle verra votre
+              déclaration et sa date.
+            </p>
+          <% } else { %>
+            <h3>Avez-vous effectué ce service ?</h3>
+            <p>
+              Le dire ne vous paie pas tout de suite : c'est
+              <%= conversation.nomEmployeur %> qui déclenche le versement en le
+              confirmant. Mais votre déclaration est enregistrée avec sa date, et
+              l'équipe la verra s'il ne confirme rien.
+            </p>
+            <form action="/candidatures/<%= conversation.id %>/jai-effectue" method="POST">
+              <div class="actions">
+                <button type="submit" class="bouton-secondaire">
+                  <%- include("partiels/icone", { nom: "valider" }) %>
+                  J'ai effectué ce service
+                </button>
+              </div>
+            </form>
+          <% } %>
+        </div>
+      <% } %>
+
+
       <%# Clore le service appartient a celui qui l'a RECU. La personne
           qui a travaille ne le declare pas a sa place. %>
       <% if (jeSuisEmployeur && conversation.statut === "acceptee") { %>

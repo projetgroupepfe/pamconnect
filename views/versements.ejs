@@ -98,6 +98,19 @@
               <% } %>
             </span>
           </li>
+          <%# SA DECLARATION. C'est elle qui transforme un silence en
+              desaccord date, et c'est sur elle que l'equipe s'appuiera
+              pour trancher. %>
+          <% if (v.declareeParElleLe) { %>
+            <li>
+              <%- include("partiels/icone", { nom: "info" }) %>
+              <span>
+                <strong><%= v.nomRetenu %></strong> indique avoir effectué le
+                service le <strong><%= v.declareeParElleLe %></strong>.
+                L'employeur ne l'a pas confirmé.
+              </span>
+            </li>
+          <% } %>
         </ul>
 
         <%# Une somme posee sur une demande ou quelqu'un a ete choisi

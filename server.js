@@ -127,6 +127,7 @@ ajouterColonneSiAbsente("candidatures", "vu_employeur_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "vu_prestataire_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "terminee_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "statut_change_le", "TEXT");
+ajouterColonneSiAbsente("candidatures", "declaree_par_elle_le", "TEXT");
 ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
 ajouterColonneSiAbsente("annonces", "annulee", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
@@ -486,7 +487,8 @@ const requetes = {
            a.annulee         AS demandeFermee,
            EXISTS (SELECT 1 FROM candidatures x
                     WHERE x.annonce_id = a.id AND x.statut = 'acceptee') AS quelquUnChoisi,
-           c.terminee_le
+           c.terminee_le,
+           c.declaree_par_elle_le
     FROM candidatures c
     JOIN annonces     a ON a.id = c.annonce_id
     JOIN utilisateurs e ON e.id = a.employeur_id
@@ -655,7 +657,10 @@ const requetes = {
              LIMIT 1) AS nomRetenu,
            (SELECT c.terminee_le FROM candidatures c
              WHERE c.annonce_id = a.id AND c.statut = 'acceptee'
-             LIMIT 1) AS serviceTermineLe
+             LIMIT 1) AS serviceTermineLe,
+           (SELECT c.declaree_par_elle_le FROM candidatures c
+             WHERE c.annonce_id = a.id AND c.statut = 'acceptee'
+             LIMIT 1) AS declareeParElleLe
     FROM versements v
     JOIN annonces     a ON a.id = v.annonce_id
     JOIN utilisateurs e ON e.id = v.employeur_id
@@ -819,6 +824,16 @@ const requetes = {
             AND a.annulee = 1
             AND a.annulee_le > COALESCE(c.vu_prestataire_le, ''))
       )
+  `),
+
+  // Elle ne peut declarer que sur une candidature acceptee, et une
+  // seule fois : la condition est dans la requete, pas seulement dans la
+  // route. Deux envois ne changent donc pas la date.
+  declarerParElle: db.prepare(`
+    UPDATE candidatures
+    SET declaree_par_elle_le = datetime('now')
+    WHERE id = @id AND statut = 'acceptee'
+      AND terminee_le IS NULL AND declaree_par_elle_le IS NULL
   `),
 
   marquerVuEmployeur: db.prepare(`
@@ -2915,6 +2930,50 @@ app.post("/verification", exigerConnexion, interdireALEquipe, (req, res) => {
       liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
     });
   });
+});
+
+// LA PERSONNE QUI A TRAVAILLE DECLARE L'AVOIR FAIT.
+//
+// Sa declaration ne libere AUCUN argent : seule celle de l'employeur le
+// fait, ou la decision de l'equipe. Sinon il suffirait de mentir pour
+// toucher une somme sans avoir travaille.
+//
+// Ce qu'elle change : l'employeur voit qu'elle attend sa confirmation,
+// et l'equipe lit un desaccord date au lieu d'une somme qui traine.
+app.post("/candidatures/:id/jai-effectue", exigerConnexion, lireFormulaire, (req, res) => {
+  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+
+  if (!conversation) {
+    return res.status(404).render("message", {
+      titre: "Discussion introuvable",
+      texte: "Cette discussion n'existe pas, ou elle ne vous concerne pas.",
+      liens: [{ url: "/messages", texte: "Mes messages" }],
+    });
+  }
+
+  // L'employeur a son propre bouton, qui lui verse la somme. Celui-ci
+  // n'est pas le sien.
+  if (req.utilisateur.id !== conversation.prestataireId) {
+    return res.status(403).render("message", {
+      titre: "Ce bouton n'est pas le vôtre",
+      texte: "Déclarer que vous avez effectué le service appartient à la personne " +
+             "qui a travaillé. De votre côté, déclarez le service effectué : " +
+             "c'est ce qui la paie.",
+      liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
+    });
+  }
+
+  if (conversation.statut !== "acceptee") {
+    return res.status(409).render("message", {
+      titre: "Aucun service à déclarer",
+      texte: "Vous ne pouvez déclarer un service que si l'employeur vous a choisie.",
+      liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
+    });
+  }
+
+  requetes.declarerParElle.run({ id: conversation.id });
+
+  res.redirect("/messages/" + conversation.id);
 });
 
 // L'employeur declare le service effectue. C'est lui qui l'a recu :
