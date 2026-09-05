@@ -316,6 +316,16 @@ const requetes = {
     WHERE id = @id AND annulee = 0
   `),
 
+  // Une demande fermee l'est soit parce que quelqu'un a ete choisi,
+  // soit parce que l'employeur l'a retiree. La colonne annulee ne
+  // distingue pas les deux : on le DEDUIT des candidatures, comme le
+  // fait deja le profil de l'employeur. Une information deduite ne peut
+  // pas se contredire.
+  annonceEstPourvue: db.prepare(`
+    SELECT 1 AS oui FROM candidatures
+    WHERE annonce_id = ? AND statut = 'acceptee' LIMIT 1
+  `),
+
   annonceParId: db.prepare(`
     SELECT a.*,
            e.nom                 AS nomEmployeur,
@@ -424,6 +434,22 @@ const requetes = {
     JOIN annonces     a ON a.id = c.annonce_id
     JOIN utilisateurs p ON p.id = c.prestataire_id
     WHERE c.id = ? AND a.employeur_id = ?
+  `),
+
+  maCandidaturePour: db.prepare(`
+    SELECT id, statut FROM candidatures
+    WHERE annonce_id = ? AND prestataire_id = ?
+  `),
+
+  // Rouvrir une candidature refusee plutot qu'en creer une seconde : la
+  // discussion deja echangee reste attachee a la meme ligne.
+  //
+  // statut_change_le repasse a NULL : il n'y a plus de decision a
+  // annoncer, la candidature attend de nouveau.
+  rouvrirCandidature: db.prepare(`
+    UPDATE candidatures
+    SET statut = 'en attente', statut_change_le = NULL
+    WHERE id = @id AND statut = 'refusee'
   `),
 
   changerStatutCandidature: db.prepare(`
@@ -2275,6 +2301,27 @@ function annonceFermee(annonce) {
   return Boolean(annonce && annonce.annulee);
 }
 
+// Ce qu'on dit a quelqu'un qui arrive sur une demande fermee. "Retiree"
+// et "pourvue" ne s'annoncent pas de la meme facon : dire a une personne
+// qui vient d'etre choisie que l'employeur a retire sa demande est le
+// contraire de la verite.
+function ecranDemandeFermee(annonceId) {
+  const pourvue = requetes.annonceEstPourvue.get(annonceId);
+
+  return pourvue
+    ? {
+        titre: "Demande pourvue",
+        texte: "L'employeur a choisi quelqu'un pour cette demande. " +
+               "Elle n'accepte plus de réponse.",
+        liens: [{ url: "/annonces", texte: "Voir les autres demandes" }],
+      }
+    : {
+        titre: "Demande retirée",
+        texte: "Cette personne a retiré sa demande. Elle n'accepte plus de réponse.",
+        liens: [{ url: "/annonces", texte: "Voir les autres demandes" }],
+      };
+}
+
 app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, (req, res) => {
   if (req.utilisateur.role !== "prestataire") {
     return res.status(403).render("message", {
@@ -2297,11 +2344,7 @@ app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, (req, res) => {
   // La demande a ete retiree par son employeur. Elle n'apparait plus dans
   // la liste, mais quelqu'un peut avoir garde l'adresse ouverte.
   if (annonceFermee(annonce)) {
-    return res.status(410).render("message", {
-      titre: "Demande retirée",
-      texte: "Cette personne a retiré sa demande. Elle n'accepte plus de réponse.",
-      liens: [{ url: "/annonces", texte: "Voir les autres demandes" }],
-    });
+    return res.status(410).render("message", ecranDemandeFermee(annonce.id));
   }
 
   res.render("repondre", { titre: "Répondre à cette demande", annonce });
@@ -2326,25 +2369,60 @@ app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
     });
   }
 
-  // La demande a ete retiree par son employeur. Elle n'apparait plus dans
-  // la liste, mais quelqu'un peut avoir garde l'adresse ouverte.
+  // Une reponse precedente existe peut-etre. Trois cas, trois suites
+  // differentes - et un seul d'entre eux etait traite jusqu'ici.
+  //
+  // Ce controle passe AVANT celui de la fermeture : accepter quelqu'un
+  // ferme la demande, et la personne choisie serait sinon renvoyee vers
+  // un ecran qui ne la concerne pas.
+  const deja = requetes.maCandidaturePour.get(annonce.id, req.utilisateur.id);
+
+  if (deja && deja.statut === "acceptee") {
+    return res.status(409).render("message", {
+      titre: "Vous avez déjà été choisie",
+      texte: "L'employeur vous a retenue pour cette demande.",
+      liens: [{ url: "/messages/" + deja.id, texte: "Ouvrir la discussion" }],
+    });
+  }
+
+  // La demande a ete fermee. Elle n'apparait plus dans la liste, mais
+  // quelqu'un peut avoir garde l'adresse ouverte.
   if (annonceFermee(annonce)) {
-    return res.status(410).render("message", {
-      titre: "Demande retirée",
-      texte: "Cette personne a retiré sa demande. Elle n'accepte plus de réponse.",
-      liens: [{ url: "/annonces", texte: "Voir les autres demandes" }],
+    return res.status(410).render("message", ecranDemandeFermee(annonce.id));
+  }
+
+  if (deja && deja.statut === "en attente") {
+    return res.status(409).render("message", {
+      titre: "Candidature déjà envoyée",
+      texte: "Vous avez déjà répondu à cette demande. Elle attend la décision " +
+             "de l'employeur.",
+      liens: [{ url: "/mon-profil", texte: "Voir mes candidatures" }],
+    });
+  }
+
+  if (deja && deja.statut === "refusee") {
+    // La demande est encore ouverte - la condition annonceFermee est
+    // passee plus haut. Refuser quelqu'un ne ferme pas la demande aux
+    // autres : rien ne justifiait de la fermer a elle pour toujours.
+    requetes.rouvrirCandidature.run({ id: deja.id });
+
+    return res.render("message", {
+      titre: "Candidature renvoyée",
+      texte: "Votre réponse a été renvoyée à cet employeur. Votre discussion " +
+             "précédente est conservée.",
+      liens: [{ url: "/messages/" + deja.id, texte: "Ouvrir la discussion" }],
     });
   }
 
   try {
     requetes.creerCandidature.run(annonce.id, req.utilisateur.id);
   } catch (erreur) {
-    // La regle UNIQUE (annonce_id, prestataire_id) du schema empeche
-    // de postuler deux fois a la meme annonce.
+    // La contrainte UNIQUE reste le dernier rempart : deux envois
+    // simultanes passeraient tous deux le controle ci-dessus.
     if (String(erreur.message).includes("UNIQUE")) {
       return res.status(409).render("message", {
-        titre: "Candidature deja envoyee",
-        texte: "Vous avez déjà répondu à cette annonce.",
+        titre: "Candidature déjà envoyée",
+        texte: "Vous avez déjà répondu à cette demande.",
         liens: [{ url: "/mon-profil", texte: "Voir mes candidatures" }],
       });
     }
