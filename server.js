@@ -2305,12 +2305,25 @@ app.post("/annonces/:id/annuler", exigerConnexion, interdireALEquipe, lireFormul
     });
   }
 
+  // ON NE RETIRE PAS UNE DEMANDE OU QUELQU'UN A ETE CHOISI.
+  //
+  // Le bouton est cache dans ce cas, mais cacher un bouton n'est pas une
+  // regle. Sans ce controle, un employeur pouvait fermer sa demande APRES
+  // avoir embauche et recuperer sa somme : la personne avait travaille
+  // pour rien. C'est exactement ce que le sequestre doit empecher.
+  if (requetes.annonceEstPourvue.get(annonce.id)) {
+    return res.status(409).render("message", {
+      titre: "Vous avez déjà choisi quelqu'un",
+      texte: "Cette demande ne peut plus être retirée : vous avez retenu une " +
+             "personne pour ce service. Si le service n'a pas eu lieu, signalez " +
+             "le problème à l'équipe plutôt que de retirer la demande.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+    });
+  }
+
   requetes.annulerAnnonce.run({ id: annonce.id });
 
-  // Retirer une demande que PERSONNE n'a obtenue libere la somme. Si
-  // quelqu'un avait ete accepte, la demande serait deja fermee et cette
-  // route ne s'executerait pas : on ne reprend pas son argent apres
-  // avoir embauche.
+  // Personne n'a ete choisi : la somme n'a plus de raison d'attendre.
   requetes.rembourserVersement.run({ annonce: annonce.id });
 
   res.render("message", {
