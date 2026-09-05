@@ -252,7 +252,7 @@
           <% const pourvue = annonce.candidatures.some(function (c) { return c.statut === "acceptee"; }); %>
           <% if (annonce.annulee) { %>
             <p class="aide">
-              <strong><%= pourvue ? "Demande pourvue." : "Demande retirée." %></strong>
+              <strong><%= pourvue ? "Vous avez choisi quelqu'un." : "Vous avez retiré cette demande." %></strong>
               Elle n'apparaît plus dans les annonces et n'accepte plus de réponse.
               Vos discussions restent accessibles.
             </p>

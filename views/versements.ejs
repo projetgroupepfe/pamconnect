@@ -30,9 +30,9 @@
       retirée sans que personne ait été choisi.
     </p>
     <p class="aide">
-      Quand une somme attend trop longtemps sur une demande pourvue, c'est
-      que l'employeur n'a pas déclaré le service. Contactez-le : la
-      personne qui a travaillé n'est pas payée tant qu'il ne l'a pas fait.
+      Quand une somme attend trop longtemps alors que quelqu'un a déjà été
+      choisi, c'est que l'employeur n'a pas déclaré le service. Contactez-le :
+      la personne qui a travaillé n'est pas payée tant qu'il ne l'a pas fait.
     </p>
   </div>
 
@@ -70,7 +70,7 @@
             <%- include("partiels/icone", { nom: "document" }) %>
             <span>
               <% if (v.nomRetenu) { %>
-                Demande pourvue — <strong><%= v.nomRetenu %></strong> a été retenue
+                Personne retenue : <strong><%= v.nomRetenu %></strong>
               <% } else if (v.demandeFermee) { %>
                 Demande retirée
               <% } else { %>

@@ -2310,7 +2310,7 @@ function ecranDemandeFermee(annonceId) {
 
   return pourvue
     ? {
-        titre: "Demande pourvue",
+        titre: "Quelqu'un a déjà été choisi",
         texte: "L'employeur a choisi quelqu'un pour cette demande. " +
                "Elle n'accepte plus de réponse.",
         liens: [{ url: "/annonces", texte: "Voir les autres demandes" }],
