@@ -2254,8 +2254,9 @@ app.post("/annonces/:id/annuler", exigerConnexion, interdireALEquipe, lireFormul
 
   res.render("message", {
     titre: "Demande retirée",
-    texte: "Elle n'apparaît plus dans les annonces et n'accepte plus de réponse. " +
-           "Les personnes qui vous avaient déjà répondu gardent accès à votre discussion.",
+    texte: "Votre demande n'apparaît plus dans les annonces et personne ne peut " +
+           "plus y répondre. Les personnes qui vous avaient déjà répondu gardent " +
+           "accès à votre discussion.",
     liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
   });
 });
@@ -2308,16 +2309,27 @@ function annonceFermee(annonce) {
 function ecranDemandeFermee(annonceId) {
   const pourvue = requetes.annonceEstPourvue.get(annonceId);
 
+  // Deux corrections dans ces phrases.
+  //
+  // "Elle n'accepte plus de reponse" : ce "Elle" pouvait designer la
+  // demande OU la personne citee juste avant. On lisait spontanement que
+  // c'etait ELLE qui fermait sa porte, ce qui n'est pas ce qui se passe.
+  //
+  // Et la phrase n'apprenait rien : si la demande est retiree, qu'elle
+  // n'accepte plus de reponse va de soi. Elle parle desormais de CELUI
+  // QUI LIT - ce qu'il peut ou ne peut plus faire, la seule chose qui
+  // l'interesse a cet instant.
   return pourvue
     ? {
         titre: "Quelqu'un a déjà été choisi",
-        texte: "L'employeur a choisi quelqu'un pour cette demande. " +
-               "Elle n'accepte plus de réponse.",
+        texte: "L'employeur a retenu une autre personne. " +
+               "Vous ne pouvez plus répondre à cette demande.",
         liens: [{ url: "/annonces", texte: "Voir les autres demandes" }],
       }
     : {
         titre: "Demande retirée",
-        texte: "Cette personne a retiré sa demande. Elle n'accepte plus de réponse.",
+        texte: "L'employeur a retiré cette demande. " +
+               "Vous ne pouvez plus y répondre.",
         liens: [{ url: "/annonces", texte: "Voir les autres demandes" }],
       };
 }
