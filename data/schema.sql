@@ -511,7 +511,14 @@ CREATE TABLE IF NOT EXISTS versements (
   denoue_le       TEXT,
   beneficiaire_id INTEGER REFERENCES utilisateurs(id),
   commission      INTEGER,
-  net             INTEGER
+  net             INTEGER,
+
+  -- Renseignes seulement quand c'est l'EQUIPE qui a tranche, faute
+  -- d'accord entre les deux. Une decision qui deplace l'argent de
+  -- quelqu'un doit pouvoir etre expliquee plus tard : on garde qui l'a
+  -- prise et le motif qu'elle a ecrit.
+  decide_par      INTEGER REFERENCES utilisateurs(id),
+  motif_decision  TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_versements_etat ON versements (etat);

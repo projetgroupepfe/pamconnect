@@ -128,6 +128,8 @@ ajouterColonneSiAbsente("candidatures", "vu_prestataire_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "terminee_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "statut_change_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "declaree_par_elle_le", "TEXT");
+ajouterColonneSiAbsente("versements", "decide_par", "INTEGER");
+ajouterColonneSiAbsente("versements", "motif_decision", "TEXT");
 ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
 ajouterColonneSiAbsente("annonces", "annulee", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
@@ -601,6 +603,38 @@ const requetes = {
     WHERE annonce_id = @annonce AND etat = 'bloque'
   `),
 
+  // L'equipe verse a la personne. Meme calcul que la declaration de
+  // l'employeur - seule la trace differe.
+  verserParEquipe: db.prepare(`
+    UPDATE versements
+    SET etat            = 'verse',
+        denoue_le       = datetime('now'),
+        beneficiaire_id = @beneficiaire,
+        commission      = @commission,
+        net             = @net,
+        decide_par      = @par,
+        motif_decision  = @motif
+    WHERE annonce_id = @annonce AND etat = 'bloque'
+  `),
+
+  rembourserParEquipe: db.prepare(`
+    UPDATE versements
+    SET etat           = 'rembourse',
+        denoue_le      = datetime('now'),
+        decide_par     = @par,
+        motif_decision = @motif
+    WHERE annonce_id = @annonce AND etat = 'bloque'
+  `),
+
+  // La candidature acceptee d'une demande, avec ce qu'il faut pour
+  // savoir si un litige existe et qui en est l'autre partie.
+  candidatureRetenue: db.prepare(`
+    SELECT c.id, c.prestataire_id, c.terminee_le, c.declaree_par_elle_le
+    FROM candidatures c
+    WHERE c.annonce_id = ? AND c.statut = 'acceptee'
+    ORDER BY c.id LIMIT 1
+  `),
+
   versementDeLAnnonce: db.prepare(`
     SELECT * FROM versements WHERE annonce_id = ?
   `),
@@ -644,6 +678,8 @@ const requetes = {
   tousLesVersements: db.prepare(`
     SELECT v.id, v.montant, v.cree_le, v.etat,
            v.denoue_le, v.commission, v.net,
+           v.motif_decision,
+           q.nom AS nomDecideur,
            a.id      AS annonceId,
            a.titre   AS titreAnnonce,
            a.metier  AS metierAnnonce,
@@ -665,6 +701,7 @@ const requetes = {
     JOIN annonces     a ON a.id = v.annonce_id
     JOIN utilisateurs e ON e.id = v.employeur_id
     LEFT JOIN utilisateurs b ON b.id = v.beneficiaire_id
+    LEFT JOIN utilisateurs q ON q.id = v.decide_par
     ORDER BY v.etat = 'bloque' DESC, v.cree_le, v.id
   `),
 
@@ -3217,6 +3254,102 @@ app.get("/mon-compte", exigerConnexion, interdireALEquipe, (req, res) => {
     recus: jeSuisEmployeur ? [] : requetes.mesVersementsRecus.all(req.utilisateur.id),
     envoyes: jeSuisEmployeur ? requetes.mesVersementsEnvoyes.all(req.utilisateur.id) : [],
   });
+});
+
+// L'EQUIPE TRANCHE UN LITIGE SUR UNE SOMME BLOQUEE.
+//
+// C'est la SEULE action de toute la plateforme qui deplace de l'argent
+// sans qu'un des deux interesses l'ait demande. Elle est donc encadree :
+//
+//   - elle n'existe que sur un vrai litige : quelqu'un a ete choisi, et
+//     soit la personne a declare avoir travaille, soit le delai est
+//     depasse. Avant cela, l'employeur n'a pas encore eu sa chance ;
+//   - un motif ECRIT est obligatoire, dans les deux sens ;
+//   - le nom de qui decide et son motif sont conserves : une decision
+//     qui deplace l'argent de quelqu'un doit pouvoir etre expliquee des
+//     mois plus tard.
+app.post("/admin/versements/:annonceId", exigerAdmin, lireFormulaire, (req, res) => {
+  const annonceId = Number(req.params.annonceId);
+  const versement = requetes.versementDeLAnnonce.get(annonceId);
+
+  if (!versement) {
+    return res.status(404).render("message", {
+      titre: "Versement introuvable",
+      texte: "Aucune somme n'est enregistrée pour cette demande.",
+      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
+    });
+  }
+
+  if (versement.etat !== "bloque") {
+    return res.status(409).render("message", {
+      titre: "Cette somme est déjà dénouée",
+      texte: "Elle a déjà été versée ou rendue. On ne rejuge pas une somme " +
+             "qui a bougé : la trace du premier examen disparaîtrait.",
+      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
+    });
+  }
+
+  const retenue = requetes.candidatureRetenue.get(annonceId);
+
+  if (!retenue) {
+    return res.status(409).render("message", {
+      titre: "Personne n'a été choisi",
+      texte: "Il n'y a rien à arbitrer : tant que l'employeur n'a retenu " +
+             "personne, sa demande peut vivre ou être retirée normalement.",
+      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
+    });
+  }
+
+  // L'employeur doit avoir eu sa chance. Trancher avant, ce serait
+  // decider a sa place alors qu'il n'a encore rien manque.
+  const attente = attenteVersement(versement.cree_le);
+  const litige = Boolean(retenue.declaree_par_elle_le) || Boolean(attente && attente.depasse);
+
+  if (!litige) {
+    return res.status(409).render("message", {
+      titre: "Rien à arbitrer pour le moment",
+      texte: "L'employeur n'a pas encore dépassé le délai, et la personne n'a " +
+             "pas déclaré avoir travaillé. Laissez-leur le temps de s'accorder.",
+      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
+    });
+  }
+
+  const motif = String(req.body.motif || "").trim().slice(0, 200);
+
+  if (!motif) {
+    return res.status(400).render("message", {
+      titre: "Motif obligatoire",
+      texte: "Vous déplacez l'argent de quelqu'un. Écrivez pourquoi : sans motif, " +
+             "personne ne pourra expliquer cette décision plus tard.",
+      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
+    });
+  }
+
+  if (req.body.decision === "verser") {
+    const detail = detaillerTarif(versement.montant);
+
+    requetes.verserParEquipe.run({
+      annonce: annonceId,
+      beneficiaire: retenue.prestataire_id,
+      commission: detail.commission,
+      net: detail.net,
+      par: req.utilisateur.id,
+      motif,
+    });
+  } else {
+    requetes.rembourserParEquipe.run({
+      annonce: annonceId,
+      par: req.utilisateur.id,
+      motif,
+    });
+  }
+
+  // Dans les deux cas l'affaire est close : la discussion rejoint les
+  // services termines. La laisser ouverte inviterait a discuter d'un
+  // dossier deja tranche.
+  requetes.terminerService.run({ id: retenue.id });
+
+  res.redirect("/admin/versements");
 });
 
 // --- Espace equipe : les sommes bloquees ---------------------------

@@ -20,16 +20,21 @@
     </a>
   </p>
 
-  <%# CE QUE L'EQUIPE NE PEUT PAS FAIRE ICI, et c'est voulu : aucun
-      bouton ne deplace de l'argent. Une somme part parce qu'un service a
-      ete declare effectue, ou parce qu'une demande a ete retiree -
-      jamais parce que quelqu'un a clique. %>
+  <%# LA SEULE PAGE OU L'EQUIPE DEPLACE DE L'ARGENT, et seulement en
+      dernier recours. Tant que les deux peuvent encore s'accorder, elle
+      regarde sans agir : c'est la declaration de l'employeur qui verse
+      la somme, pas un clic d'ici. %>
   <div class="carte confiance">
-    <h3>Cette page se lit, elle n'agit pas</h3>
+    <h3>Cette page n'agit qu'en dernier recours</h3>
     <p>
-      Aucun bouton ne déplace de l'argent. Une somme part parce qu'un
-      service a été déclaré effectué, ou parce qu'une demande a été
-      retirée sans que personne ait été choisi.
+      Une somme part normalement toute seule : parce qu'un service a été
+      déclaré effectué, ou parce qu'une demande a été retirée sans que
+      personne ait été choisi. Dans ces cas, vous n'avez rien à faire.
+    </p>
+    <p>
+      Vous ne pouvez trancher que sur un <strong>litige</strong> : quelqu'un a
+      été choisi, et soit la personne a déclaré avoir travaillé, soit le délai
+      est dépassé. Interrogez les deux avant de décider — et écrivez pourquoi.
     </p>
     <p class="aide">
       Quand une somme attend trop longtemps alors que quelqu'un a déjà été
@@ -134,6 +139,41 @@
           </p>
         <% } %>
 
+        <%# LE SEUL ENDROIT DE LA PLATEFORME OU UN CLIC DEPLACE DE L'ARGENT.
+            Il n'apparait que sur un litige : quelqu'un a ete choisi, et soit
+            la personne a declare avoir travaille, soit le delai est depasse.
+            Avant cela, l'employeur n'a encore rien manque. %>
+        <% const enLitige = v.nomRetenu && (v.declareeParElleLe || (att && att.depasse)); %>
+        <% if (enLitige) { %>
+          <div class="candidature">
+            <h4>Trancher ce litige</h4>
+            <p class="aide">
+              Interrogez les deux personnes avant de décider. Votre motif sera
+              conservé avec votre nom : il devra expliquer cette décision des mois
+              plus tard.
+            </p>
+
+            <form action="/admin/versements/<%= v.annonceId %>" method="POST">
+              <div class="champ">
+                <label for="motif-v<%= v.id %>">Motif de votre décision</label>
+                <input type="text" id="motif-v<%= v.id %>" name="motif" maxlength="200"
+                       placeholder="ex : l'employeur confirme par téléphone que le service a eu lieu">
+              </div>
+              <div class="actions">
+                <button type="submit" name="decision" value="verser" class="bouton-secondaire">
+                  <%- include("partiels/icone", { nom: "valider" }) %>
+                  Verser à <%= v.nomRetenu %>
+                </button>
+                <button type="submit" name="decision" value="rendre" class="bouton-danger">
+                  <%- include("partiels/icone", { nom: "refuser" }) %>
+                  Rendre à <%= v.nomEmployeur %>
+                </button>
+              </div>
+            </form>
+          </div>
+        <% } %>
+
+
       </div>
     <% }); %>
 
@@ -213,7 +253,25 @@
                 <strong><%= v.denoue_le %></strong>
               </span>
             </li>
+
+            <%# QUAND C'EST L'EQUIPE QUI A TRANCHE. Une somme deplacee par une
+                decision humaine ne se lit pas comme une somme partie toute
+                seule : on nomme qui a decide, et on cite son motif. %>
+            <% if (v.motif_decision) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "equipe" }) %>
+                <span>
+                  Tranché par <strong><%= v.nomDecideur %></strong>
+                </span>
+              </li>
+            <% } %>
+
           </ul>
+
+          <% if (v.motif_decision) { %>
+            <blockquote class="message-signale"><%= v.motif_decision %></blockquote>
+          <% } %>
+
 
         </div>
       <% }); %>
