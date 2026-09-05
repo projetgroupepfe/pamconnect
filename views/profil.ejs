@@ -429,7 +429,7 @@
             <ul class="infos">
               <li>
                 <%- include("partiels/icone", { nom: "disponibilite" }) %>
-                <span><strong><%= phraseCandidature(candidature.statut, false) %></strong></span>
+                <span><strong><%= phraseCandidature(candidature.statut, false, candidature) %></strong></span>
               </li>
             </ul>
             <div class="actions">

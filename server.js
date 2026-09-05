@@ -389,7 +389,10 @@ const requetes = {
 
   candidaturesDePrestataire: db.prepare(`
     SELECT c.id, c.statut,
-           a.titre AS titreAnnonce, a.horaire AS horaireAnnonce
+           a.titre AS titreAnnonce, a.horaire AS horaireAnnonce,
+           a.annulee AS demandeFermee,
+           EXISTS (SELECT 1 FROM candidatures x
+                    WHERE x.annonce_id = a.id AND x.statut = 'acceptee') AS quelquUnChoisi
     FROM candidatures c
     JOIN annonces a ON a.id = c.annonce_id
     WHERE c.prestataire_id = ?
@@ -480,6 +483,9 @@ const requetes = {
            p.nom             AS nomPrestataire,
            p.metier          AS metierPrestataire,
            a.id              AS annonceId,
+           a.annulee         AS demandeFermee,
+           EXISTS (SELECT 1 FROM candidatures x
+                    WHERE x.annonce_id = a.id AND x.statut = 'acceptee') AS quelquUnChoisi,
            c.terminee_le
     FROM candidatures c
     JOIN annonces     a ON a.id = c.annonce_id
@@ -727,10 +733,16 @@ const requetes = {
                      CASE WHEN e.id = @moi THEN c.vu_employeur_le
                           ELSE c.vu_prestataire_le END, '')) AS nonLus,
            c.terminee_le,
+           a.annulee AS demandeFermee,
+           EXISTS (SELECT 1 FROM candidatures x
+                    WHERE x.annonce_id = a.id AND x.statut = 'acceptee') AS quelquUnChoisi,
            CASE WHEN p.id = @moi
-                     AND c.statut != 'en attente'
-                     AND c.statut_change_le IS NOT NULL
-                     AND c.statut_change_le > COALESCE(c.vu_prestataire_le, '')
+                     AND ((c.statut != 'en attente'
+                           AND c.statut_change_le IS NOT NULL
+                           AND c.statut_change_le > COALESCE(c.vu_prestataire_le, ''))
+                       OR (c.statut = 'en attente'
+                           AND a.annulee = 1
+                           AND a.annulee_le > COALESCE(c.vu_prestataire_le, '')))
                 THEN 1 ELSE 0 END AS decisionNonVue
     FROM candidatures c
     JOIN annonces     a ON a.id = c.annonce_id
@@ -783,10 +795,21 @@ const requetes = {
   decisionsNonVues: db.prepare(`
     SELECT COUNT(*) AS n
     FROM candidatures c
+    JOIN annonces a ON a.id = c.annonce_id
     WHERE c.prestataire_id = @moi
-      AND c.statut != 'en attente'
-      AND c.statut_change_le IS NOT NULL
-      AND c.statut_change_le > COALESCE(c.vu_prestataire_le, '')
+      AND (
+        -- L'employeur a tranche, et elle ne l'a pas encore vu.
+        (c.statut != 'en attente'
+         AND c.statut_change_le IS NOT NULL
+         AND c.statut_change_le > COALESCE(c.vu_prestataire_le, ''))
+
+        -- Ou la demande a disparu sans que personne ne tranche : sa
+        -- candidature reste "en attente" alors qu'il n'y a plus rien a
+        -- attendre. Sans ce second cas, elle patientait pour rien.
+        OR (c.statut = 'en attente'
+            AND a.annulee = 1
+            AND a.annulee_le > COALESCE(c.vu_prestataire_le, ''))
+      )
   `),
 
   marquerVuEmployeur: db.prepare(`
@@ -1135,7 +1158,10 @@ function prixEnClair(annonce) {
 //
 // La phrase nomme donc l'auteur de la decision, et elle change selon le
 // cote depuis lequel on regarde la meme candidature.
-function phraseCandidature(statut, jeSuisEmployeur) {
+// Le troisieme parametre porte l'etat de la DEMANDE - fermee ou non,
+// et si quelqu'un a ete choisi. Il n'est utile que dans un cas : la
+// candidature attend toujours alors que la demande, elle, est close.
+function phraseCandidature(statut, jeSuisEmployeur, demande) {
   if (statut === "acceptee") {
     return jeSuisEmployeur
       ? "Vous avez accepté cette candidature"
@@ -1148,9 +1174,20 @@ function phraseCandidature(statut, jeSuisEmployeur) {
       : "L'employeur a refusé votre candidature";
   }
 
-  return jeSuisEmployeur
-    ? "En attente de votre décision"
-    : "Votre candidature est en attente";
+  if (jeSuisEmployeur) return "En attente de votre décision";
+
+  // ELLE ATTEND, MAIS QUOI ? Personne n'a tranche sa candidature, et
+  // pourtant la demande a pu disparaitre entre-temps. Lui laisser lire
+  // "en attente" revenait a lui faire guetter une decision qui ne
+  // viendrait jamais.
+  // Une seule cause possible ici : le retrait. Choisir quelqu'un refuse
+  // automatiquement les autres candidatures, donc aucune ne peut rester
+  // "en attente" sur une demande pourvue.
+  if (demande && demande.demandeFermee) {
+    return "L'employeur a retiré cette demande";
+  }
+
+  return "Votre candidature est en attente";
 }
 
 // Apres une connexion, on dit a la personne ce qu'elle peut FAIRE,

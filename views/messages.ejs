@@ -56,23 +56,17 @@
           </div>
 
           <ul class="infos">
+            <%# UNE SEULE LIGNE POUR L'ETAT. Un second bloc repetait la meme
+                information sous une autre forme, et il se trompait dans un cas :
+                une demande retiree n'est pas un refus. La marque "Nouveau" suffit
+                a distinguer ce qui vient d'arriver de ce qui etait deja su. %>
             <li>
               <%- include("partiels/icone", { nom: "disponibilite" }) %>
-              <span><strong><%= phraseCandidature(c.statut, jeSuisEmployeur) %></strong></span>
+              <span>
+                <strong><%= phraseCandidature(c.statut, jeSuisEmployeur, c) %></strong>
+                <% if (c.decisionNonVue) { %><span class="pastille">Nouveau</span><% } %>
+              </span>
             </li>
-            <%# LA DECISION D'ABORD. Un message non lu peut attendre ;
-                apprendre qu'on est choisi, non - c'est ce qui decide de
-                la suite. %>
-            <% if (c.decisionNonVue) { %>
-              <li>
-                <%- include("partiels/icone", { nom: c.statut === "acceptee" ? "valider" : "refuser" }) %>
-                <span>
-                  <strong><%= c.statut === "acceptee"
-                    ? "Votre candidature a été acceptée par " + autre
-                    : "Votre candidature n'a pas été retenue" %></strong>
-                </span>
-              </li>
-            <% } %>
 
             <%# Ce qui attend d'etre lu passe AVANT le compte total :
                 c'est la seule ligne qui demande une action. %>
