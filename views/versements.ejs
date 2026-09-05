@@ -2,15 +2,17 @@
 
   <h1>Versements</h1>
   <p class="chapeau">
-    Les sommes annoncées par les employeurs et bloquées par PamConnect.
-    Elles ne repartent qu'à la fin d'un service, ou lorsqu'une demande est
-    retirée.
+    L'argent que PamConnect a reçu des employeurs, et ce qu'il est devenu.
   </p>
 
   <p class="actions">
     <a class="bouton bouton-secondaire" href="/admin">
       <%- include("partiels/icone", { nom: "document" }) %>
       Dossiers à vérifier
+    </a>
+    <a class="bouton bouton-secondaire" href="/admin/signalements">
+      <%- include("partiels/icone", { nom: "message" }) %>
+      Messages signalés
     </a>
     <a class="bouton bouton-secondaire" href="/admin/problemes">
       <%- include("partiels/icone", { nom: "info" }) %>
@@ -20,8 +22,8 @@
 
   <%# CE QUE L'EQUIPE NE PEUT PAS FAIRE ICI, et c'est voulu : aucun
       bouton ne deplace de l'argent. Une somme part parce qu'un service a
-      ete declare effectue, ou parce qu'une demande a ete retiree - jamais
-      parce que quelqu'un a clique. %>
+      ete declare effectue, ou parce qu'une demande a ete retiree -
+      jamais parce que quelqu'un a clique. %>
   <div class="carte confiance">
     <h3>Cette page se lit, elle n'agit pas</h3>
     <p>
@@ -36,7 +38,17 @@
     </p>
   </div>
 
-  <% if (versements.length === 0) { %>
+  <%
+    // Ce qui attend d'un cote, ce qui est fait de l'autre. Les melanger
+    // obligerait a trier de l'oeil ce qui demande une attention de ce
+    // qui n'est plus qu'une trace.
+    const bloques = versements.filter(function (v) { return v.etat === "bloque"; });
+    const denoues = versements.filter(function (v) { return v.etat !== "bloque"; });
+  %>
+
+  <h2>Sommes bloquées</h2>
+
+  <% if (bloques.length === 0) { %>
 
     <div class="vide">
       <p>Aucune somme bloquée.</p>
@@ -44,7 +56,7 @@
 
   <% } else { %>
 
-    <% versements.forEach(function (v) { %>
+    <% bloques.forEach(function (v) { %>
       <% const att = attenteVersement(v.cree_le); %>
       <div class="carte">
 
@@ -59,6 +71,10 @@
 
         <ul class="infos">
           <li>
+            <%- include("partiels/icone", { nom: "experience" }) %>
+            <span><%= v.metierAnnonce %></span>
+          </li>
+          <li>
             <%- include("partiels/icone", { nom: "profil" }) %>
             <span>Versée par <strong><%= v.nomEmployeur %></strong> (<%= v.emailEmployeur %>)</span>
           </li>
@@ -70,7 +86,7 @@
             <%- include("partiels/icone", { nom: "document" }) %>
             <span>
               <% if (v.nomRetenu) { %>
-                Personne retenue : <strong><%= v.nomRetenu %></strong>
+                <strong><%= v.nomRetenu %></strong> a été retenue, le service n'est pas encore déclaré
               <% } else if (v.demandeFermee) { %>
                 Demande retirée
               <% } else { %>
@@ -80,9 +96,10 @@
           </li>
         </ul>
 
-        <%# Une somme posee sur une demande POURVUE attend une declaration
-            de service qui ne vient peut-etre jamais. C'est le seul cas
-            ou quelqu'un peut rester impaye sans que rien ne le signale. %>
+        <%# Une somme posee sur une demande ou quelqu'un a ete choisi
+            attend une declaration de service qui ne vient peut-etre
+            jamais. C'est le seul cas ou quelqu'un peut rester impaye
+            sans que rien ne le signale. %>
         <% if (v.nomRetenu && att && att.depasse) { %>
           <p>
             <span class="badge badge-refuse">
@@ -102,6 +119,88 @@
 
       </div>
     <% }); %>
+
+  <% } %>
+
+  <%# LA TRACE. Sans elle, l'equipe voyait ce qui attend et jamais ce qui
+      s'est fait : impossible de repondre a "je n'ai jamais ete payee",
+      alors que la reponse etait en base depuis le debut. %>
+  <h2>Sommes dénouées</h2>
+
+  <% if (denoues.length === 0) { %>
+
+    <div class="vide">
+      <p>Aucune somme n'a encore été versée ni rendue.</p>
+    </div>
+
+  <% } else { %>
+
+    <div class="grille">
+      <% denoues.forEach(function (v) { %>
+        <div class="carte">
+
+          <h3><%= v.titreAnnonce %></h3>
+          <div class="metier"><%= v.metierAnnonce %></div>
+
+          <p>
+            <% if (v.etat === "verse") { %>
+              <span class="badge badge-verifie">Versée à <%= v.nomBeneficiaire %></span>
+            <% } else { %>
+              <span class="badge badge-non-soumis">Rendue à <%= v.nomEmployeur %></span>
+            <% } %>
+          </p>
+
+          <% if (v.etat === "verse") { %>
+            <div class="detail-tarif">
+              <div class="ligne-tarif">
+                <span>Somme annoncée</span>
+                <strong><%= formaterMontant(v.montant) %></strong>
+              </div>
+              <div class="ligne-tarif">
+                <span>Commission PamConnect</span>
+                <span class="retenue">− <%= formaterMontant(v.commission) %></span>
+              </div>
+              <div class="ligne-tarif total">
+                <span><%= v.nomBeneficiaire %> a reçu</span>
+                <strong><%= formaterMontant(v.net) %></strong>
+              </div>
+            </div>
+          <% } else { %>
+            <div class="detail-tarif">
+              <div class="ligne-tarif total">
+                <span>Somme rendue</span>
+                <strong><%= formaterMontant(v.montant) %></strong>
+              </div>
+            </div>
+          <% } %>
+
+          <ul class="infos">
+            <li>
+              <%- include("partiels/icone", { nom: "profil" }) %>
+              <span>Versée par <strong><%= v.nomEmployeur %></strong> (<%= v.emailEmployeur %>)</span>
+            </li>
+            <li>
+              <%- include("partiels/icone", { nom: "calendrier" }) %>
+              <span>Reçue le <%= v.cree_le %></span>
+            </li>
+            <% if (v.etat === "verse" && v.serviceTermineLe) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "valider" }) %>
+                <span>Service déclaré effectué le <strong><%= v.serviceTermineLe %></strong></span>
+              </li>
+            <% } %>
+            <li>
+              <%- include("partiels/icone", { nom: "remuneration" }) %>
+              <span>
+                <%= v.etat === "verse" ? "Versée" : "Rendue" %> le
+                <strong><%= v.denoue_le %></strong>
+              </span>
+            </li>
+          </ul>
+
+        </div>
+      <% }); %>
+    </div>
 
   <% } %>
 

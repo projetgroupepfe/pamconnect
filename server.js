@@ -633,25 +633,34 @@ const requetes = {
     ORDER BY v.cree_le DESC, v.id DESC
   `),
 
-  // Ce que l'equipe doit voir : les sommes encore bloquees, la plus
-  // ancienne d'abord. Celles posees sur une demande POURVUE attendent
-  // une declaration de service qui ne vient peut-etre jamais.
-  versementsBloques: db.prepare(`
-    SELECT v.id, v.montant, v.cree_le,
+  // TOUT ce que l'equipe doit voir : l'argent qui entre, celui qui
+  // sort, et pour quel metier. Une plateforme qui garde l'argent de
+  // quelqu'un doit pouvoir dire ce qu'elle en a fait.
+  //
+  // Les sommes bloquees d'abord, la plus ancienne en tete : ce sont les
+  // seules qui attendent quelque chose. Les autres sont une trace.
+  tousLesVersements: db.prepare(`
+    SELECT v.id, v.montant, v.cree_le, v.etat,
+           v.denoue_le, v.commission, v.net,
            a.id      AS annonceId,
            a.titre   AS titreAnnonce,
+           a.metier  AS metierAnnonce,
            a.annulee AS demandeFermee,
            e.nom     AS nomEmployeur,
            e.email   AS emailEmployeur,
+           b.nom     AS nomBeneficiaire,
            (SELECT u.nom FROM candidatures c
               JOIN utilisateurs u ON u.id = c.prestataire_id
              WHERE c.annonce_id = a.id AND c.statut = 'acceptee'
-             LIMIT 1) AS nomRetenu
+             LIMIT 1) AS nomRetenu,
+           (SELECT c.terminee_le FROM candidatures c
+             WHERE c.annonce_id = a.id AND c.statut = 'acceptee'
+             LIMIT 1) AS serviceTermineLe
     FROM versements v
     JOIN annonces     a ON a.id = v.annonce_id
     JOIN utilisateurs e ON e.id = v.employeur_id
-    WHERE v.etat = 'bloque'
-    ORDER BY v.cree_le, v.id
+    LEFT JOIN utilisateurs b ON b.id = v.beneficiaire_id
+    ORDER BY v.etat = 'bloque' DESC, v.cree_le, v.id
   `),
 
   nombreVersementsBloques: db.prepare(`
@@ -3142,7 +3151,7 @@ app.get("/mon-compte", exigerConnexion, interdireALEquipe, (req, res) => {
 app.get("/admin/versements", exigerAdmin, (req, res) => {
   res.render("versements", {
     titre: "Versements",
-    versements: requetes.versementsBloques.all(),
+    versements: requetes.tousLesVersements.all(),
   });
 });
 
