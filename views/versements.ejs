@@ -27,23 +27,19 @@
   <div class="carte confiance">
     <h3>Cette page n'agit qu'en dernier recours</h3>
     <p>
-      Une somme part normalement toute seule : parce qu'un service a été
-      déclaré effectué, ou parce qu'une demande a été retirée sans que
-      personne ait été choisi. Dans ces cas, vous n'avez rien à faire.
+      Une somme part normalement toute seule : quand le service est déclaré
+      effectué, ou quand une demande est retirée sans que personne ait été
+      choisi.
     </p>
     <p>
-      Vous ne pouvez trancher que sur un <strong>litige</strong> : quelqu'un a
-      été choisi, et soit la personne a déclaré avoir travaillé, soit le délai
-      est dépassé. Interrogez les deux avant de décider — et écrivez pourquoi.
+      Vous n'intervenez qu'en cas de <strong>désaccord</strong> : quelqu'un a
+      été choisi, mais l'employeur n'a rien déclaré. Tant qu'il se tait, la
+      personne qui a travaillé n'est pas payée.
     </p>
     <p class="aide">
-      Quand une somme attend trop longtemps alors que quelqu'un a déjà été
-      choisi, c'est que l'employeur n'a pas déclaré le service. La personne
-      qui a travaillé n'est pas payée tant qu'il ne l'a pas fait.
-    </p>
-    <p class="aide">
-      Son nom et son adresse figurent sur la ligne concernée. PamConnect
-      n'envoie aucun message : l'échange se fait en dehors de la plateforme.
+      Interrogez les deux avant de décider, et écrivez pourquoi. Leurs noms et
+      adresses figurent sur la ligne : PamConnect n'envoie aucun message,
+      l'échange se fait en dehors de la plateforme.
     </p>
   </div>
 
@@ -140,13 +136,13 @@
         <% } %>
 
         <%# LE SEUL ENDROIT DE LA PLATEFORME OU UN CLIC DEPLACE DE L'ARGENT.
-            Il n'apparait que sur un litige : quelqu'un a ete choisi, et soit
+            Il n'apparait qu'en cas de desaccord : quelqu'un a ete choisi, et soit
             la personne a declare avoir travaille, soit le delai est depasse.
             Avant cela, l'employeur n'a encore rien manque. %>
-        <% const enLitige = v.nomRetenu && (v.declareeParElleLe || (att && att.depasse)); %>
-        <% if (enLitige) { %>
+        <% const desaccord = v.nomRetenu && (v.declareeParElleLe || (att && att.depasse)); %>
+        <% if (desaccord) { %>
           <div class="candidature">
-            <h4>Trancher ce litige</h4>
+            <h4>Trancher ce désaccord</h4>
             <p class="aide">
               Interrogez les deux personnes avant de décider. Votre motif sera
               conservé avec votre nom : il devra expliquer cette décision des mois

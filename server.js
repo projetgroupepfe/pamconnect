@@ -3256,12 +3256,12 @@ app.get("/mon-compte", exigerConnexion, interdireALEquipe, (req, res) => {
   });
 });
 
-// L'EQUIPE TRANCHE UN LITIGE SUR UNE SOMME BLOQUEE.
+// L'EQUIPE TRANCHE UN DESACCORD SUR UNE SOMME BLOQUEE.
 //
 // C'est la SEULE action de toute la plateforme qui deplace de l'argent
 // sans qu'un des deux interesses l'ait demande. Elle est donc encadree :
 //
-//   - elle n'existe que sur un vrai litige : quelqu'un a ete choisi, et
+//   - elle n'existe qu'en cas de desaccord : quelqu'un a ete choisi, et
 //     soit la personne a declare avoir travaille, soit le delai est
 //     depasse. Avant cela, l'employeur n'a pas encore eu sa chance ;
 //   - un motif ECRIT est obligatoire, dans les deux sens ;
@@ -3303,9 +3303,9 @@ app.post("/admin/versements/:annonceId", exigerAdmin, lireFormulaire, (req, res)
   // L'employeur doit avoir eu sa chance. Trancher avant, ce serait
   // decider a sa place alors qu'il n'a encore rien manque.
   const attente = attenteVersement(versement.cree_le);
-  const litige = Boolean(retenue.declaree_par_elle_le) || Boolean(attente && attente.depasse);
+  const desaccord = Boolean(retenue.declaree_par_elle_le) || Boolean(attente && attente.depasse);
 
-  if (!litige) {
+  if (!desaccord) {
     return res.status(409).render("message", {
       titre: "Rien à arbitrer pour le moment",
       texte: "L'employeur n'a pas encore dépassé le délai, et la personne n'a " +
