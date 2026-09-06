@@ -627,7 +627,7 @@ const requetes = {
   `),
 
   // La candidature acceptee d'une demande, avec ce qu'il faut pour
-  // savoir si un litige existe et qui en est l'autre partie.
+  // savoir si un desaccord existe et qui en est l'autre partie.
   candidatureRetenue: db.prepare(`
     SELECT c.id, c.prestataire_id, c.terminee_le, c.declaree_par_elle_le
     FROM candidatures c
@@ -1528,7 +1528,7 @@ function resoudreLieu(donnees) {
 // un paiement de la main a la main sort du systeme. La personne n'a plus
 // aucune garantie d'etre payee apres son travail, l'employeur n'a plus
 // aucun recours si le travail n'est pas fait, et l'equipe n'a aucune
-// trace sur laquelle s'appuyer en cas de litige.
+// trace sur laquelle s'appuyer en cas de desaccord.
 //
 // On n'INTERDIT rien : un message n'est jamais bloque ni efface. On
 // affiche un avertissement aux deux personnes, et on garde une marque
@@ -3429,7 +3429,7 @@ app.post("/admin/signalements/:id", exigerAdmin, lireFormulaire, (req, res) => {
 
     if (decision === "sanction") {
       // Le compte n'est pas SUPPRIME : ses annonces, ses candidatures et
-      // ses messages doivent rester consultables en cas de litige.
+      // ses messages doivent rester consultables en cas de desaccord.
       // La requete refuse par ailleurs de suspendre un compte d'equipe.
       requetes.suspendreCompte.run({ id: message.auteur_id, motif });
     } else {
