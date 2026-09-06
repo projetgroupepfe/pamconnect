@@ -2,6 +2,25 @@
 
   <h1>Mon profil</h1>
 
+  <%# Un message de l'equipe n'est PAS une sanction : il n'a donc pas la
+      couleur d'un avertissement. Elle s'en sert pour poser une question,
+      le plus souvent avant de trancher un desaccord sur de l'argent. %>
+  <% if (utilisateur.message_equipe && !utilisateur.message_equipe_lu) { %>
+    <div class="carte confiance">
+      <h3>L'équipe PamConnect vous écrit</h3>
+      <p class="aide">Le <%= utilisateur.message_equipe_le %></p>
+      <blockquote class="message-signale"><%= utilisateur.message_equipe %></blockquote>
+      <div class="actions">
+        <form action="/message-equipe/lu" method="POST">
+          <button type="submit" class="bouton">
+            <%- include("partiels/icone", { nom: "valider" }) %>
+            J'ai lu
+          </button>
+        </form>
+      </div>
+    </div>
+  <% } %>
+
   <%# Un avertissement se lit avant tout le reste, et ne disparait que
       lorsque la personne l'a reconnu. Le compte, lui, fonctionne
       normalement : ce n'est pas une suspension. %>

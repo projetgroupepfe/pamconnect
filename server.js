@@ -130,6 +130,9 @@ ajouterColonneSiAbsente("candidatures", "statut_change_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "declaree_par_elle_le", "TEXT");
 ajouterColonneSiAbsente("versements", "decide_par", "INTEGER");
 ajouterColonneSiAbsente("versements", "motif_decision", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "message_equipe", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "message_equipe_le", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "message_equipe_lu", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
 ajouterColonneSiAbsente("annonces", "annulee", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
@@ -570,6 +573,18 @@ const requetes = {
     WHERE id = @id AND est_admin = 0
   `),
 
+  ecrireMessageEquipe: db.prepare(`
+    UPDATE utilisateurs
+    SET message_equipe    = @texte,
+        message_equipe_le = datetime('now'),
+        message_equipe_lu = 0
+    WHERE id = @id AND est_admin = 0
+  `),
+
+  marquerMessageEquipeLu: db.prepare(`
+    UPDATE utilisateurs SET message_equipe_lu = 1 WHERE id = ?
+  `),
+
   marquerAvertissementLu: db.prepare(`
     UPDATE utilisateurs SET avertissement_lu = 1 WHERE id = ?
   `),
@@ -684,6 +699,7 @@ const requetes = {
            a.titre   AS titreAnnonce,
            a.metier  AS metierAnnonce,
            a.annulee AS demandeFermee,
+           e.id      AS employeurId,
            e.nom     AS nomEmployeur,
            e.email   AS emailEmployeur,
            b.nom     AS nomBeneficiaire,
@@ -1812,6 +1828,15 @@ app.use((req, res, next) => {
     : 0;
 
   res.locals.aVoir = res.locals.messagesNonLus + res.locals.decisionsNonVues;
+
+  // Ce qui attend la personne SUR SON PROFIL : un message de l'equipe,
+  // un avertissement. Sans ce compte, un message pouvait rester des
+  // semaines sans etre vu - et une question que personne ne lit ne sert
+  // a rien. Aucune requete de plus : les colonnes sont deja chargees.
+  res.locals.aLireSurMonProfil = moi && !moi.est_admin
+    ? (moi.message_equipe && !moi.message_equipe_lu ? 1 : 0)
+      + (moi.avertissement_motif && !moi.avertissement_lu ? 1 : 0)
+    : 0;
 
   res.locals.jePeux = {
     // Un membre de l'equipe est enregistre comme employeur pour une
@@ -3444,6 +3469,43 @@ app.post("/admin/signalements/:id", exigerAdmin, lireFormulaire, (req, res) => {
   });
 
   res.redirect("/admin/signalements");
+});
+
+// L'EQUIPE ECRIT A QUELQU'UN.
+//
+// Le seul canal dont elle disposait etait l'avertissement, qui est une
+// sanction : poser une question par ce moyen serait injuste. Celui-ci ne
+// compte rien et ne change rien au compte de la personne.
+app.post("/admin/message/:id", exigerAdmin, lireFormulaire, (req, res) => {
+  const destinataire = requetes.utilisateurParId.get(Number(req.params.id));
+
+  if (!destinataire || destinataire.est_admin) {
+    return res.status(404).render("message", {
+      titre: "Personne introuvable",
+      texte: "Ce compte n'existe pas, ou c'est un compte de l'équipe.",
+      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
+    });
+  }
+
+  const texte = String(req.body.texte || "").trim().slice(0, 500);
+
+  if (texte.length < 10) {
+    return res.status(400).render("message", {
+      titre: "Écrivez votre message",
+      texte: "Quelques mots suffisent, mais la personne doit comprendre ce que " +
+             "vous attendez d'elle.",
+      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
+    });
+  }
+
+  requetes.ecrireMessageEquipe.run({ id: destinataire.id, texte });
+
+  res.redirect("/admin/versements");
+});
+
+app.post("/message-equipe/lu", exigerConnexion, (req, res) => {
+  requetes.marquerMessageEquipeLu.run(req.utilisateur.id);
+  res.redirect("/mon-profil");
 });
 
 // Un avertissement reste affiche tant que la personne ne l'a pas

@@ -67,8 +67,12 @@
         if (locals.moi && locals.jePeux.verifierDossiers) {
           entrees.push({ url: "/admin", icone: "equipe", texte: "Équipe" });
         }
+        /* La pastille sert aussi ici : un message de l'equipe ou un
+           avertissement attend sur le profil, et sans signal il pouvait
+           y rester des semaines sans etre vu. */
         entrees.push(locals.moi
-          ? { url: "/mon-profil", icone: "profil", texte: "Mon profil" }
+          ? { url: "/mon-profil", icone: "profil", texte: "Mon profil",
+              pastille: locals.aLireSurMonProfil }
           : { url: "/connexion", icone: "profil", texte: "Connexion" });
       %>
       <nav class="menu" aria-label="Navigation principale">

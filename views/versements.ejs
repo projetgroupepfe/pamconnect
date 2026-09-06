@@ -141,6 +141,32 @@
             Avant cela, l'employeur n'a encore rien manque. %>
         <% const desaccord = v.nomRetenu && (v.declareeParElleLe || (att && att.depasse)); %>
         <% if (desaccord) { %>
+          <%# ECRIRE AVANT DE TRANCHER. L'equipe ne peut pas entrer dans la
+              discussion des deux personnes - elle ne lit pas leurs echanges
+              prives. Ce message est son seul moyen de poser une question, et
+              il arrive en haut du profil de la personne. %>
+          <div class="candidature">
+            <h4>Écrire à <%= v.nomEmployeur %></h4>
+            <p class="aide">
+              Il lira ce message en haut de son profil. Demandez-lui de déclarer le
+              service s'il a eu lieu, ou de vous signaler le problème sinon.
+            </p>
+            <form action="/admin/message/<%= v.employeurId %>" method="POST">
+              <div class="champ">
+                <label for="msg-<%= v.id %>">Votre message</label>
+                <input type="text" id="msg-<%= v.id %>" name="texte" maxlength="500"
+                       placeholder="ex : <%= v.nomRetenu %> indique avoir effectué le service. Pouvez-vous le confirmer ?">
+              </div>
+              <div class="actions">
+                <button type="submit" class="bouton-secondaire">
+                  <%- include("partiels/icone", { nom: "envoi" }) %>
+                  Envoyer ce message
+                </button>
+              </div>
+            </form>
+          </div>
+
+
           <div class="candidature">
             <h4>Trancher ce désaccord</h4>
             <p class="aide">

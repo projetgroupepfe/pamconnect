@@ -100,6 +100,17 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
   -- Le COMPTEUR est garde separement du dernier motif : au signalement
   -- suivant, l'equipe doit savoir si cette personne en est a son premier
   -- ecart ou a son troisieme.
+  -- Un message de l'equipe n'est PAS une sanction : aucun compteur,
+  -- aucune consequence. Elle s'en sert pour poser une question - le plus
+  -- souvent avant de trancher un desaccord sur de l'argent.
+  --
+  -- Un seul message a la fois : le suivant remplace le precedent. Garder
+  -- un historique demanderait une table, un ecran, et n'apporterait rien
+  -- ici - ce qui compte est ce qui attend une reponse maintenant.
+  message_equipe      TEXT,
+  message_equipe_le   TEXT,
+  message_equipe_lu   INTEGER NOT NULL DEFAULT 0 CHECK (message_equipe_lu IN (0, 1)),
+
   avertissements      INTEGER NOT NULL DEFAULT 0,
   avertissement_motif TEXT,
   avertissement_le    TEXT,
