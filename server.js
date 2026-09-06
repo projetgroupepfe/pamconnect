@@ -268,21 +268,40 @@ const requetes = {
     WHERE id = ? AND role = 'prestataire' AND est_admin = 0 AND suspendu = 0
   `),
 
+  // LA RECHERCHE EST PUBLIQUE : elle ne charge que ce qu'elle affiche.
+  // Un SELECT * ferait remonter le mot de passe hache, l'email, la date
+  // de naissance, les noms des fichiers d'identite - et toute colonne
+  // ajoutee plus tard, sans que personne ne l'ait decide.
+  //
+  // Elle ecarte aussi les comptes suspendus et les comptes d'equipe :
+  // une personne suspendue ne doit plus etre trouvee ni contactee.
   tousLesPrestataires: db.prepare(`
-    SELECT * FROM utilisateurs WHERE role = 'prestataire'
+      SELECT id, nom, metier, tarif, quartier, arrondissement,
+             statut_verification, experience_annees, disponibilites,
+             latitude, longitude
+    FROM utilisateurs
+    WHERE role = 'prestataire' AND est_admin = 0 AND suspendu = 0
   `),
 
   prestatairesParMetier: db.prepare(`
-    SELECT * FROM utilisateurs
-    WHERE role = 'prestataire' AND LOWER(metier) LIKE ?
+      SELECT id, nom, metier, tarif, quartier, arrondissement,
+             statut_verification, experience_annees, disponibilites,
+             latitude, longitude
+    FROM utilisateurs
+    WHERE role = 'prestataire' AND est_admin = 0 AND suspendu = 0
+      AND LOWER(metier) LIKE ?
   `),
 
   // Quand le mot cherche correspond a un metier de notre liste, on
   // compare les noms officiels : plus fiable qu'un LIKE, qui ne
   // rapproche ni les accents ni les variantes d'ecriture.
   prestatairesDuMetier: db.prepare(`
-    SELECT * FROM utilisateurs
-    WHERE role = 'prestataire' AND metier = ?
+      SELECT id, nom, metier, tarif, quartier, arrondissement,
+             statut_verification, experience_annees, disponibilites,
+             latitude, longitude
+    FROM utilisateurs
+    WHERE role = 'prestataire' AND est_admin = 0 AND suspendu = 0
+      AND metier = ?
   `),
 
   // La liste publique ignore les demandes retirees. L'employeur, lui,
