@@ -1,0 +1,203 @@
+<%- include("partiels/tete") %>
+
+  <h1>Mes jetons</h1>
+
+  <%# CE QU'UN JETON N'EST PAS. La confusion serait grave : quelqu'un
+      qui croit avoir de l'argent sur la plateforme attendrait de le
+      retirer, et ne pourrait pas. C'est donc dit avant le solde, pas
+      apres. %>
+  <div class="carte confiance">
+    <h3>À quoi servent les jetons</h3>
+    <p>
+      Un jeton donne accès à une option de PamConnect.
+      <% if (jeSuisEmployeur) { %>
+        Pour vous, il sert à <strong>mettre une demande en avant</strong> pour
+        qu'elle soit vue en premier.
+      <% } else { %>
+        Pour vous, il sert à <strong>répondre à une demande</strong>.
+      <% } %>
+    </p>
+    <p class="aide">
+      Un jeton <strong>n'est pas de l'argent</strong>. Il ne se donne pas à
+      quelqu'un d'autre, il ne se retire ni en espèces ni par Mobile Money,
+      et il ne paie jamais une prestation. Le paiement d'un service se fait
+      en FCFA, et passe par
+      <a href="/mon-compte">votre compte</a>.
+    </p>
+  </div>
+
+  <%# LE SOLDE, EN DEUX PARTS. Les melanger cacherait ce qui va expirer. %>
+  <div class="carte">
+    <div class="detail-tarif">
+      <div class="ligne-tarif total">
+        <span>Votre solde</span>
+        <strong><%= jetonsEnClair(solde.total) %></strong>
+      </div>
+
+      <% if (solde.offerts > 0) { %>
+        <div class="ligne-tarif">
+          <span>
+            Jetons offerts
+            <% if (expireLe) { %>
+              <br><small class="discret">Utilisables jusqu'au <%= expireLe %></small>
+            <% } %>
+          </span>
+          <span><%= solde.offerts %></span>
+        </div>
+      <% } %>
+
+      <% if (solde.achetes > 0) { %>
+        <div class="ligne-tarif">
+          <span>Jetons achetés<br><small class="discret">Sans date limite</small></span>
+          <span><%= solde.achetes %></span>
+        </div>
+      <% } %>
+    </div>
+
+    <% if (solde.total === 0) { %>
+      <p class="aide">
+        Vous n'avez pas encore de jetons. Choisissez un pack ci-dessous.
+      </p>
+    <% } %>
+  </div>
+
+  <h2>Acheter des jetons</h2>
+
+  <% if (valeurJeton === null || packs.length === 0) { %>
+
+    <%# Aucun prix invente : si le reglage manque, on le dit. %>
+    <div class="vide">
+      <p>Aucun pack n'est en vente pour le moment.</p>
+      <p class="aide">Les prix n'ont pas encore été réglés par l'équipe.</p>
+    </div>
+
+  <% } else { %>
+
+    <p class="chapeau">
+      Un jeton vaut <strong><%= formaterMontant(valeurJeton) %></strong>.
+    </p>
+
+    <% if (demandeEnCours) { %>
+      <div class="carte">
+        <p>
+          <span class="badge badge-en-attente">Demande en cours</span>
+        </p>
+        <p class="aide">
+          Une demande attend la confirmation de l'équipe. Vous pourrez en
+          envoyer une autre une fois celle-ci traitée.
+        </p>
+      </div>
+    <% } else { %>
+      <div class="grille">
+        <% packs.forEach(function (pack) { %>
+          <div class="carte">
+            <h3><%= pack.quantite %> jetons</h3>
+            <div class="detail-tarif">
+              <div class="ligne-tarif total">
+                <span>Prix</span>
+                <strong><%= formaterMontant(pack.prix) %></strong>
+              </div>
+            </div>
+            <form action="/mes-jetons/acheter" method="POST">
+              <input type="hidden" name="quantite" value="<%= pack.quantite %>">
+              <button type="submit" class="bouton">
+                <%- include("partiels/icone", { nom: "jeton" }) %>
+                Demander ce pack
+              </button>
+            </form>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+
+    <%# EXEMPLE, ET DIT COMME TEL. Aucun ecran d'operateur n'est imite :
+        la plateforme n'affiche jamais une page qui ressemblerait a celle
+        de MTN ou d'Orange. %>
+    <div class="carte confiance">
+      <h3>Comment se passe le paiement</h3>
+      <p>
+        Vous demandez un pack ici. L'équipe confirme ensuite avoir reçu le
+        paiement, et vos jetons sont ajoutés à votre solde.
+      </p>
+      <p class="aide">
+        <strong>Démonstration :</strong> PamConnect n'encaisse aucun paiement
+        pour l'instant. Encaisser de l'argent suppose un agrément et un
+        contrat avec les opérateurs, que la plateforme n'a pas encore. Les
+        demandes sont enregistrées et confirmées à la main par l'équipe.
+      </p>
+    </div>
+
+  <% } %>
+
+  <h2>Vos demandes d'achat</h2>
+
+  <% if (achats.length === 0) { %>
+    <p class="vide">Aucune demande pour le moment.</p>
+  <% } else { %>
+    <div class="grille">
+      <% achats.forEach(function (achat) { %>
+        <div class="carte">
+          <h3><%= achat.quantite %> jetons</h3>
+          <p>
+            <% if (achat.etat === "en attente") { %>
+              <span class="badge badge-en-attente">En attente de confirmation</span>
+            <% } else if (achat.etat === "confirme") { %>
+              <span class="badge badge-verifie">Jetons ajoutés</span>
+            <% } else { %>
+              <span class="badge badge-refuse">Refusée</span>
+            <% } %>
+          </p>
+          <ul class="infos">
+            <li>
+              <%- include("partiels/icone", { nom: "remuneration" }) %>
+              <span><%= formaterMontant(achat.montant) %></span>
+            </li>
+            <li>
+              <%- include("partiels/icone", { nom: "calendrier" }) %>
+              <span>Demandé le <%= dateLisible(achat.cree_le) %></span>
+            </li>
+          </ul>
+          <% if (achat.etat === "refuse" && achat.motif_refus) { %>
+            <p class="aide">Motif : <%= achat.motif_refus %></p>
+          <% } %>
+        </div>
+      <% }); %>
+    </div>
+  <% } %>
+
+  <h2>Vos mouvements</h2>
+
+  <%# L'HISTORIQUE COMPLET. Une plateforme qui prend un jeton doit
+      pouvoir dire quand, et pour quoi. %>
+  <% if (mouvements.length === 0) { %>
+    <p class="vide">Aucun mouvement pour le moment.</p>
+  <% } else { %>
+    <div class="carte">
+      <div class="detail-tarif">
+        <% mouvements.forEach(function (m) { %>
+          <div class="ligne-tarif">
+            <span>
+              <%= m.detail || motifJetonsLisible(m.motif) %>
+              <br><small class="discret">
+                <%= dateLisible(m.cree_le) %><%= m.nature === "offert" ? " — jetons offerts" : "" %>
+              </small>
+            </span>
+            <% if (m.quantite < 0) { %>
+              <span class="retenue">− <%= Math.abs(m.quantite) %></span>
+            <% } else { %>
+              <strong>+ <%= m.quantite %></strong>
+            <% } %>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+  <% } %>
+
+  <p class="actions">
+    <a class="bouton bouton-secondaire" href="/mon-profil">
+      <%- include("partiels/icone", { nom: "profil" }) %>
+      Retour à mon profil
+    </a>
+  </p>
+
+<%- include("partiels/pied") %>

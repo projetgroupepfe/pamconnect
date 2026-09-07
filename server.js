@@ -995,6 +995,112 @@ const requetes = {
     GROUP BY statut_verification
     ORDER BY statut_verification
   `),
+
+  // --- Les jetons ---------------------------------------------------
+
+  parametre: db.prepare(`
+    SELECT valeur FROM parametres WHERE cle = ?
+  `),
+
+  tousLesParametres: db.prepare(`
+    SELECT cle, valeur, libelle, aide FROM parametres ORDER BY libelle
+  `),
+
+  majParametre: db.prepare(`
+    UPDATE parametres SET valeur = @valeur WHERE cle = @cle
+  `),
+
+  // Le solde en DEUX PARTS : les jetons offerts, qui expirent, et les
+  // jetons achetes, qui n'expirent jamais. Les additionner ici
+  // obligerait a deviner lesquels sont partis en premier.
+  soldeJetons: db.prepare(`
+    SELECT
+      COALESCE(SUM(CASE WHEN nature = 'offert' THEN quantite ELSE 0 END), 0) AS offerts,
+      COALESCE(SUM(CASE WHEN nature = 'achete' THEN quantite ELSE 0 END), 0) AS achetes
+    FROM jetons_mouvements
+    WHERE utilisateur_id = ?
+  `),
+
+  mesMouvementsJetons: db.prepare(`
+    SELECT quantite, nature, motif, detail, expire_le, cree_le
+    FROM jetons_mouvements
+    WHERE utilisateur_id = ?
+    ORDER BY id DESC
+  `),
+
+  ecrireMouvementJetons: db.prepare(`
+    INSERT INTO jetons_mouvements
+      (utilisateur_id, quantite, nature, motif, detail, achat_id, annonce_id, expire_le)
+    VALUES
+      (@personne, @quantite, @nature, @motif, @detail, @achat, @annonce, @expire)
+  `),
+
+  // Quand les jetons offerts encore presents cesseront d'etre
+  // utilisables. La personne a le droit de le savoir avant, pas apres.
+  expirationJetonsOfferts: db.prepare(`
+    SELECT MAX(expire_le) AS quand
+    FROM jetons_mouvements
+    WHERE utilisateur_id = ? AND nature = 'offert' AND quantite > 0
+  `),
+
+  creerAchatJetons: db.prepare(`
+    INSERT INTO jetons_achats (utilisateur_id, quantite, montant_fcfa)
+    VALUES (@personne, @quantite, @montant)
+  `),
+
+  achatJetonsParId: db.prepare(`
+    SELECT * FROM jetons_achats WHERE id = ?
+  `),
+
+  achatJetonsEnAttentePour: db.prepare(`
+    SELECT id FROM jetons_achats
+    WHERE utilisateur_id = ? AND etat = 'en attente'
+    LIMIT 1
+  `),
+
+  mesAchatsJetons: db.prepare(`
+    SELECT id, quantite, montant_fcfa AS montant, etat, cree_le, motif_refus
+    FROM jetons_achats
+    WHERE utilisateur_id = ?
+    ORDER BY id DESC
+  `),
+
+  // Ce que l'equipe doit traiter, le plus ancien en tete : quelqu'un
+  // attend ses jetons depuis ce moment-la.
+  achatsJetonsEnAttente: db.prepare(`
+    SELECT a.id, a.quantite, a.montant_fcfa AS montant, a.cree_le,
+           u.id AS personneId, u.nom, u.email, u.role
+    FROM jetons_achats a
+    JOIN utilisateurs u ON u.id = a.utilisateur_id
+    WHERE a.etat = 'en attente'
+    ORDER BY a.id
+  `),
+
+  derniersAchatsJetonsTraites: db.prepare(`
+    SELECT a.id, a.quantite, a.montant_fcfa AS montant, a.etat,
+           a.traite_le, a.motif_refus,
+           u.nom, q.nom AS nomDecideur
+    FROM jetons_achats a
+    JOIN utilisateurs u ON u.id = a.utilisateur_id
+    LEFT JOIN utilisateurs q ON q.id = a.traite_par
+    WHERE a.etat <> 'en attente'
+    ORDER BY a.traite_le DESC, a.id DESC
+    LIMIT 20
+  `),
+
+  nombreAchatsJetonsEnAttente: db.prepare(`
+    SELECT COUNT(*) AS n FROM jetons_achats WHERE etat = 'en attente'
+  `),
+
+  // LE "AND etat = 'en attente'" EST LE REMPART. Deux clics sur
+  // Confirmer ne crediteront pas deux fois : le second ne modifie
+  // aucune ligne, et le code s'en apercoit.
+  classerAchatJetons: db.prepare(`
+    UPDATE jetons_achats
+       SET etat = @etat, traite_par = @par,
+           traite_le = datetime('now'), motif_refus = @motif
+     WHERE id = @id AND etat = 'en attente'
+  `),
 };
 
 // ============================================================
@@ -1631,6 +1737,91 @@ function auHasard(liste) {
   return liste[Math.floor(Math.random() * liste.length)];
 }
 
+// ============================================================
+// LES JETONS
+// ============================================================
+// Un jeton est un DROIT D'USAGE vendu par la plateforme, pas de
+// l'argent. Il ne se transfere pas d'une personne a une autre, il ne se
+// retire ni en especes ni par Mobile Money, et il ne paie jamais une
+// prestation : le paiement d'un service reste en FCFA, dans le
+// sequestre, avec sa commission de 10 %.
+//
+// AUCUN PRIX N'EST ECRIT DANS CE FICHIER. Tout vient de la table
+// parametres, que l'equipe modifie depuis son espace. Un tarif ecrit en
+// dur ici ne pourrait etre change que par quelqu'un qui programme.
+
+function parametre(cle) {
+  const ligne = requetes.parametre.get(cle);
+  return ligne ? ligne.valeur : null;
+}
+
+// Renvoie null quand le reglage manque ou n'a pas de sens, JAMAIS une
+// valeur de secours : un prix invente serait pire qu'un prix absent.
+// Les ecrans disent alors que le reglage manque.
+function parametreNombre(cle) {
+  const brut = parametre(cle);
+  if (brut === null || String(brut).trim() === "") return null;
+  const valeur = Number(brut);
+  return Number.isFinite(valeur) && valeur >= 0 ? valeur : null;
+}
+
+function valeurDuJeton() {
+  return parametreNombre("jeton_valeur_fcfa");
+}
+
+// "10:1000|30:3000" devient deux packs. Un morceau mal ecrit est
+// IGNORE, jamais devine : mieux vaut un pack de moins qu'un prix faux.
+function packsEnVente() {
+  return String(parametre("packs_jetons") || "")
+    .split("|")
+    .map((morceau) => {
+      const parts = String(morceau).split(":");
+      return {
+        quantite: Math.round(Number(parts[0])),
+        prix: Math.round(Number(parts[1])),
+      };
+    })
+    .filter((pack) => pack.quantite > 0 && pack.prix > 0);
+}
+
+// LE PRIX EST TOUJOURS ANNONCE DANS LES DEUX UNITES : "20 jetons
+// (2 000 FCFA)". Un utilisateur qui ne lit que "20 jetons" ne sait pas
+// ce qu'il depense.
+function jetonsEnClair(nombre) {
+  const n = Math.abs(Math.round(Number(nombre) || 0));
+  const mot = n > 1 ? "jetons" : "jeton";
+  const valeur = valeurDuJeton();
+
+  return valeur === null ? `${n} ${mot}` : `${n} ${mot} (${formaterMontant(n * valeur)})`;
+}
+
+function soldeJetonsDe(personneId) {
+  const s = requetes.soldeJetons.get(personneId);
+  return { offerts: s.offerts, achetes: s.achetes, total: s.offerts + s.achetes };
+}
+
+// "2026-09-07 14:23:01" devient "07/09/2026". SQLite range ses dates
+// dans un ordre qui se trie bien mais ne se lit pas.
+function dateLisible(texte) {
+  const trouve = String(texte || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return trouve ? `${trouve[3]}/${trouve[2]}/${trouve[1]}` : "";
+}
+
+// Ce que la personne lit dans son historique, quand la ligne n'a pas de
+// detail ecrit. Le motif est un mot technique, pas une phrase.
+function motifJetonsLisible(motif) {
+  const phrases = {
+    achat: "Achat de jetons",
+    bienvenue: "Jetons offerts",
+    expiration: "Jetons offerts expirés",
+    candidature: "Réponse à une demande",
+    mise_en_avant: "Mise en avant d'une demande",
+    remboursement: "Jetons rendus",
+  };
+
+  return phrases[motif] || motif;
+}
+
 // app.locals : disponible dans TOUTES les vues .ejs sans le repasser.
 app.locals.formaterTarif = formaterTarif;
 app.locals.formaterMontant = formaterMontant;
@@ -1662,6 +1853,10 @@ app.locals.disponibilitesLisibles = disponibilitesLisibles;
 app.locals.badgesDe = badgesDe;
 app.locals.libelleExperience = libelleExperience;
 app.locals.jours = JOURS;
+app.locals.jetonsEnClair = jetonsEnClair;
+app.locals.dateLisible = dateLisible;
+app.locals.motifJetonsLisible = motifJetonsLisible;
+app.locals.valeurDuJeton = valeurDuJeton;
 app.locals.moments = MOMENTS;
 
 // ============================================================
@@ -3300,6 +3495,80 @@ app.get("/mon-compte", exigerConnexion, interdireALEquipe, (req, res) => {
   });
 });
 
+// --- Mes jetons ----------------------------------------------------
+//
+// PAGE COMMUNE AUX DEUX ROLES, et c'est voulu : les deux achetent des
+// jetons au meme prix, sur le meme ecran. Ce qui differe, c'est
+// seulement CE QU'ON EN FAIT - mettre une demande en avant d'un cote,
+// repondre a une demande de l'autre - et cette phrase-la depend du role.
+//
+// Un membre de l'equipe n'en a pas : il ne publie ni ne repond.
+app.get("/mes-jetons", exigerConnexion, interdireALEquipe, (req, res) => {
+  const solde = soldeJetonsDe(req.utilisateur.id);
+  const expiration = requetes.expirationJetonsOfferts.get(req.utilisateur.id);
+
+  res.render("jetons", {
+    titre: "Mes jetons",
+    jeSuisEmployeur: req.utilisateur.role === "employeur",
+    solde,
+
+    // La date n'est annoncee que s'il reste vraiment des jetons offerts.
+    expireLe: solde.offerts > 0 && expiration && expiration.quand
+      ? dateLisible(expiration.quand)
+      : null,
+
+    packs: packsEnVente(),
+    valeurJeton: valeurDuJeton(),
+    mouvements: requetes.mesMouvementsJetons.all(req.utilisateur.id),
+    achats: requetes.mesAchatsJetons.all(req.utilisateur.id),
+    demandeEnCours: Boolean(requetes.achatJetonsEnAttentePour.get(req.utilisateur.id)),
+  });
+});
+
+// --- Demander un pack de jetons ------------------------------------
+app.post("/mes-jetons/acheter", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
+  // LE PRIX NE VIENT JAMAIS DU FORMULAIRE. On ne retient que la
+  // quantite demandee, et on relit le prix dans les packs du serveur.
+  // Sinon n'importe qui pourrait renvoyer la page en ecrivant 60 jetons
+  // pour 1 FCFA.
+  const quantite = Math.round(Number(req.body.quantite) || 0);
+  const pack = packsEnVente().find((p) => p.quantite === quantite);
+
+  if (!pack) {
+    return res.status(400).render("message", {
+      titre: "Ce pack n'existe pas",
+      texte: "Ce pack n'est plus en vente. Choisissez-en un dans la liste.",
+      liens: [{ url: "/mes-jetons", texte: "Retour à mes jetons" }],
+    });
+  }
+
+  // UNE SEULE DEMANDE A LA FOIS. Deux demandes identiques en attente
+  // sont presque toujours un double clic, et l'equipe ne saurait pas
+  // laquelle confirmer.
+  if (requetes.achatJetonsEnAttentePour.get(req.utilisateur.id)) {
+    return res.status(409).render("message", {
+      titre: "Une demande est déjà en cours",
+      texte: "Votre demande précédente attend la confirmation de l'équipe. " +
+             "Vous pourrez en envoyer une autre une fois celle-ci traitée.",
+      liens: [{ url: "/mes-jetons", texte: "Retour à mes jetons" }],
+    });
+  }
+
+  requetes.creerAchatJetons.run({
+    personne: req.utilisateur.id,
+    quantite: pack.quantite,
+    montant: pack.prix,
+  });
+
+  res.render("message", {
+    titre: "Demande enregistrée",
+    texte: `Votre demande de ${pack.quantite} jetons pour ` +
+           `${formaterMontant(pack.prix)} est enregistrée. Vos jetons seront ` +
+           `ajoutés à votre solde dès que l'équipe aura confirmé le paiement.`,
+    liens: [{ url: "/mes-jetons", texte: "Voir mes jetons" }],
+  });
+});
+
 // L'EQUIPE TRANCHE UN DESACCORD SUR UNE SOMME BLOQUEE.
 //
 // C'est la SEULE action de toute la plateforme qui deplace de l'argent
@@ -3404,6 +3673,135 @@ app.get("/admin/versements", exigerAdmin, (req, res) => {
   });
 });
 
+// --- Espace equipe : les jetons ------------------------------------
+app.get("/admin/jetons", exigerAdmin, (req, res) => {
+  res.render("admin-jetons", {
+    titre: "Jetons",
+    achats: requetes.achatsJetonsEnAttente.all(),
+    traites: requetes.derniersAchatsJetonsTraites.all(),
+    parametres: requetes.tousLesParametres.all(),
+    packs: packsEnVente(),
+  });
+});
+
+// CONFIRMER OU REFUSER UNE DEMANDE D'ACHAT.
+//
+// Confirmer CREDITE des jetons : c'est la seule facon d'en faire
+// apparaitre par un achat. L'operation doit donc etre indivisible - si
+// la ligne d'achat passe a "confirme" sans que le mouvement soit ecrit,
+// la personne a paye pour rien et plus rien ne le rattrape.
+app.post("/admin/jetons/:id", exigerAdmin, lireFormulaire, (req, res) => {
+  const achat = requetes.achatJetonsParId.get(Number(req.params.id));
+
+  if (!achat) {
+    return res.status(404).render("message", {
+      titre: "Demande introuvable",
+      texte: "Cette demande d'achat n'existe pas.",
+      liens: [{ url: "/admin/jetons", texte: "Retour aux jetons" }],
+    });
+  }
+
+  const confirmer = req.body.decision === "confirmer";
+  const motif = String(req.body.motif || "").trim();
+
+  // UN REFUS S'EXPLIQUE. Quelqu'un a annonce un paiement : lui rendre
+  // un non sans raison ne lui dit pas quoi faire ensuite.
+  if (!confirmer && motif.length < 5) {
+    return res.status(400).render("message", {
+      titre: "Motif obligatoire",
+      texte: "Pour refuser une demande d'achat, écrivez le motif. " +
+             "La personne le lira sur sa page.",
+      liens: [{ url: "/admin/jetons", texte: "Retour aux jetons" }],
+    });
+  }
+
+  const traiter = db.transaction(() => {
+    const resultat = requetes.classerAchatJetons.run({
+      id: achat.id,
+      etat: confirmer ? "confirme" : "refuse",
+      par: req.utilisateur.id,
+      motif: confirmer ? null : motif,
+    });
+
+    // Aucune ligne modifiee : quelqu'un l'a traitee entre-temps.
+    if (resultat.changes === 0) return false;
+
+    if (confirmer) {
+      requetes.ecrireMouvementJetons.run({
+        personne: achat.utilisateur_id,
+        quantite: achat.quantite,
+        nature: "achete",
+        motif: "achat",
+        detail: `Pack de ${achat.quantite} jetons, ${formaterMontant(achat.montant_fcfa)}`,
+        achat: achat.id,
+        annonce: null,
+        expire: null,
+      });
+    }
+
+    return true;
+  });
+
+  if (!traiter()) {
+    return res.status(409).render("message", {
+      titre: "Demande déjà traitée",
+      texte: "Un membre de l'équipe a déjà traité cette demande.",
+      liens: [{ url: "/admin/jetons", texte: "Retour aux jetons" }],
+    });
+  }
+
+  res.redirect("/admin/jetons");
+});
+
+// MODIFIER LES PRIX.
+//
+// C'est ce qui evite que le tarif d'un jeton soit fige pour toujours
+// dans le code. Le nouveau prix vaut pour TOUT LE MONDE des l'instant
+// ou il est enregistre - il n'y a pas un tarif par utilisateur - et il
+// ne reecrit pas les achats deja payes : chaque ligne garde son montant.
+app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
+  // On verifie AVANT d'ecrire, et on n'ecrit rien si une seule valeur
+  // est mauvaise : une table de prix a moitie mise a jour serait pire
+  // que l'ancienne.
+  const valeurJeton = Math.round(Number(req.body.jeton_valeur_fcfa));
+  const packsBruts = String(req.body.packs_jetons || "").trim();
+
+  if (!Number.isFinite(valeurJeton) || valeurJeton <= 0) {
+    return res.status(400).render("message", {
+      titre: "Valeur du jeton invalide",
+      texte: "La valeur d'un jeton doit être un nombre de FCFA supérieur à zéro.",
+      liens: [{ url: "/admin/jetons", texte: "Retour aux jetons" }],
+    });
+  }
+
+  const packsLus = packsBruts.split("|").map((morceau) => {
+    const parts = String(morceau).split(":");
+    return { quantite: Math.round(Number(parts[0])), prix: Math.round(Number(parts[1])) };
+  });
+
+  if (packsLus.length === 0 || packsLus.some((p) => !(p.quantite > 0) || !(p.prix > 0))) {
+    return res.status(400).render("message", {
+      titre: "Packs invalides",
+      texte: "Écrivez chaque pack sous la forme nombre de jetons, deux points, " +
+             "prix en FCFA, et séparez-les par une barre verticale. " +
+             "Par exemple : 10:1000|30:3000|60:6000",
+      liens: [{ url: "/admin/jetons", texte: "Retour aux jetons" }],
+    });
+  }
+
+  const enregistrer = db.transaction(() => {
+    requetes.majParametre.run({ cle: "jeton_valeur_fcfa", valeur: String(valeurJeton) });
+    requetes.majParametre.run({
+      cle: "packs_jetons",
+      valeur: packsLus.map((p) => `${p.quantite}:${p.prix}`).join("|"),
+    });
+  });
+
+  enregistrer();
+
+  res.redirect("/admin/jetons");
+});
+
 // --- Espace equipe : les dossiers a verifier -----------------------
 app.get("/admin", exigerAdmin, (req, res) => {
   res.render("admin", {
@@ -3413,6 +3811,7 @@ app.get("/admin", exigerAdmin, (req, res) => {
     signalementsOuverts: requetes.nombreSignalementsOuverts.get().n,
     problemesOuverts: requetes.nombreProblemesOuverts.get().n,
     versementsBloques: requetes.nombreVersementsBloques.get().n,
+    achatsJetons: requetes.nombreAchatsJetonsEnAttente.get().n,
   });
 });
 

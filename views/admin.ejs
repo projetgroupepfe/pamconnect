@@ -29,6 +29,10 @@
       <%- include("partiels/icone", { nom: "remuneration" }) %>
       Versements<% if (versementsBloques > 0) { %> (<%= versementsBloques %>)<% } %>
     </a>
+    <a class="bouton bouton-secondaire" href="/admin/jetons">
+      <%- include("partiels/icone", { nom: "jeton" }) %>
+      Jetons<% if (achatsJetons > 0) { %> (<%= achatsJetons %>)<% } %>
+    </a>
   </p>
 
   <h2>Dossiers à vérifier</h2>

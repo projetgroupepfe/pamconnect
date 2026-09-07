@@ -24,7 +24,7 @@ const SERIES = [
   "test_messagerie", "test_roles", "test_metiers", "test_profil_enrichi",
   "test_moderation", "test_fiche", "test_confirmation", "test_modifier_annonce",
   "test_annuler_age", "test_probleme", "test_notification", "test_archivage",
-  "test_versements", "test_demonstration",
+  "test_versements", "test_jetons", "test_demonstration",
 ];
 
 // Le serveur de test est une copie de server.js dont on change le port.

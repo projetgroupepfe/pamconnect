@@ -1,0 +1,169 @@
+<%- include("partiels/tete") %>
+
+  <h1>Jetons</h1>
+  <p class="chapeau">
+    Les demandes d'achat en attente, et les prix de la plateforme.
+  </p>
+
+  <h2>Demandes d'achat</h2>
+
+  <%# CONFIRMER CREE DES JETONS. C'est la seule facon d'en faire
+      apparaitre par un achat : a ne faire qu'apres avoir constate le
+      paiement. %>
+  <div class="carte confiance">
+    <p class="aide">
+      Confirmer une demande <strong>ajoute les jetons</strong> au solde de la
+      personne. Ne confirmez qu'après avoir constaté le paiement.
+      Un refus demande un motif : la personne le lira sur sa page.
+    </p>
+  </div>
+
+  <% if (achats.length === 0) { %>
+
+    <p class="vide">Aucune demande en attente.</p>
+
+  <% } else { %>
+
+    <% achats.forEach(function (achat) { %>
+      <div class="carte">
+        <h3><%= achat.nom %></h3>
+        <p class="discret">
+          <strong><%= achat.role === "employeur" ? "Employeur" : "Prestataire" %></strong><br>
+          <%= achat.email %>
+        </p>
+
+        <div class="detail-tarif">
+          <div class="ligne-tarif total">
+            <span><%= achat.quantite %> jetons</span>
+            <strong><%= formaterMontant(achat.montant) %></strong>
+          </div>
+        </div>
+
+        <ul class="infos">
+          <li>
+            <%- include("partiels/icone", { nom: "calendrier" }) %>
+            <span>Demandé le <%= dateLisible(achat.cree_le) %></span>
+          </li>
+        </ul>
+
+        <form action="/admin/jetons/<%= achat.id %>" method="POST">
+          <label>
+            Motif, si vous refusez
+            <input type="text" name="motif" maxlength="200"
+                   placeholder="Paiement non reçu">
+          </label>
+
+          <div class="actions">
+            <button type="submit" name="decision" value="confirmer" class="bouton">
+              <%- include("partiels/icone", { nom: "valider" }) %>
+              Confirmer le paiement
+            </button>
+            <button type="submit" name="decision" value="refuser"
+                    class="bouton bouton-secondaire">
+              <%- include("partiels/icone", { nom: "refuser" }) %>
+              Refuser
+            </button>
+          </div>
+        </form>
+      </div>
+    <% }); %>
+
+  <% } %>
+
+  <h2>Les prix</h2>
+
+  <%# LE PRIX N'EST PAS DANS LE CODE. Il se change ici, et le nouveau
+      tarif vaut pour tout le monde des l'enregistrement. Les achats
+      deja payes gardent leur montant. %>
+  <div class="carte">
+    <p class="aide">
+      Un prix modifié ici s'applique <strong>à tous les utilisateurs</strong>
+      immédiatement. Les demandes d'achat déjà envoyées gardent le montant
+      qu'elles avaient au moment de la demande.
+    </p>
+
+    <form action="/admin/parametres" method="POST">
+      <% parametres.forEach(function (p) { %>
+        <label>
+          <%= p.libelle %>
+          <input type="text" name="<%= p.cle %>" value="<%= p.valeur %>" required>
+          <small class="aide"><%= p.aide %></small>
+        </label>
+      <% }); %>
+
+      <div class="actions">
+        <button type="submit" class="bouton">
+          <%- include("partiels/icone", { nom: "reglage" }) %>
+          Enregistrer les prix
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <%# CE QUE CES PRIX DONNENT, RELU PAR LE SERVEUR. Une ligne mal ecrite
+      est ignoree sans bruit : la seule facon de s'en apercevoir est de
+      voir la liste telle qu'elle sera vendue. %>
+  <div class="carte">
+    <h3>Ce que les utilisateurs verront</h3>
+    <% if (packs.length === 0) { %>
+      <p class="vide">Aucun pack en vente.</p>
+    <% } else { %>
+      <div class="detail-tarif">
+        <% packs.forEach(function (pack) { %>
+          <div class="ligne-tarif">
+            <span><%= pack.quantite %> jetons</span>
+            <strong><%= formaterMontant(pack.prix) %></strong>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+
+  <h2>Demandes déjà traitées</h2>
+
+  <% if (traites.length === 0) { %>
+    <p class="vide">Aucune demande traitée.</p>
+  <% } else { %>
+    <div class="grille">
+      <% traites.forEach(function (a) { %>
+        <div class="carte">
+          <h3><%= a.nom %></h3>
+          <p>
+            <% if (a.etat === "confirme") { %>
+              <span class="badge badge-verifie"><%= a.quantite %> jetons ajoutés</span>
+            <% } else { %>
+              <span class="badge badge-refuse">Refusée</span>
+            <% } %>
+          </p>
+          <ul class="infos">
+            <li>
+              <%- include("partiels/icone", { nom: "remuneration" }) %>
+              <span><%= formaterMontant(a.montant) %></span>
+            </li>
+            <li>
+              <%- include("partiels/icone", { nom: "calendrier" }) %>
+              <span>Traitée le <%= dateLisible(a.traite_le) %></span>
+            </li>
+            <% if (a.nomDecideur) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "equipe" }) %>
+                <span>Par <%= a.nomDecideur %></span>
+              </li>
+            <% } %>
+          </ul>
+          <% if (a.motif_refus) { %>
+            <p class="aide">Motif : <%= a.motif_refus %></p>
+          <% } %>
+        </div>
+      <% }); %>
+    </div>
+  <% } %>
+
+  <p class="actions">
+    <a class="bouton bouton-secondaire" href="/admin">
+      <%- include("partiels/icone", { nom: "equipe" }) %>
+      Retour à l'espace équipe
+    </a>
+  </p>
+
+<%- include("partiels/pied") %>

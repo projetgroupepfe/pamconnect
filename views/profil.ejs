@@ -169,6 +169,13 @@
           <%- include("partiels/icone", { nom: "remuneration" }) %>
           Mon compte
         </a>
+        <%# Les jetons ne sont pas de l'argent : ils ont donc leur page, a
+            cote du compte et jamais dedans. Les confondre ferait croire
+            a un solde retirable. %>
+        <a class="bouton bouton-secondaire" href="/mes-jetons">
+          <%- include("partiels/icone", { nom: "jeton" }) %>
+          Mes jetons
+        </a>
       <% } %>
     </div>
 

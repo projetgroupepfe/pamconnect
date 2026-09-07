@@ -537,3 +537,120 @@ CREATE INDEX IF NOT EXISTS idx_versements_etat ON versements (etat);
 CREATE INDEX IF NOT EXISTS idx_quartiers_arrond ON quartiers (arrondissement);
 CREATE INDEX IF NOT EXISTS idx_messages_candidature ON messages (candidature_id);
 CREATE INDEX IF NOT EXISTS idx_messages_signale     ON messages (signale);
+
+
+-- ------------------------------------------------------------------
+-- Table parametres : les valeurs que l'equipe peut changer elle-meme
+-- ------------------------------------------------------------------
+-- LE PRIX N'EST PAS DANS LE CODE. Un tarif ecrit en dur dans server.js
+-- ne peut etre change que par quelqu'un qui sait programmer, et il
+-- faudrait redeployer la plateforme pour ajuster un pack de 100 FCFA.
+--
+-- Il vit donc ici, dans une ligne que l'equipe modifie depuis son
+-- espace. Le meme prix s'applique alors a TOUT LE MONDE, immediatement :
+-- il n'y a pas un tarif par utilisateur, et un changement ne reecrit pas
+-- les achats deja payes - ceux-la gardent le montant qu'ils ont coute.
+--
+-- Une valeur est du TEXTE : selon la cle, le serveur y lit un nombre
+-- (100) ou une liste (10:1000|30:3000). Une colonne par type de valeur
+-- aurait fait trois colonnes vides sur quatre.
+CREATE TABLE IF NOT EXISTS parametres (
+  cle      TEXT PRIMARY KEY,
+  valeur   TEXT NOT NULL,
+
+  -- Ce que l'equipe lit dans son ecran. Sans cela, elle modifierait une
+  -- ligne nommee "packs_jetons" sans savoir ce qu'elle regle.
+  libelle  TEXT NOT NULL,
+  aide     TEXT NOT NULL DEFAULT ''
+);
+
+INSERT OR IGNORE INTO parametres (cle, valeur, libelle, aide) VALUES
+  ('jeton_valeur_fcfa', '100',
+   'Valeur d''un jeton',
+   'En FCFA. Sert a afficher chaque prix dans les deux unites : un jeton, et ce qu''il vaut.'),
+  ('packs_jetons', '10:1000|30:3000|60:6000',
+   'Les packs en vente',
+   'Nombre de jetons, deux points, prix en FCFA. Les packs sont separes par une barre verticale.');
+
+
+-- ------------------------------------------------------------------
+-- Table jetons_achats : une demande d'achat de jetons
+-- ------------------------------------------------------------------
+-- SIMULATION, comme le sequestre. La plateforme n'encaisse rien : elle
+-- enregistre une demande, et un membre de l'equipe confirme avoir recu
+-- le paiement. C'est aussi ainsi que fonctionnent beaucoup de services
+-- a Yaounde - le paiement passe par Mobile Money entre les deux
+-- personnes, la plateforme le constate.
+--
+-- Aucun ecran d'operateur n'est imite : PamConnect n'affiche jamais une
+-- interface qui ressemblerait a celle de MTN ou d'Orange.
+--
+-- LE MONTANT EST FIGE ICI. Si l'equipe change le prix d'un pack demain,
+-- cette ligne garde ce qu'elle a coute aujourd'hui.
+CREATE TABLE IF NOT EXISTS jetons_achats (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  utilisateur_id INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+
+  quantite       INTEGER NOT NULL,
+  montant_fcfa   INTEGER NOT NULL,
+
+  etat           TEXT NOT NULL DEFAULT 'en attente'
+                 CHECK (etat IN ('en attente', 'confirme', 'refuse')),
+
+  cree_le        TEXT NOT NULL DEFAULT (datetime('now')),
+  traite_par     INTEGER REFERENCES utilisateurs(id),
+  traite_le      TEXT,
+  motif_refus    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_jetons_achats_etat ON jetons_achats (etat);
+
+
+-- ------------------------------------------------------------------
+-- Table jetons_mouvements : tout ce qui entre et sort d'un solde
+-- ------------------------------------------------------------------
+-- IL N'Y A PAS DE COLONNE "solde". Le solde est la SOMME de ces lignes,
+-- exactement comme pour les versements : un total range a cote de son
+-- historique peut diverger de lui, calcule il ne le peut pas.
+--
+-- quantite est positive quand des jetons entrent, negative quand ils
+-- sortent. Une ligne n'est jamais modifiee ni supprimee : corriger une
+-- erreur, c'est ecrire la ligne inverse.
+--
+-- DEUX NATURES, ET C'EST VOLONTAIRE. Les jetons offerts a la
+-- verification expirent ; ceux qu'on achete, jamais. Les melanger
+-- obligerait a deviner lesquels sont partis en premier. Separes, chaque
+-- solde se lit tout seul, et la personne voit ce qui va expirer.
+--
+-- Les jetons ne se transferent pas entre utilisateurs et ne se
+-- retirent pas en argent : aucune ligne ne porte de destinataire, et
+-- aucune route n'en cree.
+CREATE TABLE IF NOT EXISTS jetons_mouvements (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  utilisateur_id INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+
+  quantite       INTEGER NOT NULL,
+
+  nature         TEXT NOT NULL CHECK (nature IN ('offert', 'achete')),
+
+  --   'achat'         : un pack confirme par l'equipe
+  --   'bienvenue'     : les jetons offerts a la verification du compte
+  --   'expiration'    : les jetons offerts non utilises a temps
+  --   'candidature'   : une reponse a une demande
+  --   'mise_en_avant' : une annonce mise en avant
+  --   'remboursement' : la plateforme rend des jetons preleves
+  motif          TEXT NOT NULL,
+
+  -- La phrase que la personne lit dans son historique.
+  detail         TEXT NOT NULL DEFAULT '',
+
+  achat_id       INTEGER REFERENCES jetons_achats(id) ON DELETE SET NULL,
+  annonce_id     INTEGER REFERENCES annonces(id)      ON DELETE SET NULL,
+
+  -- Renseignee sur les jetons offerts uniquement.
+  expire_le      TEXT,
+
+  cree_le        TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_jetons_mouv_personne ON jetons_mouvements (utilisateur_id);
