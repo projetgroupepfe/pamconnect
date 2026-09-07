@@ -58,10 +58,13 @@
               const id = "creneau-" + valeur;
             %>
             <td>
-              <input type="checkbox" id="<%= id %>" name="disponibilites"
-                     value="<%= valeur %>" <%= dejaCoches.has(valeur) ? "checked" : "" %>>
-              <label for="<%= id %>" class="lecture-ecran">
-                <%= jour %> <%= m.libelle %>
+              <%# Le label ENVELOPPE la case : toute la cellule devient touchable,
+                  et son intitule reste annonce par les lecteurs d'ecran sans
+                  s'afficher. %>
+              <label for="<%= id %>">
+                <input type="checkbox" id="<%= id %>" name="disponibilites"
+                       value="<%= valeur %>" <%= dejaCoches.has(valeur) ? "checked" : "" %>>
+                <span class="lecture-ecran"><%= jour %> <%= m.libelle %></span>
               </label>
             </td>
           <% }); %>

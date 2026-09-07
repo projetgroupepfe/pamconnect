@@ -219,10 +219,22 @@ a:hover { color: var(--bleu-fonce); }
   text-align: center; padding: .35rem .2rem;
 }
 .creneaux-table th[scope="row"] { text-align: left; font-weight: 500; color: var(--encre); }
-.creneaux-table td { text-align: center; padding: .3rem .2rem; }
+.creneaux-table td { text-align: center; padding: 0; }
+
+/* LA CIBLE, PAS LA CASE. Le carre a coche mesure 21 pixels : trop peu
+   pour un pouce, alors que le reste de la feuille vise 44 a 52. Plutot
+   que de grossir le carre - qui deviendrait envahissant sur un ecran
+   large - on rend TOUTE LA CELLULE touchable. */
+.creneaux-table label {
+  display: block;
+  min-height: 44px;
+  padding: .6rem .2rem;
+  cursor: pointer;
+}
 .creneaux-table input[type="checkbox"] {
   width: 1.35rem; height: 1.35rem; margin: 0; cursor: pointer;
   accent-color: var(--bleu);
+  pointer-events: none;   /* c'est le label qui recoit le doigt */
 }
 .creneaux-table tbody tr:nth-child(odd) { background-color: var(--fond); }
 
@@ -611,6 +623,23 @@ button:hover, .bouton:hover {
 
 @media (max-width: 759px) {
   .accroche-image { display: none; }  /* une illustration de moins a charger */
+
+  /* L'EN-TETE DEBORDAIT. Trois blocs se disputaient 375 pixels : le nom,
+     le badge de zone et le bouton "Creer un compte". Le badge refuse
+     d'aller a la ligne, le bouton garde sa largeur, et le second passait
+     PAR-DESSUS le premier : "Yaounde" etait coupe en deux.
+
+     C'est le badge qui part : sur un telephone, l'accueil annonce deja
+     "les employeurs de Yaounde" en toutes lettres, juste en dessous. */
+  .lieu-entete { display: none; }
+
+  /* Le nom peut alors occuper la place qui reste, et se couper
+     proprement plutot que de pousser le bouton hors de l'ecran. */
+  .logo { font-size: 1.05rem; min-width: 0; }
+  .logo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .entete-actions { flex: 0 0 auto; }
+  .entete-actions .bouton { padding: .5rem .7rem; font-size: .85rem; }
 }
 
 
