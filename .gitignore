@@ -4,6 +4,3 @@ data/annonces.json
 data/candidatures.json
 data/*.db
 data/documents/
-
-# Configuration d outils, propre a chaque poste de travail.
-.claude/
