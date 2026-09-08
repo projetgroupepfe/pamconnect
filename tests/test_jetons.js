@@ -20,6 +20,9 @@ const RACINE = "http://127.0.0.1:3999";
 const M = "test-jeton";
 let ok = 0, ko = 0;
 
+// Le saut de ligne qui separe les titres de sections.
+const SAUT = String.fromCharCode(10);
+
 const dire = (nom, cond, detail) => {
   if (cond) { ok++; console.log("  OK    | " + nom); }
   else { ko++; console.log("  ECHEC | " + nom + (detail ? "   -> " + detail : "")); }
@@ -220,7 +223,46 @@ setTimeout(async () => {
   dire("un pack en double est ramene a un seul", prixDe("packs_jetons") === "10|30",
        prixDe("packs_jetons"));
 
-  console.log("\n--- LES JETONS NE SE TRANSFERENT PAS ---");
+  console.log("\n--- QUI A CHANGE LE PRIX ---");
+  // Partout ailleurs dans l'espace equipe, une decision garde le nom de
+  // qui l'a prise. Un tarif est une decision : c'est ce que paient les
+  // utilisateurs.
+  const trace = base.prepare(`
+    SELECT p.modifie_par, p.modifie_le, u.nom
+    FROM parametres p LEFT JOIN utilisateurs u ON u.id = p.modifie_par
+    WHERE p.cle = 'jeton_valeur_fcfa'
+  `).get();
+  dire("le nom de qui a change le prix est garde", trace.modifie_par === eq.id,
+       String(trace.modifie_par));
+  dire("la date aussi", typeof trace.modifie_le === "string");
+
+  const ecranPrix = await (await lire("/admin/jetons", eq.cookie)).text();
+  dire("l'equipe lit le dernier changement sur son ecran",
+       ecranPrix.includes("Dernier changement"));
+  dire("avec le nom du membre", ecranPrix.includes("Test eq"));
+
+  console.log(SAUT + "--- SUPPRIMER LE COMPTE NE BLOQUE RIEN ---");
+  // Le prix reste, la date reste, seul le nom disparait. Sans cette
+  // regle, un compte d'equipe qui a touche un prix serait indestructible.
+  const jetable = await creerCompte("jetable", "employeur");
+  base.prepare("UPDATE utilisateurs SET est_admin = 1 WHERE id = ?").run(jetable.id);
+  await poster("/admin/parametres", formPrix(150, [10]), jetable.cookie);
+  base.prepare("DELETE FROM utilisateurs WHERE id = ?").run(jetable.id);
+  const apres = base.prepare(
+    "SELECT valeur FROM parametres WHERE cle = 'jeton_valeur_fcfa'").get();
+  dire("le compte a pu etre supprime",
+       !base.prepare("SELECT 1 FROM utilisateurs WHERE id = ?").get(jetable.id));
+  dire("le prix qu'il a fixe reste applique", apres.valeur === "150", apres.valeur);
+
+  // On ne verifie pas ce que la colonne contient : selon l'age de la
+  // base, elle repasse a NULL ou garde un identifiant qui ne designe
+  // plus personne. Ce qui compte est identique dans les deux cas -
+  // l'ecran ne montre ni erreur ni case vide.
+  const ecranSansNom = await (await lire("/admin/jetons", eq.cookie)).text();
+  dire("l'ecran ne plante pas sans le nom", ecranSansNom.includes("Dernier changement"));
+  dire("il dit que le compte a disparu", ecranSansNom.includes("compte supprim"));
+
+  console.log(SAUT + "--- LES JETONS NE SE TRANSFERENT PAS ---");
   // Aucune route ne le permet. La verification est faite ici pour que
   // l'ajout d'une telle route casse la serie.
   const transfert = await poster("/mes-jetons/transferer",
@@ -230,8 +272,9 @@ setTimeout(async () => {
 
   console.log("\n--- NETTOYAGE ---");
   prixInitiaux.forEach((p) =>
-    base.prepare("UPDATE parametres SET valeur = ? WHERE cle = ?").run(p.valeur, p.cle));
-  console.log("  prix d'origine remis");
+    base.prepare("UPDATE parametres SET valeur = ?, modifie_par = NULL, modifie_le = NULL WHERE cle = ?")
+      .run(p.valeur, p.cle));
+  console.log("  prix d'origine remis, sans trace de test");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");
 

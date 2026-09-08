@@ -556,7 +556,18 @@ CREATE INDEX IF NOT EXISTS idx_messages_signale     ON messages (signale);
 -- aurait fait trois colonnes vides sur quatre.
 CREATE TABLE IF NOT EXISTS parametres (
   cle      TEXT PRIMARY KEY,
-  valeur   TEXT NOT NULL
+  valeur   TEXT NOT NULL,
+
+  -- QUI A CHANGE CE PRIX, ET QUAND. C'etait le seul reglage sensible de
+  -- l'espace equipe sans trace : une suspension, un arbitrage et un
+  -- refus gardent tous le nom de qui a decide, un prix non.
+  --
+  -- Un seul changement garde, le dernier. Un historique complet
+  -- demanderait une table et un ecran de plus, pour repondre a une
+  -- question que personne ne pose : ce qu'on veut savoir, c'est qui a
+  -- mis le prix qui s'applique maintenant.
+  modifie_par INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL,
+  modifie_le  TEXT
 );
 
 -- UN PACK NE PORTE QUE SON NOMBRE DE JETONS. Son prix se calcule :

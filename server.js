@@ -155,6 +155,12 @@ retirerColonneSiPresente("candidatures", "tarif_propose");
 retirerColonneSiPresente("parametres", "libelle");
 retirerColonneSiPresente("parametres", "aide");
 
+// Un prix qui change sans qu'on sache qui l'a change etait le seul
+// reglage sensible de l'espace equipe sans trace.
+ajouterColonneSiAbsente("parametres", "modifie_par",
+  "INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL");
+ajouterColonneSiAbsente("parametres", "modifie_le", "TEXT");
+
 // Le schema arrive ensuite : il cree ce qui manque et met a jour les
 // donnees de reference (quartiers, metiers).
 db.exec(fs.readFileSync(path.join(__dirname, "data", "schema.sql"), "utf-8"));
@@ -1030,7 +1036,21 @@ const requetes = {
   `),
 
   majParametre: db.prepare(`
-    UPDATE parametres SET valeur = @valeur WHERE cle = @cle
+    UPDATE parametres
+       SET valeur = @valeur, modifie_par = @par, modifie_le = datetime('now')
+     WHERE cle = @cle
+  `),
+
+  // Le dernier changement de prix, quel que soit le reglage touche.
+  // Les prix s'enregistrent ensemble : une seule ligne suffit a dire
+  // qui a decide du tarif en cours.
+  dernierChangementPrix: db.prepare(`
+    SELECT p.modifie_le, u.nom
+    FROM parametres p
+    LEFT JOIN utilisateurs u ON u.id = p.modifie_par
+    WHERE p.modifie_le IS NOT NULL
+    ORDER BY p.modifie_le DESC
+    LIMIT 1
   `),
 
   // Le solde en DEUX PARTS : les jetons offerts, qui expirent, et les
@@ -3710,6 +3730,7 @@ app.get("/admin/jetons", exigerAdmin, (req, res) => {
     traites: requetes.derniersAchatsJetonsTraites.all(),
     valeurJeton: valeurDuJeton(),
     packs: packsEnVente(),
+    dernierChangement: requetes.dernierChangementPrix.get() || null,
   });
 });
 
@@ -3832,10 +3853,15 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
   }
 
   const enregistrer = db.transaction(() => {
-    requetes.majParametre.run({ cle: "jeton_valeur_fcfa", valeur: String(valeurJeton) });
+    requetes.majParametre.run({
+      cle: "jeton_valeur_fcfa",
+      valeur: String(valeurJeton),
+      par: req.utilisateur.id,
+    });
     requetes.majParametre.run({
       cle: "packs_jetons",
       valeur: [...new Set(quantites)].sort((a, b) => a - b).join("|"),
+      par: req.utilisateur.id,
     });
   });
 

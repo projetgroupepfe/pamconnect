@@ -114,10 +114,13 @@
       <% }); %>
 
       <div class="champ">
-        <label for="pack-nouveau">Ajouter un pack</label>
+        <label for="pack-nouveau">Mettre un nouveau pack en vente</label>
         <input id="pack-nouveau" type="number" name="pack" value=""
                min="1" step="1" inputmode="numeric" placeholder="Nombre de jetons">
-        <small class="aide">Laissez vide si vous n'ajoutez rien.</small>
+        <small class="aide">
+          Tapez le nombre de jetons du pack à créer, par exemple 5 pour
+          vendre un pack de 5 jetons. Laissez vide si vous n'en créez pas.
+        </small>
       </div>
 
       <div class="actions">
@@ -127,6 +130,18 @@
         </button>
       </div>
     </form>
+
+    <%# QUI A MIS CE PRIX. Partout ailleurs dans l'espace equipe, une
+        decision garde le nom de qui l'a prise. Un tarif n'y echappe pas :
+        c'est ce que paient les utilisateurs. %>
+    <p class="aide">
+      <% if (dernierChangement && dernierChangement.modifie_le) { %>
+        Dernier changement : le <%= dateLisible(dernierChangement.modifie_le) %>
+        par <%= dernierChangement.nom || "un compte supprimé depuis" %>.
+      <% } else { %>
+        Aucun changement depuis la mise en service.
+      <% } %>
+    </p>
   </div>
 
   <h2>Demandes déjà traitées</h2>
