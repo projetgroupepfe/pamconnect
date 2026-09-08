@@ -47,11 +47,11 @@
         </ul>
 
         <form action="/admin/jetons/<%= achat.id %>" method="POST">
-          <label>
-            Motif, si vous refusez
-            <input type="text" name="motif" maxlength="200"
+          <div class="champ">
+            <label for="motif-<%= achat.id %>">Motif, si vous refusez</label>
+            <input id="motif-<%= achat.id %>" type="text" name="motif" maxlength="200"
                    placeholder="Paiement non reçu">
-          </label>
+          </div>
 
           <div class="actions">
             <button type="submit" name="decision" value="confirmer" class="bouton">
@@ -72,9 +72,10 @@
 
   <h2>Les prix</h2>
 
-  <%# LE PRIX N'EST PAS DANS LE CODE. Il se change ici, et le nouveau
-      tarif vaut pour tout le monde des l'enregistrement. Les achats
-      deja payes gardent leur montant. %>
+  <%# UN SEUL NOMBRE COMMANDE TOUT. Le prix d'un pack ne se saisit pas :
+      il se calcule. Saisir les deux laisserait l'equipe ecrire un jeton
+      a 200 FCFA et un pack de 10 a 1 000, et plus rien ne dirait lequel
+      des deux a raison. %>
   <div class="carte">
     <p class="aide">
       Un prix modifié ici s'applique <strong>à tous les utilisateurs</strong>
@@ -83,13 +84,41 @@
     </p>
 
     <form action="/admin/parametres" method="POST">
-      <% parametres.forEach(function (p) { %>
-        <label>
-          <%= p.libelle %>
-          <input type="text" name="<%= p.cle %>" value="<%= p.valeur %>" required>
-          <small class="aide"><%= p.aide %></small>
-        </label>
+
+      <div class="champ">
+        <label for="valeur-jeton">Valeur d'un jeton, en FCFA</label>
+        <input id="valeur-jeton" type="number" name="jeton_valeur_fcfa"
+               value="<%= valeurJeton === null ? "" : valeurJeton %>"
+               min="1" step="1" inputmode="numeric" required>
+        <small class="aide">
+          C'est ce nombre qui donne le prix de tout le reste. Un pack de
+          10 jetons se vendra dix fois cette somme.
+        </small>
+      </div>
+
+      <h3>Les packs en vente</h3>
+
+      <%# Une case par pack, plus une case vide pour en ajouter un.
+          Vider une case retire le pack : pas de bouton Supprimer a
+          construire, et rien de plus a expliquer. %>
+      <% packs.forEach(function (pack, rang) { %>
+        <div class="champ">
+          <label for="pack-<%= rang %>">Pack de <%= pack.quantite %> jetons</label>
+          <input id="pack-<%= rang %>" type="number" name="pack"
+                 value="<%= pack.quantite %>" min="1" step="1" inputmode="numeric">
+          <small class="aide">
+            Se vend <strong><%= formaterMontant(pack.prix) %></strong>.
+            Videz cette case pour retirer ce pack.
+          </small>
+        </div>
       <% }); %>
+
+      <div class="champ">
+        <label for="pack-nouveau">Ajouter un pack</label>
+        <input id="pack-nouveau" type="number" name="pack" value=""
+               min="1" step="1" inputmode="numeric" placeholder="Nombre de jetons">
+        <small class="aide">Laissez vide si vous n'ajoutez rien.</small>
+      </div>
 
       <div class="actions">
         <button type="submit" class="bouton">
@@ -98,25 +127,6 @@
         </button>
       </div>
     </form>
-  </div>
-
-  <%# CE QUE CES PRIX DONNENT, RELU PAR LE SERVEUR. Une ligne mal ecrite
-      est ignoree sans bruit : la seule facon de s'en apercevoir est de
-      voir la liste telle qu'elle sera vendue. %>
-  <div class="carte">
-    <h3>Ce que les utilisateurs verront</h3>
-    <% if (packs.length === 0) { %>
-      <p class="vide">Aucun pack en vente.</p>
-    <% } else { %>
-      <div class="detail-tarif">
-        <% packs.forEach(function (pack) { %>
-          <div class="ligne-tarif">
-            <span><%= pack.quantite %> jetons</span>
-            <strong><%= formaterMontant(pack.prix) %></strong>
-          </div>
-        <% }); %>
-      </div>
-    <% } %>
   </div>
 
   <h2>Demandes déjà traitées</h2>

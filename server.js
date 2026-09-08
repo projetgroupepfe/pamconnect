@@ -147,9 +147,36 @@ renommerColonneSiPresente("annonces", "budget", "prix");
 // l'annonce, la personne postule ou repond ailleurs.
 retirerColonneSiPresente("candidatures", "tarif_propose");
 
+// Les libelles des reglages etaient ranges en base pour construire un
+// formulaire tout seul. Ce formulaire montrait des cases identiques
+// pour des reglages qui ne se saisissent pas pareil - un nombre d'un
+// cote, une liste de packs de l'autre. Les intitules sont revenus dans
+// la vue, comme dans tous les autres formulaires du projet.
+retirerColonneSiPresente("parametres", "libelle");
+retirerColonneSiPresente("parametres", "aide");
+
 // Le schema arrive ensuite : il cree ce qui manque et met a jour les
 // donnees de reference (quartiers, metiers).
 db.exec(fs.readFileSync(path.join(__dirname, "data", "schema.sql"), "utf-8"));
+
+// Les packs etaient ranges avec leur prix : "10:1000|30:3000". Le prix
+// se calcule desormais a partir de la valeur du jeton, et la ligne ne
+// garde que les quantites. Conversion faite une fois, sans rien perdre :
+// c'est la quantite qui portait l'information.
+{
+  const ligne = db.prepare("SELECT valeur FROM parametres WHERE cle = 'packs_jetons'").get();
+
+  if (ligne && ligne.valeur.includes(":")) {
+    const propre = ligne.valeur
+      .split("|")
+      .map((morceau) => morceau.split(":")[0].trim())
+      .filter((quantite) => Number(quantite) > 0)
+      .join("|");
+
+    db.prepare("UPDATE parametres SET valeur = ? WHERE cle = 'packs_jetons'").run(propre);
+    console.log("Packs de jetons : format simplifie -> " + propre);
+  }
+}
 
 // RATTRAPAGE : les demandes publiees avant l'existence du sequestre n'ont
 // pas de versement. La regle veut que toute demande en porte un - sinon
@@ -1002,10 +1029,6 @@ const requetes = {
     SELECT valeur FROM parametres WHERE cle = ?
   `),
 
-  tousLesParametres: db.prepare(`
-    SELECT cle, valeur, libelle, aide FROM parametres ORDER BY libelle
-  `),
-
   majParametre: db.prepare(`
     UPDATE parametres SET valeur = @valeur WHERE cle = @cle
   `),
@@ -1769,19 +1792,25 @@ function valeurDuJeton() {
   return parametreNombre("jeton_valeur_fcfa");
 }
 
-// "10:1000|30:3000" devient deux packs. Un morceau mal ecrit est
-// IGNORE, jamais devine : mieux vaut un pack de moins qu'un prix faux.
+// LE PRIX D'UN PACK NE SE SAISIT PAS, IL SE CALCULE : 10 jetons a
+// 100 FCFA se vendent 1 000 FCFA. Ranger les deux laisserait l'equipe
+// ecrire un jeton a 200 et un pack de 10 a 1 000, et plus rien ne
+// dirait lequel des deux a raison.
+//
+// Un morceau mal ecrit est IGNORE, jamais devine : mieux vaut un pack
+// de moins qu'un prix faux.
 function packsEnVente() {
-  return String(parametre("packs_jetons") || "")
+  const valeur = valeurDuJeton();
+  if (valeur === null) return [];
+
+  const quantites = String(parametre("packs_jetons") || "")
     .split("|")
-    .map((morceau) => {
-      const parts = String(morceau).split(":");
-      return {
-        quantite: Math.round(Number(parts[0])),
-        prix: Math.round(Number(parts[1])),
-      };
-    })
-    .filter((pack) => pack.quantite > 0 && pack.prix > 0);
+    .map((morceau) => Math.round(Number(String(morceau).trim())))
+    .filter((quantite) => quantite > 0);
+
+  return [...new Set(quantites)]
+    .sort((a, b) => a - b)
+    .map((quantite) => ({ quantite, prix: quantite * valeur }));
 }
 
 // LE PRIX EST TOUJOURS ANNONCE DANS LES DEUX UNITES : "20 jetons
@@ -3679,7 +3708,7 @@ app.get("/admin/jetons", exigerAdmin, (req, res) => {
     titre: "Jetons",
     achats: requetes.achatsJetonsEnAttente.all(),
     traites: requetes.derniersAchatsJetonsTraites.all(),
-    parametres: requetes.tousLesParametres.all(),
+    valeurJeton: valeurDuJeton(),
     packs: packsEnVente(),
   });
 });
@@ -3764,7 +3793,6 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
   // est mauvaise : une table de prix a moitie mise a jour serait pire
   // que l'ancienne.
   const valeurJeton = Math.round(Number(req.body.jeton_valeur_fcfa));
-  const packsBruts = String(req.body.packs_jetons || "").trim();
 
   if (!Number.isFinite(valeurJeton) || valeurJeton <= 0) {
     return res.status(400).render("message", {
@@ -3774,17 +3802,31 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
     });
   }
 
-  const packsLus = packsBruts.split("|").map((morceau) => {
-    const parts = String(morceau).split(":");
-    return { quantite: Math.round(Number(parts[0])), prix: Math.round(Number(parts[1])) };
-  });
+  // Le formulaire envoie une case par pack, toutes nommees "pack".
+  // Une seule case remplie donne un texte, plusieurs donnent un tableau :
+  // concat ramene les deux au meme cas.
+  const cases = [].concat(req.body.pack === undefined ? [] : req.body.pack)
+    .map((valeur) => String(valeur).trim())
+    .filter((valeur) => valeur !== "");
 
-  if (packsLus.length === 0 || packsLus.some((p) => !(p.quantite > 0) || !(p.prix > 0))) {
+  const quantites = cases.map((valeur) => Math.round(Number(valeur)));
+
+  if (quantites.some((quantite) => !(quantite > 0))) {
     return res.status(400).render("message", {
-      titre: "Packs invalides",
-      texte: "Écrivez chaque pack sous la forme nombre de jetons, deux points, " +
-             "prix en FCFA, et séparez-les par une barre verticale. " +
-             "Par exemple : 10:1000|30:3000|60:6000",
+      titre: "Nombre de jetons invalide",
+      texte: "Un pack se règle par son nombre de jetons, qui doit être " +
+             "supérieur à zéro. Videz une case pour retirer un pack.",
+      liens: [{ url: "/admin/jetons", texte: "Retour aux jetons" }],
+    });
+  }
+
+  // VIDER TOUTES LES CASES FERMERAIT LA VENTE. C'est peut-etre voulu,
+  // mais jamais par accident : on le refuse, et on le dit.
+  if (quantites.length === 0) {
+    return res.status(400).render("message", {
+      titre: "Aucun pack",
+      texte: "Il faut au moins un pack en vente. Sans pack, plus personne " +
+             "ne peut obtenir de jetons.",
       liens: [{ url: "/admin/jetons", texte: "Retour aux jetons" }],
     });
   }
@@ -3793,7 +3835,7 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
     requetes.majParametre.run({ cle: "jeton_valeur_fcfa", valeur: String(valeurJeton) });
     requetes.majParametre.run({
       cle: "packs_jetons",
-      valeur: packsLus.map((p) => `${p.quantite}:${p.prix}`).join("|"),
+      valeur: [...new Set(quantites)].sort((a, b) => a - b).join("|"),
     });
   });
 

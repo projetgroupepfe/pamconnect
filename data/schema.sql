@@ -556,21 +556,18 @@ CREATE INDEX IF NOT EXISTS idx_messages_signale     ON messages (signale);
 -- aurait fait trois colonnes vides sur quatre.
 CREATE TABLE IF NOT EXISTS parametres (
   cle      TEXT PRIMARY KEY,
-  valeur   TEXT NOT NULL,
-
-  -- Ce que l'equipe lit dans son ecran. Sans cela, elle modifierait une
-  -- ligne nommee "packs_jetons" sans savoir ce qu'elle regle.
-  libelle  TEXT NOT NULL,
-  aide     TEXT NOT NULL DEFAULT ''
+  valeur   TEXT NOT NULL
 );
 
-INSERT OR IGNORE INTO parametres (cle, valeur, libelle, aide) VALUES
-  ('jeton_valeur_fcfa', '100',
-   'Valeur d''un jeton',
-   'En FCFA. Sert a afficher chaque prix dans les deux unites : un jeton, et ce qu''il vaut.'),
-  ('packs_jetons', '10:1000|30:3000|60:6000',
-   'Les packs en vente',
-   'Nombre de jetons, deux points, prix en FCFA. Les packs sont separes par une barre verticale.');
+-- UN PACK NE PORTE QUE SON NOMBRE DE JETONS. Son prix se calcule :
+-- 10 jetons a 100 FCFA se vendent 1 000 FCFA.
+--
+-- Ranger aussi le prix laisserait les deux se contredire - un jeton a
+-- 200 et un pack de 10 a 1 000 - et il n'y aurait aucun moyen de savoir
+-- lequel des deux dit vrai. Un seul nombre a changer, une seule verite.
+INSERT OR IGNORE INTO parametres (cle, valeur) VALUES
+  ('jeton_valeur_fcfa', '100'),
+  ('packs_jetons', '10|30|60');
 
 
 -- ------------------------------------------------------------------

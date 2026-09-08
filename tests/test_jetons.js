@@ -26,6 +26,15 @@ const dire = (nom, cond, detail) => {
 };
 
 const form = (o) => new URLSearchParams(o);
+
+// Le formulaire des prix envoie une case "pack" par pack. URLSearchParams
+// ne le fait pas depuis un objet : il faut les ajouter une par une.
+const formPrix = (valeur, quantites) => {
+  const p = new URLSearchParams();
+  p.append("jeton_valeur_fcfa", String(valeur));
+  quantites.forEach((q) => p.append("pack", String(q)));
+  return p;
+};
 const lire = (chemin, cookie) =>
   fetch(RACINE + chemin, { headers: cookie ? { Cookie: cookie } : {}, redirect: "manual" });
 
@@ -163,14 +172,17 @@ setTimeout(async () => {
   console.log("\n--- LES PRIX NE SONT PAS FIGES ---");
   // Le point central : l'equipe change le tarif, et TOUT LE MONDE voit
   // le nouveau. Pas un prix par utilisateur, pas un prix dans le code.
-  const majPrix = await poster("/admin/parametres",
-    form({ jeton_valeur_fcfa: "200", packs_jetons: "5:1000|50:9000" }), eq.cookie);
+  const majPrix = await poster("/admin/parametres", formPrix(200, [5, 50]), eq.cookie);
   dire("l'equipe peut changer les prix", majPrix.code === 302, String(majPrix.code));
   dire("la valeur du jeton est enregistree", prixDe("jeton_valeur_fcfa") === "200");
+  dire("un pack ne garde que sa quantite", prixDe("packs_jetons") === "5|50",
+       prixDe("packs_jetons"));
 
   page = await (await lire("/mes-jetons", emp.cookie)).text();
   dire("l'employeur voit le nouveau pack", page.includes("5 jetons"));
-  dire("et son nouveau prix", page.includes("9 000 FCFA"));
+  // 5 jetons a 200 FCFA : le prix se CALCULE, il ne se saisit pas.
+  dire("le prix du pack suit la valeur du jeton", page.includes("1 000 FCFA"));
+  dire("le grand pack aussi", page.includes("10 000 FCFA"));
   dire("son solde est reevalue au nouveau tarif", page.includes("2 000 FCFA"));
 
   // UN COMPTE NEUF, sans historique d'achat : c'est le seul endroit ou
@@ -179,7 +191,7 @@ setTimeout(async () => {
   // passees - et c'est normal, une demande refusee garde sa quantite.
   const neuf = await creerCompte("neuf", "employeur");
   const pageNeuve = await (await lire("/mes-jetons", neuf.cookie)).text();
-  dire("un nouvel utilisateur voit exactement le meme prix", pageNeuve.includes("9 000 FCFA"));
+  dire("un nouvel utilisateur voit exactement le meme prix", pageNeuve.includes("10 000 FCFA"));
   dire("et le meme pack", pageNeuve.includes("5 jetons"));
   dire("l'ancien pack n'est plus propose", !pageNeuve.includes("30 jetons"));
   dire("l'ancien prix n'est plus propose", !pageNeuve.includes("3 000 FCFA"));
@@ -189,15 +201,24 @@ setTimeout(async () => {
        base.prepare("SELECT montant_fcfa FROM jetons_achats WHERE id = ?").get(achat.id).montant_fcfa === 1000);
 
   console.log("\n--- UN PRIX ABSURDE EST REFUSE ---");
-  const zero = await poster("/admin/parametres",
-    form({ jeton_valeur_fcfa: "0", packs_jetons: "5:1000" }), eq.cookie);
+  const zero = await poster("/admin/parametres", formPrix(0, [5]), eq.cookie);
   dire("une valeur de jeton nulle est refusee", zero.code === 400, String(zero.code));
   dire("rien n'a ete ecrit", prixDe("jeton_valeur_fcfa") === "200");
 
   const casse = await poster("/admin/parametres",
-    form({ jeton_valeur_fcfa: "200", packs_jetons: "dix jetons pour mille" }), eq.cookie);
+    formPrix(200, ["dix"]), eq.cookie);
   dire("un pack mal ecrit est refuse", casse.code === 400, String(casse.code));
-  dire("les packs precedents sont intacts", prixDe("packs_jetons") === "5:1000|50:9000");
+  dire("les packs precedents sont intacts", prixDe("packs_jetons") === "5|50");
+
+  // Tout vider fermerait la vente. C'est peut-etre voulu, jamais par accident.
+  const vide = await poster("/admin/parametres", formPrix(200, []), eq.cookie);
+  dire("supprimer tous les packs est refuse", vide.code === 400, String(vide.code));
+  dire("les packs sont toujours la", prixDe("packs_jetons") === "5|50");
+
+  // Deux fois le meme pack ne doit pas donner deux lignes identiques.
+  await poster("/admin/parametres", formPrix(100, [10, 10, 30]), eq.cookie);
+  dire("un pack en double est ramene a un seul", prixDe("packs_jetons") === "10|30",
+       prixDe("packs_jetons"));
 
   console.log("\n--- LES JETONS NE SE TRANSFERENT PAS ---");
   // Aucune route ne le permet. La verification est faite ici pour que
