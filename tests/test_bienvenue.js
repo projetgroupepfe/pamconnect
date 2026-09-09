@@ -106,6 +106,47 @@ setTimeout(async () => {
   dire("la page l'annonce", page.includes("Bienvenue"));
   dire("elle dit combien de jours", page.includes("60 jours"));
 
+  console.log(SAUT + "--- L'EQUIPE VALIDE, LES JETONS ARRIVENT ---");
+  // LE CHEMIN NORMAL. La personne depose ses papiers, l'equipe accepte,
+  // et les jetons sont la sans qu'elle ait a ouvrir un ecran precis.
+  const depose = await creerCompte("depose", "prestataire", false,
+    { metier: "menagere", tarif: "11000" });
+
+  // On place le dossier en attente comme le fait l'envoi des documents.
+  base.prepare(`
+    UPDATE utilisateurs
+       SET statut_verification = 'en attente', documents_envoyes_le = datetime('now')
+     WHERE id = ?
+  `).run(depose.id);
+
+  dire("rien avant la decision", solde(depose.id) === 0, String(solde(depose.id)));
+
+  const validation = await poster("/admin/verification",
+    form({ utilisateurId: String(depose.id), decision: "valider" }), eq.cookie);
+  dire("la validation aboutit", validation.code === 302, String(validation.code));
+  dire("les jetons sont credites aussitot", solde(depose.id) === 3, String(solde(depose.id)));
+  dire("sans qu'elle ait ouvert sa page", mouvements(depose.id, "bienvenue").length === 1);
+
+  // Et l'ouverture de la page ne doit rien ajouter par-dessus.
+  await ouvrir(depose.cookie);
+  dire("ouvrir sa page n'en ajoute pas", solde(depose.id) === 3, String(solde(depose.id)));
+  dire("toujours un seul cadeau", mouvements(depose.id, "bienvenue").length === 1);
+
+  console.log(SAUT + "--- UN DOSSIER REFUSE N'OFFRE RIEN ---");
+  const refuse = await creerCompte("refuse", "prestataire", false,
+    { metier: "menagere", tarif: "11000" });
+  base.prepare(`
+    UPDATE utilisateurs
+       SET statut_verification = 'en attente', documents_envoyes_le = datetime('now')
+     WHERE id = ?
+  `).run(refuse.id);
+  await poster("/admin/verification",
+    form({ utilisateurId: String(refuse.id), decision: "refuser", motif: "Piece illisible" }),
+    eq.cookie);
+  dire("aucun jeton apres un refus", solde(refuse.id) === 0, String(solde(refuse.id)));
+  await ouvrir(refuse.cookie);
+  dire("ni en ouvrant sa page", solde(refuse.id) === 0, String(solde(refuse.id)));
+
   console.log(SAUT + "--- UNE SEULE FOIS DANS LA VIE DU COMPTE ---");
   await ouvrir(pasVerifie.cookie);
   await ouvrir(pasVerifie.cookie);

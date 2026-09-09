@@ -1874,14 +1874,20 @@ function jetonsDeBienvenue(role) {
     : "bienvenue_prestataire");
 }
 
-// LES JETONS OFFERTS ARRIVENT A LA PREMIERE VISITE APRES LA
-// VERIFICATION, pas au moment ou l'equipe valide le dossier.
+// LES JETONS OFFERTS ARRIVENT QUAND L'EQUIPE VALIDE LE DOSSIER.
+// La cause et l'effet tiennent alors dans le meme geste : le dossier
+// est accepte, les jetons sont credites.
 //
-// C'est volontaire. Les comptes verifies avant l'existence des jetons
-// les recevraient sinon jamais, et il aurait fallu leur inventer une
-// date de depart. Ici le compte a rebours part quand la personne les
-// recoit vraiment : elle a ses 60 jours pleins, quelle que soit la date
-// de sa verification.
+// Cette fonction est appelee a DEUX endroits, et ce n'est pas un
+// doublon :
+//   - a la validation, c'est le cas normal ;
+//   - a l'ouverture de la page des jetons, en RATTRAPAGE, pour les
+//     comptes verifies avant l'existence des jetons - ceux-la n'ont
+//     aucune validation a laquelle se raccrocher.
+//
+// Le controle ci-dessous est ce qui rend les deux appels sans danger :
+// il regarde s'il existe deja une ligne, et non un drapeau qu'il
+// faudrait penser a poser.
 //
 // Ne fait rien si la personne n'est pas verifiee, ou si elle les a deja
 // recus une fois.
@@ -4284,6 +4290,14 @@ app.post("/admin/verification", exigerAdmin, lireFormulaire, (req, res) => {
 
   if (req.body.decision === "valider") {
     requetes.validerVerification.run(dossier.id);
+
+    // LES JETONS OFFERTS, ICI ET PAS AILLEURS. La personne les trouvera
+    // en se connectant, sans avoir a passer par un ecran particulier.
+    //
+    // On relit la personne apres la validation : l'objet charge plus
+    // haut porte encore l'ancien statut, et la fonction refuserait
+    // d'offrir quoi que ce soit a un dossier "en attente".
+    offrirLaBienvenue(requetes.utilisateurParId.get(dossier.id));
   } else {
     const motif = String(req.body.motif || "").trim() || "Documents non conformes.";
     requetes.refuserVerification.run(motif, dossier.id);
