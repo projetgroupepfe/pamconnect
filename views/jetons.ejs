@@ -38,14 +38,55 @@
       apres. %>
   <div class="carte confiance">
     <h3>À quoi servent les jetons</h3>
+
+    <%# LE PRIX D'UNE ACTION, DIT ICI ET PAS AILLEURS. Annoncer "des
+        jetons vous sont offerts" sans dire ce qu'ils permettent laisse
+        la personne compter des unites dont elle ignore la valeur. %>
     <p>
       Un jeton donne accès à une option de PamConnect.
       <% if (jeSuisEmployeur) { %>
-        Pour vous, il sert à <strong>mettre une demande en avant</strong> pour
-        qu'elle soit vue en premier.
+        Pour vous, il sert à <strong>mettre une demande en avant</strong>,
+        pour qu'elle soit vue avant les autres.
+        <% if (coutAction) { %>
+          Une mise en avant coûte <strong><%= jetonsEnClair(coutAction) %></strong>.
+        <% } %>
       <% } else { %>
         Pour vous, il sert à <strong>répondre à une demande</strong>.
+        <% if (coutAction) { %>
+          Une réponse coûte <strong><%= jetonsEnClair(coutAction) %></strong>.
+        <% } %>
       <% } %>
+    </p>
+
+    <%# CE QUE LE SOLDE PERMET VRAIMENT. Un employeur qui recoit 10 jetons
+        alors qu'une mise en avant en coute 20 doit le lire ici, pas le
+        decouvrir en cliquant. %>
+    <% if (coutAction && solde.total > 0) { %>
+      <% const possible = Math.floor(solde.total / coutAction); %>
+      <% if (possible > 0) { %>
+        <% const action = jeSuisEmployeur
+             ? (possible > 1 ? "mises en avant" : "mise en avant")
+             : (possible > 1 ? "réponses" : "réponse"); %>
+        <p>
+          Votre solde vous permet <strong><%= possible %> <%= action %></strong>.
+        </p>
+      <% } else { %>
+        <p>
+          Il vous manque <strong><%= jetonsEnClair(coutAction - solde.total) %></strong>
+          pour <%= jeSuisEmployeur ? "une mise en avant" : "une réponse" %>.
+          Vos jetons en couvrent déjà une partie.
+        </p>
+      <% } %>
+    <% } %>
+
+    <%# A RETIRER quand la depense sera construite : etape 3 pour la
+        reponse a une demande, etape 4 pour la mise en avant. Tant que le
+        bouton n'existe pas, la page ne doit pas laisser croire qu'il
+        existe - quelqu'un le chercherait sans le trouver. %>
+    <p class="aide">
+      <strong>Cette option n'est pas encore ouverte.</strong> Elle arrive dans
+      une prochaine version. D'ici là, vos jetons vous attendent et rien ne
+      vous est prélevé.
     </p>
     <p class="aide">
       Un jeton <strong>n'est pas de l'argent</strong>. Il ne se donne pas à

@@ -586,7 +586,14 @@ INSERT OR IGNORE INTO parametres (cle, valeur) VALUES
   -- le gratuit a une date de fin, on ne peut pas s'y installer.
   ('bienvenue_employeur', '10'),
   ('bienvenue_prestataire', '3'),
-  ('bienvenue_jours', '60');
+  ('bienvenue_jours', '60'),
+
+  -- CE QU'UNE ACTION COUTE. Ces deux nombres ne servent pas encore a
+  -- prelever quoi que ce soit : ils servent d'abord a DIRE la verite.
+  -- Sans eux, la page annonce "des jetons vous sont offerts" sans
+  -- pouvoir dire ce qu'ils permettent de faire.
+  ('cout_candidature', '1'),
+  ('cout_mise_en_avant', '20');
 
 
 -- ------------------------------------------------------------------

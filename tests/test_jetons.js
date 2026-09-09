@@ -45,6 +45,10 @@ const formPrix = (valeur, quantites) => {
   p.append("bienvenue_employeur", "0");
   p.append("bienvenue_prestataire", "0");
   p.append("bienvenue_jours", "60");
+
+  // Ce qu'une action coute. Ne pas les renvoyer les effacerait.
+  p.append("cout_candidature", "1");
+  p.append("cout_mise_en_avant", "20");
   return p;
 };
 const lire = (chemin, cookie) =>

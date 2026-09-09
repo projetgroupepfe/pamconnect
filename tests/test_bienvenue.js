@@ -46,6 +46,8 @@ const formReglages = (o) => {
   p.append("bienvenue_employeur", String(o.employeur === undefined ? 10 : o.employeur));
   p.append("bienvenue_prestataire", String(o.prestataire === undefined ? 3 : o.prestataire));
   p.append("bienvenue_jours", String(o.jours === undefined ? 60 : o.jours));
+  p.append("cout_candidature", String(o.coutReponse === undefined ? 1 : o.coutReponse));
+  p.append("cout_mise_en_avant", String(o.coutAvant === undefined ? 20 : o.coutAvant));
   return p;
 };
 
@@ -116,6 +118,39 @@ setTimeout(async () => {
   const emp = await creerCompte("emp", "employeur", true);
   await ouvrir(emp.cookie);
   dire("dix jetons pour un employeur", solde(emp.id) === 10, String(solde(emp.id)));
+
+  console.log(SAUT + "--- LA PAGE DIT CE QUE LE SOLDE PERMET ---");
+  // Un nombre de jetons ne veut rien dire tout seul. La page doit
+  // traduire : combien d'actions, et ce qui manque le cas echeant.
+  const pagePres = await ouvrir(pasVerifie.cookie);
+  dire("le prix d'une reponse est annonce", pagePres.includes("Une réponse coûte"));
+  dire("en jetons et en francs", pagePres.includes("1 jeton (100 FCFA)"));
+  dire("trois jetons donnent trois reponses", pagePres.includes("3 réponses"));
+
+  // L'EMPLOYEUR RECOIT 10 JETONS ALORS QU'UNE MISE EN AVANT EN COUTE 20.
+  // C'est une reduction de moitie, pas une mise en avant offerte - et il
+  // doit le lire ici plutot que de le decouvrir en cliquant.
+  const pageEmp = await ouvrir(emp.cookie);
+  dire("le prix d'une mise en avant est annonce", pageEmp.includes("Une mise en avant coûte"));
+  dire("il lit ce qui lui manque", pageEmp.includes("Il vous manque"));
+  dire("et combien exactement", pageEmp.includes("10 jetons (1 000 FCFA)"));
+  dire("on ne lui promet pas une action complete", !pageEmp.includes("1 mise en avant</strong>"));
+
+  console.log(SAUT + "--- CE QUI N'EST PAS ENCORE CONSTRUIT EST DIT ---");
+  // Tant que la depense n'existe pas, la page ne doit pas laisser
+  // chercher un bouton introuvable.
+  dire("la page l'annonce", pageEmp.includes("Cette option n'est pas encore ouverte"));
+
+  console.log(SAUT + "--- L'EQUIPE REGLE CE QU'UNE ACTION COUTE ---");
+  await poster("/admin/parametres", formReglages({ coutReponse: 2 }), eq.cookie);
+  const pageDeux = await ouvrir(pasVerifie.cookie);
+  dire("le nouveau cout s'affiche", pageDeux.includes("2 jetons (200 FCFA)"));
+  dire("et le solde ne permet plus qu'une reponse", pageDeux.includes("1 réponse"));
+
+  const gratuit = await poster("/admin/parametres", formReglages({ coutReponse: 0 }), eq.cookie);
+  dire("une action gratuite est refusee", gratuit.code === 400, String(gratuit.code));
+
+  await poster("/admin/parametres", formReglages({}), eq.cookie);
 
   console.log(SAUT + "--- CE QUI EXPIRE, ET CE QUI N'EXPIRE PAS ---");
   // On ajoute des jetons achetes a cote des jetons offerts : seuls les

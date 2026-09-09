@@ -1948,6 +1948,16 @@ function mettreAJourLesJetons(personne) {
   return { offerts, perdus };
 }
 
+// CE QU'UNE ACTION COUTE, selon le role.
+// Un employeur met une demande en avant, une personne qui propose ses
+// services repond a une demande. Deux actions, deux prix, et jamais
+// l'un sur l'ecran de l'autre.
+function coutDeLAction(role) {
+  return parametreNombre(role === "employeur"
+    ? "cout_mise_en_avant"
+    : "cout_candidature");
+}
+
 function soldeJetonsDe(personneId) {
   const s = requetes.soldeJetons.get(personneId);
   return { offerts: s.offerts, achetes: s.achetes, total: s.offerts + s.achetes };
@@ -3677,6 +3687,12 @@ app.get("/mes-jetons", exigerConnexion, interdireALEquipe, (req, res) => {
 
     packs: packsEnVente(),
     valeurJeton: valeurDuJeton(),
+
+    // Ce que coute UNE action pour cette personne-la. La page s'en sert
+    // pour dire ce que son solde permet - au lieu d'afficher un nombre
+    // de jetons dont personne ne sait ce qu'il vaut.
+    coutAction: coutDeLAction(req.utilisateur.role),
+
     mouvements: requetes.mesMouvementsJetons.all(req.utilisateur.id),
     achats: requetes.mesAchatsJetons.all(req.utilisateur.id),
     demandeEnCours: Boolean(requetes.achatJetonsEnAttentePour.get(req.utilisateur.id)),
@@ -3845,6 +3861,8 @@ app.get("/admin/jetons", exigerAdmin, (req, res) => {
     traites: requetes.derniersAchatsJetonsTraites.all(),
     valeurJeton: valeurDuJeton(),
     packs: packsEnVente(),
+    coutCandidature: parametreNombre("cout_candidature"),
+    coutMiseEnAvant: parametreNombre("cout_mise_en_avant"),
     bienvenueEmployeur: parametreNombre("bienvenue_employeur"),
     bienvenuePrestataire: parametreNombre("bienvenue_prestataire"),
     bienvenueJours: parametreNombre("bienvenue_jours"),
@@ -3997,6 +4015,21 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
     });
   }
 
+  // CE QU'UNE ACTION COUTE. Zero serait une action gratuite, ce qui vide
+  // les jetons de leur seul role : faire reflechir avant d'agir.
+  const coutCandidature = Math.round(Number(req.body.cout_candidature));
+  const coutMiseEnAvant = Math.round(Number(req.body.cout_mise_en_avant));
+
+  if (!Number.isFinite(coutCandidature) || coutCandidature <= 0 ||
+      !Number.isFinite(coutMiseEnAvant) || coutMiseEnAvant <= 0) {
+    return res.status(400).render("message", {
+      titre: "Coût invalide",
+      texte: "Une action doit coûter au moins un jeton. " +
+             "À zéro, elle serait gratuite et le jeton ne servirait plus à rien.",
+      liens: [{ url: "/admin/jetons", texte: "Retour aux jetons" }],
+    });
+  }
+
   const enregistrer = db.transaction(() => {
     requetes.majParametre.run({
       cle: "jeton_valeur_fcfa",
@@ -4021,6 +4054,16 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
     requetes.majParametre.run({
       cle: "bienvenue_jours",
       valeur: String(joursValidite),
+      par: req.utilisateur.id,
+    });
+    requetes.majParametre.run({
+      cle: "cout_candidature",
+      valeur: String(coutCandidature),
+      par: req.utilisateur.id,
+    });
+    requetes.majParametre.run({
+      cle: "cout_mise_en_avant",
+      valeur: String(coutMiseEnAvant),
       par: req.utilisateur.id,
     });
   });
