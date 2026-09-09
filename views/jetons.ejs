@@ -53,7 +53,7 @@
       <% } else { %>
         Pour vous, il sert à <strong>répondre à une demande</strong>.
         <% if (coutAction) { %>
-          Une réponse coûte <strong><%= jetonsEnClair(coutAction) %></strong>.
+          Répondre à une demande coûte <strong><%= jetonsEnClair(coutAction) %></strong>.
         <% } %>
       <% } %>
     </p>
@@ -64,16 +64,14 @@
     <% if (coutAction && solde.total > 0) { %>
       <% const possible = Math.floor(solde.total / coutAction); %>
       <% if (possible > 0) { %>
-        <% const action = jeSuisEmployeur
-             ? (possible > 1 ? "mises en avant" : "mise en avant")
-             : (possible > 1 ? "réponses" : "réponse"); %>
         <p>
-          Votre solde vous permet <strong><%= possible %> <%= action %></strong>.
+          Votre solde vous permet de
+          <strong><%= actionsPossibles(jeSuisEmployeur, possible) %></strong>.
         </p>
       <% } else { %>
         <p>
           Il vous manque <strong><%= jetonsEnClair(coutAction - solde.total) %></strong>
-          pour <%= jeSuisEmployeur ? "une mise en avant" : "une réponse" %>.
+          pour <%= uneAction(jeSuisEmployeur) %>.
           Vos jetons en couvrent déjà une partie.
         </p>
       <% } %>
@@ -196,16 +194,16 @@
               <% const apres = solde.total + pack.quantite; %>
               <% const combien = Math.floor(apres / coutAction); %>
               <% if (combien > 0) { %>
-                <% const quoi = jeSuisEmployeur
-                     ? (combien > 1 ? "mises en avant" : "mise en avant")
-                     : (combien > 1 ? "réponses" : "réponse"); %>
-                <p class="aide">Après cet achat : <strong><%= combien %> <%= quoi %></strong>.</p>
+                <p class="aide">
+                  Après cet achat, de quoi
+                  <strong><%= actionsPossibles(jeSuisEmployeur, combien) %></strong>.
+                </p>
               <% } else { %>
                 <% const manque = coutAction - apres; %>
                 <p class="aide">
                   Après cet achat, il vous manquera encore
                   <strong><%= manque %> <%= manque > 1 ? "jetons" : "jeton" %></strong>
-                  pour <%= jeSuisEmployeur ? "une mise en avant" : "une réponse" %>.
+                  pour <%= uneAction(jeSuisEmployeur) %>.
                 </p>
               <% } %>
             <% } %>

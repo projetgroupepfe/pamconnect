@@ -1958,6 +1958,25 @@ function coutDeLAction(role) {
     : "cout_candidature");
 }
 
+// CE QU'UN NOMBRE DE JETONS PERMET DE FAIRE, en toutes lettres.
+//
+// "8 reponses" ne dit pas reponses a quoi. Le mot seul ne veut rien
+// dire : on repond a une DEMANDE, on met une DEMANDE en avant. Ecrite
+// ici une fois, la phrase ne peut pas dire deux choses selon l'ecran.
+function actionsPossibles(estEmployeur, nombre) {
+  const n = Math.max(0, Math.round(Number(nombre) || 0));
+
+  return estEmployeur
+    ? `mettre ${n} ${n > 1 ? "demandes" : "demande"} en avant`
+    : `répondre à ${n} ${n > 1 ? "demandes" : "demande"}`;
+}
+
+// La meme chose au singulier indefini, pour les phrases qui parlent
+// d'une action sans la compter : "il vous manque 5 jetons pour ...".
+function uneAction(estEmployeur) {
+  return estEmployeur ? "mettre une demande en avant" : "répondre à une demande";
+}
+
 function soldeJetonsDe(personneId) {
   const s = requetes.soldeJetons.get(personneId);
   return { offerts: s.offerts, achetes: s.achetes, total: s.offerts + s.achetes };
@@ -2019,6 +2038,8 @@ app.locals.jours = JOURS;
 app.locals.jetonsEnClair = jetonsEnClair;
 app.locals.dateLisible = dateLisible;
 app.locals.motifJetonsLisible = motifJetonsLisible;
+app.locals.actionsPossibles = actionsPossibles;
+app.locals.uneAction = uneAction;
 app.locals.valeurDuJeton = valeurDuJeton;
 app.locals.moments = MOMENTS;
 

@@ -123,9 +123,14 @@ setTimeout(async () => {
   // Un nombre de jetons ne veut rien dire tout seul. La page doit
   // traduire : combien d'actions, et ce qui manque le cas echeant.
   const pagePres = await ouvrir(pasVerifie.cookie);
-  dire("le prix d'une reponse est annonce", pagePres.includes("Une réponse coûte"));
+  dire("le prix d'une reponse est annonce",
+       pagePres.includes("Répondre à une demande coûte"));
   dire("en jetons et en francs", pagePres.includes("1 jeton (100 FCFA)"));
-  dire("trois jetons donnent trois reponses", pagePres.includes("3 réponses"));
+
+  // LA PHRASE DIT L'ACTION, PAS UN MOT SEUL. "3 reponses" ne disait pas
+  // reponses a quoi.
+  dire("trois jetons permettent de repondre a trois demandes",
+       pagePres.includes("répondre à 3 demandes"));
 
   // L'EMPLOYEUR RECOIT 10 JETONS ALORS QU'UNE MISE EN AVANT EN COUTE 20.
   // C'est une reduction de moitie, pas une mise en avant offerte - et il
@@ -137,22 +142,35 @@ setTimeout(async () => {
   dire("son solde ne lui promet aucune action complete",
        !pageEmp.includes("Votre solde vous permet"));
 
+  // RIEN N'EST FIGE. Le meme ecran, lu par deux personnes qui n'ont pas
+  // le meme solde ni le meme role, n'annonce pas les memes nombres. Un
+  // texte ecrit en dur passerait tous les tests precedents mais pas
+  // celui-ci.
+  dire("les deux pages ne disent pas la meme chose",
+       pagePres.includes("répondre à 8 demandes") &&
+       !pageEmp.includes("répondre à 8 demandes"));
+  dire("et l'inverse est vrai aussi",
+       pageEmp.includes("mettre 1 demande en avant") &&
+       !pagePres.includes("mettre 1 demande en avant"));
+
   console.log(SAUT + "--- CHAQUE PACK DIT CE QU'IL DONNERA ---");
   // Aucun pack n'est cache : un petit pack semble inutile a un employeur,
   // mais il complete exactement les jetons qu'on lui a offerts. Ce qu'on
   // ignore, c'est ce que la personne a deja - on compte donc devant elle.
 
   // Elle a 3 jetons, une reponse en coute 1.
-  dire("le pack de 5 lui donnera huit reponses", pagePres.includes("8 réponses"));
-  dire("le pack de 10 lui en donnera treize", pagePres.includes("13 réponses"));
+  dire("le pack de 5 lui permettra huit demandes",
+       pagePres.includes("répondre à 8 demandes"));
+  dire("le pack de 10 lui en permettra treize",
+       pagePres.includes("répondre à 13 demandes"));
 
   // Lui a 10 jetons, une mise en avant en coute 20.
   dire("le pack de 5 ne lui suffit pas", pageEmp.includes("il vous manquera encore"));
   dire("et il lit combien il lui manquerait", pageEmp.includes("5 jetons</strong>"));
-  dire("le pack de 10 lui donnera une mise en avant",
-       pageEmp.includes("1 mise en avant</strong>"));
-  dire("le pack de 60 lui en donnera trois",
-       pageEmp.includes("3 mises en avant</strong>"));
+  dire("le pack de 10 lui permettra une mise en avant",
+       pageEmp.includes("mettre 1 demande en avant"));
+  dire("le pack de 60 lui en permettra trois",
+       pageEmp.includes("mettre 3 demandes en avant"));
 
   // AUCUN PACK N'EST CACHE. Les quatre restent proposes aux deux cotes.
   dire("les quatre packs restent visibles pour elle",
@@ -169,7 +187,8 @@ setTimeout(async () => {
   await poster("/admin/parametres", formReglages({ coutReponse: 2 }), eq.cookie);
   const pageDeux = await ouvrir(pasVerifie.cookie);
   dire("le nouveau cout s'affiche", pageDeux.includes("2 jetons (200 FCFA)"));
-  dire("et le solde ne permet plus qu'une reponse", pageDeux.includes("1 réponse"));
+  dire("et le solde ne permet plus qu'une demande",
+       pageDeux.includes("répondre à 1 demande"));
 
   const gratuit = await poster("/admin/parametres", formReglages({ coutReponse: 0 }), eq.cookie);
   dire("une action gratuite est refusee", gratuit.code === 400, String(gratuit.code));
