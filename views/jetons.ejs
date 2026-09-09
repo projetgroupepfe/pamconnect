@@ -2,6 +2,36 @@
 
   <h1>Mes jetons</h1>
 
+  <%# CE QUI VIENT DE SE PASSER, dit une seule fois. Des jetons offerts
+      sans que personne ne l'apprenne ne servent a rien, et des jetons
+      qui disparaissent en silence ressemblent a une erreur. %>
+  <% if (offertsMaintenant) { %>
+    <div class="carte confiance">
+      <h3>Bienvenue : <%= offertsMaintenant.quantite %> jetons vous sont offerts</h3>
+      <p>
+        Votre identité est vérifiée. Ces jetons vous sont offerts
+        <strong>une seule fois</strong>, pour commencer.
+      </p>
+      <p class="aide">
+        Ils sont utilisables pendant <%= offertsMaintenant.jours %> jours.
+        Passé ce délai, ceux que vous n'aurez pas utilisés disparaissent.
+      </p>
+    </div>
+  <% } %>
+
+  <% if (perdusMaintenant) { %>
+    <div class="carte">
+      <p><span class="badge badge-non-soumis">Jetons offerts expirés</span></p>
+      <p>
+        Vos <%= perdusMaintenant %> jetons offerts ne sont plus utilisables :
+        le délai est passé.
+      </p>
+      <p class="aide">
+        Les jetons que vous achetez, eux, n'ont pas de date limite.
+      </p>
+    </div>
+  <% } %>
+
   <%# CE QU'UN JETON N'EST PAS. La confusion serait grave : quelqu'un
       qui croit avoir de l'argent sur la plateforme attendrait de le
       retirer, et ne pourrait pas. C'est donc dit avant le solde, pas
@@ -39,7 +69,9 @@
           <span>
             Jetons offerts
             <% if (expireLe) { %>
-              <br><small class="discret">Utilisables jusqu'au <%= expireLe %></small>
+              <br><small class="discret">
+                À utiliser avant le <%= expireLe %>, sinon ils sont perdus
+              </small>
             <% } %>
           </span>
           <span><%= solde.offerts %></span>
@@ -55,9 +87,25 @@
     </div>
 
     <% if (solde.total === 0) { %>
-      <p class="aide">
-        Vous n'avez pas encore de jetons. Choisissez un pack ci-dessous.
-      </p>
+      <%# UNE PERSONNE NON VERIFIEE N'A RIEN A ACHETER TOUT DE SUITE :
+          des jetons l'attendent, et le dire vaut mieux que de la laisser
+          payer ce qu'on allait lui offrir. %>
+      <% if (moi.statut_verification !== "verifie") { %>
+        <p class="aide">
+          Vous n'avez pas encore de jetons. Des jetons vous seront
+          <strong>offerts</strong> dès que votre identité aura été vérifiée.
+        </p>
+        <p class="actions">
+          <a class="bouton bouton-secondaire" href="/verification">
+            <%- include("partiels/icone", { nom: "verifie" }) %>
+            Faire vérifier mon identité
+          </a>
+        </p>
+      <% } else { %>
+        <p class="aide">
+          Vous n'avez pas encore de jetons. Choisissez un pack ci-dessous.
+        </p>
+      <% } %>
     <% } %>
   </div>
 

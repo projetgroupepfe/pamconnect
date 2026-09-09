@@ -36,6 +36,15 @@ const formPrix = (valeur, quantites) => {
   const p = new URLSearchParams();
   p.append("jeton_valeur_fcfa", String(valeur));
   quantites.forEach((q) => p.append("pack", String(q)));
+
+  // AUCUN JETON OFFERT PENDANT CETTE SERIE. Elle parle de l'achat : un
+  // solde qui part de zero, un pack demande, une confirmation. Un cadeau
+  // a la verification fausserait chacun de ses comptes.
+  //
+  // Les jetons offerts ont leur propre serie, test_bienvenue.
+  p.append("bienvenue_employeur", "0");
+  p.append("bienvenue_prestataire", "0");
+  p.append("bienvenue_jours", "60");
   return p;
 };
 const lire = (chemin, cookie) =>
@@ -80,7 +89,11 @@ setTimeout(async () => {
   const eq = await creerCompte("eq", "employeur");
   base.prepare("UPDATE utilisateurs SET est_admin = 1 WHERE id = ?").run(eq.id);
 
-  console.log("\n--- LA PAGE ET SON PUBLIC ---");
+  // A FAIRE AVANT LA PREMIERE VISITE : les jetons offerts sont credites
+  // quand la personne ouvre sa page, pas a l'inscription.
+  await poster("/admin/parametres", formPrix(100, [5, 10, 30, 60]), eq.cookie);
+
+  console.log(SAUT + "--- LA PAGE ET SON PUBLIC ---");
   dire("un employeur y accede", (await lire("/mes-jetons", emp.cookie)).status === 200);
   dire("une personne qui propose ses services aussi",
        (await lire("/mes-jetons", pre.cookie)).status === 200);

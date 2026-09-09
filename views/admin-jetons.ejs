@@ -70,7 +70,7 @@
 
   <% } %>
 
-  <h2>Les prix</h2>
+  <h2>Les prix et les jetons offerts</h2>
 
   <%# UN SEUL NOMBRE COMMANDE TOUT. Le prix d'un pack ne se saisit pas :
       il se calcule. Saisir les deux laisserait l'equipe ecrire un jeton
@@ -120,6 +120,43 @@
         <small class="aide">
           Tapez le nombre de jetons du pack à créer, par exemple 5 pour
           vendre un pack de 5 jetons. Laissez vide si vous n'en créez pas.
+        </small>
+      </div>
+
+      <h3>Les jetons offerts à la vérification</h3>
+
+      <%# CE N'EST PAS UN CADEAU : ils arrivent apres l'envoi des papiers
+          et l'attente, une seule fois par compte, et ils periment. Mettre
+          zero les supprime - c'est un choix, pas une panne. %>
+      <div class="champ">
+        <label for="offert-employeur">Jetons offerts à un employeur</label>
+        <input id="offert-employeur" type="number" name="bienvenue_employeur"
+               value="<%= bienvenueEmployeur === null ? "" : bienvenueEmployeur %>"
+               min="0" step="1" inputmode="numeric" required>
+        <small class="aide">
+          Reçus une seule fois, dès que son identité est vérifiée.
+          Mettez zéro pour ne plus rien offrir.
+        </small>
+      </div>
+
+      <div class="champ">
+        <label for="offert-prestataire">Jetons offerts à une personne qui propose ses services</label>
+        <input id="offert-prestataire" type="number" name="bienvenue_prestataire"
+               value="<%= bienvenuePrestataire === null ? "" : bienvenuePrestataire %>"
+               min="0" step="1" inputmode="numeric" required>
+        <small class="aide">
+          De quoi répondre à quelques demandes avant d'avoir à en acheter.
+        </small>
+      </div>
+
+      <div class="champ">
+        <label for="offert-jours">Durée de validité des jetons offerts, en jours</label>
+        <input id="offert-jours" type="number" name="bienvenue_jours"
+               value="<%= bienvenueJours === null ? "" : bienvenueJours %>"
+               min="1" step="1" inputmode="numeric" required>
+        <small class="aide">
+          Passé ce délai, les jetons offerts non utilisés disparaissent.
+          Les jetons achetés, eux, ne périment jamais.
         </small>
       </div>
 

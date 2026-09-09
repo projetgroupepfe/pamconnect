@@ -1086,6 +1086,26 @@ const requetes = {
     WHERE utilisateur_id = ? AND nature = 'offert' AND quantite > 0
   `),
 
+  // A-T-ELLE DEJA RECU SA BIENVENUE ? C'est le seul garde-fou contre
+  // un second cadeau : on ne range pas un drapeau sur le compte, on
+  // regarde s'il existe deja une ligne. Une information deduite ne peut
+  // pas se contredire.
+  aRecuLaBienvenue: db.prepare(`
+    SELECT 1 AS oui FROM jetons_mouvements
+    WHERE utilisateur_id = ? AND motif = 'bienvenue'
+    LIMIT 1
+  `),
+
+  // La date d'expiration est calculee par SQLite, comme toutes les
+  // autres dates de la base : en heure universelle, au meme format.
+  crediterBienvenue: db.prepare(`
+    INSERT INTO jetons_mouvements
+      (utilisateur_id, quantite, nature, motif, detail, expire_le)
+    VALUES
+      (@personne, @quantite, 'offert', 'bienvenue', @detail,
+       datetime('now', @delai))
+  `),
+
   creerAchatJetons: db.prepare(`
     INSERT INTO jetons_achats (utilisateur_id, quantite, montant_fcfa)
     VALUES (@personne, @quantite, @montant)
@@ -1842,6 +1862,90 @@ function jetonsEnClair(nombre) {
   const valeur = valeurDuJeton();
 
   return valeur === null ? `${n} ${mot}` : `${n} ${mot} (${formaterMontant(n * valeur)})`;
+}
+
+// COMBIEN DE JETONS SONT OFFERTS A CETTE PERSONNE.
+// Deux nombres differents, parce que les deux roles n'en font pas le
+// meme usage : un employeur met une demande en avant, une personne qui
+// propose ses services repond a des demandes.
+function jetonsDeBienvenue(role) {
+  return parametreNombre(role === "employeur"
+    ? "bienvenue_employeur"
+    : "bienvenue_prestataire");
+}
+
+// LES JETONS OFFERTS ARRIVENT A LA PREMIERE VISITE APRES LA
+// VERIFICATION, pas au moment ou l'equipe valide le dossier.
+//
+// C'est volontaire. Les comptes verifies avant l'existence des jetons
+// les recevraient sinon jamais, et il aurait fallu leur inventer une
+// date de depart. Ici le compte a rebours part quand la personne les
+// recoit vraiment : elle a ses 60 jours pleins, quelle que soit la date
+// de sa verification.
+//
+// Ne fait rien si la personne n'est pas verifiee, ou si elle les a deja
+// recus une fois.
+function offrirLaBienvenue(personne) {
+  if (!personne || personne.est_admin) return null;
+  if (personne.statut_verification !== "verifie") return null;
+  if (requetes.aRecuLaBienvenue.get(personne.id)) return null;
+
+  const quantite = jetonsDeBienvenue(personne.role);
+  const jours = parametreNombre("bienvenue_jours");
+
+  // Reglage absent ou a zero : on n'offre rien plutot que de deviner.
+  if (!quantite || quantite <= 0 || !jours || jours <= 0) return null;
+
+  requetes.crediterBienvenue.run({
+    personne: personne.id,
+    quantite,
+    detail: `${quantite} jetons offerts a la verification de votre compte`,
+    delai: `+${Math.round(jours)} days`,
+  });
+
+  return { quantite, jours: Math.round(jours) };
+}
+
+// LES JETONS OFFERTS QUI ONT PASSE LEUR DATE.
+//
+// On n'efface aucune ligne : on en ecrit une NEGATIVE. L'historique doit
+// pouvoir montrer que des jetons ont ete offerts, puis perdus faute
+// d'avoir servi. Effacer l'entree ferait disparaitre le cadeau lui-meme.
+//
+// Les jetons achetes ne sont jamais touches : eux n'expirent pas.
+function expirerLesJetonsOfferts(personneId) {
+  const s = requetes.soldeJetons.get(personneId);
+  if (s.offerts <= 0) return null;
+
+  const echeance = requetes.expirationJetonsOfferts.get(personneId);
+  if (!echeance || !echeance.quand) return null;
+
+  // SQLite ecrit ses dates en heure universelle. Sans le Z final,
+  // JavaScript les lirait comme des heures locales et l'expiration
+  // tomberait une heure trop tot ou trop tard.
+  if (new Date(String(echeance.quand).replace(" ", "T") + "Z") > new Date()) return null;
+
+  requetes.ecrireMouvementJetons.run({
+    personne: personneId,
+    quantite: -s.offerts,
+    nature: "offert",
+    motif: "expiration",
+    detail: `${s.offerts} jetons offerts non utilises a temps`,
+    achat: null,
+    annonce: null,
+    expire: null,
+  });
+
+  return s.offerts;
+}
+
+// A APPELER AVANT DE LIRE OU DE DEPENSER UN SOLDE. Les deux regles se
+// suivent dans cet ordre : on n'expire pas des jetons qui viennent
+// d'etre offerts, et on n'offre pas par-dessus des jetons perimes.
+function mettreAJourLesJetons(personne) {
+  const offerts = offrirLaBienvenue(personne);
+  const perdus = offerts ? null : expirerLesJetonsOfferts(personne.id);
+  return { offerts, perdus };
 }
 
 function soldeJetonsDe(personneId) {
@@ -3553,6 +3657,11 @@ app.get("/mon-compte", exigerConnexion, interdireALEquipe, (req, res) => {
 //
 // Un membre de l'equipe n'en a pas : il ne publie ni ne repond.
 app.get("/mes-jetons", exigerConnexion, interdireALEquipe, (req, res) => {
+  // Les jetons offerts arrivent ici, et les perimes partent ici. Ne rien
+  // faire tant que personne ne regarde couterait une tache de fond, pour
+  // un resultat qu'on ne verrait qu'en ouvrant cette page.
+  const mouvement = mettreAJourLesJetons(req.utilisateur);
+
   const solde = soldeJetonsDe(req.utilisateur.id);
   const expiration = requetes.expirationJetonsOfferts.get(req.utilisateur.id);
 
@@ -3571,6 +3680,12 @@ app.get("/mes-jetons", exigerConnexion, interdireALEquipe, (req, res) => {
     mouvements: requetes.mesMouvementsJetons.all(req.utilisateur.id),
     achats: requetes.mesAchatsJetons.all(req.utilisateur.id),
     demandeEnCours: Boolean(requetes.achatJetonsEnAttentePour.get(req.utilisateur.id)),
+
+    // Ce qui vient de se passer a l'instant, pour le dire une fois en
+    // haut de la page. La personne doit apprendre qu'on lui a offert
+    // des jetons - ou qu'elle vient de les perdre.
+    offertsMaintenant: mouvement.offerts,
+    perdusMaintenant: mouvement.perdus,
   });
 });
 
@@ -3730,6 +3845,9 @@ app.get("/admin/jetons", exigerAdmin, (req, res) => {
     traites: requetes.derniersAchatsJetonsTraites.all(),
     valeurJeton: valeurDuJeton(),
     packs: packsEnVente(),
+    bienvenueEmployeur: parametreNombre("bienvenue_employeur"),
+    bienvenuePrestataire: parametreNombre("bienvenue_prestataire"),
+    bienvenueJours: parametreNombre("bienvenue_jours"),
     dernierChangement: requetes.dernierChangementPrix.get() || null,
   });
 });
@@ -3852,6 +3970,33 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
     });
   }
 
+  // LES JETONS OFFERTS. Zero est une valeur permise - c'est la facon de
+  // ne plus rien offrir - mais jamais un nombre negatif ni un texte.
+  const offertEmployeur = Math.round(Number(req.body.bienvenue_employeur));
+  const offertPrestataire = Math.round(Number(req.body.bienvenue_prestataire));
+  const joursValidite = Math.round(Number(req.body.bienvenue_jours));
+
+  if (!Number.isFinite(offertEmployeur) || offertEmployeur < 0 ||
+      !Number.isFinite(offertPrestataire) || offertPrestataire < 0) {
+    return res.status(400).render("message", {
+      titre: "Jetons offerts invalides",
+      texte: "Le nombre de jetons offerts doit être zéro ou plus. " +
+             "Mettez zéro pour ne plus rien offrir.",
+      liens: [{ url: "/admin/jetons", texte: "Retour aux jetons" }],
+    });
+  }
+
+  // UNE DUREE DE ZERO JOUR VOUDRAIT DIRE "deja perimes en arrivant".
+  // C'est un piege, pas un reglage : on le refuse.
+  if (!Number.isFinite(joursValidite) || joursValidite <= 0) {
+    return res.status(400).render("message", {
+      titre: "Durée invalide",
+      texte: "Les jetons offerts doivent rester utilisables au moins un jour. " +
+             "Pour ne plus rien offrir, mettez le nombre de jetons à zéro.",
+      liens: [{ url: "/admin/jetons", texte: "Retour aux jetons" }],
+    });
+  }
+
   const enregistrer = db.transaction(() => {
     requetes.majParametre.run({
       cle: "jeton_valeur_fcfa",
@@ -3861,6 +4006,21 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
     requetes.majParametre.run({
       cle: "packs_jetons",
       valeur: [...new Set(quantites)].sort((a, b) => a - b).join("|"),
+      par: req.utilisateur.id,
+    });
+    requetes.majParametre.run({
+      cle: "bienvenue_employeur",
+      valeur: String(offertEmployeur),
+      par: req.utilisateur.id,
+    });
+    requetes.majParametre.run({
+      cle: "bienvenue_prestataire",
+      valeur: String(offertPrestataire),
+      par: req.utilisateur.id,
+    });
+    requetes.majParametre.run({
+      cle: "bienvenue_jours",
+      valeur: String(joursValidite),
       par: req.utilisateur.id,
     });
   });

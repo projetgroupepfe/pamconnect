@@ -578,7 +578,15 @@ CREATE TABLE IF NOT EXISTS parametres (
 -- lequel des deux dit vrai. Un seul nombre a changer, une seule verite.
 INSERT OR IGNORE INTO parametres (cle, valeur) VALUES
   ('jeton_valeur_fcfa', '100'),
-  ('packs_jetons', '10|30|60');
+  ('packs_jetons', '5|10|30|60'),
+
+  -- LES JETONS DE BIENVENUE. Ils ne sont pas un cadeau : ils arrivent
+  -- apres la verification d'identite, c'est-a-dire apres avoir envoye
+  -- ses papiers et attendu. Une seule fois par compte, et ils expirent -
+  -- le gratuit a une date de fin, on ne peut pas s'y installer.
+  ('bienvenue_employeur', '10'),
+  ('bienvenue_prestataire', '3'),
+  ('bienvenue_jours', '60');
 
 
 -- ------------------------------------------------------------------
