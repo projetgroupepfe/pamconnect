@@ -156,6 +156,18 @@
         </small>
       </div>
 
+      <div class="champ">
+        <label for="par-jour">Réponses autorisées par 24 heures</label>
+        <input id="par-jour" type="number" name="candidatures_par_jour"
+               value="<%= candidaturesParJour === null ? "" : candidaturesParJour %>"
+               min="1" step="1" inputmode="numeric" required>
+        <small class="aide">
+          Combien de demandes une même personne peut recevoir de réponses
+          de sa part, quel que soit son solde. Le jeton fait réfléchir,
+          cette limite empêche de répondre à tout.
+        </small>
+      </div>
+
       <h3>Les jetons offerts à la vérification</h3>
 
       <%# CE N'EST PAS UN CADEAU : ils arrivent apres l'envoi des papiers

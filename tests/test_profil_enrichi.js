@@ -154,10 +154,11 @@ setTimeout(async () => {
       body: form({ email: m, motdepasse: "motdepasse123" }) });
     return rr.headers.getSetCookie()[0].split(";")[0];
   })();
-  // Publier exige une identite verifiee. Ce n'est pas le sujet de
-  // cette serie : on la donne aux employeurs qu'elle cree.
+  // Publier une demande ET y repondre exigent une identite verifiee.
+  // Ce n'est pas le sujet de cette serie : on la donne a tous les
+  // comptes qu'elle cree.
   base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' "
-    + "WHERE email LIKE ? AND role = 'employeur'").run("%" + M + "%");
+    + "WHERE email LIKE ?").run("%" + M + "%");
 
   await fetch(RACINE + "/annonces", { method: "POST", headers: { Cookie: empAncien },
     redirect: "manual", body: form({ titre: M + " sans prix", metier: "menagere",

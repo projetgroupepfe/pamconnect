@@ -49,6 +49,7 @@ const formPrix = (valeur, quantites) => {
   // Ce qu'une action coute. Ne pas les renvoyer les effacerait.
   p.append("cout_candidature", "1");
   p.append("cout_mise_en_avant", "20");
+  p.append("candidatures_par_jour", "3");
   return p;
 };
 const lire = (chemin, cookie) =>

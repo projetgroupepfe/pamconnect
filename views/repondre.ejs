@@ -99,6 +99,50 @@
       </p>
     </div>
 
+    <%# CE QUE CETTE REPONSE VA COUTER, avant de s'engager. La meme regle
+        que pour la commission : le prix ne se decouvre pas apres. %>
+    <% if (cout) { %>
+      <h2>Ce que cette réponse vous coûte</h2>
+      <div class="carte">
+        <div class="detail-tarif">
+          <div class="ligne-tarif">
+            <span>Envoyer cette réponse</span>
+            <span class="retenue">− <%= jetonsEnClair(cout) %></span>
+          </div>
+          <div class="ligne-tarif total">
+            <span>Il vous restera</span>
+            <strong><%= jetonsEnClair(Math.max(0, solde - cout)) %></strong>
+          </div>
+        </div>
+
+        <% if (solde < cout) { %>
+          <p class="aide">
+            <strong>Votre solde ne suffit pas.</strong> Il vous reste
+            <%= jetonsEnClair(solde) %>.
+          </p>
+          <p class="actions">
+            <a class="bouton bouton-secondaire" href="/mes-jetons">
+              <%- include("partiels/icone", { nom: "jeton" }) %>
+              Voir mes jetons
+            </a>
+          </p>
+        <% } %>
+
+        <%# LA LIMITE DU JOUR, dite avant l'envoi. La decouvrir apres
+            coup donnerait le sentiment d'un refus arbitraire. %>
+        <% if (limite) { %>
+          <p class="aide">
+            Vous pouvez envoyer <%= limite %> réponses par tranche de 24 heures.
+            <% if (restantAujourdhui === 0) { %>
+              <strong>Vous les avez toutes utilisées.</strong>
+            <% } else { %>
+              Il vous en reste <strong><%= restantAujourdhui %></strong>.
+            <% } %>
+          </p>
+        <% } %>
+      </div>
+    <% } %>
+
     <div class="actions">
       <form action="/candidatures" method="POST">
         <input type="hidden" name="annonceId" value="<%= annonce.id %>">

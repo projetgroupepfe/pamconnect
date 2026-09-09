@@ -128,6 +128,7 @@ ajouterColonneSiAbsente("candidatures", "vu_prestataire_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "terminee_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "statut_change_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "declaree_par_elle_le", "TEXT");
+ajouterColonneSiAbsente("candidatures", "envoyee_le", "TEXT");
 ajouterColonneSiAbsente("versements", "decide_par", "INTEGER");
 ajouterColonneSiAbsente("versements", "motif_decision", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "message_equipe", "TEXT");
@@ -164,6 +165,17 @@ ajouterColonneSiAbsente("parametres", "modifie_le", "TEXT");
 // Le schema arrive ensuite : il cree ce qui manque et met a jour les
 // donnees de reference (quartiers, metiers).
 db.exec(fs.readFileSync(path.join(__dirname, "data", "schema.sql"), "utf-8"));
+
+// Les reponses envoyees avant l'existence de cette colonne n'ont pas de
+// date d'envoi. Leur date de creation EST leur date d'envoi : elles
+// n'avaient aucun moyen d'etre renvoyees.
+{
+  const reprises = db.prepare(`
+    UPDATE candidatures SET envoyee_le = cree_le WHERE envoyee_le IS NULL
+  `).run().changes;
+
+  if (reprises > 0) console.log("Reponses datees apres coup : " + reprises);
+}
 
 // Les packs etaient ranges avec leur prix : "10:1000|30:3000". Le prix
 // se calcule desormais a partir de la valeur du jeton, et la ligne ne
@@ -458,7 +470,32 @@ const requetes = {
   `),
 
   creerCandidature: db.prepare(`
-    INSERT INTO candidatures (annonce_id, prestataire_id) VALUES (?, ?)
+    INSERT INTO candidatures (annonce_id, prestataire_id, envoyee_le)
+    VALUES (?, ?, datetime('now'))
+  `),
+
+  // Renvoyer une reponse refusee est un NOUVEL envoi : il coute un jeton
+  // et compte dans la limite du jour, comme le premier.
+  marquerEnvoyee: db.prepare(`
+    UPDATE candidatures SET envoyee_le = datetime('now') WHERE id = ?
+  `),
+
+  // COMBIEN DE REPONSES DANS LES 24 DERNIERES HEURES.
+  //
+  // Une fenetre glissante, pas une journee de calendrier. Sinon il
+  // suffirait d'envoyer trois reponses a 23 h et trois autres a 1 h du
+  // matin - la limite ne tiendrait qu'une nuit sur deux.
+  candidaturesRecentes: db.prepare(`
+    SELECT COUNT(*) AS n FROM candidatures
+    WHERE prestataire_id = ? AND envoyee_le >= datetime('now', '-1 day')
+  `),
+
+  // Quand la plus ancienne des reponses recentes sortira de la fenetre :
+  // c'est le moment ou une place se libere.
+  prochaineReponsePossible: db.prepare(`
+    SELECT datetime(MIN(envoyee_le), '+1 day') AS quand
+    FROM candidatures
+    WHERE prestataire_id = ? AND envoyee_le >= datetime('now', '-1 day')
   `),
 
   // Verifie en UNE requete que la candidature existe ET que l'annonce
@@ -1945,6 +1982,55 @@ function expirerLesJetonsOfferts(personneId) {
   return s.offerts;
 }
 
+// DEPENSER DES JETONS.
+//
+// LES JETONS OFFERTS PARTENT EN PREMIER. Ils expirent, les achetes non :
+// prendre les achetes d'abord ferait perdre a la personne ce qu'on lui
+// avait donne, alors qu'elle avait de quoi payer autrement.
+//
+// Une depense a cheval sur les deux ecrit deux lignes : chacune garde sa
+// nature, sinon un solde ne pourrait plus se lire en deux parts.
+//
+// Renvoie false si le solde ne suffit pas, SANS RIEN ECRIRE. L'appelant
+// doit alors abandonner l'action : on ne fait jamais a moitie.
+function depenserJetons(personne, quantite, motif, detail, annonceId) {
+  const combien = Math.round(Number(quantite) || 0);
+  if (combien <= 0) return false;
+
+  const s = requetes.soldeJetons.get(personne.id);
+  if (s.offerts + s.achetes < combien) return false;
+
+  const surOfferts = Math.min(s.offerts, combien);
+  const surAchetes = combien - surOfferts;
+
+  if (surOfferts > 0) {
+    requetes.ecrireMouvementJetons.run({
+      personne: personne.id, quantite: -surOfferts, nature: "offert",
+      motif, detail, achat: null, annonce: annonceId || null, expire: null,
+    });
+  }
+
+  if (surAchetes > 0) {
+    requetes.ecrireMouvementJetons.run({
+      personne: personne.id, quantite: -surAchetes, nature: "achete",
+      motif, detail, achat: null, annonce: annonceId || null, expire: null,
+    });
+  }
+
+  return true;
+}
+
+// Dans combien de temps une place se liberera, en heures pleines.
+// Renvoie au moins 1 : "dans 0 heure" ne veut rien dire.
+function heuresAvant(quandUTC) {
+  if (!quandUTC) return null;
+
+  const cible = new Date(String(quandUTC).replace(" ", "T") + "Z");
+  const restant = cible.getTime() - Date.now();
+
+  return restant <= 0 ? 0 : Math.max(1, Math.ceil(restant / 3600000));
+}
+
 // A APPELER AVANT DE LIRE OU DE DEPENSER UN SOLDE. Les deux regles se
 // suivent dans cet ordre : on n'expire pas des jetons qui viennent
 // d'etre offerts, et on n'offre pas par-dessus des jetons perimes.
@@ -2621,11 +2707,20 @@ app.post("/mon-profil/mot-de-passe", exigerConnexion, lireFormulaire, (req, res)
 // A placer APRES exigerConnexion, qui remplit req.utilisateur.
 function exigerVerification(req, res, next) {
   if (req.utilisateur.statut_verification !== "verifie") {
+    // LA MEME REGLE, DEUX RAISONS. L'employeur fait venir quelqu'un chez
+    // lui ; la personne qui repond se deplace chez un inconnu. Chacun
+    // doit lire la raison qui le concerne, pas celle de l'autre.
+    const texte = req.utilisateur.role === "employeur"
+      ? "Avant de publier une demande, votre identité doit être vérifiée par " +
+        "PamConnect. Les personnes qui vous répondront se déplaceront chez vous : " +
+        "elles ont le droit de savoir qui vous êtes."
+      : "Avant de répondre à une demande, votre identité doit être vérifiée par " +
+        "PamConnect. Vous entrerez chez quelqu'un qui ne vous connaît pas : " +
+        "il a le droit de savoir qui vient.";
+
     return res.status(403).render("message", {
       titre: "Vérification requise",
-      texte: "Avant de publier une demande, votre identité doit être vérifiée par " +
-             "PamConnect. Les personnes qui vous répondront se déplaceront chez vous : " +
-             "elles ont le droit de savoir qui vous êtes.",
+      texte,
       liens: [{ url: "/verification", texte: "Faire vérifier mon identité" }],
     });
   }
@@ -2874,7 +2969,7 @@ function ecranDemandeFermee(annonceId) {
       };
 }
 
-app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, (req, res) => {
+app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, exigerVerification, (req, res) => {
   if (req.utilisateur.role !== "prestataire") {
     return res.status(403).render("message", {
       titre: "Acces refuse",
@@ -2899,10 +2994,26 @@ app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, (req, res) => {
     return res.status(410).render("message", ecranDemandeFermee(annonce.id));
   }
 
-  res.render("repondre", { titre: "Répondre à cette demande", annonce });
+  // CE QUE CETTE REPONSE VA COUTER, avant de s'engager. La meme regle
+  // que pour la commission : on ne decouvre pas le prix apres.
+  mettreAJourLesJetons(req.utilisateur);
+
+  const cout = parametreNombre("cout_candidature");
+  const solde = soldeJetonsDe(req.utilisateur.id);
+  const envoyees = requetes.candidaturesRecentes.get(req.utilisateur.id).n;
+  const limite = parametreNombre("candidatures_par_jour");
+
+  res.render("repondre", {
+    titre: "Répondre à cette demande",
+    annonce,
+    cout,
+    solde: solde.total,
+    restantAujourdhui: limite === null ? null : Math.max(0, limite - envoyees),
+    limite,
+  });
 });
 
-app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
+app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (req, res) => {
   if (req.utilisateur.role !== "prestataire") {
     return res.status(403).render("message", {
       titre: "Acces refuse",
@@ -2952,23 +3063,109 @@ app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
     });
   }
 
+  // ------------------------------------------------------------------
+  // A PARTIR D'ICI, LA REPONSE VA PARTIR. Les controles precedents
+  // renvoyaient quelqu'un qui n'avait rien a envoyer ; ceux-ci decident
+  // si l'envoi est possible, et ils coutent un jeton.
+  // ------------------------------------------------------------------
+
+  // Les jetons offerts arrivent ou expirent ici aussi : quelqu'un peut
+  // repondre sans jamais avoir ouvert sa page de jetons.
+  mettreAJourLesJetons(req.utilisateur);
+
+  // LA LIMITE DU JOUR PASSE AVANT LE SOLDE. Une personne qui a beaucoup
+  // de jetons doit lire qu'elle a atteint la limite, pas qu'elle peut
+  // payer - sinon la limite ressemble a un probleme d'argent.
+  const limite = parametreNombre("candidatures_par_jour");
+  const envoyees = requetes.candidaturesRecentes.get(req.utilisateur.id).n;
+
+  if (limite !== null && envoyees >= limite) {
+    const quand = requetes.prochaineReponsePossible.get(req.utilisateur.id);
+    const heures = heuresAvant(quand && quand.quand);
+
+    return res.status(429).render("message", {
+      titre: "Vous avez atteint la limite du jour",
+      texte: `Vous pouvez envoyer ${limite} réponses par tranche de 24 heures. ` +
+             `Cette limite protège les employeurs : elle évite qu'une même ` +
+             `personne réponde à tout sans avoir regardé.` +
+             (heures ? ` Vous pourrez répondre à nouveau dans ${heures} heure${heures > 1 ? "s" : ""}.` : ""),
+      liens: [{ url: "/annonces", texte: "Revenir aux demandes" }],
+    });
+  }
+
+  const cout = parametreNombre("cout_candidature");
+  const solde = soldeJetonsDe(req.utilisateur.id);
+
+  if (cout !== null && solde.total < cout) {
+    return res.status(402).render("message", {
+      titre: "Il vous manque des jetons",
+      texte: `Répondre à une demande coûte ${jetonsEnClair(cout)}. ` +
+             `Il vous reste ${jetonsEnClair(solde.total)}.`,
+      liens: [{ url: "/mes-jetons", texte: "Voir mes jetons" }],
+    });
+  }
+
+  const detail = `Réponse à la demande : ${annonce.titre}`;
+
+  // RENVOYER UNE REPONSE REFUSEE est un nouvel envoi : il coute autant
+  // que le premier, et compte dans la limite du jour. Sans cela, un
+  // refus pourrait etre suivi de renvois sans fin, gratuitement.
   if (deja && deja.statut === "refusee") {
     // La demande est encore ouverte - la condition annonceFermee est
     // passee plus haut. Refuser quelqu'un ne ferme pas la demande aux
     // autres : rien ne justifiait de la fermer a elle pour toujours.
-    requetes.rouvrirCandidature.run({ id: deja.id });
+    const renvoyer = db.transaction(() => {
+      if (cout && !depenserJetons(req.utilisateur, cout, "candidature", detail, annonce.id)) {
+        return false;
+      }
+      requetes.rouvrirCandidature.run({ id: deja.id });
+      requetes.marquerEnvoyee.run(deja.id);
+      return true;
+    });
+
+    if (!renvoyer()) {
+      return res.status(402).render("message", {
+        titre: "Il vous manque des jetons",
+        texte: `Répondre à une demande coûte ${jetonsEnClair(cout)}.`,
+        liens: [{ url: "/mes-jetons", texte: "Voir mes jetons" }],
+      });
+    }
 
     return res.render("message", {
       titre: "Candidature renvoyée",
       texte: "Votre réponse a été renvoyée à cet employeur. Votre discussion " +
-             "précédente est conservée.",
+             "précédente est conservée." +
+             (cout ? ` ${jetonsEnClair(cout)} a été prélevé.` : ""),
       liens: [{ url: "/messages/" + deja.id, texte: "Ouvrir la discussion" }],
     });
   }
 
+  // LE JETON N'EST PRELEVE QUE SI LA REPONSE PART. La creation et le
+  // prelevement sont indivisibles : une reponse enregistree sans jeton
+  // preleve serait gratuite, un jeton preleve sans reponse serait un vol.
   try {
-    requetes.creerCandidature.run(annonce.id, req.utilisateur.id);
+    const envoyer = db.transaction(() => {
+      const creee = requetes.creerCandidature.run(annonce.id, req.utilisateur.id);
+
+      if (cout && !depenserJetons(req.utilisateur, cout, "candidature", detail, annonce.id)) {
+        // La transaction sera annulee par l'exception : la candidature
+        // qui vient d'etre creee disparait avec elle.
+        throw new Error("SOLDE_INSUFFISANT");
+      }
+
+      return creee;
+    });
+
+    envoyer();
   } catch (erreur) {
+    if (String(erreur.message) === "SOLDE_INSUFFISANT") {
+      return res.status(402).render("message", {
+        titre: "Il vous manque des jetons",
+        texte: `Répondre à une demande coûte ${jetonsEnClair(cout)}.`,
+        liens: [{ url: "/mes-jetons", texte: "Voir mes jetons" }],
+      });
+    }
+
     // La contrainte UNIQUE reste le dernier rempart : deux envois
     // simultanes passeraient tous deux le controle ci-dessus.
     if (String(erreur.message).includes("UNIQUE")) {
@@ -2978,13 +3175,20 @@ app.post("/candidatures", exigerConnexion, lireFormulaire, (req, res) => {
         liens: [{ url: "/mon-profil", texte: "Voir mes candidatures" }],
       });
     }
+
     throw erreur;
   }
 
+  const reste = soldeJetonsDe(req.utilisateur.id).total;
+
   res.render("message", {
-    titre: "Candidature envoyee !",
-    texte: "Votre candidature a bien été enregistrée.",
-    liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
+    titre: "Réponse envoyée",
+    texte: "Votre réponse a bien été enregistrée." +
+           (cout ? ` ${jetonsEnClair(cout)} a été prélevé. Il vous reste ${jetonsEnClair(reste)}.` : ""),
+    liens: [
+      { url: "/annonces", texte: "Retour aux demandes" },
+      { url: "/mes-jetons", texte: "Voir mes jetons" },
+    ],
   });
 });
 
@@ -3724,10 +3928,11 @@ app.get("/mes-jetons", exigerConnexion, interdireALEquipe, (req, res) => {
     achats: requetes.mesAchatsJetons.all(req.utilisateur.id),
     demandeEnCours: Boolean(requetes.achatJetonsEnAttentePour.get(req.utilisateur.id)),
 
-    // Ce qui vient de se passer a l'instant, pour le dire une fois en
-    // haut de la page. La personne doit apprendre qu'on lui a offert
-    // des jetons - ou qu'elle vient de les perdre.
-    offertsMaintenant: mouvement.offerts,
+    // Les jetons offerts sont annonces a partir du SOLDE, pas de ce qui
+    // vient de se passer : ils sont credites par l'equipe, la personne
+    // ne les voit donc pas arriver.
+    //
+    // La perte, elle, est bien un evenement : on la dit une fois.
     perdusMaintenant: mouvement.perdus,
   });
 });
@@ -3890,6 +4095,7 @@ app.get("/admin/jetons", exigerAdmin, (req, res) => {
     packs: packsEnVente(),
     coutCandidature: parametreNombre("cout_candidature"),
     coutMiseEnAvant: parametreNombre("cout_mise_en_avant"),
+    candidaturesParJour: parametreNombre("candidatures_par_jour"),
     bienvenueEmployeur: parametreNombre("bienvenue_employeur"),
     bienvenuePrestataire: parametreNombre("bienvenue_prestataire"),
     bienvenueJours: parametreNombre("bienvenue_jours"),
@@ -4057,6 +4263,19 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
     });
   }
 
+  // ZERO REPONSE PAR JOUR FERMERAIT LA PLATEFORME a ceux qui y
+  // travaillent. C'est trop grave pour etre un accident de saisie.
+  const parJour = Math.round(Number(req.body.candidatures_par_jour));
+
+  if (!Number.isFinite(parJour) || parJour <= 0) {
+    return res.status(400).render("message", {
+      titre: "Limite invalide",
+      texte: "Il faut autoriser au moins une réponse par jour. À zéro, " +
+             "plus personne ne pourrait répondre à une demande.",
+      liens: [{ url: "/admin/jetons", texte: "Retour aux jetons" }],
+    });
+  }
+
   const enregistrer = db.transaction(() => {
     requetes.majParametre.run({
       cle: "jeton_valeur_fcfa",
@@ -4091,6 +4310,11 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
     requetes.majParametre.run({
       cle: "cout_mise_en_avant",
       valeur: String(coutMiseEnAvant),
+      par: req.utilisateur.id,
+    });
+    requetes.majParametre.run({
+      cle: "candidatures_par_jour",
+      valeur: String(parJour),
       par: req.utilisateur.id,
     });
   });

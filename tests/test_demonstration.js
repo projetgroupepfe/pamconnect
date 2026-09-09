@@ -80,36 +80,29 @@ setTimeout(async () => {
   dire("elle n'y a pas encore repondu",
        base.prepare("SELECT COUNT(*) n FROM candidatures WHERE annonce_id = ?").get(annonce.id).n === 0);
 
-  console.log("\n--- ECRAN 1 : ELLE REPOND, ET VOIT CE QU'ELLE TOUCHERA ---");
+  console.log("\n--- ECRAN 1 : SANS VERIFICATION, ELLE NE PEUT PAS REPONDRE ---");
   const listeAnnonces = await (await lire("/annonces", pre.cookie)).text();
   dire("la demande apparait dans les annonces", listeAnnonces.includes(M + " garde des enfants"));
   dire("avec le bouton Je suis disponible", listeAnnonces.includes("Je suis disponible"));
 
-  const ecranReponse = await (await lire("/candidatures/nouvelle/" + annonce.id, pre.cookie)).text();
-  dire("l'ecran montre le prix annonce", ecranReponse.includes("20 000"));
-  dire("la commission", ecranReponse.includes("2 000"));
-  dire("et ce qu'elle touchera", ecranReponse.includes("18 000"));
-  dire("le bouton s'appelle bien Confirmer ma reponse",
-       ecranReponse.includes("Confirmer ma réponse"));
+  // LE PREMIER MOMENT FORT : la porte est fermee, et l'ecran dit
+  // pourquoi. La protection ne va pas dans un seul sens - l'employeur
+  // aussi a le droit de savoir qui entre chez lui.
+  const porteFermee = await lire("/candidatures/nouvelle/" + annonce.id, pre.cookie);
+  dire("l'ecran de reponse lui est refuse", porteFermee.status === 403, String(porteFermee.status));
+  const texteRefus = await porteFermee.text();
+  dire("la raison est celle qui la concerne",
+       texteRefus.includes("il a le droit de savoir qui vient"));
+  dire("et on lui propose de faire verifier son identite",
+       texteRefus.includes("Faire vérifier mon identité"));
 
-  await poster("/candidatures", form({ annonceId: String(annonce.id) }), pre.cookie);
-  const cand = base.prepare("SELECT id FROM candidatures WHERE annonce_id = ?").get(annonce.id);
-  dire("sa reponse est enregistree", Boolean(cand));
-
-  console.log("\n--- ECRAN 2 : L'EMPLOYEUR NE PEUT PAS L'EMBAUCHER ---");
-  const profilAvant = await (await lire("/mon-profil", emp.cookie)).text();
-  dire("il voit la candidature", profilAvant.includes("Demo personne"));
-  // LE MOMENT CENTRAL DE LA DEMONSTRATION : le bouton n'existe pas.
-  dire("le bouton Choisir cette personne n'existe PAS",
-       !profilAvant.includes("Choisir cette personne"));
-  dire("seul Refuser est propose", profilAvant.includes("Refuser cette candidature"));
-  dire("et l'ecran dit pourquoi", profilAvant.includes("dès que PamConnect aura"));
   // La regle est sur le serveur, pas dans la page.
-  dire("accepter en envoyant la requete a la main est refuse",
-       (await poster("/candidatures/statut",
-         form({ candidatureId: String(cand.id), statut: "acceptee" }), emp.cookie)).code === 403);
+  dire("envoyer la requete a la main ne change rien",
+       (await poster("/candidatures", form({ annonceId: String(annonce.id) }), pre.cookie)).code === 403);
+  dire("aucune reponse n'est enregistree",
+       base.prepare("SELECT COUNT(*) n FROM candidatures WHERE annonce_id = ?").get(annonce.id).n === 0);
 
-  console.log("\n--- ECRAN 3 : ELLE DEPOSE SES PAPIERS ---");
+  console.log("\n--- ECRAN 2 : ELLE DEPOSE SES PAPIERS ---");
   const f = new FormData();
   f.append("cni", fichier("cni.jpg", 2000, "image/jpeg"));
   f.append("casier", fichier("casier.pdf", 3000, "application/pdf"));
@@ -122,7 +115,7 @@ setTimeout(async () => {
   dire("son profil dit depuis quand elle attend",
        (await (await lire("/mon-profil", pre.cookie)).text()).includes("Réponse attendue"));
 
-  console.log("\n--- ECRAN 4 : L'EQUIPE VERIFIE ---");
+  console.log("\n--- ECRAN 3 : L'EQUIPE VERIFIE, ET LES JETONS ARRIVENT ---");
   const espaceEquipe = await (await lire("/admin", eq.cookie)).text();
   dire("le dossier apparait", espaceEquipe.includes("Demo personne"));
   dire("avec depuis quand il attend", espaceEquipe.includes("Reçu il y a"));
@@ -130,21 +123,60 @@ setTimeout(async () => {
        (await lire("/admin/document/" + pre.id + "/cni", eq.cookie)).status === 200);
   dire("le casier aussi",
        (await lire("/admin/document/" + pre.id + "/casier", eq.cookie)).status === 200);
+  dire("elle n'a aucun jeton avant la validation",
+       base.prepare("SELECT COALESCE(SUM(quantite),0) n FROM jetons_mouvements WHERE utilisateur_id = ?")
+         .get(pre.id).n === 0);
 
   await poster("/admin/verification",
     form({ utilisateurId: String(pre.id), decision: "valider" }), eq.cookie);
   dire("la validation passe le statut a verifie",
        base.prepare("SELECT statut_verification FROM utilisateurs WHERE id = ?")
          .get(pre.id).statut_verification === "verifie");
+
   // La fiche affirme que les documents sont supprimes du disque.
   const apresValidation = base.prepare("SELECT cni_fichier, casier_fichier FROM utilisateurs WHERE id = ?").get(pre.id);
   dire("les deux documents sont effaces du disque",
        apresValidation.cni_fichier === null && apresValidation.casier_fichier === null);
 
-  console.log("\n--- ECRAN 5 : LE BOUTON APPARAIT, ET ELLE EST PREVENUE ---");
+  // DEUXIEME MOMENT FORT : la validation credite les jetons offerts.
+  // La cause et l'effet tiennent dans le meme geste.
+  const soldeOffert = base.prepare(
+    "SELECT COALESCE(SUM(quantite),0) n FROM jetons_mouvements WHERE utilisateur_id = ?").get(pre.id).n;
+  dire("trois jetons lui sont offerts", soldeOffert === 3, String(soldeOffert));
+  const pageJetons = await (await lire("/mes-jetons", pre.cookie)).text();
+  dire("sa page le lui annonce", pageJetons.includes("jetons vous sont offerts"));
+  dire("elle sait jusqu a quand ils durent", pageJetons.includes("À utiliser avant le"));
+  dire("et ce qu'ils lui permettent", pageJetons.includes("répondre à 3 demandes"));
+
+  console.log("\n--- ECRAN 4 : ELLE REPOND, ET VOIT CE QU'ELLE TOUCHERA ---");
+  const ecranReponse = await (await lire("/candidatures/nouvelle/" + annonce.id, pre.cookie)).text();
+  dire("l'ecran s'ouvre maintenant", ecranReponse.includes("Confirmer ma réponse"));
+  dire("il montre le prix annonce", ecranReponse.includes("20 000"));
+  dire("la commission", ecranReponse.includes("2 000"));
+  dire("et ce qu'elle touchera", ecranReponse.includes("18 000"));
+
+  // TROISIEME MOMENT FORT : le prix de la reponse, annonce AVANT l'envoi.
+  dire("le cout de la reponse est annonce avant", ecranReponse.includes("Envoyer cette réponse"));
+  dire("en jetons et en francs", ecranReponse.includes("1 jeton (100 FCFA)"));
+  dire("ce qu'il lui restera aussi", ecranReponse.includes("Il vous restera"));
+
+  const reponse = await poster("/candidatures", form({ annonceId: String(annonce.id) }), pre.cookie);
+  const cand = base.prepare("SELECT id FROM candidatures WHERE annonce_id = ?").get(annonce.id);
+  dire("sa reponse est enregistree", Boolean(cand));
+  dire("un jeton a ete preleve",
+       base.prepare("SELECT COALESCE(SUM(quantite),0) n FROM jetons_mouvements WHERE utilisateur_id = ?")
+         .get(pre.id).n === 2);
+  dire("l'ecran le lui dit", reponse.corps.includes("Il vous reste"));
+  dire("le prelevement porte le nom de la demande",
+       String(base.prepare(`SELECT detail FROM jetons_mouvements
+                            WHERE utilisateur_id = ? AND motif = 'candidature'`)
+         .get(pre.id).detail).includes("garde des enfants"));
+
+  console.log("\n--- ECRAN 5 : L'EMPLOYEUR LA CHOISIT ---");
   const profilApres = await (await lire("/mon-profil", emp.cookie)).text();
-  dire("le badge est passe au vert", profilApres.includes("Identité vérifiée"));
-  dire("le bouton Choisir cette personne EXISTE maintenant",
+  dire("il voit la candidature", profilApres.includes("Demo personne"));
+  dire("le badge est vert", profilApres.includes("Identité vérifiée"));
+  dire("le bouton Choisir cette personne existe",
        profilApres.includes("Choisir cette personne"));
 
   const confirmation = await (await lire("/candidatures/" + cand.id + "/confirmer", emp.cookie)).text();

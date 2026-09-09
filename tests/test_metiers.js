@@ -76,10 +76,11 @@ setTimeout(async () => {
 
   // L'employeur ecrit "menagere" ; la candidate a ecrit "MENAGE".
   // Sans la liste, ces deux mots ne se seraient jamais rencontres.
-  // Publier exige une identite verifiee. Ce n'est pas le sujet de
-  // cette serie : on la donne aux employeurs qu'elle cree.
+  // Publier une demande ET y repondre exigent une identite verifiee.
+  // Ce n'est pas le sujet de cette serie : on la donne a tous les
+  // comptes qu'elle cree.
   base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' "
-    + "WHERE email LIKE ? AND role = 'employeur'").run("%" + M + "%");
+    + "WHERE email LIKE ?").run("%" + M + "%");
 
   await fetch(RACINE + "/annonces", { method: "POST", headers: { Cookie: emp.cookie },
     redirect: "manual", body: form({ titre: M + " demande menage", metier: "menagere",

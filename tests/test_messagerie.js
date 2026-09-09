@@ -43,10 +43,11 @@ setTimeout(async () => {
   const autreEmp = await creerCompte("e2", "employeur");
   const autrePre = await creerCompte("p2", "prestataire", { metier: "MetierMsg", tarif: "9000" });
 
-  // Publier exige une identite verifiee. Ce n'est pas le sujet de
-  // cette serie : on la donne aux employeurs qu'elle cree.
+  // Publier une demande ET y repondre exigent une identite verifiee.
+  // Ce n'est pas le sujet de cette serie : on la donne a tous les
+  // comptes qu'elle cree.
   base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' "
-    + "WHERE email LIKE ? AND role = 'employeur'").run("%" + M + "%");
+    + "WHERE email LIKE ?").run("%" + M + "%");
 
   await poster("/annonces", form({ titre: M + " ménage", metier: "MetierMsg",
     quartier: "Mvan", horaire: "Lundi 8h", prix: "10000",

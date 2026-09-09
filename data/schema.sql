@@ -239,6 +239,13 @@ CREATE TABLE IF NOT EXISTS candidatures (
   -- silence.
   declaree_par_elle_le TEXT,
 
+  -- QUAND CETTE REPONSE A ETE ENVOYEE POUR LA DERNIERE FOIS.
+  --
+  -- cree_le ne suffit pas : une reponse refusee peut etre renvoyee, et
+  -- c'est un nouvel envoi - il coute un jeton et compte dans la limite
+  -- du jour. Sans cette colonne, on compterait la premiere fois.
+  envoyee_le      TEXT,
+
   -- Un prestataire ne peut postuler qu'UNE SEULE FOIS a une annonce donnee.
   UNIQUE (annonce_id, prestataire_id)
 );
@@ -593,7 +600,12 @@ INSERT OR IGNORE INTO parametres (cle, valeur) VALUES
   -- Sans eux, la page annonce "des jetons vous sont offerts" sans
   -- pouvoir dire ce qu'ils permettent de faire.
   ('cout_candidature', '1'),
-  ('cout_mise_en_avant', '20');
+  ('cout_mise_en_avant', '20'),
+
+  -- COMBIEN DE REPONSES PAR 24 HEURES, quel que soit le solde. Le jeton
+  -- fait reflechir, il n'empeche pas quelqu'un de tres motive de repondre
+  -- a tout. Cette limite-la si.
+  ('candidatures_par_jour', '3');
 
 
 -- ------------------------------------------------------------------

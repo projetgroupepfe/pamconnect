@@ -48,6 +48,7 @@ const formReglages = (o) => {
   p.append("bienvenue_jours", String(o.jours === undefined ? 60 : o.jours));
   p.append("cout_candidature", String(o.coutReponse === undefined ? 1 : o.coutReponse));
   p.append("cout_mise_en_avant", String(o.coutAvant === undefined ? 20 : o.coutAvant));
+  p.append("candidatures_par_jour", "3");
   return p;
 };
 
@@ -103,8 +104,8 @@ setTimeout(async () => {
   dire("un seul mouvement", mouvements(pasVerifie.id, "bienvenue").length === 1);
   dire("de nature offerte", cadeau.nature === "offert");
   dire("avec une date limite", typeof cadeau.expire_le === "string" && cadeau.expire_le.length > 0);
-  dire("la page l'annonce", page.includes("Bienvenue"));
-  dire("elle dit combien de jours", page.includes("60 jours"));
+  dire("la page l'annonce", page.includes("jetons vous sont offerts"));
+  dire("elle dit jusqu a quand ils durent", page.includes("À utiliser avant le"));
 
   console.log(SAUT + "--- L'EQUIPE VALIDE, LES JETONS ARRIVENT ---");
   // LE CHEMIN NORMAL. La personne depose ses papiers, l'equipe accepte,
@@ -153,7 +154,10 @@ setTimeout(async () => {
   page = await ouvrir(pasVerifie.cookie);
   dire("le solde n'a pas bouge", solde(pasVerifie.id) === 3, String(solde(pasVerifie.id)));
   dire("toujours un seul cadeau", mouvements(pasVerifie.id, "bienvenue").length === 1);
-  dire("la page ne le reannonce pas", !page.includes("Bienvenue :"));
+  // La carte reste affichee - elle dit ce que la personne POSSEDE, pas
+  // ce qui vient d arriver. Ce qui ne doit pas se repeter, c est le
+  // CADEAU lui-meme, et le compte des mouvements le verifie.
+  dire("le solde reste celui du premier cadeau", solde(pasVerifie.id) === 3);
 
   console.log(SAUT + "--- L'EMPLOYEUR N'A PAS LE MEME NOMBRE ---");
   const emp = await creerCompte("emp", "employeur", true);
@@ -279,7 +283,15 @@ setTimeout(async () => {
     { metier: "menagere", tarif: "12000" });
   page = await ouvrir(apres.cookie);
   dire("le nouveau nombre s'applique", solde(apres.id) === 5, String(solde(apres.id)));
-  dire("et la nouvelle duree", page.includes("30 jours"));
+  // La duree ne s affiche plus en jours mais en DATE limite : on la lit
+  // donc la ou elle est enregistree. Une tolerance d un jour suffit -
+  // on verifie 30 jours, pas une seconde pres.
+  const limite = base.prepare(`
+    SELECT julianday(expire_le) - julianday('now') AS jours
+    FROM jetons_mouvements WHERE utilisateur_id = ? AND motif = 'bienvenue'
+  `).get(apres.id).jours;
+  dire("et la nouvelle duree", limite > 29 && limite <= 30, String(Math.round(limite)));
+  dire("la date limite est affichee", page.includes("À utiliser avant le"));
   dire("celle d'avant ne bouge pas", solde(pasVerifie.id) === 20);
 
   console.log(SAUT + "--- ZERO JETON OFFERT EST UN CHOIX VALIDE ---");

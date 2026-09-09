@@ -52,10 +52,11 @@ setTimeout(async () => {
   const cEmp = (await q("/connexion", { method: "POST", body: f({ email: emp, motdepasse: mdp }) })).cookie;
   const cPre = (await q("/connexion", { method: "POST", body: f({ email: pre, motdepasse: mdp }) })).cookie;
 
-  // Publier exige une identite verifiee. Ce n'est pas le sujet de
-  // cette serie : on la donne aux employeurs qu'elle cree.
+  // Publier une demande ET y repondre exigent une identite verifiee.
+  // Ce n'est pas le sujet de cette serie : on la donne a tous les
+  // comptes qu'elle cree.
   base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' "
-    + "WHERE email LIKE ? AND role = 'employeur'").run("%" + M + "%");
+    + "WHERE email LIKE ?").run("%" + M + "%");
 
   await q("/annonces", { method: "POST", cookie: cEmp, body: f({ titre: M + " annonce", metier: "MetierDoublon", arrondissement: "Yaounde 1", quartier: "Bastos", horaire: "Lundi 8h-12h", prix: "10000" }) });
   const ann = base.prepare("SELECT * FROM annonces WHERE titre LIKE ?").get("%" + M + "%");

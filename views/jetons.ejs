@@ -2,20 +2,28 @@
 
   <h1>Mes jetons</h1>
 
-  <%# CE QUI VIENT DE SE PASSER, dit une seule fois. Des jetons offerts
-      sans que personne ne l'apprenne ne servent a rien, et des jetons
-      qui disparaissent en silence ressemblent a une erreur. %>
-  <% if (offertsMaintenant) { %>
+  <%# LE CADEAU RESTE ANNONCE TANT QU'IL EN RESTE. Il est credite par
+      l'equipe au moment ou elle valide le dossier : la personne ne le
+      voit donc pas arriver. Sans cette carte, elle trouverait trois
+      jetons sur son compte sans savoir d'ou ils viennent ni jusqu'a
+      quand ils durent.
+
+      Elle disparait quand les jetons sont depenses ou perimes,
+      c'est-a-dire quand elle n'a plus rien a dire. %>
+  <% if (solde.offerts > 0) { %>
     <div class="carte confiance">
-      <h3>Bienvenue : <%= offertsMaintenant.quantite %> jetons vous sont offerts</h3>
+      <h3><%= solde.offerts %> <%= solde.offerts > 1 ? "jetons vous sont offerts" : "jeton vous est offert" %></h3>
       <p>
-        Votre identité est vérifiée. Ces jetons vous sont offerts
-        <strong>une seule fois</strong>, pour commencer.
+        PamConnect les offre <strong>une seule fois</strong>, à la vérification
+        de votre compte.
       </p>
-      <p class="aide">
-        Ils sont utilisables pendant <%= offertsMaintenant.jours %> jours.
-        Passé ce délai, ceux que vous n'aurez pas utilisés disparaissent.
-      </p>
+      <% if (expireLe) { %>
+        <p class="aide">
+          À utiliser avant le <strong><%= expireLe %></strong>. Passé cette date,
+          ceux que vous n'aurez pas utilisés disparaissent. Les jetons que vous
+          achetez, eux, n'ont pas de date limite.
+        </p>
+      <% } %>
     </div>
   <% } %>
 
@@ -77,15 +85,22 @@
       <% } %>
     <% } %>
 
-    <%# A RETIRER quand la depense sera construite : etape 3 pour la
-        reponse a une demande, etape 4 pour la mise en avant. Tant que le
-        bouton n'existe pas, la page ne doit pas laisser croire qu'il
-        existe - quelqu'un le chercherait sans le trouver. %>
-    <p class="aide">
-      <strong>Cette option n'est pas encore ouverte.</strong> Elle arrive dans
-      une prochaine version. D'ici là, vos jetons vous attendent et rien ne
-      vous est prélevé.
-    </p>
+    <%# A RETIRER quand la mise en avant sera construite. Repondre a une
+        demande, lui, fonctionne : la phrase ne s'affiche donc plus que
+        du cote employeur. %>
+    <% if (jeSuisEmployeur) { %>
+      <p class="aide">
+        <strong>Cette option n'est pas encore ouverte.</strong> Elle arrive dans
+        une prochaine version. D'ici là, vos jetons vous attendent et rien ne
+        vous est prélevé.
+      </p>
+    <% } else { %>
+      <p class="aide">
+        Le jeton est prélevé <strong>seulement quand votre réponse part</strong>.
+        Si la demande est fermée ou si vous avez déjà répondu, rien ne vous
+        est retiré.
+      </p>
+    <% } %>
     <p class="aide">
       Un jeton <strong>n'est pas de l'argent</strong>. Il ne se donne pas à
       quelqu'un d'autre, il ne se retire ni en espèces ni par Mobile Money,

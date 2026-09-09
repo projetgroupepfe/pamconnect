@@ -33,6 +33,13 @@ async function creerCompte(suffixe, role, extra) {
     { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", quartier: "Bastos" },
     extra || {})));
   const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123" }));
+
+  // A LA CREATION, pas en une ligne posee plus haut : un compte cree au
+  // milieu de la serie ne serait pas couvert, et il ne pourrait ni
+  // publier ni repondre.
+  base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' WHERE email = ?")
+    .run(mail.toLowerCase());
+
   return { mail, cookie: c.cookie };
 }
 
@@ -42,10 +49,11 @@ setTimeout(async () => {
   const eq = await creerCompte("eq", "employeur");
   base.prepare("UPDATE utilisateurs SET est_admin = 1 WHERE email = ?").run(eq.mail);
 
-  // Publier exige une identite verifiee. Ce n'est pas le sujet de
-  // cette serie : on la donne aux employeurs qu'elle cree.
+  // Publier une demande ET y repondre exigent une identite verifiee.
+  // Ce n'est pas le sujet de cette serie : on la donne a tous les
+  // comptes qu'elle cree.
   base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' "
-    + "WHERE email LIKE ? AND role = 'employeur'").run("%" + M + "%");
+    + "WHERE email LIKE ?").run("%" + M + "%");
 
   await poster("/annonces", form({ titre: M + " demande", metier: "menagere",
     quartier: "Mvan", horaire: "Lundi 8h", prix: "10000" }), emp.cookie);

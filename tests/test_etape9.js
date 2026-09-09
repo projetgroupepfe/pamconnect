@@ -100,10 +100,11 @@ setTimeout(async () => {
   v("un cookie de session est bien pose", !!coEmp.cookie, String(coEmp.cookie));
   const cookieEmp = coEmp.cookie;
 
-  // Publier exige une identite verifiee. Ce n'est pas le sujet de
-  // cette serie : on la donne aux employeurs qu'elle cree.
+  // Publier une demande ET y repondre exigent une identite verifiee.
+  // Ce n'est pas le sujet de cette serie : on la donne a tous les
+  // comptes qu'elle cree.
   base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' "
-    + "WHERE email LIKE ? AND role = 'employeur'").run("%" + MARQUE + "%");
+    + "WHERE email LIKE ?").run("%" + MARQUE + "%");
 
 
   const coMaj = await requete("/connexion", { method: "POST",
@@ -155,9 +156,19 @@ setTimeout(async () => {
     .get("%" + MARQUE + "%");
   v("l'annonce est bien enregistree en base", !!monAnnonce);
 
+  // REPONDRE EXIGE UNE IDENTITE VERIFIEE, comme publier. Cette serie
+  // parle de ce qui vient APRES : un employeur qui voudrait choisir
+  // quelqu'un dont le dossier n'est pas valide. Ce cas ne s'atteint plus
+  // par le parcours normal, mais la regle du serveur existe toujours -
+  // on la met donc a l'epreuve en ramenant la candidate a son etat de
+  // depart, une fois sa reponse envoyee.
   const cand = await requete("/candidatures", { method: "POST", cookie: cookiePre,
     body: form({ annonceId: monAnnonce.id }) });
-  v("POST /candidatures accepte la candidature", cand.code === 200 && cand.corps.includes("envoyee"), "code " + cand.code);
+  v("POST /candidatures accepte la candidature",
+    cand.code === 200 && cand.corps.includes("Votre r"), "code " + cand.code);
+
+  base.prepare("UPDATE utilisateurs SET statut_verification = 'non soumis' WHERE email = ?")
+    .run(preMail.toLowerCase());
 
   const profil2 = await requete("/mon-profil", { cookie: cookieEmp });
   v("l'employeur voit la candidature recue", profil2.corps.includes("En attente"));

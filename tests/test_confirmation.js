@@ -48,16 +48,25 @@ setTimeout(async () => {
   const eq = await creerCompte("eq", "employeur");
   base.prepare("UPDATE utilisateurs SET est_admin = 1 WHERE email = ?").run(eq.mail);
 
-  // Publier exige une identite verifiee. Ce n'est pas le sujet de
-  // cette serie : on la donne aux employeurs qu'elle cree.
+  // Publier une demande ET y repondre exigent une identite verifiee.
+  // Ce n'est pas le sujet de cette serie : on la donne a tous les
+  // comptes qu'elle cree.
   base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' "
-    + "WHERE email LIKE ? AND role = 'employeur'").run("%" + M + "%");
+    + "WHERE email LIKE ?").run("%" + M + "%");
 
   await poster("/annonces", form({ titre: M + " demande", metier: "menagere",
     quartier: "Mvan", horaire: "Lundi et jeudi 8h", duree_estimee: "environ 4 heures",
     conditions: "Il y a un chien.", prix: "18000" }), emp.cookie);
   const annonce = base.prepare("SELECT id FROM annonces WHERE titre LIKE ? ORDER BY id DESC LIMIT 1").get("%" + M + "%");
+  // REPONDRE EXIGE UNE IDENTITE VERIFIEE, comme publier. Cette serie
+  // parle de ce qui vient APRES : un employeur qui voudrait choisir
+  // quelqu'un dont le dossier n'est pas valide. Ce cas ne s'atteint plus
+  // par le parcours normal, mais la regle du serveur existe toujours -
+  // on la met donc a l'epreuve en ramenant la candidate a son etat de
+  // depart, une fois sa reponse envoyee.
   await poster("/candidatures", form({ annonceId: String(annonce.id) }), pre.cookie);
+  base.prepare("UPDATE utilisateurs SET statut_verification = 'non soumis' WHERE email = ?")
+    .run(pre.mail.toLowerCase());
   const cand = base.prepare("SELECT id FROM candidatures WHERE annonce_id = ?").get(annonce.id);
   const url = "/candidatures/" + cand.id + "/confirmer";
 

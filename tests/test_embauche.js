@@ -48,12 +48,20 @@ setTimeout(async () => {
   // Le sujet de cette serie est la verification de la CANDIDATE.
   // L'employeur, lui, doit etre verifie pour pouvoir publier.
   base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' "
-    + "WHERE email LIKE ? AND role = 'employeur'").run("%" + M + "%");
+    + "WHERE email LIKE ?").run("%" + M + "%");
 
   await poster("/annonces", form({ titre: M + " annonce", metier: "MetierEmbauche",
     arrondissement: "Yaounde 1", quartier: "Bastos", horaire: "Lundi 8h-12h", prix: "10000" }), cEmp);
   const annonce = base.prepare("SELECT * FROM annonces WHERE titre LIKE ?").get("%" + M + "%");
+  // REPONDRE EXIGE UNE IDENTITE VERIFIEE, comme publier. Cette serie
+  // parle de ce qui vient APRES : un employeur qui voudrait choisir
+  // quelqu'un dont le dossier n'est pas valide. Ce cas ne s'atteint plus
+  // par le parcours normal, mais la regle du serveur existe toujours -
+  // on la met donc a l'epreuve en ramenant la candidate a son etat de
+  // depart, une fois sa reponse envoyee.
   await poster("/candidatures", form({ annonceId: annonce.id }), cPres);
+  base.prepare("UPDATE utilisateurs SET statut_verification = 'non soumis' WHERE email = ?")
+    .run(mailPres.toLowerCase());
 
   const candidature = base.prepare("SELECT * FROM candidatures WHERE annonce_id = ?").get(annonce.id);
   const statutCandidature = () =>

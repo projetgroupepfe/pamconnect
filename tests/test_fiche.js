@@ -102,10 +102,11 @@ setTimeout(async () => {
   const recherche = await (await lire("/recherche?metier=menage", emp.cookie)).text();
   dire("depuis la recherche", recherche.includes("/personnes/" + u.id));
 
-  // Publier exige une identite verifiee. Ce n'est pas le sujet de
-  // cette serie : on la donne aux employeurs qu'elle cree.
+  // Publier une demande ET y repondre exigent une identite verifiee.
+  // Ce n'est pas le sujet de cette serie : on la donne a tous les
+  // comptes qu'elle cree.
   base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' "
-    + "WHERE email LIKE ? AND role = 'employeur'").run("%" + M + "%");
+    + "WHERE email LIKE ?").run("%" + M + "%");
 
   await fetch(RACINE + "/annonces", { method: "POST", headers: { Cookie: emp.cookie },
     redirect: "manual", body: form({ titre: M + " demande", metier: "menagere",

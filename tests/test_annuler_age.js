@@ -42,10 +42,10 @@ async function creerCompte(suffixe, role, extra) {
   //
   // L'inscription enregistre l'email EN MINUSCULES : chercher la casse
   // d'origine ne trouve rien.
-  if (role === "employeur") {
-    base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' WHERE email = ?")
-      .run(mail.toLowerCase());
-  }
+  // LES DEUX ROLES. Publier exige une identite verifiee, et y repondre
+  // aussi depuis que la reponse coute un jeton.
+  base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' WHERE email = ?")
+    .run(mail.toLowerCase());
 
   return { mail, cookie: c.cookie };
 }
