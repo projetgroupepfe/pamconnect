@@ -134,7 +134,31 @@ setTimeout(async () => {
   dire("le prix d'une mise en avant est annonce", pageEmp.includes("Une mise en avant coûte"));
   dire("il lit ce qui lui manque", pageEmp.includes("Il vous manque"));
   dire("et combien exactement", pageEmp.includes("10 jetons (1 000 FCFA)"));
-  dire("on ne lui promet pas une action complete", !pageEmp.includes("1 mise en avant</strong>"));
+  dire("son solde ne lui promet aucune action complete",
+       !pageEmp.includes("Votre solde vous permet"));
+
+  console.log(SAUT + "--- CHAQUE PACK DIT CE QU'IL DONNERA ---");
+  // Aucun pack n'est cache : un petit pack semble inutile a un employeur,
+  // mais il complete exactement les jetons qu'on lui a offerts. Ce qu'on
+  // ignore, c'est ce que la personne a deja - on compte donc devant elle.
+
+  // Elle a 3 jetons, une reponse en coute 1.
+  dire("le pack de 5 lui donnera huit reponses", pagePres.includes("8 réponses"));
+  dire("le pack de 10 lui en donnera treize", pagePres.includes("13 réponses"));
+
+  // Lui a 10 jetons, une mise en avant en coute 20.
+  dire("le pack de 5 ne lui suffit pas", pageEmp.includes("il vous manquera encore"));
+  dire("et il lit combien il lui manquerait", pageEmp.includes("5 jetons</strong>"));
+  dire("le pack de 10 lui donnera une mise en avant",
+       pageEmp.includes("1 mise en avant</strong>"));
+  dire("le pack de 60 lui en donnera trois",
+       pageEmp.includes("3 mises en avant</strong>"));
+
+  // AUCUN PACK N'EST CACHE. Les quatre restent proposes aux deux cotes.
+  dire("les quatre packs restent visibles pour elle",
+       [5, 10, 30, 60].every((q) => pagePres.includes(">" + q + " jetons<")));
+  dire("et pour lui aussi",
+       [5, 10, 30, 60].every((q) => pageEmp.includes(">" + q + " jetons<")));
 
   console.log(SAUT + "--- CE QUI N'EST PAS ENCORE CONSTRUIT EST DIT ---");
   // Tant que la depense n'existe pas, la page ne doit pas laisser
