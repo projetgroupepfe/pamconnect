@@ -257,10 +257,33 @@
           <% if (monAvis.commentaire) { %>
             <p><%= monAvis.commentaire %></p>
           <% } %>
-          <p class="aide">
-            Un seul avis par service, et il ne se modifie pas : un avis que
-            l'on pourrait réécrire deviendrait un moyen de pression.
-          </p>
+          <%# CE QUE L EQUIPE EN A FAIT. Masquer un avis efface la parole
+              de quelqu un : celui qui l a ecrit doit l apprendre, et
+              lire pourquoi. C est la regle partout ailleurs sur la
+              plateforme - un avertissement, un refus, un arbitrage
+              portent tous leur motif. %>
+          <% if (monAvis.masque) { %>
+            <p>
+              <span class="badge badge-non-soumis">Masqué par l'équipe</span>
+            </p>
+            <p class="aide">
+              Votre avis n'apparaît plus nulle part et ne compte plus dans la
+              moyenne de cette personne.
+              <% if (monAvis.motif_masquage) { %>
+                <br><strong>Motif :</strong> <%= monAvis.motif_masquage %>
+              <% } %>
+            </p>
+            <p class="aide">
+              L'équipe masque un avis lorsqu'il est faux, insultant ou
+              discriminatoire. Si vous n'êtes pas d'accord,
+              <a href="/probleme/<%= conversation.id %>">écrivez-lui</a>.
+            </p>
+          <% } else { %>
+            <p class="aide">
+              Un seul avis par service, et il ne se modifie pas : un avis que
+              l'on pourrait réécrire deviendrait un moyen de pression.
+            </p>
+          <% } %>
         </div>
       <% } else { %>
         <div class="carte">

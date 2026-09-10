@@ -729,18 +729,33 @@ CREATE TABLE IF NOT EXISTS avis (
 
   commentaire    TEXT,
 
-  -- Les quatre notes de detail sont FACULTATIVES : imposer cinq etoiles
-  -- a remplir ferait abandonner le formulaire, et une note posee au
-  -- hasard vaut moins que pas de note.
+  -- LES QUATRE NOTES DE DETAIL, FACULTATIVES. Imposer cinq etoiles a
+  -- remplir ferait abandonner le formulaire, et une note posee au hasard
+  -- vaut moins que pas de note.
   --
-  -- "qualite" n'a pas le meme sens des deux cotes : la qualite du
-  -- travail chez l'employeur qui note, le respect des conditions
-  -- annoncees chez la personne qui note. Une colonne, deux libelles -
-  -- deux colonnes auraient laisse l'une vide sur deux avis.
-  ponctualite    INTEGER CHECK (ponctualite BETWEEN 1 AND 5),
-  qualite        INTEGER CHECK (qualite BETWEEN 1 AND 5),
-  respect        INTEGER CHECK (respect BETWEEN 1 AND 5),
-  communication  INTEGER CHECK (communication BETWEEN 1 AND 5),
+  -- LEUR NOM EST NEUTRE, ET C'EST VOULU : les deux cotes ne jugent pas
+  -- la meme chose. Le sens de chaque colonne se lit dans le ROLE de
+  -- celui qui a ecrit l'avis :
+  --
+  --   colonne     employeur qui note         personne qui note
+  --   ---------   ------------------------   --------------------------
+  --   critere1    Ponctualite                Conditions conformes
+  --   critere2    Qualite du travail         Paiement declare sans retard
+  --   critere3    Respect du domicile        Respect
+  --   critere4    Communication              Communication
+  --
+  -- Huit colonnes dont quatre vides sur chaque ligne auraient dit la
+  -- meme chose, en moins lisible. Les libelles vivent dans UNE fonction
+  -- du serveur, criteresAvis() : le formulaire et l'affichage s'en
+  -- servent tous les deux, ils ne peuvent donc pas diverger.
+  --
+  -- "Paiement declare sans retard" est celui qui manquait, et c'est le
+  -- plus important pour elle : un employeur qui oublie de declarer le
+  -- service la laisse impayee.
+  critere1       INTEGER CHECK (critere1 BETWEEN 1 AND 5),
+  critere2       INTEGER CHECK (critere2 BETWEEN 1 AND 5),
+  critere3       INTEGER CHECK (critere3 BETWEEN 1 AND 5),
+  critere4       INTEGER CHECK (critere4 BETWEEN 1 AND 5),
 
   cree_le        TEXT NOT NULL DEFAULT (datetime('now')),
 

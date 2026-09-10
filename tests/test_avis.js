@@ -143,6 +143,9 @@ setTimeout(async () => {
   dire("il previent que c'est definitif", ecran.includes("ne pourra plus être modifié"));
   dire("et que c'est public", ecran.includes("visible par tout le monde"));
   dire("les criteres de l'employeur", ecran.includes("Qualité du travail"));
+  dire("et celui du domicile", ecran.includes("Respect de votre domicile"));
+  // CE QUI CONCERNE L EMPLOYEUR N A RIEN A FAIRE SUR SON ECRAN A LUI.
+  dire("il ne juge pas le paiement", !ecran.includes("Paiement déclaré"));
 
   const sansNote = await poster("/avis/" + cand.id, form({ commentaire: "rien" }), emp.cookie);
   dire("un avis sans note est refuse", sansNote.code === 400, String(sansNote.code));
@@ -153,7 +156,7 @@ setTimeout(async () => {
 
   const pose = await poster("/avis/" + cand.id,
     form({ note: "5", commentaire: M + " travail soigne et ponctuel",
-           ponctualite: "5", qualite: "4", respect: "", communication: "5" }), emp.cookie);
+           critere1: "5", critere2: "4", critere3: "", critere4: "5" }), emp.cookie);
   dire("l'avis est publie", pose.code === 200, String(pose.code));
 
   const son = avisDe(cand.id, emp.id);
@@ -161,9 +164,9 @@ setTimeout(async () => {
   dire("avec la note", son.note === 5);
   dire("le commentaire", String(son.commentaire).includes("soigne"));
   dire("il vise la personne", son.vise_id === elle.id);
-  dire("les criteres remplis sont gardes", son.ponctualite === 5 && son.qualite === 4);
+  dire("les criteres remplis sont gardes", son.critere1 === 5 && son.critere2 === 4);
   // FACULTATIF VEUT DIRE FACULTATIF : une case vide n'est pas une erreur.
-  dire("celui laisse vide reste vide", son.respect === null);
+  dire("celui laisse vide reste vide", son.critere3 === null);
 
   console.log(SAUT + "--- UN SEUL AVIS, ET IL NE SE MODIFIE PAS ---");
   dire("l'ecran se ferme", (await lire("/avis/" + cand.id, emp.cookie)).status === 409);
@@ -181,6 +184,9 @@ setTimeout(async () => {
   dire("son ecran s'ouvre", sonEcran.includes("Donner mon avis"));
   // Le meme critere ne dit pas la meme chose des deux cotes.
   dire("ses criteres a elle", sonEcran.includes("Conditions conformes"));
+  // LE CRITERE QUI LA CONCERNE VRAIMENT : un employeur qui oublie de
+  // declarer le service la laisse impayee.
+  dire("elle juge le paiement declare", sonEcran.includes("Paiement déclaré sans retard"));
   dire("et pas ceux de l'employeur", !sonEcran.includes("Qualité du travail"));
 
   await poster("/avis/" + cand.id,
@@ -266,6 +272,15 @@ setTimeout(async () => {
   dire("la moyenne est recalculee", reputation(elle.id).moyenne === 4);
   const ficheApres = await (await lire("/personnes/" + elle.id)).text();
   dire("il disparait de la fiche", !ficheApres.includes("travail soigne"));
+
+  console.log(SAUT + "--- L AUTEUR APPREND QUE SON AVIS EST MASQUE ---");
+  // C etait le seul endroit de la plateforme ou une decision tombait en
+  // silence. Un avertissement, un refus, un arbitrage portent tous leur
+  // motif, lu par la personne concernee.
+  const vueAuteur = await (await lire("/messages/" + cand.id, emp.cookie)).text();
+  dire("son ecran le dit", vueAuteur.includes("Masqué par l"));
+  dire("avec le motif ecrit par l equipe", vueAuteur.includes("verifiables"));
+  dire("et ce qu il peut faire", vueAuteur.includes("/probleme/" + cand.id));
 
   console.log(SAUT + "--- LAISSER EN LIGNE EST AUSSI UNE DECISION ---");
   await poster("/avis/" + sien.id + "/signaler", form({}), emp.cookie);

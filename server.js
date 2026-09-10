@@ -154,6 +154,16 @@ retirerColonneSiPresente("candidatures", "tarif_propose");
 // pour des reglages qui ne se saisissent pas pareil - un nombre d'un
 // cote, une liste de packs de l'autre. Les intitules sont revenus dans
 // la vue, comme dans tous les autres formulaires du projet.
+// Les quatre criteres d'un avis portaient les noms de ce que
+// l'EMPLOYEUR juge. La personne qui a travaille recevait les memes, et
+// il manquait le seul qui compte vraiment pour elle : l'employeur a-t-il
+// declare le service pour qu'elle soit payee. Le nom devient neutre, le
+// sens se lit dans le role de l'auteur.
+renommerColonneSiPresente("avis", "ponctualite", "critere1");
+renommerColonneSiPresente("avis", "qualite", "critere2");
+renommerColonneSiPresente("avis", "respect", "critere3");
+renommerColonneSiPresente("avis", "communication", "critere4");
+
 retirerColonneSiPresente("parametres", "libelle");
 retirerColonneSiPresente("parametres", "aide");
 
@@ -1100,10 +1110,10 @@ const requetes = {
   creerAvis: db.prepare(`
     INSERT INTO avis
       (candidature_id, auteur_id, vise_id, note, commentaire,
-       ponctualite, qualite, respect, communication)
+       critere1, critere2, critere3, critere4)
     VALUES
       (@candidature, @auteur, @vise, @note, @commentaire,
-       @ponctualite, @qualite, @respect, @communication)
+       @critere1, @critere2, @critere3, @critere4)
   `),
 
   // L'avis que CETTE personne a deja laisse sur CE service. Un seul est
@@ -1127,7 +1137,7 @@ const requetes = {
   // sont exclus : c'est le sens du masquage.
   avisRecus: db.prepare(`
     SELECT a.id, a.signale, a.note, a.commentaire, a.cree_le,
-           a.ponctualite, a.qualite, a.respect, a.communication,
+           a.critere1, a.critere2, a.critere3, a.critere4,
            u.nom AS nomAuteur, u.role AS roleAuteur,
            n.titre AS titreAnnonce
     FROM avis a
@@ -2011,19 +2021,30 @@ function noteFacultative(valeur) {
   return Number.isFinite(n) && n >= 1 && n <= 5 ? n : null;
 }
 
-// Les quatre criteres, avec le libelle qui convient a celui qui note.
+// LES QUATRE CRITERES, ET ILS NE SONT PAS LES MEMES DES DEUX COTES.
 //
-// "Qualite" n'a pas le meme sens des deux cotes : l'employeur juge le
-// travail rendu, la personne juge si les conditions annoncees etaient
-// les vraies. Une seule colonne, deux libelles.
+// Un employeur juge un travail rendu chez lui. Une personne juge un
+// employeur chez qui elle s'est deplacee - et la premiere chose qui la
+// concerne n'est pas la ponctualite de cet homme, c'est de savoir s'il
+// a declare le service pour qu'elle soit payee.
+//
+// Ecrit ICI et nulle part ailleurs : le formulaire et l'affichage s'en
+// servent tous les deux. Ecrits deux fois, ils finiraient par dire deux
+// choses, et un avis se lirait avec les libelles de l'autre role.
 function criteresAvis(jeSuisEmployeur) {
-  return [
-    { cle: "ponctualite", libelle: "Ponctualité" },
-    { cle: "qualite",
-      libelle: jeSuisEmployeur ? "Qualité du travail" : "Conditions conformes à la demande" },
-    { cle: "respect", libelle: "Respect" },
-    { cle: "communication", libelle: "Communication" },
-  ];
+  return jeSuisEmployeur
+    ? [
+        { cle: "critere1", libelle: "Ponctualité" },
+        { cle: "critere2", libelle: "Qualité du travail" },
+        { cle: "critere3", libelle: "Respect de votre domicile" },
+        { cle: "critere4", libelle: "Communication" },
+      ]
+    : [
+        { cle: "critere1", libelle: "Conditions conformes à ce qui était annoncé" },
+        { cle: "critere2", libelle: "Paiement déclaré sans retard" },
+        { cle: "critere3", libelle: "Respect" },
+        { cle: "critere4", libelle: "Communication" },
+      ];
 }
 
 // ============================================================
@@ -4264,10 +4285,10 @@ app.post("/avis/:id", exigerConnexion, interdireALEquipe, lireFormulaire, (req, 
       vise,
       note,
       commentaire,
-      ponctualite: noteFacultative(req.body.ponctualite),
-      qualite: noteFacultative(req.body.qualite),
-      respect: noteFacultative(req.body.respect),
-      communication: noteFacultative(req.body.communication),
+      critere1: noteFacultative(req.body.critere1),
+      critere2: noteFacultative(req.body.critere2),
+      critere3: noteFacultative(req.body.critere3),
+      critere4: noteFacultative(req.body.critere4),
     });
   } catch (erreur) {
     // La contrainte UNIQUE reste le dernier rempart : deux envois

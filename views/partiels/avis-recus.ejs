@@ -66,14 +66,17 @@
         <p><%= a.commentaire %></p>
       <% } %>
 
-      <%# Les quatre criteres ne s'affichent que s'ils ont ete remplis :
-          une ligne vide ne dit rien a personne. %>
-      <% const details = [
-           ["Ponctualité", a.ponctualite],
-           [a.roleAuteur === "employeur" ? "Qualité du travail" : "Conditions conformes", a.qualite],
-           ["Respect", a.respect],
-           ["Communication", a.communication],
-         ].filter(function (d) { return d[1]; }); %>
+      <%# LES LIBELLES VIENNENT DE LA MEME FONCTION QUE LE FORMULAIRE.
+          Le sens d'un critere depend du role de celui qui a ECRIT
+          l'avis, pas de celui qui le lit : un avis d'employeur se lit
+          avec les libelles de l'employeur, meme sur la page de la
+          personne notee.
+
+          Les criteres vides ne s'affichent pas : une ligne sans note ne
+          dit rien a personne. %>
+      <% const details = criteresAvis(a.roleAuteur === "employeur")
+           .map(function (critere) { return [critere.libelle, a[critere.cle]]; })
+           .filter(function (d) { return d[1]; }); %>
 
       <% if (details.length > 0) { %>
         <ul class="infos">
