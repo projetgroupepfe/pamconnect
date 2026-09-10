@@ -33,6 +33,10 @@
       <%- include("partiels/icone", { nom: "jeton" }) %>
       Jetons<% if (achatsJetons > 0) { %> (<%= achatsJetons %>)<% } %>
     </a>
+    <a class="bouton bouton-secondaire" href="/admin/avis">
+      <%- include("partiels/icone", { nom: "avis" }) %>
+      Avis signalés<% if (avisSignales > 0) { %> (<%= avisSignales %>)<% } %>
+    </a>
   </p>
 
   <h2>Dossiers à vérifier</h2>

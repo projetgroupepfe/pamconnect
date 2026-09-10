@@ -53,6 +53,25 @@
             <% } %>
           </span>
         </li>
+
+        <%# SA REPUTATION, A LUI AUSSI. Une plateforme qui ne fait noter
+            que d un cote met toute la pression sur celui qui a le moins
+            de pouvoir - et elle ne dit rien du logement ou l on envoie
+            quelqu un. %>
+        <li>
+          <%- include("partiels/icone", { nom: "avis" }) %>
+          <span>
+            <% if (reputationEmployeur.nombre === 0) { %>
+              <span class="aide">Aucun avis sur cet employeur pour le moment.</span>
+            <% } else { %>
+              <strong><%= moyenneLisible(reputationEmployeur.moyenne) %> sur 5</strong>
+              <span class="aide">
+                sur <%= reputationEmployeur.nombre %> avis laissés par des personnes
+                qui ont travaillé pour lui
+              </span>
+            <% } %>
+          </span>
+        </li>
       </ul>
       <%# La phrase doit suivre le badge. Sinon l'ecran affiche
           "Identite non verifiee" et, juste en dessous, "PamConnect a

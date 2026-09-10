@@ -1,0 +1,94 @@
+<%- include("partiels/tete") %>
+
+  <div class="colonne">
+
+    <h1>Donner mon avis</h1>
+    <p class="chapeau">
+      Sur <strong><%= nomVise %></strong>, après « <%= conversation.titreAnnonce %> ».
+    </p>
+
+    <%# CE QUI EST DEFINITIF DOIT ETRE DIT AVANT. Un avis ne se modifie
+        pas : le decouvrir apres l'avoir ecrit serait une mauvaise
+        surprise, et sur un sujet qui touche la reputation de quelqu'un. %>
+    <div class="carte confiance">
+      <p>
+        Votre avis sera <strong>visible par tout le monde</strong>, avec votre nom.
+      </p>
+      <p class="aide">
+        Il ne pourra plus être modifié : un avis que l'on peut réécrire devient
+        un moyen de pression après coup. <%= nomVise %> pourra le signaler à
+        l'équipe s'il le juge faux, insultant ou discriminatoire.
+      </p>
+    </div>
+
+    <form action="/avis/<%= conversation.id %>" method="POST">
+
+      <h2>Votre note</h2>
+      <div class="carte">
+        <%# Des boutons en colonne plutot qu'une rangee d'etoiles : sur un
+            telephone, cinq etoiles cote a cote se touchent mal, et un
+            chiffre seul ne dit pas ce qu'il vaut. %>
+        <div class="champ">
+          <% const echelle = [
+               [5, "Excellent"],
+               [4, "Bien"],
+               [3, "Correct"],
+               [2, "Décevant"],
+               [1, "Mauvais"],
+             ]; %>
+          <% echelle.forEach(function (ligne) { %>
+            <label class="choix-note">
+              <input type="radio" name="note" value="<%= ligne[0] %>" required>
+              <span>
+                <strong><%= ligne[0] %></strong> sur 5 — <%= ligne[1] %>
+              </span>
+            </label>
+          <% }); %>
+        </div>
+      </div>
+
+      <h2>Ce que vous voulez dire</h2>
+      <div class="carte">
+        <div class="champ">
+          <label for="commentaire">Votre commentaire, si vous le souhaitez</label>
+          <textarea id="commentaire" name="commentaire" rows="4" maxlength="1000"
+                    placeholder="<%= jeSuisEmployeur
+                      ? 'Ce qui s est bien passé, ce qui pourrait être mieux.'
+                      : 'Les conditions étaient-elles celles annoncées ?' %>"></textarea>
+          <small class="aide">
+            Facultatif. Écrivez ce que vous diriez à quelqu'un qui hésite.
+          </small>
+        </div>
+      </div>
+
+      <%# LES QUATRE CRITERES SONT REPLIES. Imposer cinq notes ferait
+          abandonner le formulaire, et une note posee au hasard vaut moins
+          que pas de note du tout. %>
+      <details class="carte">
+        <summary>Noter plus précisément <span class="aide">(facultatif)</span></summary>
+
+        <% criteresAvis(jeSuisEmployeur).forEach(function (critere) { %>
+          <div class="champ">
+            <label for="c-<%= critere.cle %>"><%= critere.libelle %></label>
+            <select id="c-<%= critere.cle %>" name="<%= critere.cle %>">
+              <option value="">Ne pas noter</option>
+              <% [5, 4, 3, 2, 1].forEach(function (n) { %>
+                <option value="<%= n %>"><%= n %> sur 5</option>
+              <% }); %>
+            </select>
+          </div>
+        <% }); %>
+      </details>
+
+      <div class="actions">
+        <button type="submit">
+          <%- include("partiels/icone", { nom: "avis" }) %>
+          Publier mon avis
+        </button>
+        <a class="bouton bouton-secondaire" href="/messages/<%= conversation.id %>">Annuler</a>
+      </div>
+    </form>
+
+  </div>
+
+<%- include("partiels/pied") %>

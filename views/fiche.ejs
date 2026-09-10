@@ -101,4 +101,10 @@
 
   </div>
 
+  <%- include("partiels/avis-recus", {
+        reputation: reputation,
+        avis: avis,
+        titre: "Ce que disent les employeurs",
+        vide: "Cette personne n'a pas encore reçu d'avis. Ce n'est pas un mauvais signe : elle commence." }) %>
+
 <%- include("partiels/pied") %>

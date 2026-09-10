@@ -1,0 +1,116 @@
+<%#
+  La reputation d'une personne : sa moyenne, le nombre d'avis, et les
+  avis eux-memes.
+
+  Dessinee ici parce qu'elle s'affiche a trois endroits : la fiche
+  publique, le profil de la personne, et l'ecran ou l'on decide de
+  repondre a une demande. Recopiee, elle finirait par dire trois choses
+  differentes.
+
+  Appelee ainsi :
+    include("partiels/avis-recus", { reputation: ..., avis: [...] })
+
+  Options :
+    titre     : le titre a afficher (aucun si absent)
+    vide      : la phrase quand personne n'a encore note
+    signalable: true pour proposer "Signaler cet avis" (son propre profil)
+
+  ATTENTION : ne jamais ecrire la sequence de fermeture EJS dans ce
+  commentaire, elle terminerait le bloc au milieu d'une phrase.
+%>
+
+<% if (locals.titre) { %><h2><%= locals.titre %></h2><% } %>
+
+<% if (reputation.nombre === 0) { %>
+
+  <%# PAS DE NOTE N'EST PAS UNE MAUVAISE NOTE. Afficher "0 sur 5" a
+      quelqu'un qui vient d'arriver serait un mensonge, et le
+      condamnerait avant d'avoir commence. %>
+  <p class="vide">
+    <%= locals.vide || "Aucun avis pour le moment." %>
+  </p>
+
+<% } else { %>
+
+  <div class="carte">
+    <p>
+      <span class="badge badge-info">
+        <%- include("icone", { nom: "avis", taille: 15 }) %>
+        <%= moyenneLisible(reputation.moyenne) %> sur 5
+      </span>
+      <span class="aide">
+        sur <%= reputation.nombre %> avis
+      </span>
+    </p>
+
+    <%# LE NOMBRE COMPTE AUTANT QUE LA MOYENNE. Une seule note de 5 ne
+        vaut pas cinquante notes a 4,8 : on le dit plutot que de laisser
+        croire le contraire. %>
+    <% if (reputation.nombre < 3) { %>
+      <p class="aide">
+        Peu d'avis pour l'instant : cette moyenne peut encore beaucoup bouger.
+      </p>
+    <% } %>
+  </div>
+
+  <% avis.forEach(function (a) { %>
+    <div class="carte">
+      <p>
+        <strong><%= moyenneLisible(a.note) %> sur 5</strong>
+        <span class="aide">
+          — <%= a.nomAuteur %><% if (a.titreAnnonce) { %>, après « <%= a.titreAnnonce %> »<% } %>
+        </span>
+      </p>
+
+      <% if (a.commentaire) { %>
+        <p><%= a.commentaire %></p>
+      <% } %>
+
+      <%# Les quatre criteres ne s'affichent que s'ils ont ete remplis :
+          une ligne vide ne dit rien a personne. %>
+      <% const details = [
+           ["Ponctualité", a.ponctualite],
+           [a.roleAuteur === "employeur" ? "Qualité du travail" : "Conditions conformes", a.qualite],
+           ["Respect", a.respect],
+           ["Communication", a.communication],
+         ].filter(function (d) { return d[1]; }); %>
+
+      <% if (details.length > 0) { %>
+        <ul class="infos">
+          <% details.forEach(function (d) { %>
+            <li>
+              <%- include("icone", { nom: "avis" }) %>
+              <span><%= d[0] %> : <strong><%= d[1] %> sur 5</strong></span>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+
+      <ul class="infos">
+        <li>
+          <%- include("icone", { nom: "calendrier" }) %>
+          <span><%= dateLisible(a.cree_le) %></span>
+        </li>
+      </ul>
+
+      <%# SIGNALER, PAS EFFACER. La personne visee ne peut pas retirer un
+          avis : elle le soumet a l'equipe, qui tranche. %>
+      <% if (locals.signalable && a.id) { %>
+        <% if (a.signale) { %>
+          <p class="aide">
+            <span class="badge badge-en-attente">Signalé</span>
+            L'équipe examine cet avis. Il reste visible en attendant.
+          </p>
+        <% } else { %>
+          <form action="/avis/<%= a.id %>/signaler" method="POST">
+            <button type="submit" class="bouton-secondaire">
+              <%- include("icone", { nom: "info" }) %>
+              Signaler cet avis
+            </button>
+          </form>
+        <% } %>
+      <% } %>
+    </div>
+  <% }); %>
+
+<% } %>

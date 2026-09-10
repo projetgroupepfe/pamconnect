@@ -1,0 +1,81 @@
+<%- include("partiels/tete") %>
+
+  <h1>Avis signalés</h1>
+  <p class="chapeau">
+    Les avis que la personne visée conteste, et que l'équipe doit examiner.
+  </p>
+
+  <%# MASQUER EFFACE LA PAROLE DE QUELQU'UN. Ce n'est pas une correction
+      de forme : c'est une décision, et elle demande un motif écrit. %>
+  <div class="carte confiance">
+    <p class="aide">
+      Un avis reste <strong>visible tant qu'il n'est pas masqué</strong> :
+      un signalement n'est pas une sanction. Masquez seulement ce qui est
+      faux, insultant ou discriminatoire — pas ce qui est simplement sévère.
+      Un avis masqué disparaît des écrans et ne compte plus dans la moyenne,
+      mais il reste en base avec votre motif.
+    </p>
+  </div>
+
+  <% if (avis.length === 0) { %>
+
+    <p class="vide">Aucun avis signalé.</p>
+
+  <% } else { %>
+
+    <% avis.forEach(function (a) { %>
+      <div class="carte">
+        <h3><%= a.note %> sur 5 — sur <%= a.nomVise %></h3>
+        <p class="discret">
+          Écrit par <strong><%= a.nomAuteur %></strong><br>
+          <%= a.emailAuteur %><br>
+          Après « <%= a.titreAnnonce %> »
+        </p>
+
+        <% if (a.commentaire) { %>
+          <div class="carte">
+            <p><%= a.commentaire %></p>
+          </div>
+        <% } else { %>
+          <p class="aide">Aucun commentaire : une note seule.</p>
+        <% } %>
+
+        <ul class="infos">
+          <li>
+            <%- include("partiels/icone", { nom: "calendrier" }) %>
+            <span>Écrit le <%= dateLisible(a.cree_le) %></span>
+          </li>
+        </ul>
+
+        <form action="/admin/avis/<%= a.id %>" method="POST">
+          <div class="champ">
+            <label for="motif-<%= a.id %>">Motif, si vous masquez</label>
+            <input id="motif-<%= a.id %>" type="text" name="motif" maxlength="200"
+                   placeholder="Propos insultants">
+          </div>
+
+          <div class="actions">
+            <button type="submit" name="decision" value="masquer" class="bouton-danger">
+              <%- include("partiels/icone", { nom: "refuser" }) %>
+              Masquer cet avis
+            </button>
+            <button type="submit" name="decision" value="rien"
+                    class="bouton bouton-secondaire">
+              <%- include("partiels/icone", { nom: "valider" }) %>
+              Laisser en ligne
+            </button>
+          </div>
+        </form>
+      </div>
+    <% }); %>
+
+  <% } %>
+
+  <p class="actions">
+    <a class="bouton bouton-secondaire" href="/admin">
+      <%- include("partiels/icone", { nom: "equipe" }) %>
+      Retour à l'espace équipe
+    </a>
+  </p>
+
+<%- include("partiels/pied") %>

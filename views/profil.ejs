@@ -179,6 +179,18 @@
       <% } %>
     </div>
 
+    <%# CE QUE LES AUTRES DISENT DE MOI, avec le seul recours possible :
+        le signaler. On ne peut pas effacer un avis qui nous vise - il
+        deviendrait sinon inutile a ceux qui le lisent. %>
+    <% if (!utilisateur.est_admin) { %>
+      <%- include("partiels/avis-recus", {
+            reputation: reputation,
+            avis: mesAvis,
+            titre: "Les avis reçus",
+            signalable: true,
+            vide: "Personne ne vous a encore noté. Cela viendra après votre premier service terminé." }) %>
+    <% } %>
+
     <% if (utilisateur.role === "prestataire" && utilisateur.statut_verification === "refuse" && utilisateur.motif_refus) { %>
       <p class="aide">Motif du refus : <%= utilisateur.motif_refus %></p>
     <% } %>

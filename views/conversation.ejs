@@ -243,6 +243,83 @@
 
     <% } %>
 
+    <%# UN AVIS SUPPOSE UN SERVICE. Ce bloc n'apparait qu'une fois le
+        service declare effectue : avant, il n'y a rien a juger. %>
+    <% if (conversation.terminee_le) { %>
+      <h2>Votre avis</h2>
+
+      <% if (monAvis) { %>
+        <div class="carte">
+          <p>
+            <strong><%= monAvis.note %> sur 5</strong>
+            <span class="aide">— votre avis, publié le <%= dateLisible(monAvis.cree_le) %></span>
+          </p>
+          <% if (monAvis.commentaire) { %>
+            <p><%= monAvis.commentaire %></p>
+          <% } %>
+          <p class="aide">
+            Un seul avis par service, et il ne se modifie pas : un avis que
+            l'on pourrait réécrire deviendrait un moyen de pression.
+          </p>
+        </div>
+      <% } else { %>
+        <div class="carte">
+          <p>
+            Ce service est terminé. Dites ce qui s'est passé à
+            <strong><%= jeSuisEmployeur ? conversation.nomPrestataire : conversation.nomEmployeur %></strong>
+            — votre avis aidera les suivants à décider.
+          </p>
+          <div class="actions">
+            <a class="bouton" href="/avis/<%= conversation.id %>">
+              <%- include("partiels/icone", { nom: "avis" }) %>
+              Donner mon avis
+            </a>
+          </div>
+        </div>
+      <% } %>
+
+      <%# CE QUE L'AUTRE A ECRIT SUR MOI, avec le seul recours possible :
+          le signaler. On ne peut pas l'effacer soi-meme. %>
+      <% if (avisRecu) { %>
+        <div class="carte">
+          <p>
+            <strong><%= avisRecu.note %> sur 5</strong>
+            <span class="aide">
+              — ce que <%= avisRecu.nomAuteur %> a écrit sur vous
+            </span>
+          </p>
+          <% if (avisRecu.commentaire) { %>
+            <p><%= avisRecu.commentaire %></p>
+          <% } %>
+
+          <% if (avisRecu.masque) { %>
+            <p class="aide">
+              <span class="badge badge-non-soumis">Masqué par l'équipe</span>
+              Il n'apparaît plus nulle part et ne compte plus dans votre moyenne.
+            </p>
+          <% } else if (avisRecu.signale) { %>
+            <p class="aide">
+              <span class="badge badge-en-attente">Signalé</span>
+              L'équipe examine cet avis. Il reste visible en attendant.
+            </p>
+          <% } else { %>
+            <p class="aide">
+              Vous ne pouvez pas l'effacer. S'il est faux, insultant ou
+              discriminatoire, l'équipe peut le masquer après examen.
+            </p>
+            <form action="/avis/<%= avisRecu.id %>/signaler" method="POST">
+              <div class="actions">
+                <button type="submit" class="bouton-secondaire">
+                  <%- include("partiels/icone", { nom: "info" }) %>
+                  Signaler cet avis
+                </button>
+              </div>
+            </form>
+          <% } %>
+        </div>
+      <% } %>
+    <% } %>
+
 <%# Ecrire au support n'a pas besoin d'un message a montrer du
           doigt. Le bouton "Signaler ce message" ne couvrait que les
           problemes DANS la discussion ; les vrais problemes se passent

@@ -1087,6 +1087,103 @@ const requetes = {
     ORDER BY statut_verification
   `),
 
+  // --- Les avis ------------------------------------------------------
+
+  creerAvis: db.prepare(`
+    INSERT INTO avis
+      (candidature_id, auteur_id, vise_id, note, commentaire,
+       ponctualite, qualite, respect, communication)
+    VALUES
+      (@candidature, @auteur, @vise, @note, @commentaire,
+       @ponctualite, @qualite, @respect, @communication)
+  `),
+
+  // L'avis que CETTE personne a deja laisse sur CE service. Un seul est
+  // possible : la contrainte UNIQUE le garantit, cette requete permet de
+  // le dire avant plutot que de laisser le formulaire echouer.
+  monAvisPour: db.prepare(`
+    SELECT * FROM avis WHERE candidature_id = ? AND auteur_id = ?
+  `),
+
+  // Les deux avis d'un service, quel qu'en soit l'auteur. Sert a la
+  // discussion, ou chacun voit ce qu'il a ecrit et ce qu'on a ecrit
+  // sur lui.
+  avisDeLaCandidature: db.prepare(`
+    SELECT a.*, u.nom AS nomAuteur
+    FROM avis a JOIN utilisateurs u ON u.id = a.auteur_id
+    WHERE a.candidature_id = ?
+    ORDER BY a.id
+  `),
+
+  // LES AVIS PUBLICS D'UNE PERSONNE. Les avis masques par l'equipe en
+  // sont exclus : c'est le sens du masquage.
+  avisRecus: db.prepare(`
+    SELECT a.id, a.signale, a.note, a.commentaire, a.cree_le,
+           a.ponctualite, a.qualite, a.respect, a.communication,
+           u.nom AS nomAuteur, u.role AS roleAuteur,
+           n.titre AS titreAnnonce
+    FROM avis a
+    JOIN utilisateurs u ON u.id = a.auteur_id
+    JOIN candidatures c ON c.id = a.candidature_id
+    JOIN annonces     n ON n.id = c.annonce_id
+    WHERE a.vise_id = ? AND a.masque = 0
+    ORDER BY a.id DESC
+  `),
+
+  // La moyenne et le nombre d'avis, masques exclus.
+  //
+  // Calculee, jamais rangee a cote du compte : une moyenne stockee finit
+  // par mentir des qu'un avis est masque ou qu'un compte disparait.
+  reputationDe: db.prepare(`
+    SELECT COUNT(*) AS nombre, AVG(note) AS moyenne
+    FROM avis WHERE vise_id = ? AND masque = 0
+  `),
+
+  // --- Moderation des avis ---
+
+  avisParId: db.prepare(`
+    SELECT * FROM avis WHERE id = ?
+  `),
+
+  // SEULE LA PERSONNE VISEE PEUT SIGNALER. C'est elle que l'avis
+  // designe, et c'est elle qui sait s'il est faux.
+  signalerAvis: db.prepare(`
+    UPDATE avis SET signale = 1 WHERE id = @id AND vise_id = @vise AND signale = 0
+  `),
+
+  avisSignales: db.prepare(`
+    SELECT a.*,
+           auteur.nom AS nomAuteur, auteur.email AS emailAuteur,
+           vise.nom   AS nomVise,
+           n.titre    AS titreAnnonce
+    FROM avis a
+    JOIN utilisateurs auteur ON auteur.id = a.auteur_id
+    JOIN utilisateurs vise   ON vise.id   = a.vise_id
+    JOIN candidatures c ON c.id = a.candidature_id
+    JOIN annonces     n ON n.id = c.annonce_id
+    WHERE a.signale = 1 AND a.masque = 0
+    ORDER BY a.id
+  `),
+
+  nombreAvisSignales: db.prepare(`
+    SELECT COUNT(*) AS n FROM avis WHERE signale = 1 AND masque = 0
+  `),
+
+  // MASQUER, PAS SUPPRIMER, et jamais sans motif ecrit : une decision
+  // qui efface la parole de quelqu'un doit pouvoir s'expliquer.
+  masquerAvis: db.prepare(`
+    UPDATE avis
+       SET masque = 1, masque_par = @par, masque_le = datetime('now'),
+           motif_masquage = @motif
+     WHERE id = @id AND masque = 0
+  `),
+
+  // Examine, rien a reprocher : le signalement disparait de la liste de
+  // l'equipe, l'avis reste en ligne.
+  classerAvisSansSuite: db.prepare(`
+    UPDATE avis SET signale = 0 WHERE id = @id AND masque = 0
+  `),
+
   // --- Les jetons ---------------------------------------------------
 
   parametre: db.prepare(`
@@ -1859,6 +1956,56 @@ function auHasard(liste) {
 }
 
 // ============================================================
+// LES AVIS
+// ============================================================
+// La reputation d'une personne : sa moyenne et le nombre d'avis.
+//
+// Les deux comptent, et le second plus qu'on ne croit : une seule note
+// de 5 ne vaut pas cinquante notes a 4,8. La moyenne seule ferait passer
+// un inconnu chanceux devant quelqu'un qui a fait ses preuves.
+function reputationDe(personneId) {
+  const r = requetes.reputationDe.get(personneId);
+
+  return {
+    nombre: r.nombre,
+    // Arrondie au dixieme, et null tant que personne n'a note : afficher
+    // "0 sur 5" a quelqu'un qui vient d'arriver serait un mensonge.
+    moyenne: r.nombre > 0 ? Math.round(r.moyenne * 10) / 10 : null,
+  };
+}
+
+// La moyenne ecrite comme on la lit : "4,8" et non "4.8".
+function moyenneLisible(moyenne) {
+  return moyenne === null ? "" : String(moyenne).replace(".", ",");
+}
+
+// Une note entre 1 et 5, ou null si la case a ete laissee vide.
+// FACULTATIF VEUT DIRE FACULTATIF : une valeur absente n'est pas une
+// erreur, elle n'est simplement pas enregistree.
+function noteFacultative(valeur) {
+  const brut = String(valeur === undefined || valeur === null ? "" : valeur).trim();
+  if (brut === "") return null;
+
+  const n = Math.round(Number(brut));
+  return Number.isFinite(n) && n >= 1 && n <= 5 ? n : null;
+}
+
+// Les quatre criteres, avec le libelle qui convient a celui qui note.
+//
+// "Qualite" n'a pas le meme sens des deux cotes : l'employeur juge le
+// travail rendu, la personne juge si les conditions annoncees etaient
+// les vraies. Une seule colonne, deux libelles.
+function criteresAvis(jeSuisEmployeur) {
+  return [
+    { cle: "ponctualite", libelle: "Ponctualité" },
+    { cle: "qualite",
+      libelle: jeSuisEmployeur ? "Qualité du travail" : "Conditions conformes à la demande" },
+    { cle: "respect", libelle: "Respect" },
+    { cle: "communication", libelle: "Communication" },
+  ];
+}
+
+// ============================================================
 // LES JETONS
 // ============================================================
 // Un jeton est un DROIT D'USAGE vendu par la plateforme, pas de
@@ -2154,6 +2301,8 @@ app.locals.motifJetonsLisible = motifJetonsLisible;
 app.locals.actionsPossibles = actionsPossibles;
 app.locals.uneAction = uneAction;
 app.locals.valeurDuJeton = valeurDuJeton;
+app.locals.moyenneLisible = moyenneLisible;
+app.locals.criteresAvis = criteresAvis;
 app.locals.moments = MOMENTS;
 
 // ============================================================
@@ -2517,6 +2666,11 @@ app.get("/mon-profil", exigerConnexion, (req, res) => {
     utilisateur,
     mesAnnonces,
     mesCandidatures,
+
+    // Ce que les autres disent de moi. Signalable ici, et nulle part
+    // ailleurs : c est mon profil, ce sont mes avis.
+    reputation: reputationDe(req.utilisateur.id),
+    mesAvis: requetes.avisRecus.all(req.utilisateur.id),
   });
 });
 
@@ -3189,6 +3343,7 @@ app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, exigerVerification
   const limite = parametreNombre("candidatures_par_jour");
 
   res.render("repondre", {
+    reputationEmployeur: reputationDe(annonce.employeur_id),
     titre: "Répondre à cette demande",
     annonce,
     cout,
@@ -3552,6 +3707,9 @@ app.get("/messages/:id", exigerConnexion, (req, res) => {
   res.locals.aVoir = res.locals.messagesNonLus + res.locals.decisionsNonVues;
 
   res.render("conversation", {
+    monAvis: requetes.monAvisPour.get(conversation.id, req.utilisateur.id) || null,
+    avisRecu: requetes.avisDeLaCandidature.all(conversation.id)
+      .find(function (a) { return a.vise_id === req.utilisateur.id; }) || null,
     titre: "Discussion",
     conversation,
     messages: requetes.messagesDeConversation.all(conversation.id),
@@ -3641,6 +3799,9 @@ app.post("/messages/:id/signaler", exigerConnexion, lireFormulaire, (req, res) =
 // c'est ce qui permet de decouvrir la plateforme avant de s'inscrire.
 // Elle ne montre que des informations choisies une par une (voir la
 // requete fichePublique).
+// La fiche publique d'une personne porte desormais sa reputation. Elle
+// n'est pas un ornement : c'est la seule chose sur cette page qui vienne
+// d'ailleurs que de la personne elle-meme.
 app.get("/personnes/:id", (req, res) => {
   const personne = requetes.fichePublique.get(Number(req.params.id));
 
@@ -3660,7 +3821,17 @@ app.get("/personnes/:id", (req, res) => {
   const peutVoirAge = Boolean(moi && moi.role === "employeur" && !moi.est_admin &&
     requetes.embaucheEntre.get({ personne: personne.id, employeur: moi.id }));
 
-  res.render("fiche", { titre: personne.nom, personne, peutVoirAge });
+  res.render("fiche", {
+    titre: personne.nom,
+    personne,
+    peutVoirAge,
+
+    // LA SEULE CHOSE DE CETTE PAGE QUI NE VIENNE PAS D ELLE. Tout le
+    // reste - metier, tarif, disponibilites - est declare par la
+    // personne. Les avis viennent de ceux qui l ont employee.
+    reputation: reputationDe(Number(req.params.id)),
+    avis: requetes.avisRecus.all(Number(req.params.id)),
+  });
 });
 
 // --- Recherche de prestataires -------------------------------------
@@ -3986,6 +4157,183 @@ app.post("/probleme/:id", exigerConnexion, lireFormulaire, (req, res) => {
            "Votre discussion reste ouverte : rien n'a changé pour vous.",
     liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
   });
+});
+
+// --- Donner son avis : l'ecran ------------------------------------
+//
+// UN AVIS SUPPOSE UN SERVICE. Trois conditions, dans cet ordre :
+// la discussion existe, elle me concerne, et le service est TERMINE.
+// Sans la troisieme, on noterait une rencontre qui n'a pas eu lieu.
+function chargerServiceANoter(req, res) {
+  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+
+  if (!conversation) {
+    res.status(404).render("message", {
+      titre: "Service introuvable",
+      texte: "Ce service n'existe pas, ou il ne vous concerne pas.",
+      liens: [{ url: "/messages", texte: "Retour aux discussions" }],
+    });
+    return null;
+  }
+
+  if (!conversation.terminee_le) {
+    res.status(409).render("message", {
+      titre: "Le service n'est pas terminé",
+      texte: "On ne donne son avis qu'après un service effectué. " +
+             "Vous pourrez le faire dès qu'il aura été déclaré.",
+      liens: [{ url: "/messages/" + conversation.id, texte: "Ouvrir la discussion" }],
+    });
+    return null;
+  }
+
+  return conversation;
+}
+
+app.get("/avis/:id", exigerConnexion, interdireALEquipe, (req, res) => {
+  const conversation = chargerServiceANoter(req, res);
+  if (!conversation) return;
+
+  const jeSuisEmployeur = req.utilisateur.id === conversation.employeurId;
+  const deja = requetes.monAvisPour.get(conversation.id, req.utilisateur.id);
+
+  // UN SEUL AVIS PAR SERVICE. On ne revient pas dessus : un avis qu'on
+  // peut reecrire devient un moyen de pression apres coup.
+  if (deja) {
+    return res.status(409).render("message", {
+      titre: "Vous avez déjà donné votre avis",
+      texte: "Un seul avis par service. Il ne peut pas être modifié : " +
+             "un avis que l'on pourrait réécrire deviendrait un moyen de pression.",
+      liens: [{ url: "/messages/" + conversation.id, texte: "Ouvrir la discussion" }],
+    });
+  }
+
+  res.render("avis", {
+    titre: "Donner mon avis",
+    conversation,
+    jeSuisEmployeur,
+    nomVise: jeSuisEmployeur ? conversation.nomPrestataire : conversation.nomEmployeur,
+  });
+});
+
+// --- Donner son avis : l'enregistrement ---------------------------
+app.post("/avis/:id", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
+  const conversation = chargerServiceANoter(req, res);
+  if (!conversation) return;
+
+  const jeSuisEmployeur = req.utilisateur.id === conversation.employeurId;
+  const vise = jeSuisEmployeur ? conversation.prestataireId : conversation.employeurId;
+
+  const note = Math.round(Number(req.body.note));
+
+  if (!Number.isFinite(note) || note < 1 || note > 5) {
+    return res.status(400).render("message", {
+      titre: "Note manquante",
+      texte: "Choisissez une note de 1 à 5 étoiles. C'est la seule chose obligatoire.",
+      liens: [{ url: "/avis/" + conversation.id, texte: "Retour au formulaire" }],
+    });
+  }
+
+  const commentaire = String(req.body.commentaire || "").trim().slice(0, 1000) || null;
+
+  try {
+    requetes.creerAvis.run({
+      candidature: conversation.id,
+      auteur: req.utilisateur.id,
+      vise,
+      note,
+      commentaire,
+      ponctualite: noteFacultative(req.body.ponctualite),
+      qualite: noteFacultative(req.body.qualite),
+      respect: noteFacultative(req.body.respect),
+      communication: noteFacultative(req.body.communication),
+    });
+  } catch (erreur) {
+    // La contrainte UNIQUE reste le dernier rempart : deux envois
+    // simultanes passeraient tous deux le controle de l'ecran.
+    if (String(erreur.message).includes("UNIQUE")) {
+      return res.status(409).render("message", {
+        titre: "Vous avez déjà donné votre avis",
+        texte: "Un seul avis par service.",
+        liens: [{ url: "/messages/" + conversation.id, texte: "Ouvrir la discussion" }],
+      });
+    }
+    throw erreur;
+  }
+
+  res.render("message", {
+    titre: "Merci pour votre avis",
+    texte: "Il est visible par tout le monde, et il ne peut plus être modifié. " +
+           "La personne concernée peut le signaler à l'équipe si elle le juge faux.",
+    liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
+  });
+});
+
+// --- Signaler un avis a l'equipe ----------------------------------
+//
+// SEULE LA PERSONNE VISEE. C'est elle que l'avis designe, et c'est elle
+// qui sait s'il est faux. Personne ne signale l'avis d'un autre.
+app.post("/avis/:id/signaler", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
+  const avis = requetes.avisParId.get(Number(req.params.id));
+
+  if (!avis || avis.vise_id !== req.utilisateur.id) {
+    return res.status(404).render("message", {
+      titre: "Avis introuvable",
+      texte: "Cet avis n'existe pas, ou il ne vous concerne pas.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  }
+
+  requetes.signalerAvis.run({ id: avis.id, vise: req.utilisateur.id });
+
+  res.render("message", {
+    titre: "Signalement envoyé",
+    texte: "L'équipe PamConnect va lire cet avis. En attendant, il reste visible : " +
+           "un avis n'est masqué qu'après examen.",
+    liens: [{ url: "/messages/" + avis.candidature_id, texte: "Retour à la discussion" }],
+  });
+});
+
+// --- Espace equipe : les avis signales -----------------------------
+app.get("/admin/avis", exigerAdmin, (req, res) => {
+  res.render("admin-avis", {
+    titre: "Avis signalés",
+    avis: requetes.avisSignales.all(),
+  });
+});
+
+app.post("/admin/avis/:id", exigerAdmin, lireFormulaire, (req, res) => {
+  const avis = requetes.avisParId.get(Number(req.params.id));
+
+  if (!avis) {
+    return res.status(404).render("message", {
+      titre: "Avis introuvable",
+      texte: "Cet avis n'existe pas.",
+      liens: [{ url: "/admin/avis", texte: "Retour aux avis signalés" }],
+    });
+  }
+
+  const masquer = req.body.decision === "masquer";
+  const motif = String(req.body.motif || "").trim();
+
+  // MASQUER EFFACE LA PAROLE DE QUELQU'UN. Cela ne se fait pas sans
+  // ecrire pourquoi : la decision doit pouvoir s'expliquer des mois
+  // plus tard.
+  if (masquer && motif.length < 5) {
+    return res.status(400).render("message", {
+      titre: "Motif obligatoire",
+      texte: "Pour masquer un avis, écrivez le motif. Masquer efface la parole " +
+             "de quelqu'un : la décision doit pouvoir être expliquée.",
+      liens: [{ url: "/admin/avis", texte: "Retour aux avis signalés" }],
+    });
+  }
+
+  if (masquer) {
+    requetes.masquerAvis.run({ id: avis.id, par: req.utilisateur.id, motif });
+  } else {
+    requetes.classerAvisSansSuite.run({ id: avis.id });
+  }
+
+  res.redirect("/admin/avis");
 });
 
 // --- Espace equipe : les problemes signales ------------------------
@@ -4537,6 +4885,7 @@ app.get("/admin", exigerAdmin, (req, res) => {
     problemesOuverts: requetes.nombreProblemesOuverts.get().n,
     versementsBloques: requetes.nombreVersementsBloques.get().n,
     achatsJetons: requetes.nombreAchatsJetonsEnAttente.get().n,
+    avisSignales: requetes.nombreAvisSignales.get().n,
   });
 });
 

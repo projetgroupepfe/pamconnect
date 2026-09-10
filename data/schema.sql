@@ -698,3 +698,68 @@ CREATE TABLE IF NOT EXISTS jetons_mouvements (
 );
 
 CREATE INDEX IF NOT EXISTS idx_jetons_mouv_personne ON jetons_mouvements (utilisateur_id);
+
+
+-- ------------------------------------------------------------------
+-- Table avis : ce que chacun dit de l'autre, apres le service
+-- ------------------------------------------------------------------
+-- DANS LES DEUX SENS, et c'est le point. L'employeur note la personne
+-- qui a travaille ; elle note l'employeur. Une plateforme qui ne fait
+-- noter que d'un cote met toute la pression sur celui qui a le moins de
+-- pouvoir - et elle ne dit rien du logement ou l'on envoie quelqu'un.
+--
+-- UN AVIS SUPPOSE UN SERVICE. La candidature doit porter une date de
+-- fin : personne ne note une rencontre qui n'a pas eu lieu.
+--
+-- UNIQUE (candidature_id, auteur_id) : un seul avis par service et par
+-- personne. On ne revient pas dessus - un avis qu'on peut reecrire
+-- devient un moyen de pression apres coup.
+CREATE TABLE IF NOT EXISTS avis (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+
+  -- LE SERVICE CONCERNE. Chaque avis y reste rattache : sans lui, on ne
+  -- pourrait pas verifier qu'il repose sur quelque chose.
+  candidature_id INTEGER NOT NULL REFERENCES candidatures(id) ON DELETE CASCADE,
+
+  auteur_id      INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+  vise_id        INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+
+  -- La note d'ensemble, seule obligatoire.
+  note           INTEGER NOT NULL CHECK (note BETWEEN 1 AND 5),
+
+  commentaire    TEXT,
+
+  -- Les quatre notes de detail sont FACULTATIVES : imposer cinq etoiles
+  -- a remplir ferait abandonner le formulaire, et une note posee au
+  -- hasard vaut moins que pas de note.
+  --
+  -- "qualite" n'a pas le meme sens des deux cotes : la qualite du
+  -- travail chez l'employeur qui note, le respect des conditions
+  -- annoncees chez la personne qui note. Une colonne, deux libelles -
+  -- deux colonnes auraient laisse l'une vide sur deux avis.
+  ponctualite    INTEGER CHECK (ponctualite BETWEEN 1 AND 5),
+  qualite        INTEGER CHECK (qualite BETWEEN 1 AND 5),
+  respect        INTEGER CHECK (respect BETWEEN 1 AND 5),
+  communication  INTEGER CHECK (communication BETWEEN 1 AND 5),
+
+  cree_le        TEXT NOT NULL DEFAULT (datetime('now')),
+
+  -- --- Moderation ---
+  -- Signale par la personne visee : c'est elle que l'avis designe, et
+  -- c'est elle qui sait s'il est faux ou insultant.
+  signale        INTEGER NOT NULL DEFAULT 0 CHECK (signale IN (0, 1)),
+
+  -- MASQUE, PAS SUPPRIME. Un avis efface ne laisserait aucune trace de
+  -- ce qui a ete decide ni pourquoi. Masque, il disparait des ecrans et
+  -- ne compte plus dans la moyenne, mais l'equipe peut encore expliquer
+  -- sa decision des mois plus tard.
+  masque         INTEGER NOT NULL DEFAULT 0 CHECK (masque IN (0, 1)),
+  masque_par     INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL,
+  masque_le      TEXT,
+  motif_masquage TEXT,
+
+  UNIQUE (candidature_id, auteur_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_avis_vise    ON avis (vise_id);
+CREATE INDEX IF NOT EXISTS idx_avis_signale ON avis (signale);
