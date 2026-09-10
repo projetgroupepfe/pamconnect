@@ -189,6 +189,26 @@
             titre: "Les avis reçus",
             signalable: true,
             vide: "Personne ne vous a encore noté. Cela viendra après votre premier service terminé." }) %>
+
+      <%# CETTE PAGE NE SERT QU'A LIRE. Quelqu'un qui y voit un avis et
+          cherche comment repondre ne trouvait rien : l'ecran ne disait
+          pas que l'autre chemin existe. %>
+      <% if (servicesANoter > 0) { %>
+        <div class="carte">
+          <p>
+            <strong><%= servicesANoter %> service<%= servicesANoter > 1 ? "s" : "" %>
+            attend<%= servicesANoter > 1 ? "ent" : "" %> votre avis.</strong>
+            Cette page montre ce que les autres ont dit de vous ; c'est dans
+            vos messages que vous dites ce que vous pensez d'eux.
+          </p>
+          <div class="actions">
+            <a class="bouton" href="/messages">
+              <%- include("partiels/icone", { nom: "avis" }) %>
+              Donner mes avis
+            </a>
+          </div>
+        </div>
+      <% } %>
     <% } %>
 
     <% if (utilisateur.role === "prestataire" && utilisateur.statut_verification === "refuse" && utilisateur.motif_refus) { %>

@@ -125,6 +125,13 @@ setTimeout(async () => {
   dire("et le mot archivees ne s affiche plus seul",
        liste.includes("attend votre avis"));
 
+  console.log(SAUT + "--- LE PROFIL MONTRE L AUTRE CHEMIN ---");
+  // Mon profil montre ce que les autres ont dit DE MOI. Quelqu un qui y
+  // cherche comment repondre ne trouvait rien.
+  const monProfil = await (await lire("/mon-profil", emp.cookie)).text();
+  dire("le profil dit qu un service attend", monProfil.includes("attend votre avis"));
+  dire("et qu il faut passer par les messages", monProfil.includes("Donner mes avis"));
+
   console.log(SAUT + "--- SEULS LES DEUX CONCERNES ---");
   const autre = await creerCompte("autre", "employeur");
   dire("un tiers recoit 404", (await lire("/avis/" + cand.id, autre.cookie)).status === 404);

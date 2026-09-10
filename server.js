@@ -1138,6 +1138,19 @@ const requetes = {
     ORDER BY a.id DESC
   `),
 
+  // COMBIEN DE SERVICES ATTENDENT MON AVIS. Sert a dire, depuis le
+  // profil, que l'autre chemin existe : ici on lit ce qu'on a dit de
+  // moi, on n'y ecrit pas ce que je pense des autres.
+  servicesANoter: db.prepare(`
+    SELECT COUNT(*) AS n
+    FROM candidatures c
+    JOIN annonces a ON a.id = c.annonce_id
+    WHERE c.terminee_le IS NOT NULL
+      AND (a.employeur_id = @moi OR c.prestataire_id = @moi)
+      AND NOT EXISTS (SELECT 1 FROM avis v
+                       WHERE v.candidature_id = c.id AND v.auteur_id = @moi)
+  `),
+
   // La moyenne et le nombre d'avis, masques exclus.
   //
   // Calculee, jamais rangee a cote du compte : une moyenne stockee finit
@@ -2679,6 +2692,7 @@ app.get("/mon-profil", exigerConnexion, (req, res) => {
     // ailleurs : c est mon profil, ce sont mes avis.
     reputation: reputationDe(req.utilisateur.id),
     mesAvis: requetes.avisRecus.all(req.utilisateur.id),
+    servicesANoter: requetes.servicesANoter.get({ moi: req.utilisateur.id }).n,
   });
 });
 
