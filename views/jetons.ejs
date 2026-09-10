@@ -160,16 +160,20 @@
             <% if (coutAction) { %>
               <% const apres = solde.total + pack.quantite; %>
               <% const combien = Math.floor(apres / coutAction); %>
+              <%# LE TOTAL, ET PAS SEULEMENT CE QUE LE PACK APPORTE. Sans
+                  lui, "de quoi mettre 2 demandes en avant" sous un pack
+                  de 20 jetons se lit comme si le pack en valait deux -
+                  et le prix semble divise par deux. %>
               <% if (combien > 0) { %>
                 <p class="aide">
-                  Après cet achat, de quoi
-                  <strong><%= actionsPossibles(jeSuisEmployeur, combien) %></strong>.
+                  Après cet achat : <strong><%= apres %> jetons</strong>,
+                  de quoi <%= actionsPossibles(jeSuisEmployeur, combien) %>.
                 </p>
               <% } else { %>
                 <% const manque = coutAction - apres; %>
                 <p class="aide">
-                  Après cet achat, il vous manquera encore
-                  <strong><%= manque %> <%= manque > 1 ? "jetons" : "jeton" %></strong>
+                  Après cet achat : <strong><%= apres %> jetons</strong>. Il vous en
+                  manquera encore <strong><%= manque %></strong>
                   pour <%= uneAction(jeSuisEmployeur) %>.
                 </p>
               <% } %>

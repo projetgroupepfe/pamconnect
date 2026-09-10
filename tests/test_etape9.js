@@ -113,13 +113,13 @@ setTimeout(async () => {
 
   const profil1 = await requete("/mon-profil", { cookie: cookieEmp });
   v("GET /mon-profil affiche le profil", profil1.code === 200 && profil1.corps.includes("Employeur Test"), "code " + profil1.code);
-  v("section 'Mes annonces' presente (etape 7)", profil1.corps.includes("Mes annonces"));
+  v("section 'Mes demandes' presente (etape 7)", profil1.corps.includes("Mes demandes"));
 
   const profilAnon = await requete("/mon-profil");
   v("sans cookie, /mon-profil redirige", profilAnon.code === 302, "code " + profilAnon.code);
 
   const pub = await requete("/publier-annonce", { cookie: cookieEmp });
-  v("GET /publier-annonce affiche le formulaire", pub.code === 200 && pub.corps.includes("Publier une annonce"));
+  v("GET /publier-annonce affiche le formulaire", pub.code === 200 && pub.corps.includes("Publier une demande"));
 
   const titreAnnonce = MARQUE + " <b>gras</b>";
   const post = await requete("/annonces", { method: "POST", cookie: cookieEmp,
@@ -137,7 +137,7 @@ setTimeout(async () => {
 
   console.log("\n--- PARTIE 4 : GET /annonces migre vers Express ---");
   const liste = await requete("/annonces");
-  v("GET /annonces affiche la liste", liste.code === 200 && liste.corps.includes("Annonces disponibles"), "code " + liste.code);
+  v("GET /annonces affiche la liste", liste.code === 200 && liste.corps.includes("Demandes disponibles"), "code " + liste.code);
   v("la nouvelle annonce apparait", liste.corps.includes(MARQUE));
   v("le titre est echappe (&lt;b&gt;)", liste.corps.includes("&lt;b&gt;gras&lt;/b&gt;"));
   v("visiteur non connecte : invite a se connecter", liste.corps.includes("Connectez-vous"));

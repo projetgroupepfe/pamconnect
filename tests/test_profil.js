@@ -69,7 +69,7 @@ setTimeout(async () => {
     pe.corps.includes("Employeur") && // Le compte a ete cree avec le quartier "Manguier" : le serveur en
       // deduit Yaounde 1, meme si le formulaire annoncait Yaounde 4.
       pe.corps.includes("Yaoundé 1") && pe.corps.includes("Manguier"));
-  v("section 'Mes annonces' presente", pe.corps.includes("Mes annonces"));
+  v("section 'Mes demandes' presente", pe.corps.includes("Mes demandes"));
   v("lien 'Mon profil' dans le menu", pe.corps.includes('href="/mon-profil"'));
 
   console.log("\n--- PROFIL PRESTATAIRE ---");

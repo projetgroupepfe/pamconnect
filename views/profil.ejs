@@ -215,7 +215,7 @@
       mais il n'a pas le droit de publier : lui montrer "Mes annonces"
       serait lui proposer une action que le serveur refuse. %>
   <% if (jePeux.publier) { %>
-    <h2>Mes annonces</h2>
+    <h2>Mes demandes</h2>
 
     <%# L'action principale reste accessible en permanence, et non cachee
         dans un menu. Mais une seule fois : quand la liste est vide, c'est
@@ -224,18 +224,18 @@
       <div class="actions">
         <a class="bouton" href="/publier-annonce">
           <%- include("partiels/icone", { nom: "ajouter" }) %>
-          Publier une annonce
+          Publier une demande
         </a>
       </div>
     <% } %>
 
     <% if (mesAnnonces.length === 0) { %>
       <div class="vide">
-        <p>Vous n'avez publié aucune annonce.</p>
+        <p>Vous n'avez publié aucune demande.</p>
         <div class="actions">
           <a class="bouton" href="/publier-annonce">
             <%- include("partiels/icone", { nom: "ajouter" }) %>
-            Publier une annonce
+            Publier une demande
           </a>
         </div>
       </div>
@@ -279,7 +279,7 @@
           <% if (annonce.annulee) { %>
             <p class="aide">
               <strong><%= pourvue ? "Vous avez choisi quelqu'un." : "Vous avez retiré cette demande." %></strong>
-              Elle n'apparaît plus dans les annonces et n'accepte plus de réponse.
+              Elle n'apparaît plus dans la liste et n'accepte plus de réponse.
               Vos discussions restent accessibles.
             </p>
           <% } else { %>
@@ -322,7 +322,7 @@
                 couleur, meme icone. On dit donc ce que chacune fait. %>
             <p class="aide">
               <strong>Retirer ferme votre demande</strong> : elle disparaît
-              des annonces, personne ne peut plus y répondre, et la somme
+              de la liste, personne ne peut plus y répondre, et la somme
               bloquée vous est rendue.
               Pour écarter une seule personne sans fermer votre demande,
               utilisez <strong>Refuser cette candidature</strong> plus bas :
@@ -456,11 +456,11 @@
 
     <% if (mesCandidatures.length === 0) { %>
       <div class="vide">
-        <p>Vous n'avez répondu à aucune annonce.</p>
+        <p>Vous n'avez répondu à aucune demande.</p>
         <div class="actions">
           <a class="bouton" href="/annonces">
             <%- include("partiels/icone", { nom: "document" }) %>
-            Voir les annonces
+            Voir les demandes
           </a>
         </div>
       </div>

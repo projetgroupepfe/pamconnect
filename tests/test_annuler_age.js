@@ -168,7 +168,7 @@ setTimeout(async () => {
 
   // Ce qui va se passer est annonce AVANT le clic.
   const ecran = await (await lire("/candidatures/" + toutes[0].id + "/confirmer", emp2.cookie)).text();
-  dire("l'ecran annonce que la demande sera retiree", ecran.includes("retirée des annonces"));
+  dire("l'ecran annonce que la demande sera retiree", ecran.includes("retirée de la liste"));
   dire("et combien de personnes recevront un refus", ecran.includes("<strong>2</strong>"));
 
   await poster("/candidatures/statut",

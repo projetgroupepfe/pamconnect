@@ -1532,14 +1532,14 @@ function apresConnexion(utilisateur) {
 
   if (utilisateur.role === "employeur") {
     return {
-      texte: "Retrouvez vos annonces et les réponses que vous avez reçues.",
+      texte: "Retrouvez vos demandes et les réponses que vous avez reçues.",
       lien: { url: "/mon-profil", texte: "Voir mon profil" },
     };
   }
 
   return {
-    texte: "Retrouvez les annonces qui correspondent à ce que vous faites.",
-    lien: { url: "/annonces", texte: "Voir les annonces" },
+    texte: "Retrouvez les demandes qui correspondent à ce que vous faites.",
+    lien: { url: "/annonces", texte: "Voir les demandes" },
   };
 }
 
@@ -2288,7 +2288,7 @@ function interdireALEquipe(req, res, next) {
     return res.status(403).render("message", {
       titre: "Reserve aux employeurs",
       texte: "Un compte de l'equipe PamConnect verifie les identites. " +
-             "Il ne publie pas d'annonce et n'embauche personne.",
+             "Il ne publie pas de demande et n'embauche personne.",
       liens: [{ url: "/admin", texte: "Aller a l'espace equipe" }],
     });
   }
@@ -2753,12 +2753,12 @@ app.get("/publier-annonce", exigerConnexion, interdireALEquipe, exigerVerificati
   if (req.utilisateur.role !== "employeur") {
     return res.status(403).render("message", {
       titre: "Acces refuse",
-      texte: "Seuls les employeurs peuvent publier une annonce.",
+      texte: "Seuls les employeurs peuvent publier une demande.",
       liens: [{ url: "/", texte: "Retour a l'accueil" }],
     });
   }
 
-  res.render("publier-annonce", { titre: "Publier une annonce" });
+  res.render("publier-annonce", { titre: "Publier une demande" });
 });
 
 // --- Enregistrer une annonce ---------------------------------------
@@ -2819,7 +2819,7 @@ app.get("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, (req, res)
     return res.status(404).render("message", {
       titre: "Demande introuvable",
       texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -2837,7 +2837,7 @@ app.post("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, lireFormu
     return res.status(404).render("message", {
       titre: "Demande introuvable",
       texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -2861,8 +2861,8 @@ app.post("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, lireFormu
 
   res.render("message", {
     titre: "Demande mise à jour",
-    texte: "Les personnes qui consultent vos annonces voient la nouvelle version.",
-    liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+    texte: "Les personnes qui consultent vos demandes voient la nouvelle version.",
+    liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
   });
 });
 
@@ -3047,7 +3047,7 @@ app.post("/annonces/:id/annuler", exigerConnexion, interdireALEquipe, lireFormul
     return res.status(404).render("message", {
       titre: "Demande introuvable",
       texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3063,7 +3063,7 @@ app.post("/annonces/:id/annuler", exigerConnexion, interdireALEquipe, lireFormul
       texte: "Cette demande ne peut plus être retirée : vous avez retenu une " +
              "personne pour ce service. Si le service n'a pas eu lieu, signalez " +
              "le problème à l'équipe plutôt que de retirer la demande.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3074,10 +3074,10 @@ app.post("/annonces/:id/annuler", exigerConnexion, interdireALEquipe, lireFormul
 
   res.render("message", {
     titre: "Demande retirée",
-    texte: "Votre demande n'apparaît plus dans les annonces et personne ne peut " +
+    texte: "Votre demande n'apparaît plus dans la liste et personne ne peut " +
            "plus y répondre. Les personnes qui vous avaient déjà répondu gardent " +
            "accès à votre discussion.",
-    liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+    liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
   });
 });
 
@@ -3159,7 +3159,7 @@ app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, exigerVerification
     return res.status(403).render("message", {
       titre: "Acces refuse",
       texte: "Seules les personnes qui proposent leurs services peuvent répondre.",
-      liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
+      liens: [{ url: "/annonces", texte: "Retour aux demandes" }],
     });
   }
 
@@ -3167,9 +3167,9 @@ app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, exigerVerification
 
   if (!annonce) {
     return res.status(404).render("message", {
-      titre: "Annonce introuvable",
-      texte: "Cette annonce n'existe plus.",
-      liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
+      titre: "Demande introuvable",
+      texte: "Cette demande n'existe plus.",
+      liens: [{ url: "/annonces", texte: "Retour aux demandes" }],
     });
   }
 
@@ -3203,7 +3203,7 @@ app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (
     return res.status(403).render("message", {
       titre: "Acces refuse",
       texte: "Seules les personnes qui proposent leurs services peuvent répondre à une demande.",
-      liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
+      liens: [{ url: "/annonces", texte: "Retour aux demandes" }],
     });
   }
 
@@ -3211,9 +3211,9 @@ app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (
 
   if (!annonce) {
     return res.status(404).render("message", {
-      titre: "Annonce introuvable",
-      texte: "Cette annonce n'existe plus.",
-      liens: [{ url: "/annonces", texte: "Retour aux annonces" }],
+      titre: "Demande introuvable",
+      texte: "Cette demande n'existe plus.",
+      liens: [{ url: "/annonces", texte: "Retour aux demandes" }],
     });
   }
 
@@ -3399,7 +3399,7 @@ app.get("/candidatures/:id/confirmer", exigerConnexion, (req, res) => {
     return res.status(404).render("message", {
       titre: "Candidature introuvable",
       texte: "Cette candidature n'existe pas, ou elle ne concerne aucune de vos demandes.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3407,7 +3407,7 @@ app.get("/candidatures/:id/confirmer", exigerConnexion, (req, res) => {
     return res.status(409).render("message", {
       titre: "Décision déjà prise",
       texte: "Cette candidature a déjà reçu une réponse.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3418,7 +3418,7 @@ app.get("/candidatures/:id/confirmer", exigerConnexion, (req, res) => {
       titre: "Vérification requise",
       texte: "L'identité de cette personne n'a pas encore été vérifiée par PamConnect. " +
              "Vous pourrez la choisir dès que son dossier sera validé.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes annonces" }],
+      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3441,7 +3441,7 @@ app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => 
     return res.status(400).render("message", {
       titre: "Decision inconnue",
       texte: "Une candidature ne peut qu'etre acceptee ou refusee.",
-      liens: [{ url: "/mon-profil", texte: "Retour a mes annonces" }],
+      liens: [{ url: "/mon-profil", texte: "Retour a mes demandes" }],
     });
   }
 
@@ -3453,8 +3453,8 @@ app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => 
   if (!candidature) {
     return res.status(404).render("message", {
       titre: "Candidature introuvable",
-      texte: "Cette candidature n'existe pas, ou elle ne concerne aucune de tes annonces.",
-      liens: [{ url: "/mon-profil", texte: "Retour a mes annonces" }],
+      texte: "Cette candidature n'existe pas, ou elle ne concerne aucune de vos demandes.",
+      liens: [{ url: "/mon-profil", texte: "Retour a mes demandes" }],
     });
   }
 
@@ -3466,7 +3466,7 @@ app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => 
       titre: "Verification requise",
       texte: "L'identité de cette personne n'a pas encore été vérifiée par PamConnect. " +
              "Vous pourrez la choisir dès que son dossier sera validé.",
-      liens: [{ url: "/mon-profil", texte: "Retour a mes annonces" }],
+      liens: [{ url: "/mon-profil", texte: "Retour a mes demandes" }],
     });
   }
 

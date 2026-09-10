@@ -207,12 +207,16 @@ setTimeout(async () => {
   // Elle a 3 jetons, une reponse en coute 1.
   dire("le pack de 5 lui permettra huit demandes",
        pagePres.includes("répondre à 8 demandes"));
+  dire("avec son total apres achat", pagePres.includes("8 jetons</strong>"));
   dire("le pack de 10 lui en permettra treize",
        pagePres.includes("répondre à 13 demandes"));
 
   // Lui a 10 jetons, une mise en avant en coute 20.
-  dire("le pack de 5 ne lui suffit pas", pageEmp.includes("il vous manquera encore"));
-  dire("et il lit combien il lui manquerait", pageEmp.includes("5 jetons</strong>"));
+  dire("le pack de 5 ne lui suffit pas", pageEmp.includes("manquera encore"));
+  // LE TOTAL EST ECRIT : sinon "de quoi mettre 2 demandes en avant" sous
+  // un pack de 20 jetons se lirait comme si le pack seul les donnait, et
+  // le prix semblerait divise par deux.
+  dire("avec son total apres achat", pageEmp.includes("15 jetons</strong>"));
   dire("le pack de 10 lui permettra une mise en avant",
        pageEmp.includes("mettre 1 demande en avant"));
   dire("le pack de 60 lui en permettra trois",

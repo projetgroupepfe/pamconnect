@@ -137,8 +137,8 @@ setTimeout(async () => {
 
   // 1. Le bouton a disparu de la page.
   const profilEquipe = await (await lire("/mon-profil", cookieAdmin)).text();
-  dire("pas de bloc 'Mes annonces' sur un compte d'equipe",
-       !profilEquipe.includes("Mes annonces"));
+  dire("pas de bloc 'Mes demandes' sur un compte d'equipe",
+       !profilEquipe.includes("Mes demandes"));
   dire("pas de bouton vers /publier-annonce",
        !profilEquipe.includes("/publier-annonce"));
   dire("un lien vers l'espace equipe le remplace",
@@ -164,7 +164,7 @@ setTimeout(async () => {
   dire("un employeur ordinaire atteint le formulaire",
        (await lire("/publier-annonce", cookieVrai)).status === 200);
   const profilVrai = await (await lire("/mon-profil", cookieVrai)).text();
-  dire("et il voit toujours 'Mes annonces'", profilVrai.includes("Mes annonces"));
+  dire("et il voit toujours 'Mes demandes'", profilVrai.includes("Mes demandes"));
 
   console.log("\n--- LES MOTS DE LA BASE NE SORTENT PAS A L'ECRAN ---");
 
