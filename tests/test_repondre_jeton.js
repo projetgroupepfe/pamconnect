@@ -47,6 +47,7 @@ const formReglages = (o) => {
   p.append("cout_candidature", String(o.cout === undefined ? 1 : o.cout));
   p.append("cout_mise_en_avant", "20");
   p.append("candidatures_par_jour", String(o.parJour === undefined ? 3 : o.parJour));
+  p.append("duree_mise_en_avant_jours", "7");
   return p;
 };
 

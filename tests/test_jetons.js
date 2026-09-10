@@ -50,6 +50,7 @@ const formPrix = (valeur, quantites) => {
   p.append("cout_candidature", "1");
   p.append("cout_mise_en_avant", "20");
   p.append("candidatures_par_jour", "3");
+  p.append("duree_mise_en_avant_jours", "7");
   return p;
 };
 const lire = (chemin, cookie) =>

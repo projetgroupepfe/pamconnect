@@ -283,11 +283,28 @@
               Vos discussions restent accessibles.
             </p>
           <% } else { %>
+            <%# L'ETAT AVANT L'ACTION : une demande deja en avant n'a pas
+                besoin d'un bouton, elle a besoin d'une date. %>
+            <% if (annonce.enAvant) { %>
+              <p>
+                <span class="badge badge-info">Mise en avant</span>
+                <span class="aide">
+                  jusqu'au <%= dateLisible(annonce.mise_en_avant_jusqu_au) %>
+                </span>
+              </p>
+            <% } %>
+
             <div class="actions">
               <a class="bouton bouton-secondaire" href="/annonces/<%= annonce.id %>/modifier">
                 <%- include("partiels/icone", { nom: "profil" }) %>
                 Modifier cette demande
               </a>
+              <% if (!annonce.enAvant) { %>
+                <a class="bouton bouton-secondaire" href="/annonces/<%= annonce.id %>/mettre-en-avant">
+                  <%- include("partiels/icone", { nom: "jeton" }) %>
+                  Mettre en avant
+                </a>
+              <% } %>
               <%# Retirer n'efface rien : la demande sort de la liste
                   publique, les discussions restent. %>
               <form action="/annonces/<%= annonce.id %>/annuler" method="POST">

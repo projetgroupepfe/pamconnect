@@ -1,0 +1,138 @@
+<%- include("partiels/tete") %>
+
+  <div class="colonne">
+
+    <h1>Mettre cette demande en avant</h1>
+    <p class="chapeau">Vérifiez ce que cela change avant de confirmer.</p>
+
+    <div class="carte">
+      <h3><%= annonce.titre %></h3>
+      <ul class="infos">
+        <li>
+          <%- include("partiels/icone", { nom: "experience" }) %>
+          <span><strong><%= annonce.metier %></strong></span>
+        </li>
+        <li>
+          <%- include("partiels/icone", { nom: "lieu" }) %>
+          <span>
+            <% if (annonce.quartier) { %><strong><%= annonce.quartier %></strong>, <% } %><%= annonce.arrondissement %>
+          </span>
+        </li>
+      </ul>
+    </div>
+
+    <% if (finActuelle) { %>
+
+      <%# DEJA EN AVANT. On ne propose pas de prolonger : quelqu'un qui
+          clique deux fois paierait deux fois sans s'en apercevoir. %>
+      <div class="carte confiance">
+        <p><span class="badge badge-verifie">Mise en avant</span></p>
+        <p>
+          Cette demande est déjà en avant jusqu'au <strong><%= finActuelle %></strong>.
+        </p>
+        <p class="aide">
+          Vous pourrez la remettre en avant après cette date. D'ici là, rien
+          ne vous sera prélevé.
+        </p>
+      </div>
+
+      <p class="actions">
+        <a class="bouton bouton-secondaire" href="/mon-profil">
+          <%- include("partiels/icone", { nom: "profil" }) %>
+          Retour à mon profil
+        </a>
+      </p>
+
+    <% } else if (!cout || !jours) { %>
+
+      <%# Aucun prix invente : si le reglage manque, on le dit. %>
+      <div class="vide">
+        <p>Cette option n'est pas disponible pour le moment.</p>
+        <p class="aide">Le prix n'a pas encore été réglé par l'équipe.</p>
+      </div>
+
+    <% } else { %>
+
+      <h2>Ce que cela change</h2>
+      <div class="carte">
+        <ul class="infos">
+          <li>
+            <%- include("partiels/icone", { nom: "suivant" }) %>
+            <span>
+              Votre demande passe <strong>devant les autres demandes de
+              <%= annonce.metier %></strong> dans la liste.
+            </span>
+          </li>
+          <li>
+            <%- include("partiels/icone", { nom: "info" }) %>
+            <span>Elle porte le badge <strong>Mise en avant</strong>, visible de tous.</span>
+          </li>
+          <li>
+            <%- include("partiels/icone", { nom: "calendrier" }) %>
+            <span>
+              Pendant <strong><%= jours %> jours</strong>. Ensuite elle reprend sa
+              place, sans que vous ayez rien à faire.
+            </span>
+          </li>
+        </ul>
+
+        <%# CE QUE LA MISE EN AVANT NE FAIT PAS. Le dire ici evite une
+            deception, et c'est la meme regle que du cote des personnes
+            qui proposent leurs services : personne ne paie pour
+            apparaitre devant ce que quelqu'un cherche vraiment. %>
+        <p class="aide">
+          Elle ne passe pas devant les demandes d'un <strong>autre métier</strong> :
+          une personne voit d'abord celles qui correspondent au sien. On ne paie
+          pas pour être vu par quelqu'un qui cherche autre chose.
+        </p>
+      </div>
+
+      <h2>Ce que cela coûte</h2>
+      <div class="carte">
+        <div class="detail-tarif">
+          <div class="ligne-tarif">
+            <span>Mise en avant, <%= jours %> jours</span>
+            <span class="retenue">− <%= jetonsEnClair(cout) %></span>
+          </div>
+          <div class="ligne-tarif total">
+            <span>Il vous restera</span>
+            <strong><%= jetonsEnClair(Math.max(0, solde - cout)) %></strong>
+          </div>
+        </div>
+
+        <% if (solde < cout) { %>
+          <p class="aide">
+            <strong>Votre solde ne suffit pas.</strong> Il vous reste
+            <%= jetonsEnClair(solde) %>.
+          </p>
+          <p class="actions">
+            <a class="bouton bouton-secondaire" href="/mes-jetons">
+              <%- include("partiels/icone", { nom: "jeton" }) %>
+              Voir mes jetons
+            </a>
+          </p>
+        <% } else { %>
+          <%# DIT AVANT, PAS APRES. Retirer sa demande est un droit ; le
+              decouvrir apres avoir paye serait une mauvaise surprise. %>
+          <p class="aide">
+            Si vous retirez votre demande ou si vous choisissez quelqu'un avant
+            la fin des <%= jours %> jours, <strong>les jetons ne sont pas rendus</strong>.
+          </p>
+        <% } %>
+      </div>
+
+      <div class="actions">
+        <form action="/annonces/<%= annonce.id %>/mettre-en-avant" method="POST">
+          <button type="submit"<%= solde < cout ? " disabled" : "" %>>
+            <%- include("partiels/icone", { nom: "valider" }) %>
+            Confirmer la mise en avant
+          </button>
+        </form>
+        <a class="bouton bouton-secondaire" href="/mon-profil">Annuler</a>
+      </div>
+
+    <% } %>
+
+  </div>
+
+<%- include("partiels/pied") %>

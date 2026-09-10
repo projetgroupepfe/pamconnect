@@ -137,6 +137,7 @@ ajouterColonneSiAbsente("utilisateurs", "message_equipe_lu", "INTEGER NOT NULL D
 ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
 ajouterColonneSiAbsente("annonces", "annulee", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
+ajouterColonneSiAbsente("annonces", "mise_en_avant_jusqu_au", "TEXT");
 
 // CHANGEMENT DE MODELE : le montant d'une annonce n'est plus une
 // indication mais LE PRIX que l'employeur paiera. Le nom de la colonne
@@ -354,11 +355,17 @@ const requetes = {
   toutesLesAnnonces: db.prepare(`
     SELECT a.*,
            e.nom                 AS nomEmployeur,
-           e.statut_verification AS verificationEmployeur
+           e.statut_verification AS verificationEmployeur,
+
+           -- Mise en avant EN COURS : la date de fin n'est pas passee.
+           -- Calculee ici, jamais rangee : un drapeau range demanderait
+           -- que quelqu'un pense a l'eteindre a la bonne minute.
+           (a.mise_en_avant_jusqu_au IS NOT NULL
+            AND a.mise_en_avant_jusqu_au > datetime('now')) AS enAvant
     FROM annonces a
     JOIN utilisateurs e ON e.id = a.employeur_id
     WHERE a.annulee = 0
-    ORDER BY a.cree_le DESC, a.id DESC
+    ORDER BY enAvant DESC, a.cree_le DESC, a.id DESC
   `),
 
   // Les autres personnes qui attendaient encore une reponse sur cette
@@ -410,7 +417,18 @@ const requetes = {
   // l'employeur de cette annonce n'obtient rien, meme en tapant
   // l'adresse a la main.
   monAnnonce: db.prepare(`
-    SELECT * FROM annonces WHERE id = ? AND employeur_id = ?
+    SELECT *,
+           (mise_en_avant_jusqu_au IS NOT NULL
+            AND mise_en_avant_jusqu_au > datetime('now')) AS enAvant
+    FROM annonces WHERE id = ? AND employeur_id = ?
+  `),
+
+  // La date de fin est calculee par SQLite, comme toutes les autres
+  // dates de la base : en heure universelle, au meme format.
+  mettreEnAvant: db.prepare(`
+    UPDATE annonces
+       SET mise_en_avant_jusqu_au = datetime('now', @duree)
+     WHERE id = @id AND employeur_id = @employeur AND annulee = 0
   `),
 
   // Combien de personnes ont deja repondu. Elles se sont decidees sur ce
@@ -429,7 +447,10 @@ const requetes = {
   `),
 
   annoncesDeEmployeur: db.prepare(`
-    SELECT * FROM annonces WHERE employeur_id = ? ORDER BY cree_le DESC, id DESC
+    SELECT *,
+           (mise_en_avant_jusqu_au IS NOT NULL
+            AND mise_en_avant_jusqu_au > datetime('now')) AS enAvant
+    FROM annonces WHERE employeur_id = ? ORDER BY cree_le DESC, id DESC
   `),
 
   creerAnnonce: db.prepare(`
@@ -2845,6 +2866,170 @@ app.post("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, lireFormu
   });
 });
 
+// --- Mettre une demande en avant : l'ecran de confirmation ---------
+//
+// CE QUE LA MISE EN AVANT N'EST PAS. Elle ne fait pas passer devant les
+// demandes d'un autre metier : une aide-menagere voit d'abord les
+// demandes de menage, et c'est parmi celles-la que la mise en avant
+// joue. On ne paie pas pour tromper quelqu'un sur ce qu'il cherche.
+//
+// C'est la meme regle que du cote des personnes qui proposent leurs
+// services : aucune ne peut payer pour apparaitre en tete d'une
+// recherche.
+function ecranMiseEnAvant(req, res, erreur) {
+  const annonce = chargerMonAnnonce(req, res);
+
+  if (!annonce) {
+    return res.status(404).render("message", {
+      titre: "Demande introuvable",
+      texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  }
+
+  if (annonce.annulee) {
+    return res.status(409).render("message", {
+      titre: "Cette demande est fermée",
+      texte: "Une demande retirée ou déjà pourvue ne peut pas être mise en avant.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  }
+
+  mettreAJourLesJetons(req.utilisateur);
+
+  const cout = parametreNombre("cout_mise_en_avant");
+  const jours = parametreNombre("duree_mise_en_avant_jours");
+  const solde = soldeJetonsDe(req.utilisateur.id);
+
+  return res.render("mettre-en-avant", {
+    titre: "Mettre cette demande en avant",
+    annonce,
+    cout,
+    jours,
+    solde: solde.total,
+    finActuelle: annonce.enAvant ? dateLisible(annonce.mise_en_avant_jusqu_au) : null,
+    erreur: erreur || null,
+  });
+}
+
+app.get("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe,
+  (req, res) => ecranMiseEnAvant(req, res));
+
+// --- Mettre une demande en avant : le prelevement ------------------
+app.post("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe,
+  lireFormulaire, (req, res) => {
+  const annonce = chargerMonAnnonce(req, res);
+
+  if (!annonce) {
+    return res.status(404).render("message", {
+      titre: "Demande introuvable",
+      texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  }
+
+  if (annonce.annulee) {
+    return res.status(409).render("message", {
+      titre: "Cette demande est fermée",
+      texte: "Une demande retirée ou déjà pourvue ne peut pas être mise en avant.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  }
+
+  // DEJA EN AVANT : on refuse au lieu de prolonger. Prolonger
+  // silencieusement ferait payer deux fois quelqu'un qui a clique deux
+  // fois, et il n'aurait aucun moyen de s'en apercevoir.
+  if (annonce.enAvant) {
+    return res.status(409).render("message", {
+      titre: "Cette demande est déjà en avant",
+      texte: `Elle le reste jusqu'au ${dateLisible(annonce.mise_en_avant_jusqu_au)}. ` +
+             `Vous pourrez la remettre en avant après cette date.`,
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  }
+
+  mettreAJourLesJetons(req.utilisateur);
+
+  const cout = parametreNombre("cout_mise_en_avant");
+  const jours = parametreNombre("duree_mise_en_avant_jours");
+
+  if (!cout || !jours) {
+    return res.status(503).render("message", {
+      titre: "Option indisponible",
+      texte: "Le prix de la mise en avant n'a pas encore été réglé par l'équipe.",
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  }
+
+  const solde = soldeJetonsDe(req.utilisateur.id);
+
+  if (solde.total < cout) {
+    return res.status(402).render("message", {
+      titre: "Il vous manque des jetons",
+      texte: `Mettre une demande en avant coûte ${jetonsEnClair(cout)}. ` +
+             `Il vous reste ${jetonsEnClair(solde.total)}.`,
+      liens: [{ url: "/mes-jetons", texte: "Voir mes jetons" }],
+    });
+  }
+
+  // LES DEUX ECRITURES SONT INDIVISIBLES. Une demande mise en avant
+  // sans jeton preleve serait gratuite ; un jeton preleve sans mise en
+  // avant serait un vol.
+  const poser = db.transaction(() => {
+    if (!depenserJetons(req.utilisateur, cout, "mise_en_avant",
+          `Mise en avant : ${annonce.titre}`, annonce.id)) {
+      return false;
+    }
+
+    const fait = requetes.mettreEnAvant.run({
+      id: annonce.id,
+      employeur: req.utilisateur.id,
+      duree: `+${Math.round(jours)} days`,
+    });
+
+    // La demande a ete fermee entre-temps : on annule tout.
+    if (fait.changes === 0) throw new Error("DEMANDE_FERMEE");
+
+    return true;
+  });
+
+  let pose;
+  try {
+    pose = poser();
+  } catch (erreur) {
+    if (String(erreur.message) === "DEMANDE_FERMEE") {
+      return res.status(409).render("message", {
+        titre: "Cette demande est fermée",
+        texte: "Elle a été fermée entre-temps. Aucun jeton n'a été prélevé.",
+        liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+      });
+    }
+    throw erreur;
+  }
+
+  if (!pose) {
+    return res.status(402).render("message", {
+      titre: "Il vous manque des jetons",
+      texte: `Mettre une demande en avant coûte ${jetonsEnClair(cout)}.`,
+      liens: [{ url: "/mes-jetons", texte: "Voir mes jetons" }],
+    });
+  }
+
+  const apres = requetes.monAnnonce.get(annonce.id, req.utilisateur.id);
+
+  res.render("message", {
+    titre: "Votre demande est mise en avant",
+    texte: `Elle passe devant les autres demandes de ${annonce.metier} ` +
+           `jusqu'au ${dateLisible(apres.mise_en_avant_jusqu_au)}, et porte le badge ` +
+           `« Mise en avant ». ${jetonsEnClair(cout)} a été prélevé. ` +
+           `Après cette date, elle reprend sa place sans que vous ayez rien à faire.`,
+    liens: [
+      { url: "/annonces", texte: "Voir la liste des demandes" },
+      { url: "/mon-profil", texte: "Retour à mon profil" },
+    ],
+  });
+});
+
 // --- Retirer une demande -------------------------------------------
 //
 // On ne SUPPRIME pas. Une demande retiree disparait de la liste publique
@@ -4096,6 +4281,7 @@ app.get("/admin/jetons", exigerAdmin, (req, res) => {
     coutCandidature: parametreNombre("cout_candidature"),
     coutMiseEnAvant: parametreNombre("cout_mise_en_avant"),
     candidaturesParJour: parametreNombre("candidatures_par_jour"),
+    dureeMiseEnAvant: parametreNombre("duree_mise_en_avant_jours"),
     bienvenueEmployeur: parametreNombre("bienvenue_employeur"),
     bienvenuePrestataire: parametreNombre("bienvenue_prestataire"),
     bienvenueJours: parametreNombre("bienvenue_jours"),
@@ -4263,6 +4449,18 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
     });
   }
 
+  // UNE MISE EN AVANT DE ZERO JOUR serait payee pour rien.
+  const dureeAvant = Math.round(Number(req.body.duree_mise_en_avant_jours));
+
+  if (!Number.isFinite(dureeAvant) || dureeAvant <= 0) {
+    return res.status(400).render("message", {
+      titre: "Durée invalide",
+      texte: "Une mise en avant doit durer au moins un jour. " +
+             "À zéro, elle serait payée pour rien.",
+      liens: [{ url: "/admin/jetons", texte: "Retour aux jetons" }],
+    });
+  }
+
   // ZERO REPONSE PAR JOUR FERMERAIT LA PLATEFORME a ceux qui y
   // travaillent. C'est trop grave pour etre un accident de saisie.
   const parJour = Math.round(Number(req.body.candidatures_par_jour));
@@ -4315,6 +4513,11 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
     requetes.majParametre.run({
       cle: "candidatures_par_jour",
       valeur: String(parJour),
+      par: req.utilisateur.id,
+    });
+    requetes.majParametre.run({
+      cle: "duree_mise_en_avant_jours",
+      valeur: String(dureeAvant),
       par: req.utilisateur.id,
     });
   });

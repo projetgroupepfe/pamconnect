@@ -49,6 +49,7 @@ const formReglages = (o) => {
   p.append("cout_candidature", String(o.coutReponse === undefined ? 1 : o.coutReponse));
   p.append("cout_mise_en_avant", String(o.coutAvant === undefined ? 20 : o.coutAvant));
   p.append("candidatures_par_jour", "3");
+  p.append("duree_mise_en_avant_jours", "7");
   return p;
 };
 
@@ -223,10 +224,14 @@ setTimeout(async () => {
   dire("et pour lui aussi",
        [5, 10, 30, 60].every((q) => pageEmp.includes(">" + q + " jetons<")));
 
-  console.log(SAUT + "--- CE QUI N'EST PAS ENCORE CONSTRUIT EST DIT ---");
-  // Tant que la depense n'existe pas, la page ne doit pas laisser
-  // chercher un bouton introuvable.
-  dire("la page l'annonce", pageEmp.includes("Cette option n'est pas encore ouverte"));
+  console.log(SAUT + "--- LA PAGE DIT OU DEPENSER SES JETONS ---");
+  // Une option qu'on ne trouve pas vaut une option qui n'existe pas.
+  dire("l'employeur sait ou lancer une mise en avant",
+       pageEmp.includes("vos demandes"));
+  dire("et rien ne dit plus que l'option est fermee",
+       !pageEmp.includes("pas encore ouverte"));
+  dire("elle, sait quand le jeton part",
+       pagePres.includes("seulement quand votre réponse part"));
 
   console.log(SAUT + "--- L'EQUIPE REGLE CE QU'UNE ACTION COUTE ---");
   await poster("/admin/parametres", formReglages({ coutReponse: 2 }), eq.cookie);

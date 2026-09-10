@@ -157,6 +157,17 @@
       </div>
 
       <div class="champ">
+        <label for="duree-avant">Durée d'une mise en avant, en jours</label>
+        <input id="duree-avant" type="number" name="duree_mise_en_avant_jours"
+               value="<%= dureeMiseEnAvant === null ? "" : dureeMiseEnAvant %>"
+               min="1" step="1" inputmode="numeric" required>
+        <small class="aide">
+          Combien de temps la demande passe devant les autres du même métier.
+          Ensuite elle reprend sa place toute seule.
+        </small>
+      </div>
+
+      <div class="champ">
         <label for="par-jour">Réponses autorisées par 24 heures</label>
         <input id="par-jour" type="number" name="candidatures_par_jour"
                value="<%= candidaturesParJour === null ? "" : candidaturesParJour %>"

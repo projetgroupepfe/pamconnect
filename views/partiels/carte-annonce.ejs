@@ -14,6 +14,13 @@
 <div class="carte">
   <h3><%= annonce.titre %></h3>
 
+  <%# LE BADGE EST OBLIGATOIRE, pas decoratif. Une demande qui passe
+      devant les autres parce que son auteur a paye doit le dire :
+      sinon la liste ment sur ce qui l'ordonne. %>
+  <% if (annonce.enAvant) { %>
+    <p><span class="badge badge-info">Mise en avant</span></p>
+  <% } %>
+
   <ul class="infos">
     <li>
       <%- include("icone", { nom: "experience" }) %>

@@ -185,6 +185,14 @@ CREATE TABLE IF NOT EXISTS annonces (
   annulee         INTEGER NOT NULL DEFAULT 0 CHECK (annulee IN (0, 1)),
   annulee_le      TEXT,
 
+  -- --- Mise en avant ---
+  -- JUSQU'A QUAND, et non "est-elle en avant". Un drapeau demanderait
+  -- que quelqu'un pense a l'eteindre au bon moment ; une date se
+  -- compare, et la demande reprend sa place toute seule.
+  --
+  -- NULL : cette demande n'a jamais ete mise en avant.
+  mise_en_avant_jusqu_au TEXT,
+
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -605,7 +613,8 @@ INSERT OR IGNORE INTO parametres (cle, valeur) VALUES
   -- COMBIEN DE REPONSES PAR 24 HEURES, quel que soit le solde. Le jeton
   -- fait reflechir, il n'empeche pas quelqu'un de tres motive de repondre
   -- a tout. Cette limite-la si.
-  ('candidatures_par_jour', '3');
+  ('candidatures_par_jour', '3'),
+  ('duree_mise_en_avant_jours', '7');
 
 
 -- ------------------------------------------------------------------
