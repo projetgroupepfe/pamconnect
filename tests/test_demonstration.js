@@ -155,6 +155,12 @@ setTimeout(async () => {
   dire("la commission", ecranReponse.includes("2 000"));
   dire("et ce qu'elle touchera", ecranReponse.includes("18 000"));
 
+  // ELLE NE DEMANDE RIEN : c est l employeur qui a annonce ce prix.
+  // "Vous demandez" n est juste que sur son propre profil.
+  dire("le prix est presente comme celui de l employeur",
+       ecranReponse.includes("employeur paie"));
+  dire("et jamais comme le sien", !ecranReponse.includes("Vous demandez"));
+
   // TROISIEME MOMENT FORT : le prix de la reponse, annonce AVANT l'envoi.
   dire("le cout de la reponse est annonce avant", ecranReponse.includes("Envoyer cette réponse"));
   dire("en jetons et en francs", ecranReponse.includes("1 jeton (100 FCFA)"));

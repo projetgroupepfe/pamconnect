@@ -91,7 +91,9 @@
         <% } %>
       </ul>
 
-      <%- include("partiels/detail-tarif", { tarif: annonce.prix }) %>
+      <%# prixAnnonce : ce montant est celui de l'employeur, pas le tarif
+          qu'elle indique sur son profil. %>
+      <%- include("partiels/detail-tarif", { tarif: annonce.prix, prixAnnonce: true }) %>
 
       <p class="aide">
         C'est le prix fixé par l'employeur pour ce service.

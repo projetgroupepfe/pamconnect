@@ -14,6 +14,15 @@ const detail = detaillerTarif(locals.tarif);
    plus frequent (son inscription, son profil, la liste des annonces). */
 const pourEmployeur = locals.pourEmployeur === true;
 const beneficiaire  = locals.beneficiaire || "La personne";
+
+/* TROISIEME CAS : la personne qui travaille regarde le prix D'UNE
+   DEMANDE, et non son propre tarif.
+
+   "Vous demandez" etait faux la : elle ne demande rien, elle a postule
+   a un prix annonce par quelqu'un d'autre. On nomme donc celui qui
+   paie, ce qui evite aussi de repeter mot pour mot le "Prix annonce"
+   affiche juste au-dessus. */
+const prixAnnonce = locals.prixAnnonce === true;
 %>
 <% if (detail.brut <= 0) { %>
 
@@ -40,7 +49,7 @@ const beneficiaire  = locals.beneficiaire || "La personne";
 
   <div class="detail-tarif">
     <div class="ligne-tarif">
-      <span><%= pourEmployeur ? "Vous payez" : "Vous demandez" %></span>
+      <span><%= pourEmployeur ? "Vous payez" : (prixAnnonce ? "L'employeur paie" : "Vous demandez") %></span>
       <strong><%= formaterMontant(detail.brut) %></strong>
     </div>
     <div class="ligne-tarif">
