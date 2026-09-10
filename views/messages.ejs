@@ -104,9 +104,19 @@
 
     <% if (terminees.length > 0) { %>
       <h2>Services terminés</h2>
+      <%# CE BLOC N'EST PAS QU'UNE ARCHIVE. Tant qu'un avis n'a pas ete
+          donne, quelque chose y attend - et le mot "archivees" disait
+          exactement le contraire. %>
+      <% const aNoter = terminees.filter(function (c) { return !c.jaiDonneMonAvis; }).length; %>
       <p class="chapeau">
-        Ces discussions sont archivées : vous pouvez les relire, mais plus
-        y écrire.
+        <% if (aNoter > 0) { %>
+          <strong><%= aNoter %> service<%= aNoter > 1 ? "s" : "" %> attend<%= aNoter > 1 ? "ent" : "" %> votre avis.</strong>
+          Ces discussions ne reçoivent plus de message, mais vous pouvez
+          encore dire ce qui s'est passé.
+        <% } else { %>
+          Ces discussions sont archivées : vous pouvez les relire, mais plus
+          y écrire.
+        <% } %>
       </p>
       <div class="grille">
         <% terminees.forEach(function (c) { %>
@@ -126,6 +136,12 @@
                 <%- include("partiels/icone", { nom: "valider" }) %>
                 <span>Service effectué le <strong><%= c.terminee_le %></strong></span>
               </li>
+              <% if (!c.jaiDonneMonAvis) { %>
+                <li>
+                  <%- include("partiels/icone", { nom: "avis" }) %>
+                  <span><strong>Votre avis est attendu</strong></span>
+                </li>
+              <% } %>
               <li>
                 <%- include("partiels/icone", { nom: "message" }) %>
                 <span>
@@ -138,7 +154,16 @@
               </li>
             </ul>
 
+            <%# LE BOUTON, LA OU L'ON REGARDE. Il fallait sinon ouvrir une
+                discussion marquee "relire" et descendre jusqu'en bas pour
+                le trouver. %>
             <div class="actions">
+              <% if (!c.jaiDonneMonAvis) { %>
+                <a class="bouton" href="/avis/<%= c.id %>">
+                  <%- include("partiels/icone", { nom: "avis" }) %>
+                  Donner mon avis
+                </a>
+              <% } %>
               <a class="bouton bouton-secondaire" href="/messages/<%= c.id %>">
                 <%- include("partiels/icone", { nom: "document" }) %>
                 Relire la discussion

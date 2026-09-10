@@ -100,9 +100,30 @@ setTimeout(async () => {
   dire("l'envoi aussi", tropTot.code === 409, String(tropTot.code));
   dire("aucun avis en base", !avisDe(cand.id, emp.id));
   dire("la raison est donnee", tropTot.corps.includes("après un service effectué"));
+  const avantFin = await (await lire("/messages/" + cand.id, emp.cookie)).text();
+  dire("la discussion ne propose rien encore", !avantFin.includes("Donner mon avis"));
 
   // L'employeur declare le service effectue : la porte s'ouvre.
   await poster("/candidatures/" + cand.id + "/terminer", form({}), emp.cookie);
+
+  console.log(SAUT + "--- LA DISCUSSION PROPOSE D Y ALLER ---");
+  // Un ecran qui marche mais qu on ne trouve pas vaut un ecran absent.
+  // Cette serie verifiait /avis/:id sans jamais verifier le lien.
+  const discussion = await (await lire("/messages/" + cand.id, emp.cookie)).text();
+  dire("le bloc apparait apres la declaration", discussion.includes("Votre avis"));
+  dire("avec le bouton", discussion.includes("Donner mon avis"));
+  dire("cote personne aussi",
+       (await (await lire("/messages/" + cand.id, elle.cookie)).text()).includes("Donner mon avis"));
+
+  console.log(SAUT + "--- LA LISTE DES MESSAGES LE DIT AUSSI ---");
+  // C est le premier ecran que l on regarde. Le service y etait range
+  // dans un bloc "archivees, vous pouvez les relire" - rien ne disait
+  // qu un avis attendait dedans.
+  const liste = await (await lire("/messages", emp.cookie)).text();
+  dire("la liste annonce l attente", liste.includes("Votre avis est attendu"));
+  dire("avec le bouton, sans ouvrir la discussion", liste.includes("/avis/" + cand.id));
+  dire("et le mot archivees ne s affiche plus seul",
+       liste.includes("attend votre avis"));
 
   console.log(SAUT + "--- SEULS LES DEUX CONCERNES ---");
   const autre = await creerCompte("autre", "employeur");
@@ -143,6 +164,10 @@ setTimeout(async () => {
   dire("un second envoi est refuse", deux.code === 409, String(deux.code));
   dire("la premiere note tient", avisDe(cand.id, emp.id).note === 5);
   dire("la raison est dite", deux.corps.includes("Un seul avis par service"));
+
+  const listeApres = await (await lire("/messages", emp.cookie)).text();
+  dire("une fois note, la liste n insiste plus",
+       !listeApres.includes("Votre avis est attendu"));
 
   console.log(SAUT + "--- ELLE NOTE L'EMPLOYEUR AUSSI ---");
   const sonEcran = await (await lire("/avis/" + cand.id, elle.cookie)).text();

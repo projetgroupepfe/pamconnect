@@ -911,6 +911,14 @@ const requetes = {
                           ELSE c.vu_prestataire_le END, '')) AS nonLus,
            c.terminee_le,
            a.annulee AS demandeFermee,
+
+           -- AI-JE DEJA DONNE MON AVIS SUR CE SERVICE ? Sans cette
+           -- colonne, la liste ne pouvait pas dire qu'un avis attendait :
+           -- elle rangeait le service dans les archives et n'en parlait
+           -- plus.
+           EXISTS (SELECT 1 FROM avis v
+                    WHERE v.candidature_id = c.id AND v.auteur_id = @moi) AS jaiDonneMonAvis,
+
            EXISTS (SELECT 1 FROM candidatures x
                     WHERE x.annonce_id = a.id AND x.statut = 'acceptee') AS quelquUnChoisi,
            CASE WHEN p.id = @moi

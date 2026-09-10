@@ -112,7 +112,10 @@ setTimeout(async () => {
   console.log("\n--- LA LISTE SEPARE LE PASSE DU PRESENT ---");
   const liste = await (await lire("/messages", pre.cookie)).text();
   dire("une section 'Services termines' apparait", liste.includes("Services terminés"));
-  dire("elle dit que ces discussions sont archivees", liste.includes("sont archivées"));
+  // "Archivees" ne s affiche que lorsqu il n y a plus rien a y faire.
+  // Tant qu un avis attend, le bloc le dit - c etait tout le probleme.
+  dire("elle dit qu un avis est attendu", liste.includes("attend votre avis"));
+  dire("et qu on n y ecrit plus", liste.includes("ne reçoivent plus de message"));
   dire("et donne la date du service", liste.includes("Service effectué le"));
   dire("plus aucune discussion en cours", liste.includes("Aucune discussion en cours"));
 
