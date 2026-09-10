@@ -104,8 +104,8 @@ setTimeout(async () => {
   dire("un seul mouvement", mouvements(pasVerifie.id, "bienvenue").length === 1);
   dire("de nature offerte", cadeau.nature === "offert");
   dire("avec une date limite", typeof cadeau.expire_le === "string" && cadeau.expire_le.length > 0);
-  dire("la page l'annonce", page.includes("jetons vous sont offerts"));
-  dire("elle dit jusqu a quand ils durent", page.includes("À utiliser avant le"));
+  dire("la page dit d ou ils viennent", page.includes("Offerts à la vérification"));
+  dire("et jusqu a quand ils durent", page.includes("à utiliser avant le"));
 
   console.log(SAUT + "--- L'EQUIPE VALIDE, LES JETONS ARRIVENT ---");
   // LE CHEMIN NORMAL. La personne depose ses papiers, l'equipe accepte,
@@ -168,8 +168,7 @@ setTimeout(async () => {
   // Un nombre de jetons ne veut rien dire tout seul. La page doit
   // traduire : combien d'actions, et ce qui manque le cas echeant.
   const pagePres = await ouvrir(pasVerifie.cookie);
-  dire("le prix d'une reponse est annonce",
-       pagePres.includes("Répondre à une demande coûte"));
+  dire("le prix d'une reponse est annonce", pagePres.includes("Répondre à une demande"));
   dire("en jetons et en francs", pagePres.includes("1 jeton (100 FCFA)"));
 
   // LA PHRASE DIT L'ACTION, PAS UN MOT SEUL. "3 reponses" ne disait pas
@@ -181,7 +180,8 @@ setTimeout(async () => {
   // C'est une reduction de moitie, pas une mise en avant offerte - et il
   // doit le lire ici plutot que de le decouvrir en cliquant.
   const pageEmp = await ouvrir(emp.cookie);
-  dire("le prix d'une mise en avant est annonce", pageEmp.includes("Une mise en avant coûte"));
+  dire("le prix d'une mise en avant est annonce",
+       pageEmp.includes("Mettre une demande en avant"));
   dire("il lit ce qui lui manque", pageEmp.includes("Il vous manque"));
   dire("et combien exactement", pageEmp.includes("10 jetons (1 000 FCFA)"));
   dire("son solde ne lui promet aucune action complete",
@@ -291,7 +291,7 @@ setTimeout(async () => {
     FROM jetons_mouvements WHERE utilisateur_id = ? AND motif = 'bienvenue'
   `).get(apres.id).jours;
   dire("et la nouvelle duree", limite > 29 && limite <= 30, String(Math.round(limite)));
-  dire("la date limite est affichee", page.includes("À utiliser avant le"));
+  dire("la date limite est affichee", page.includes("à utiliser avant le"));
   dire("celle d'avant ne bouge pas", solde(pasVerifie.id) === 20);
 
   console.log(SAUT + "--- ZERO JETON OFFERT EST UN CHOIX VALIDE ---");

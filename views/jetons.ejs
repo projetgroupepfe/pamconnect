@@ -2,31 +2,6 @@
 
   <h1>Mes jetons</h1>
 
-  <%# LE CADEAU RESTE ANNONCE TANT QU'IL EN RESTE. Il est credite par
-      l'equipe au moment ou elle valide le dossier : la personne ne le
-      voit donc pas arriver. Sans cette carte, elle trouverait trois
-      jetons sur son compte sans savoir d'ou ils viennent ni jusqu'a
-      quand ils durent.
-
-      Elle disparait quand les jetons sont depenses ou perimes,
-      c'est-a-dire quand elle n'a plus rien a dire. %>
-  <% if (solde.offerts > 0) { %>
-    <div class="carte confiance">
-      <h3><%= solde.offerts %> <%= solde.offerts > 1 ? "jetons vous sont offerts" : "jeton vous est offert" %></h3>
-      <p>
-        PamConnect les offre <strong>une seule fois</strong>, à la vérification
-        de votre compte.
-      </p>
-      <% if (expireLe) { %>
-        <p class="aide">
-          À utiliser avant le <strong><%= expireLe %></strong>. Passé cette date,
-          ceux que vous n'aurez pas utilisés disparaissent. Les jetons que vous
-          achetez, eux, n'ont pas de date limite.
-        </p>
-      <% } %>
-    </div>
-  <% } %>
-
   <% if (perdusMaintenant) { %>
     <div class="carte">
       <p><span class="badge badge-non-soumis">Jetons offerts expirés</span></p>
@@ -40,73 +15,51 @@
     </div>
   <% } %>
 
-  <%# CE QU'UN JETON N'EST PAS. La confusion serait grave : quelqu'un
-      qui croit avoir de l'argent sur la plateforme attendrait de le
-      retirer, et ne pourrait pas. C'est donc dit avant le solde, pas
-      apres. %>
+  <%# TROIS PHRASES, PAS HUIT. Cette carte s'ouvrait sur un pave que
+      personne ne lit jusqu'au bout, avant meme d'avoir vu son solde.
+      Chaque phrase qui reste repond a une question qu'on se pose ici :
+      ce que ca coute, ce que mon solde permet, et ce qu'un jeton n'est
+      pas - la confusion la plus grave, celle qui ferait attendre un
+      retrait impossible. %>
   <div class="carte confiance">
     <h3>À quoi servent les jetons</h3>
 
-    <%# LE PRIX D'UNE ACTION, DIT ICI ET PAS AILLEURS. Annoncer "des
-        jetons vous sont offerts" sans dire ce qu'ils permettent laisse
-        la personne compter des unites dont elle ignore la valeur. %>
     <p>
-      Un jeton donne accès à une option de PamConnect.
       <% if (jeSuisEmployeur) { %>
-        Pour vous, il sert à <strong>mettre une demande en avant</strong>,
-        pour qu'elle soit vue avant les autres.
-        <% if (coutAction) { %>
-          Une mise en avant coûte <strong><%= jetonsEnClair(coutAction) %></strong>.
-        <% } %>
+        <strong>Mettre une demande en avant</strong>, pour qu'elle soit vue
+        avant les autres<% if (coutAction) { %>, coûte
+        <strong><%= jetonsEnClair(coutAction) %></strong><% } %>.
       <% } else { %>
-        Pour vous, il sert à <strong>répondre à une demande</strong>.
-        <% if (coutAction) { %>
-          Répondre à une demande coûte <strong><%= jetonsEnClair(coutAction) %></strong>.
+        <strong>Répondre à une demande</strong><% if (coutAction) { %> coûte
+        <strong><%= jetonsEnClair(coutAction) %></strong><% } %>.
+      <% } %>
+      <% if (coutAction && solde.total > 0) { %>
+        <% const possible = Math.floor(solde.total / coutAction); %>
+        <% if (possible > 0) { %>
+          Votre solde vous permet de
+          <strong><%= actionsPossibles(jeSuisEmployeur, possible) %></strong>.
+        <% } else { %>
+          Il vous manque <strong><%= jetonsEnClair(coutAction - solde.total) %></strong>.
         <% } %>
       <% } %>
     </p>
 
-    <%# CE QUE LE SOLDE PERMET VRAIMENT. Un employeur qui recoit 10 jetons
-        alors qu'une mise en avant en coute 20 doit le lire ici, pas le
-        decouvrir en cliquant. %>
-    <% if (coutAction && solde.total > 0) { %>
-      <% const possible = Math.floor(solde.total / coutAction); %>
-      <% if (possible > 0) { %>
-        <p>
-          Votre solde vous permet de
-          <strong><%= actionsPossibles(jeSuisEmployeur, possible) %></strong>.
-        </p>
-      <% } else { %>
-        <p>
-          Il vous manque <strong><%= jetonsEnClair(coutAction - solde.total) %></strong>
-          pour <%= uneAction(jeSuisEmployeur) %>.
-          Vos jetons en couvrent déjà une partie.
-        </p>
-      <% } %>
-    <% } %>
-
-    <%# A RETIRER quand la mise en avant sera construite. Repondre a une
-        demande, lui, fonctionne : la phrase ne s'affiche donc plus que
-        du cote employeur. %>
     <% if (jeSuisEmployeur) { %>
+      <%# A RETIRER quand la mise en avant sera construite. %>
       <p class="aide">
-        <strong>Cette option n'est pas encore ouverte.</strong> Elle arrive dans
-        une prochaine version. D'ici là, vos jetons vous attendent et rien ne
-        vous est prélevé.
+        <strong>Cette option n'est pas encore ouverte.</strong> Rien ne vous est
+        prélevé d'ici là.
       </p>
     <% } else { %>
       <p class="aide">
-        Le jeton est prélevé <strong>seulement quand votre réponse part</strong>.
-        Si la demande est fermée ou si vous avez déjà répondu, rien ne vous
-        est retiré.
+        Le jeton part <strong>seulement quand votre réponse part</strong>.
       </p>
     <% } %>
+
     <p class="aide">
-      Un jeton <strong>n'est pas de l'argent</strong>. Il ne se donne pas à
-      quelqu'un d'autre, il ne se retire ni en espèces ni par Mobile Money,
-      et il ne paie jamais une prestation. Le paiement d'un service se fait
-      en FCFA, et passe par
-      <a href="/mon-compte">votre compte</a>.
+      Un jeton <strong>n'est pas de l'argent</strong> : il ne se donne pas, il
+      ne se retire ni en espèces ni par Mobile Money, et il ne paie jamais une
+      prestation. Pour cela, voir <a href="/mon-compte">votre compte</a>.
     </p>
   </div>
 
@@ -120,13 +73,13 @@
 
       <% if (solde.offerts > 0) { %>
         <div class="ligne-tarif">
+          <%# D'OU ILS VIENNENT ET JUSQU'A QUAND, en une ligne. Un pave
+              entier disait la meme chose juste au-dessus de celle-ci. %>
           <span>
             Jetons offerts
-            <% if (expireLe) { %>
-              <br><small class="discret">
-                À utiliser avant le <%= expireLe %>, sinon ils sont perdus
-              </small>
-            <% } %>
+            <br><small class="discret">
+              Offerts à la vérification de votre compte<% if (expireLe) { %>, à utiliser avant le <%= expireLe %><% } %>
+            </small>
           </span>
           <span><%= solde.offerts %></span>
         </div>

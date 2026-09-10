@@ -144,8 +144,8 @@ setTimeout(async () => {
     "SELECT COALESCE(SUM(quantite),0) n FROM jetons_mouvements WHERE utilisateur_id = ?").get(pre.id).n;
   dire("trois jetons lui sont offerts", soldeOffert === 3, String(soldeOffert));
   const pageJetons = await (await lire("/mes-jetons", pre.cookie)).text();
-  dire("sa page le lui annonce", pageJetons.includes("jetons vous sont offerts"));
-  dire("elle sait jusqu a quand ils durent", pageJetons.includes("À utiliser avant le"));
+  dire("sa page dit d ou ils viennent", pageJetons.includes("Offerts à la vérification"));
+  dire("et jusqu a quand ils durent", pageJetons.includes("à utiliser avant le"));
   dire("et ce qu'ils lui permettent", pageJetons.includes("répondre à 3 demandes"));
 
   console.log("\n--- ECRAN 4 : ELLE REPOND, ET VOIT CE QU'ELLE TOUCHERA ---");
