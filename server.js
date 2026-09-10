@@ -3099,7 +3099,7 @@ app.get("/annonces", (req, res) => {
     : null;
 
   res.render("annonces", {
-    titre: "Annonces",
+    titre: "Demandes",
     pourMoi: monMetier ? toutes.filter((a) => a.metier === monMetier) : [],
     autres: monMetier ? toutes.filter((a) => a.metier !== monMetier) : toutes,
     monMetier,
