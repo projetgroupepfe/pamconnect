@@ -2099,12 +2099,59 @@ function criteresAvis(jeSuisEmployeur) {
 //   cinquante a 4,8   -> (5x4 + 240)/ (5+50) = 4,7
 //
 // La seconde passe devant, et c'est exactement ce qu'on voulait.
+// CINQ AVIS IMAGINAIRES. Assez pour qu'une note unique ne fasse pas
+// gagner, assez peu pour qu'une vingtaine d'avis reels reprennent
+// entierement la main.
 const POIDS_AVIS_IMAGINAIRES = 5;
+
+// LA NOTE DE DEPART, celle des avis imaginaires.
+//
+// On voudrait y mettre la moyenne de la plateforme - c'est la reference
+// la plus juste. Mais tant qu'elle repose sur quelques avis, ce n'est
+// pas une information, c'est un accident : un seul avis a 3 ferait
+// partir tout le monde de 3.
+//
+// En dessous du seuil, on part donc de 4 sur 5 - le niveau d'un service
+// correct. Au-dessus, la vraie moyenne prend le relais, sans rien
+// changer d'autre.
+const NOTE_DE_DEPART = 4;
+const AVIS_POUR_UNE_MOYENNE_FIABLE = 20;
 
 // Au-dela de dix services termines, en faire plus ne change plus le
 // classement : l'experience est acquise. Sans ce plafond, quelqu'un qui
 // en a cent ecraserait tout le monde pour toujours.
 const SERVICES_POUR_EXPERIENCE_COMPLETE = 10;
+
+// LES CINQ PARTS DU SCORE, SUR CENT POINTS. Chacune est un choix, et
+// chacune s'explique en une phrase - c'est ce qu'on nous demandera.
+//
+//   VERIFIEE      la plus lourde : c'est la promesse de la plateforme,
+//                 et une personne non verifiee ne peut pas etre
+//                 embauchee. La mettre en tete ferait perdre du temps
+//                 a tout le monde.
+//   REPUTATION    a egalite : la verification est une porte, la
+//                 reputation se merite. Plus basse, l'experience ne
+//                 rattraperait jamais ; plus haute, les etoiles
+//                 passeraient devant la porte.
+//   EXPERIENCE    assez pour distinguer qui a fait ses preuves, pas
+//                 assez pour rendre les anciens intouchables.
+//   SANS_DESACCORD  meme poids : faire beaucoup de services mal ne doit
+//                 pas battre en faire peu et bien.
+//   DISPONIBLE    la plus legere : elle se declare, elle ne se merite
+//                 pas. Mais un profil sans creneaux oblige l'employeur
+//                 a deviner.
+const PART_VERIFIEE = 30;
+const PART_REPUTATION = 30;
+const PART_EXPERIENCE = 15;
+const PART_SANS_DESACCORD = 15;
+const PART_DISPONIBLE = 10;
+
+// La proximite s'AJOUTE, elle n'entre pas dans les cent points : dix
+// points au plus, soit un tiers de la verification. Quelqu'un de proche
+// mais non verifie ne peut donc jamais passer devant quelqu'un de
+// verifie un peu plus loin.
+const PART_PROXIMITE = 10;
+const DISTANCE_SANS_INTERET_KM = 10;
 
 function noteAjustee(nbAvis, sommeNotes, moyenneGenerale) {
   return (POIDS_AVIS_IMAGINAIRES * moyenneGenerale + sommeNotes)
@@ -2116,21 +2163,22 @@ function noteAjustee(nbAvis, sommeNotes, moyenneGenerale) {
 // La verification pese le plus : c'est la promesse de la plateforme, et
 // une personne non verifiee ne peut de toute facon pas etre embauchee.
 function scoreDe(personne, chiffres, moyenneGenerale) {
-  const verifiee = personne.statut_verification === "verifie" ? 30 : 0;
+  const verifiee = personne.statut_verification === "verifie" ? PART_VERIFIEE : 0;
 
-  const reputation = 30 * (noteAjustee(chiffres.nbAvis, chiffres.sommeNotes,
-                                       moyenneGenerale) / 5);
+  const reputation = PART_REPUTATION
+    * (noteAjustee(chiffres.nbAvis, chiffres.sommeNotes, moyenneGenerale) / 5);
 
-  const experience = 15 * Math.min(1, chiffres.services / SERVICES_POUR_EXPERIENCE_COMPLETE);
+  const experience = PART_EXPERIENCE
+    * Math.min(1, chiffres.services / SERVICES_POUR_EXPERIENCE_COMPLETE);
 
   // AUCUN SERVICE N'EST AUCUN PROBLEME. On ne punit pas quelqu'un qui
   // commence : sans service termine, cette part vaut le maximum, et
   // c'est la part "experience" qui reste a zero.
   const sansProbleme = chiffres.services === 0
-    ? 15
-    : 15 * (1 - chiffres.litiges / chiffres.services);
+    ? PART_SANS_DESACCORD
+    : PART_SANS_DESACCORD * (1 - chiffres.litiges / chiffres.services);
 
-  const disponible = personne.disponibilites ? 10 : 0;
+  const disponible = personne.disponibilites ? PART_DISPONIBLE : 0;
 
   return {
     total: verifiee + reputation + experience + sansProbleme + disponible,
@@ -2146,13 +2194,16 @@ function scoreDe(personne, chiffres, moyenneGenerale) {
 // position est connue.
 function pointsDeProximite(personne, lieuCherche, distanceKm) {
   if (distanceKm !== undefined && distanceKm !== null) {
-    // Dix points a moins d'un kilometre, plus rien au-dela de dix.
-    return 10 * Math.max(0, Math.min(1, (10 - distanceKm) / 9));
+    // Tout au plus a moins d'un kilometre, plus rien au-dela de dix.
+    return PART_PROXIMITE * Math.max(0, Math.min(1,
+      (DISTANCE_SANS_INTERET_KM - distanceKm) / (DISTANCE_SANS_INTERET_KM - 1)));
   }
 
   if (!lieuCherche) return 0;
-  if (lieuCherche.quartier && personne.quartier === lieuCherche.quartier) return 10;
-  if (lieuCherche.arrondissement && personne.arrondissement === lieuCherche.arrondissement) return 5;
+  if (lieuCherche.quartier && personne.quartier === lieuCherche.quartier) return PART_PROXIMITE;
+  if (lieuCherche.arrondissement && personne.arrondissement === lieuCherche.arrondissement) {
+    return PART_PROXIMITE / 2;
+  }
 
   return 0;
 }
@@ -4036,8 +4087,14 @@ app.get("/recherche", (req, res) => {
   //
   // La moyenne generale est lue une fois : elle sert de point de depart
   // a ceux qui n'ont pas encore d'avis.
+  // LA MOYENNE DE LA PLATEFORME NE SERT QUE QUAND ELLE VEUT DIRE
+  // QUELQUE CHOSE. Avec un seul avis, elle vaut la note de cet avis-la
+  // et tire tout le monde vers elle : ce n'est pas une information,
+  // c'est un accident.
   const general = requetes.moyenneDeLaPlateforme.get();
-  const moyenneGenerale = general.nombre > 0 ? general.moyenne : 4;
+  const moyenneGenerale = general.nombre >= AVIS_POUR_UNE_MOYENNE_FIABLE
+    ? general.moyenne
+    : NOTE_DE_DEPART;
 
   const lieuCherche = {
     quartier: trouverQuartier(String(req.query.quartier || "")),
