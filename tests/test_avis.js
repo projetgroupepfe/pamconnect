@@ -218,8 +218,9 @@ setTimeout(async () => {
        fiche.indexOf("4,5 sur 5") < fiche.indexOf("Ce que disent les employeurs"));
   dire("et le nombre d'avis", fiche.includes("sur 2 avis"));
   dire("et le commentaire", fiche.includes("travail soigne"));
-  // Peu d'avis : on le dit plutot que de laisser croire a une reputation etablie.
-  dire("elle previent que c'est peu", fiche.includes("peut encore beaucoup bouger"));
+  // LE NOMBRE PORTE L INFORMATION. Un paragraphe pour commenter un
+  // chiffre deja lisible n apprend rien et allonge la page.
+  dire("le nombre d avis suffit a dire que c est peu", fiche.includes("sur 2 avis"));
 
   console.log(SAUT + "--- LA NOTE EST LA OU L ON CHOISIT ---");
   // L employeur ne choisit pas depuis la recherche : il choisit sous sa

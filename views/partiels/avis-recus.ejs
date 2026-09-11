@@ -43,14 +43,6 @@
       </span>
     </p>
 
-    <%# LE NOMBRE COMPTE AUTANT QUE LA MOYENNE. Une seule note de 5 ne
-        vaut pas cinquante notes a 4,8 : on le dit plutot que de laisser
-        croire le contraire. %>
-    <% if (reputation.nombre < 3) { %>
-      <p class="aide">
-        Peu d'avis pour l'instant : cette moyenne peut encore beaucoup bouger.
-      </p>
-    <% } %>
   </div>
 
   <% avis.forEach(function (a) { %>
