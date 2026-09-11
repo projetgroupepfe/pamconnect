@@ -212,6 +212,10 @@ setTimeout(async () => {
   console.log(SAUT + "--- LES AVIS SONT PUBLICS ---");
   const fiche = await (await lire("/personnes/" + elle.id)).text();
   dire("la fiche affiche la moyenne", fiche.includes("4,5 sur 5"));
+  // EN HAUT, a cote de la verification : c est la que l on decide. Le
+  // detail des avis reste en bas, pour qui veut en savoir plus.
+  dire("et elle est en haut, dans les badges",
+       fiche.indexOf("4,5 sur 5") < fiche.indexOf("Ce que disent les employeurs"));
   dire("et le nombre d'avis", fiche.includes("sur 2 avis"));
   dire("et le commentaire", fiche.includes("travail soigne"));
   // Peu d'avis : on le dit plutot que de laisser croire a une reputation etablie.
