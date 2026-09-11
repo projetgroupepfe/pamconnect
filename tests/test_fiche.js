@@ -70,7 +70,13 @@ setTimeout(async () => {
        !page.includes("qu'elle souhaite") && !page.includes("Le tarif qu'elle demande"));
   dire("et elle a perdu le tiret long", !page.includes("votre demande —"));
   dire("aucun calcul de commission sur ce montant", !page.includes("Commission PamConnect"));
-  dire("ce qui n'existe pas encore est annonce", page.includes("ne sont pas encore"));
+  // LES AVIS EXISTENT DEPUIS L ETAPE 5. La fiche annoncait le contraire,
+  // juste au-dessus d une note affichee : le texte a ete retire.
+  dire("la fiche ne dit plus que les avis manquent",
+       !page.includes("ne sont pas encore"));
+  dire("elle dit ce que la personne a fait, ou qu elle commence",
+       page.includes("Nouveau prestataire") || page.includes("Pas encore not")
+       || page.includes("sur 5"));
 
   console.log("\n--- CE QU'ELLE NE MONTRE PAS ---");
   dire("jamais l'adresse email", !page.includes(pre.mail));

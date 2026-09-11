@@ -4087,7 +4087,10 @@ app.get("/personnes/:id", (req, res) => {
     // LA SEULE CHOSE DE CETTE PAGE QUI NE VIENNE PAS D ELLE. Tout le
     // reste - metier, tarif, disponibilites - est declare par la
     // personne. Les avis viennent de ceux qui l ont employee.
-    reputation: reputationDe(Number(req.params.id)),
+    reputation: Object.assign(reputationDe(Number(req.params.id)), {
+      services: requetes.reputationEtExperience
+        .get({ personne: Number(req.params.id) }).services,
+    }),
     avis: requetes.avisRecus.all(Number(req.params.id)),
   });
 });

@@ -96,22 +96,17 @@
 
             <%# LA REPUTATION, A COTE DE LA VERIFICATION. Ce sont les deux
                 seules choses de cette carte qui ne viennent pas de la
-                personne elle-meme. %>
-            <% if (prestataire.nbAvis > 0) { %>
-              <span class="badge badge-info">
-                <%- include("partiels/icone", { nom: "avis", taille: 15 }) %>
-                <%= moyenneLisible(prestataire.moyenne) %> sur 5
-              </span>
-              <span class="aide">
-                sur <%= prestataire.nbAvis %> avis
-              </span>
-            <% } else if (prestataire.nouvelle) { %>
-              <%# PAS D AVIS N EST PAS UNE MAUVAISE NOTE. Le badge le dit,
-                  au lieu de laisser un vide que chacun interprete. Elle
-                  reste dans les resultats. %>
-              <span class="badge badge-info">Nouveau prestataire</span>
-              <span class="aide">personne ne l'a encore notée</span>
-            <% } %>
+                personne elle-meme.
+
+                Le meme morceau que la fiche, le profil et l'ecran de
+                confirmation. Cette carte avait son propre code, et les
+                deux ecrans ont fini par dire deux choses de la meme
+                personne : la fiche annoncait "Nouveau prestataire", la
+                carte n'affichait rien du tout. %>
+            <%- include("partiels/note-personne", {
+                  nbAvis: prestataire.nbAvis,
+                  moyenne: prestataire.moyenne,
+                  services: prestataire.services }) %>
           </p>
 
           <ul class="infos">
