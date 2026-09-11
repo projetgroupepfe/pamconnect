@@ -182,12 +182,19 @@
         le signaler. On ne peut pas effacer un avis qui nous vise - il
         deviendrait sinon inutile a ceux qui le lisent. %>
     <% if (!utilisateur.est_admin) { %>
+      <%# LE MEME ECRAN, DEUX METIERS. Un employeur ne rend pas de
+          service : il en commande un, et c'est la personne qu'il a
+          embauchee qui le note une fois le travail fait. Lui dire
+          d'attendre son "premier service termine" ne voulait rien
+          dire de son cote. %>
       <%- include("partiels/avis-recus", {
             reputation: reputation,
             avis: mesAvis,
             titre: "Les avis reçus",
             signalable: true,
-            vide: "Personne ne vous a encore noté. Cela viendra après votre premier service terminé." }) %>
+            vide: utilisateur.role === "employeur"
+              ? "Personne ne vous a encore noté. Les personnes que vous embauchez pourront le faire une fois le service terminé."
+              : "Personne ne vous a encore noté. Cela viendra après votre premier service terminé." }) %>
 
       <%# CETTE PAGE NE SERT QU'A LIRE. Quelqu'un qui y voit un avis et
           cherche comment repondre ne trouvait rien : l'ecran ne disait

@@ -132,6 +132,19 @@ setTimeout(async () => {
   dire("le profil dit qu un service attend", monProfil.includes("attend votre avis"));
   dire("et qu il faut passer par les messages", monProfil.includes("Donner mes avis"));
 
+  // UN EMPLOYEUR NE REND PAS DE SERVICE, IL EN COMMANDE UN. Lui dire
+  // d'attendre son "premier service termine" ne voulait rien dire de
+  // son cote : ce sont les gens qu'il embauche qui le notent.
+  dire("l employeur n attend pas SON service",
+       !monProfil.includes("votre premier service"));
+  dire("on lui dit qui le notera",
+       monProfil.includes("Les personnes que vous embauchez"));
+  const sonProfil = await (await lire("/mon-profil", elle.cookie)).text();
+  dire("elle, si : elle rend le service",
+       sonProfil.includes("votre premier service"));
+  dire("et on ne lui parle pas d embaucher",
+       !sonProfil.includes("Les personnes que vous embauchez"));
+
   console.log(SAUT + "--- SEULS LES DEUX CONCERNES ---");
   const autre = await creerCompte("autre", "employeur");
   dire("un tiers recoit 404", (await lire("/avis/" + cand.id, autre.cookie)).status === 404);
