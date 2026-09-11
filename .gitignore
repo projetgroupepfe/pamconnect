@@ -4,3 +4,4 @@ data/annonces.json
 data/candidatures.json
 data/*.db
 data/documents/
+_serveur_test_temporaire.js
