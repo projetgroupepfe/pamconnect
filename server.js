@@ -1170,6 +1170,38 @@ const requetes = {
     FROM avis WHERE vise_id = ? AND masque = 0
   `),
 
+  // TOUT CE QUI SERT A CLASSER, en une requete par personne.
+  //
+  // Rien n'est range : chaque chiffre est recalcule. Un classement
+  // stocke vieillirait en silence - la personne garderait sa place
+  // longtemps apres avoir cesse de la meriter.
+  reputationEtExperience: db.prepare(`
+    SELECT
+      -- La moyenne et le nombre d'avis, masques exclus.
+      (SELECT COUNT(*) FROM avis v WHERE v.vise_id = @personne AND v.masque = 0) AS nbAvis,
+      (SELECT COALESCE(SUM(note), 0) FROM avis v
+        WHERE v.vise_id = @personne AND v.masque = 0) AS sommeNotes,
+
+      -- Les services qu'elle a reellement termines.
+      (SELECT COUNT(*) FROM candidatures c
+        WHERE c.prestataire_id = @personne AND c.terminee_le IS NOT NULL) AS services,
+
+      -- Ceux qui ont donne lieu a un probleme signale la visant, quelle
+      -- qu'en ait ete l'issue. Un desaccord porte a l'equipe reste un
+      -- desaccord, meme classe sans suite.
+      (SELECT COUNT(DISTINCT p.candidature_id) FROM problemes p
+         JOIN candidatures c ON c.id = p.candidature_id
+        WHERE p.vise_id = @personne AND c.terminee_le IS NOT NULL) AS litiges
+  `),
+
+  // La note moyenne de TOUTE la plateforme. Elle sert de point de
+  // depart a ceux qui n'ont pas encore d'avis : sans elle, une premiere
+  // note de 5 ferait passer un inconnu devant tout le monde.
+  moyenneDeLaPlateforme: db.prepare(`
+    SELECT COUNT(*) AS nombre, COALESCE(AVG(note), 0) AS moyenne
+    FROM avis WHERE masque = 0
+  `),
+
   // --- Moderation des avis ---
 
   avisParId: db.prepare(`
@@ -2045,6 +2077,91 @@ function criteresAvis(jeSuisEmployeur) {
         { cle: "critere3", libelle: "Respect" },
         { cle: "critere4", libelle: "Communication" },
       ];
+}
+
+// ============================================================
+// LE CLASSEMENT
+// ============================================================
+// CE QU'IL NE FAUT SURTOUT PAS FAIRE : classer sur les etoiles seules.
+// Une personne avec UNE note de 5 passerait devant une autre qui a
+// cinquante avis a 4,8. La premiere n'a rien prouve, la seconde si.
+//
+// La correction s'appelle une moyenne ponderee : on ajoute a chaque
+// personne quelques avis IMAGINAIRES, places a la moyenne de la
+// plateforme. Ils pesent lourd quand on n'a qu'un avis, et ne pesent
+// plus rien quand on en a cinquante.
+//
+//   note ajustee = (poids x moyenne generale + somme des notes)
+//                  / (poids + nombre d'avis)
+//
+// Avec un poids de 5 et une moyenne generale de 4 :
+//   une note de 5     -> (5x4 + 5)  / (5+1)  = 4,2
+//   cinquante a 4,8   -> (5x4 + 240)/ (5+50) = 4,7
+//
+// La seconde passe devant, et c'est exactement ce qu'on voulait.
+const POIDS_AVIS_IMAGINAIRES = 5;
+
+// Au-dela de dix services termines, en faire plus ne change plus le
+// classement : l'experience est acquise. Sans ce plafond, quelqu'un qui
+// en a cent ecraserait tout le monde pour toujours.
+const SERVICES_POUR_EXPERIENCE_COMPLETE = 10;
+
+function noteAjustee(nbAvis, sommeNotes, moyenneGenerale) {
+  return (POIDS_AVIS_IMAGINAIRES * moyenneGenerale + sommeNotes)
+       / (POIDS_AVIS_IMAGINAIRES + nbAvis);
+}
+
+// LE SCORE, SUR CENT POINTS, et chaque part s'explique en une phrase.
+//
+// La verification pese le plus : c'est la promesse de la plateforme, et
+// une personne non verifiee ne peut de toute facon pas etre embauchee.
+function scoreDe(personne, chiffres, moyenneGenerale) {
+  const verifiee = personne.statut_verification === "verifie" ? 30 : 0;
+
+  const reputation = 30 * (noteAjustee(chiffres.nbAvis, chiffres.sommeNotes,
+                                       moyenneGenerale) / 5);
+
+  const experience = 15 * Math.min(1, chiffres.services / SERVICES_POUR_EXPERIENCE_COMPLETE);
+
+  // AUCUN SERVICE N'EST AUCUN PROBLEME. On ne punit pas quelqu'un qui
+  // commence : sans service termine, cette part vaut le maximum, et
+  // c'est la part "experience" qui reste a zero.
+  const sansProbleme = chiffres.services === 0
+    ? 15
+    : 15 * (1 - chiffres.litiges / chiffres.services);
+
+  const disponible = personne.disponibilites ? 10 : 0;
+
+  return {
+    total: verifiee + reputation + experience + sansProbleme + disponible,
+    verifiee, reputation, experience, sansProbleme, disponible,
+  };
+}
+
+// LE LIEU, EN PLUS DU RESTE. Il ne se melange pas au score : quelqu'un
+// de proche mais non verifie ne doit pas passer devant quelqu'un de
+// verifie un peu plus loin.
+//
+// Au plus 10 points : le meme quartier, ou une distance courte quand la
+// position est connue.
+function pointsDeProximite(personne, lieuCherche, distanceKm) {
+  if (distanceKm !== undefined && distanceKm !== null) {
+    // Dix points a moins d'un kilometre, plus rien au-dela de dix.
+    return 10 * Math.max(0, Math.min(1, (10 - distanceKm) / 9));
+  }
+
+  if (!lieuCherche) return 0;
+  if (lieuCherche.quartier && personne.quartier === lieuCherche.quartier) return 10;
+  if (lieuCherche.arrondissement && personne.arrondissement === lieuCherche.arrondissement) return 5;
+
+  return 0;
+}
+
+// UNE PERSONNE SANS AUCUN AVIS N'EST PAS UNE MAUVAISE PERSONNE : elle
+// commence. Le badge le dit, au lieu de laisser un vide que chacun
+// interprete comme il veut.
+function estNouvelle(chiffres) {
+  return chiffres.nbAvis === 0 && chiffres.services === 0;
 }
 
 // ============================================================
@@ -3911,15 +4028,49 @@ app.get("/recherche", (req, res) => {
       .map((p) => ({
         ...p,
         distance: calculerDistanceKm(latEmployeur, lonEmployeur, p.latitude, p.longitude),
-      }))
-      .sort((a, b) => a.distance - b.distance);
+      }));
   }
 
-  // On prepare le texte de la distance ici : la vue ne fait aucun calcul.
-  const resultats = prestataires.map((p) => ({
-    ...p,
-    distanceTexte: p.distance !== undefined ? `${p.distance.toFixed(1)} km` : "Distance inconnue",
-  }));
+  // LE CLASSEMENT. Ce qui vient avant a FILTRE - le metier, la position
+  // connue. Ce qui suit ORDONNE, et sur autre chose que les etoiles.
+  //
+  // La moyenne generale est lue une fois : elle sert de point de depart
+  // a ceux qui n'ont pas encore d'avis.
+  const general = requetes.moyenneDeLaPlateforme.get();
+  const moyenneGenerale = general.nombre > 0 ? general.moyenne : 4;
+
+  const lieuCherche = {
+    quartier: trouverQuartier(String(req.query.quartier || "")),
+    arrondissement: String(req.query.arrondissement || "").trim() || null,
+  };
+
+  const resultats = prestataires
+    .map((p) => {
+      const chiffres = requetes.reputationEtExperience.get({ personne: p.id });
+      const score = scoreDe(p, chiffres, moyenneGenerale);
+      const proximite = pointsDeProximite(p, lieuCherche, p.distance);
+
+      return {
+        ...p,
+        distanceTexte: p.distance !== undefined
+          ? `${p.distance.toFixed(1)} km`
+          : "Distance inconnue",
+
+        // Ce que la vue affiche : la moyenne reelle, le nombre d'avis,
+        // et le badge des personnes qui commencent. Jamais le score -
+        // un nombre affiche se compare, se discute, et finit par se
+        // chercher.
+        nbAvis: chiffres.nbAvis,
+        moyenne: chiffres.nbAvis > 0
+          ? Math.round((chiffres.sommeNotes / chiffres.nbAvis) * 10) / 10
+          : null,
+        services: chiffres.services,
+        nouvelle: estNouvelle(chiffres),
+
+        classement: score.total + proximite,
+      };
+    })
+    .sort((a, b) => b.classement - a.classement);
 
   res.render("recherche", {
     titre: "Rechercher un prestataire",
