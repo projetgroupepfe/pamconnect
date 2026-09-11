@@ -221,6 +221,33 @@ setTimeout(async () => {
   // Peu d'avis : on le dit plutot que de laisser croire a une reputation etablie.
   dire("elle previent que c'est peu", fiche.includes("peut encore beaucoup bouger"));
 
+  console.log(SAUT + "--- LA NOTE EST LA OU L ON CHOISIT ---");
+  // L employeur ne choisit pas depuis la recherche : il choisit sous sa
+  // demande, et sur l ecran de confirmation. Sans la note a ces deux
+  // endroits, il devait ouvrir une fiche et revenir pour chaque personne.
+  await poster("/annonces", form({ titre: M + " Choix", metier: "menagere",
+    quartier: "Mvan", horaire: "Lundi 8h", prix: "11000" }), emp.cookie);
+  const aChoisir = base.prepare(
+    "SELECT id FROM annonces WHERE titre = ? ORDER BY id DESC LIMIT 1").get(M + " Choix");
+
+  // Posee directement : la limite de trois reponses par 24 heures est
+  // atteinte dans ce scenario, et ce n'est pas le sujet ici.
+  const enAttente = base.prepare(`
+    INSERT INTO candidatures (annonce_id, prestataire_id, statut, envoyee_le)
+    VALUES (?, ?, 'en attente', datetime('now'))
+  `).run(aChoisir.id, elle.id);
+
+  const profilEmp = await (await lire("/mon-profil", emp.cookie)).text();
+  dire("sa note apparait sous la candidature", profilEmp.includes("4,5 sur 5"));
+  dire("avec le nombre d avis", profilEmp.includes("sur 2 avis"));
+  dire("et les services termines", profilEmp.includes("services terminés"));
+
+  // L ecran de confirmation ne s ouvre que sur une candidature en
+  // attente : une fois quelqu un choisi, il n y a plus rien a confirmer.
+  const confirmation = await (await lire(
+    "/candidatures/" + Number(enAttente.lastInsertRowid) + "/confirmer", emp.cookie)).text();
+  dire("et sur l ecran de confirmation", confirmation.includes("4,5 sur 5"));
+
   console.log(SAUT + "--- LA REPUTATION DE L'EMPLOYEUR AUSSI ---");
   // Une plateforme qui ne fait noter que d'un cote met toute la pression
   // sur celui qui a le moins de pouvoir.

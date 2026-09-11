@@ -481,7 +481,18 @@ const requetes = {
            u.nom                 AS nomPrestataire,
            u.experience_annees   AS experiencePrestataire,
            u.disponibilites      AS disponibilitesPrestataire,
-           u.statut_verification AS verificationPrestataire
+           u.statut_verification AS verificationPrestataire,
+
+           -- SA REPUTATION, ICI. C'est sous sa demande que l'employeur
+           -- choisit, pas dans la recherche : sans ces deux chiffres il
+           -- devait ouvrir une fiche, revenir, et recommencer pour
+           -- chaque personne.
+           (SELECT COUNT(*) FROM avis v
+             WHERE v.vise_id = u.id AND v.masque = 0) AS nbAvis,
+           (SELECT ROUND(AVG(note), 1) FROM avis v
+             WHERE v.vise_id = u.id AND v.masque = 0) AS moyenne,
+           (SELECT COUNT(*) FROM candidatures x
+             WHERE x.prestataire_id = u.id AND x.terminee_le IS NOT NULL) AS servicesTermines
     FROM candidatures c
     JOIN utilisateurs u ON u.id = c.prestataire_id
     WHERE c.annonce_id = ?
@@ -3796,7 +3807,20 @@ app.get("/candidatures/:id/confirmer", exigerConnexion, (req, res) => {
     choisie: c.id,
   }).n;
 
-  res.render("confirmer-embauche", { titre: "Confirmer votre choix", c, autres });
+  // LE MOMENT DE LA DECISION : sa note doit etre sur cet ecran, pas a
+  // un clic de la.
+  const saReputation = reputationDe(c.prestataireId);
+
+  res.render("confirmer-embauche", {
+    titre: "Confirmer votre choix",
+    c,
+    autres,
+    reputation: {
+      nombre: saReputation.nombre,
+      moyenne: saReputation.moyenne,
+      services: requetes.reputationEtExperience.get({ personne: c.prestataireId }).services,
+    },
+  });
 });
 
 app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => {

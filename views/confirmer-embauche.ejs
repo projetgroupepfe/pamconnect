@@ -23,6 +23,13 @@
           <%- include("partiels/icone", { nom: "verifie" }) %>
           Identité et casier vérifiés
         </span>
+
+        <%# LE MOMENT DE LA DECISION. Sa note doit etre la, pas a un
+            clic de la. %>
+        <%- include("partiels/note-personne", {
+              nbAvis: reputation.nombre,
+              moyenne: reputation.moyenne,
+              services: reputation.services }) %>
         <% if (libelleExperience(c.experiencePrestataire)) { %>
           <span class="badge badge-info">
             <%- include("partiels/icone", { nom: "experience" }) %>

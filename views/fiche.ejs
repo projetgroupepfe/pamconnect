@@ -27,17 +27,8 @@
         <%# LA NOTE A COTE DE LA VERIFICATION : ce sont les deux seules
             choses de cette page qui ne viennent pas d'elle. Tout le
             reste - metier, tarif, disponibilites - est declare. %>
-        <% if (reputation.nombre > 0) { %>
-          <span class="badge badge-info">
-            <%- include("partiels/icone", { nom: "avis" }) %>
-            <%= moyenneLisible(reputation.moyenne) %> sur 5
-            <span class="lecture-ecran">sur <%= reputation.nombre %> avis</span>
-          </span>
-          <span class="aide">sur <%= reputation.nombre %> avis</span>
-        <% } else { %>
-          <%# PAS D AVIS N EST PAS UNE MAUVAISE NOTE : elle commence. %>
-          <span class="badge badge-info">Nouveau prestataire</span>
-        <% } %>
+        <%- include("partiels/note-personne", {
+              nbAvis: reputation.nombre, moyenne: reputation.moyenne }) %>
 
         <% badgesDe(personne).filter(function (b) { return b.cle !== "verifie"; })
              .forEach(function (b) { %>

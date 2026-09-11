@@ -382,6 +382,14 @@
                     <% } %>
                     <%= libelleVerification(candidature.verificationPrestataire) %>
                   </span>
+
+                  <%# SA NOTE, ICI. C'est sous sa demande que l'employeur
+                      choisit : sans ces deux chiffres il devait ouvrir une
+                      fiche, revenir, et recommencer pour chaque personne. %>
+                  <%- include("partiels/note-personne", {
+                        nbAvis: candidature.nbAvis,
+                        moyenne: candidature.moyenne,
+                        services: candidature.servicesTermines }) %>
                 </p>
 
                 <%# Le montant retenu pour CETTE candidature : celui du

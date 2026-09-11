@@ -1,0 +1,25 @@
+<%#
+  La note d'une personne, en une ligne, la ou l'on decide.
+
+  Appelee ainsi :
+    include("partiels/note-personne", { nbAvis: ..., moyenne: ..., services: ... })
+
+  PAS D'AVIS N'EST PAS UNE MAUVAISE NOTE : on n'ecrit jamais "0 sur 5".
+  Quelqu'un qui commence porte un badge qui le dit.
+
+  ATTENTION : ne jamais ecrire la sequence de fermeture EJS dans ce
+  commentaire, elle terminerait le bloc au milieu d'une phrase.
+%>
+<% if (nbAvis > 0) { %>
+  <span class="badge badge-info">
+    <%- include("icone", { nom: "avis", taille: 15 }) %>
+    <%= moyenneLisible(moyenne) %> sur 5
+  </span>
+  <span class="aide">
+    sur <%= nbAvis %> avis<% if (locals.services > 0) { %>,
+    <%= locals.services %> service<%= locals.services > 1 ? "s" : "" %> terminé<%= locals.services > 1 ? "s" : "" %><% } %>
+  </span>
+<% } else { %>
+  <span class="badge badge-info">Nouveau prestataire</span>
+  <span class="aide">personne ne l'a encore notée</span>
+<% } %>
