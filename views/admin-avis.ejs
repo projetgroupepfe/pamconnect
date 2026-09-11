@@ -1,8 +1,8 @@
 <%- include("partiels/tete") %>
 
-  <h1>Avis signalés</h1>
+  <h1>Les avis</h1>
   <p class="chapeau">
-    Les avis que la personne visée conteste, et que l'équipe doit examiner.
+    Ceux que la personne visée conteste, et les derniers écrits sur la plateforme.
   </p>
 
   <%# MASQUER EFFACE LA PAROLE DE QUELQU'UN. Ce n'est pas une correction
@@ -16,6 +16,8 @@
       mais il reste en base avec votre motif.
     </p>
   </div>
+
+  <h2>Avis signalés</h2>
 
   <% if (avis.length === 0) { %>
 
@@ -66,6 +68,62 @@
             </button>
           </div>
         </form>
+      </div>
+    <% }); %>
+
+  <% } %>
+
+  <h2>Les derniers avis écrits</h2>
+
+  <%# UN AVIS FAUX NE DEVIENT PAS ACCEPTABLE PARCE QUE PERSONNE NE L'A
+      SIGNALE. La personne visée ne se connecte peut-être jamais. %>
+  <p class="chapeau">
+    Vingt derniers avis, signalés ou non. L'équipe peut en masquer un
+    sans attendre qu'on le lui demande.
+  </p>
+
+  <% if (derniers.length === 0) { %>
+
+    <p class="vide">Aucun avis pour le moment.</p>
+
+  <% } else { %>
+
+    <% derniers.forEach(function (a) { %>
+      <div class="carte">
+        <h3><%= a.note %> sur 5 — sur <%= a.nomVise %></h3>
+        <p class="discret">
+          Écrit par <strong><%= a.nomAuteur %></strong><br>
+          Après « <%= a.titreAnnonce %> », le <%= dateLisible(a.cree_le) %>
+        </p>
+
+        <% if (a.commentaire) { %>
+          <p><%= a.commentaire %></p>
+        <% } %>
+
+        <% if (a.masque) { %>
+          <p>
+            <span class="badge badge-non-soumis">Masqué</span>
+            <span class="aide">
+              par <%= a.nomDecideur || "un compte supprimé depuis" %>,
+              le <%= dateLisible(a.masque_le) %>
+            </span>
+          </p>
+          <p class="aide">Motif : <%= a.motif_masquage %></p>
+        <% } else { %>
+          <form action="/admin/avis/<%= a.id %>" method="POST">
+            <div class="champ">
+              <label for="motif-recent-<%= a.id %>">Motif, si vous masquez</label>
+              <input id="motif-recent-<%= a.id %>" type="text" name="motif" maxlength="200"
+                     placeholder="Avis de test">
+            </div>
+            <div class="actions">
+              <button type="submit" name="decision" value="masquer" class="bouton-danger">
+                <%- include("partiels/icone", { nom: "refuser" }) %>
+                Masquer cet avis
+              </button>
+            </div>
+          </form>
+        <% } %>
       </div>
     <% }); %>
 

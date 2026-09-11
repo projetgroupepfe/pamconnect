@@ -313,6 +313,25 @@ setTimeout(async () => {
   dire("avec le motif ecrit par l equipe", vueAuteur.includes("verifiables"));
   dire("et ce qu il peut faire", vueAuteur.includes("/probleme/" + cand.id));
 
+  console.log(SAUT + "--- L EQUIPE N ATTEND PAS QU ON LUI SIGNALE ---");
+  // Un avis faux ne devient pas acceptable parce que personne ne l a
+  // signale. Sans cette liste, il restait en ligne pour toujours des que
+  // la personne visee ne se connectait plus.
+  const ecranTous = await (await lire("/admin/avis", eq.cookie)).text();
+  dire("les derniers avis sont listes", ecranTous.includes("Les derniers avis"));
+  dire("meme ceux que personne n a signales", ecranTous.includes("maison accueillante"));
+
+  const jamaisSignale = base.prepare(`
+    SELECT id FROM avis WHERE candidature_id = ? AND auteur_id = ?`).get(deuxieme.cand.id, emp.id);
+  const masqueDirect = await poster("/admin/avis/" + jamaisSignale.id,
+    form({ decision: "masquer", motif: "Avis de test a retirer" }), eq.cookie);
+  dire("l equipe peut le masquer directement", masqueDirect.code === 302, String(masqueDirect.code));
+  dire("il sort de la moyenne",
+       base.prepare("SELECT masque FROM avis WHERE id = ?").get(jamaisSignale.id).masque === 1);
+  // ET LE MOTIF RESTE LISIBLE : une decision doit pouvoir s expliquer.
+  const apresMasquage = await (await lire("/admin/avis", eq.cookie)).text();
+  dire("le motif reste lisible par l equipe", apresMasquage.includes("Avis de test a retirer"));
+
   console.log(SAUT + "--- LAISSER EN LIGNE EST AUSSI UNE DECISION ---");
   await poster("/avis/" + sien.id + "/signaler", form({}), emp.cookie);
   dire("l'avis est signale", base.prepare("SELECT signale FROM avis WHERE id = ?").get(sien.id).signale === 1);

@@ -1243,6 +1243,29 @@ const requetes = {
     SELECT COUNT(*) AS n FROM avis WHERE signale = 1 AND masque = 0
   `),
 
+  // LES DERNIERS AVIS ECRITS, signales ou non. Un avis faux ne devient
+  // pas acceptable parce que personne ne l'a signale : la personne visee
+  // ne se connecte peut-etre jamais.
+  //
+  // Les masques y figurent aussi, avec leur motif : l'equipe doit
+  // pouvoir relire ce qu'elle a decide.
+  derniersAvis: db.prepare(`
+    SELECT a.*,
+           auteur.nom AS nomAuteur, auteur.email AS emailAuteur,
+           vise.nom   AS nomVise,
+           q.nom      AS nomDecideur,
+           n.titre    AS titreAnnonce
+    FROM avis a
+    JOIN utilisateurs auteur ON auteur.id = a.auteur_id
+    JOIN utilisateurs vise   ON vise.id   = a.vise_id
+    LEFT JOIN utilisateurs q ON q.id = a.masque_par
+    JOIN candidatures c ON c.id = a.candidature_id
+    JOIN annonces     n ON n.id = c.annonce_id
+    WHERE a.signale = 0
+    ORDER BY a.id DESC
+    LIMIT 20
+  `),
+
   // MASQUER, PAS SUPPRIMER, et jamais sans motif ecrit : une decision
   // qui efface la parole de quelqu'un doit pouvoir s'expliquer.
   masquerAvis: db.prepare(`
@@ -4571,8 +4594,9 @@ app.post("/avis/:id/signaler", exigerConnexion, interdireALEquipe, lireFormulair
 // --- Espace equipe : les avis signales -----------------------------
 app.get("/admin/avis", exigerAdmin, (req, res) => {
   res.render("admin-avis", {
-    titre: "Avis signalés",
+    titre: "Les avis",
     avis: requetes.avisSignales.all(),
+    derniers: requetes.derniersAvis.all(),
   });
 });
 
