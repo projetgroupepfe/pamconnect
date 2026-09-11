@@ -271,7 +271,27 @@
         </div>
       </div>
     <% } else { %>
-      <% mesAnnonces.forEach(function (annonce) { %>
+      <%# CE QUI EST EN COURS D'ABORD. Une demande fermee garde ses
+          discussions et la trace de son argent : on ne la supprime pas,
+          on la range. %>
+      <% const ouvertes = mesAnnonces.filter(function (a) { return !a.annulee; }); %>
+      <% const fermees  = mesAnnonces.filter(function (a) { return a.annulee; }); %>
+
+      <% if (ouvertes.length === 0) { %>
+        <p class="vide">Aucune demande en cours.</p>
+      <% } %>
+
+      <% ouvertes.concat(fermees).forEach(function (annonce, rang) { %>
+        <%# Le titre de la section fermee, pose juste avant la premiere
+            d'entre elles. %>
+        <% if (fermees.length > 0 && rang === ouvertes.length) { %>
+          <h2>Demandes terminées</h2>
+          <p class="chapeau">
+            Retirées ou pourvues. Elles n'apparaissent plus dans la liste
+            publique, mais vos discussions et vos versements y restent
+            rattachés.
+          </p>
+        <% } %>
         <div class="carte">
           <h3><%= annonce.titre %></h3>
           <ul class="infos">

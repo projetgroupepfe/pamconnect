@@ -325,7 +325,22 @@ setTimeout(async () => {
   dire("sans pronom ambigu la non plus",
        !autre.corps.includes("accepte plus de réponse"));
 
-  console.log("\n--- NETTOYAGE ---");
+  console.log("\n--- LES DEMANDES FERMEES SONT RANGEES, PAS SUPPRIMEES ---");
+  // Ce qui est en cours et ce qui est fini ne se lisent pas au meme
+  // moment. Mais une demande fermee garde ses discussions, ses reponses
+  // et la trace de son argent : on ne la supprime pas, on la range.
+  const profilAli = await (await lire("/mon-profil", emp.cookie)).text();
+  dire("la section des demandes terminees existe",
+       profilAli.includes("Demandes termin"));
+  dire("elle dit pourquoi elles restent", profilAli.includes("y restent"));
+  dire("la demande retiree est toujours listee",
+       profilAli.includes("retir\u00e9 cette demande"));
+  // ET APRES LES VIVANTES : une demande ouverte ne doit pas se perdre au
+  // milieu de celles qui sont closes.
+  dire("elle vient apres le titre de la section",
+       profilAli.indexOf("Demandes termin") < profilAli.lastIndexOf("retir\u00e9 cette demande"));
+
+  console.log(String.fromCharCode(10) + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");
 
