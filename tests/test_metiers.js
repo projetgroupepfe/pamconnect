@@ -92,7 +92,7 @@ setTimeout(async () => {
   const sectionAutres = page.indexOf("Les autres demandes");
 
   dire("la section 'Pour vous' porte son metier officiel",
-       page.includes("Pour vous — Ménage à domicile"));
+       page.includes("Pour vous : Ménage à domicile"));
   dire("la demande ecrite 'menagere' y figure", avant !== -1);
   dire("elle est placee AVANT les autres demandes",
        sectionAutres === -1 || avant < sectionAutres,

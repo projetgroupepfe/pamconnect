@@ -40,7 +40,7 @@
 <div class="champ">
   <label for="arrondissement">Arrondissement</label>
   <select id="arrondissement" name="arrondissement">
-    <option value="">—</option>
+    <option value="">Non précisé</option>
     <% arrondissements.forEach(function (a) { %>
       <option value="<%= a %>" <%= arrondissement === a ? "selected" : "" %>><%= a %></option>
     <% }); %>

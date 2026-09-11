@@ -11,7 +11,7 @@
     <p class="aide">
       Un avis reste <strong>visible tant qu'il n'est pas masqué</strong> :
       un signalement n'est pas une sanction. Masquez seulement ce qui est
-      faux, insultant ou discriminatoire — pas ce qui est simplement sévère.
+      faux, insultant ou discriminatoire, jamais ce qui est simplement sévère.
       Un avis masqué disparaît des écrans et ne compte plus dans la moyenne,
       mais il reste en base avec votre motif.
     </p>
@@ -27,7 +27,7 @@
 
     <% avis.forEach(function (a) { %>
       <div class="carte">
-        <h3><%= a.note %> sur 5 — sur <%= a.nomVise %></h3>
+        <h3><%= a.note %> sur 5 pour <%= a.nomVise %></h3>
         <p class="discret">
           Écrit par <strong><%= a.nomAuteur %></strong><br>
           <%= a.emailAuteur %><br>
@@ -51,7 +51,7 @@
 
         <form action="/admin/avis/<%= a.id %>" method="POST">
           <div class="champ">
-            <label for="motif-<%= a.id %>">Motif, si vous masquez</label>
+            <label for="motif-<%= a.id %>">Motif, obligatoire pour masquer</label>
             <input id="motif-<%= a.id %>" type="text" name="motif" maxlength="200"
                    placeholder="Propos insultants">
           </div>
@@ -90,7 +90,7 @@
 
     <% derniers.forEach(function (a) { %>
       <div class="carte">
-        <h3><%= a.note %> sur 5 — sur <%= a.nomVise %></h3>
+        <h3><%= a.note %> sur 5 pour <%= a.nomVise %></h3>
         <p class="discret">
           Écrit par <strong><%= a.nomAuteur %></strong><br>
           Après « <%= a.titreAnnonce %> », le <%= dateLisible(a.cree_le) %>
@@ -112,9 +112,12 @@
         <% } else { %>
           <form action="/admin/avis/<%= a.id %>" method="POST">
             <div class="champ">
-              <label for="motif-recent-<%= a.id %>">Motif, si vous masquez</label>
+              <label for="motif-recent-<%= a.id %>">Motif, obligatoire</label>
               <input id="motif-recent-<%= a.id %>" type="text" name="motif" maxlength="200"
-                     placeholder="Avis de test">
+                     placeholder="Propos insultants">
+              <small class="aide">
+                Ce que vous écrivez ici, l'auteur de l'avis le lira.
+              </small>
             </div>
             <div class="actions">
               <button type="submit" name="decision" value="masquer" class="bouton-danger">

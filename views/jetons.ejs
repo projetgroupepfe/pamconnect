@@ -260,7 +260,7 @@
             <span>
               <%= m.detail || motifJetonsLisible(m.motif) %>
               <br><small class="discret">
-                <%= dateLisible(m.cree_le) %><%= m.nature === "offert" ? " — jetons offerts" : "" %>
+                <%= dateLisible(m.cree_le) %><%= m.nature === "offert" ? ", jetons offerts" : "" %>
               </small>
             </span>
             <% if (m.quantite < 0) { %>

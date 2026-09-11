@@ -57,8 +57,7 @@
     <div class="carte">
       <p>
         <strong><%= moyenneLisible(a.note) %> sur 5</strong>
-        <span class="aide">
-          — <%= a.nomAuteur %><% if (a.titreAnnonce) { %>, après « <%= a.titreAnnonce %> »<% } %>
+        <span class="aide"> par <%= a.nomAuteur %><% if (a.titreAnnonce) { %>, après « <%= a.titreAnnonce %> »<% } %>
         </span>
       </p>
 

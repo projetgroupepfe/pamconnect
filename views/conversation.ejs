@@ -13,7 +13,7 @@
           <%- include("partiels/icone", { nom: "profil" }) %>
           <span>
             Avec
-            <strong><%= jeSuisEmployeur ? conversation.nomPrestataire : conversation.nomEmployeur %></strong><% if (jeSuisEmployeur && conversation.metierPrestataire) { %> — <%= conversation.metierPrestataire %><% } %>
+            <strong><%= jeSuisEmployeur ? conversation.nomPrestataire : conversation.nomEmployeur %></strong><% if (jeSuisEmployeur && conversation.metierPrestataire) { %>, <%= conversation.metierPrestataire %><% } %>
           </span>
         </li>
         <li>
@@ -252,7 +252,7 @@
         <div class="carte">
           <p>
             <strong><%= monAvis.note %> sur 5</strong>
-            <span class="aide">— votre avis, publié le <%= dateLisible(monAvis.cree_le) %></span>
+            <span class="aide">votre avis, publié le <%= dateLisible(monAvis.cree_le) %></span>
           </p>
           <% if (monAvis.commentaire) { %>
             <p><%= monAvis.commentaire %></p>
@@ -289,8 +289,7 @@
         <div class="carte">
           <p>
             Ce service est terminé. Dites ce qui s'est passé à
-            <strong><%= jeSuisEmployeur ? conversation.nomPrestataire : conversation.nomEmployeur %></strong>
-            — votre avis aidera les suivants à décider.
+            <strong><%= jeSuisEmployeur ? conversation.nomPrestataire : conversation.nomEmployeur %></strong>. Votre avis aidera les suivants à décider.
           </p>
           <div class="actions">
             <a class="bouton" href="/avis/<%= conversation.id %>">
@@ -307,8 +306,7 @@
         <div class="carte">
           <p>
             <strong><%= avisRecu.note %> sur 5</strong>
-            <span class="aide">
-              — ce que <%= avisRecu.nomAuteur %> a écrit sur vous
+            <span class="aide"> ce que <%= avisRecu.nomAuteur %> a écrit sur vous
             </span>
           </p>
           <% if (avisRecu.commentaire) { %>

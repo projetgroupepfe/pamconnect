@@ -145,8 +145,7 @@
             <li>
               <%- include("partiels/icone", { nom: "calendrier" }) %>
               <span>
-                <strong><%= c.jour.charAt(0).toUpperCase() + c.jour.slice(1) %></strong>
-                — <%= c.moments.join(", ") %>
+                <strong><%= c.jour.charAt(0).toUpperCase() + c.jour.slice(1) %></strong> : <%= c.moments.join(", ") %>
               </span>
             </li>
           <% }); %>
@@ -290,7 +289,7 @@
                 <span>
                   <%= prixEnClair(annonce) %>
                   <% if (annonce.duree_estimee) { %>
-                    <span class="aide">— <%= annonce.duree_estimee %></span>
+                    <span class="aide"><%= annonce.duree_estimee %></span>
                   <% } %>
                 </span>
               </li>
