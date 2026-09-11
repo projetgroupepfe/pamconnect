@@ -94,7 +94,26 @@
 
     <%- include("partiels/portee-verification", { court: false }) %>
 
+    <%# LA MEME IMPASSE, sur la fiche. Il regarde la personne qu'il
+        veut et n'a qu'un bouton de retour. %>
+    <% if (locals.jePeux && jePeux.publier) { %>
+      <div class="carte confiance">
+        <h3>Travailler avec cette personne</h3>
+        <p>
+          Publiez votre demande avec le service, l'horaire et le prix.
+          Cette personne pourra y répondre, et vous la choisirez parmi
+          celles qui se proposent.
+        </p>
+      </div>
+    <% } %>
+
     <div class="actions">
+      <% if (locals.jePeux && jePeux.publier) { %>
+        <a class="bouton" href="/publier-annonce">
+          <%- include("partiels/icone", { nom: "ajouter" }) %>
+          Publier une demande
+        </a>
+      <% } %>
       <a class="bouton bouton-secondaire" href="/recherche">Retour à la recherche</a>
     </div>
 

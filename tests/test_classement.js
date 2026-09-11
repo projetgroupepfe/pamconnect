@@ -188,6 +188,31 @@ setTimeout(async () => {
   dire("aucun score chiffre n'est montre",
        !page5.includes("classement") || !page5.includes("/100"));
 
+  console.log(SAUT + "--- LA RECHERCHE N EST PAS UNE IMPASSE ---");
+  // Un employeur trouve la personne qu il veut, et ensuite ? Sur cette
+  // plateforme on n embauche pas depuis une fiche : on publie une
+  // demande. Personne ne devine cette regle, il faut la dire.
+  const vueEmp = await (await lire("/recherche?metier=" + encodeURIComponent(METIER), emp.cookie)).text();
+  dire("l employeur lit ce qu il doit faire", vueEmp.includes("Vous avez trouvé quelqu'un"));
+  dire("avec le bouton qui y mene", vueEmp.includes("/publier-annonce"));
+  dire("et la raison : la somme est bloquee", vueEmp.includes("dès la publication"));
+
+  const fiche = await (await lire("/personnes/" + eprouvee.id, emp.cookie)).text();
+  dire("la fiche le dit aussi", fiche.includes("Travailler avec cette personne"));
+
+  // LA PERSONNE QUI PROPOSE SES SERVICES N A RIEN A PUBLIER : ce bloc
+  // n est pas pour elle.
+  const vuePre = await (await lire("/recherche?metier=" + encodeURIComponent(METIER), eprouvee.cookie)).text();
+  dire("elle ne voit pas ce bloc", !vuePre.includes("Vous avez trouvé quelqu'un"));
+
+  console.log(SAUT + "--- LE NOMBRE NE COMPTE PLUS LES INSCRITS ---");
+  // "10 personnes au total" repond a une question que personne ne pose,
+  // et un petit nombre decourage au lieu d informer.
+  const sansMetier = await (await lire("/recherche")).text();
+  dire("sans recherche, aucun total", !sansMetier.includes("au total"));
+  dire("le titre reste clair", sansMetier.includes("Les personnes disponibles"));
+  dire("avec un metier, le compte revient", vueEmp.includes("pour «"));
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   const a = base.prepare("DELETE FROM annonces WHERE titre LIKE ?").run("%" + M + "%").changes;

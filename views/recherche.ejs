@@ -28,11 +28,19 @@
     </form>
   </div>
 
-  <h2>
-    <%= prestataires.length %>
-    personne<%= prestataires.length > 1 ? "s" : "" %>
-    <%= locals.metierRecherche ? "pour « " + metierRecherche + " »" : "au total" %>
-  </h2>
+  <%# LE NOMBRE REPOND A UNE QUESTION, ou il ne sert a rien.
+      "3 personnes pour menage" renseigne. "10 personnes au total"
+      compte les inscrits : ce n'est pas ce que l'employeur cherche a
+      savoir, et un petit nombre decourage au lieu d'informer. %>
+  <% if (locals.metierRecherche) { %>
+    <h2>
+      <%= prestataires.length %>
+      personne<%= prestataires.length > 1 ? "s" : "" %>
+      pour « <%= metierRecherche %> »
+    </h2>
+  <% } else { %>
+    <h2>Les personnes disponibles</h2>
+  <% } %>
 
   <%# ON DIT CE QUI COMPTE, sans donner de note. Un classement qu'on
       n'explique pas est un classement qu'on subit ; un score affiche,
@@ -200,5 +208,34 @@
     );
   });
 </script>
+
+
+  <%# L'IMPASSE. Il a trouve quelqu'un, et ensuite ? Sur cette
+      plateforme on n'embauche pas depuis une fiche : on publie une
+      demande, et les personnes y repondent.
+
+      C'est un choix - la somme est bloquee des la publication, et les
+      autres gardent leur chance - mais un choix que personne ne devine.
+      On le dit ici, la ou la question se pose. %>
+  <% if (locals.jePeux && jePeux.publier && prestataires.length > 0) { %>
+    <div class="carte confiance">
+      <h3>Vous avez trouvé quelqu'un ?</h3>
+      <p>
+        On n'embauche pas directement depuis cette page. Publiez votre
+        demande avec le service, l'horaire et le prix : les personnes qui
+        vous intéressent pourront y répondre, et vous choisirez parmi elles.
+      </p>
+      <p class="aide">
+        C'est ce qui vous protège : la somme que vous annoncez est bloquée
+        dès la publication, et vous ne payez qu'après le service.
+      </p>
+      <div class="actions">
+        <a class="bouton" href="/publier-annonce">
+          <%- include("partiels/icone", { nom: "ajouter" }) %>
+          Publier une demande
+        </a>
+      </div>
+    </div>
+  <% } %>
 
 <%- include("partiels/pied") %>
