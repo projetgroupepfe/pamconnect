@@ -87,9 +87,8 @@
           calculer une facture. %>
       <p><strong><%= formaterTarif(personne.tarif) %></strong> pour une prestation.</p>
       <p class="aide">
-        C'est le montant souhaité pour ses services. Le prix réellement
-        payé est celui que vous annoncez dans votre demande. Cette personne
-        y répond si cela lui convient.
+        C'est le montant souhaité.
+        Le prix payé est celui que vous annoncez dans votre demande.
       </p>
     </div>
 
@@ -105,6 +104,6 @@
         reputation: reputation,
         avis: avis,
         titre: "Ce que disent les employeurs",
-        vide: "Cette personne n'a pas encore reçu d'avis. Ce n'est pas un mauvais signe : elle commence." }) %>
+        vide: "Personne ne l'a encore notée." }) %>
 
 <%- include("partiels/pied") %>
