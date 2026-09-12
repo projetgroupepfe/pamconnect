@@ -45,6 +45,12 @@
       <% const ouvertes = mesAnnonces.filter(function (a) { return !a.annulee; }); %>
       <% const fermees  = mesAnnonces.filter(function (a) { return a.annulee; }); %>
 
+      <%# Le titre n'apparait que s'il y a une seconde section : seul,
+          au-dessus de la seule liste de la page, il n'apprendrait rien. %>
+      <% if (ouvertes.length > 0 && fermees.length > 0) { %>
+        <h2>Demandes en cours</h2>
+      <% } %>
+
       <% if (ouvertes.length === 0) { %>
         <p class="vide">Aucune demande en cours.</p>
       <% } %>

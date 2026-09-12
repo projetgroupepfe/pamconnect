@@ -329,6 +329,10 @@ setTimeout(async () => {
   // Ce qui est en cours et ce qui est fini ne se lisent pas au meme
   // moment. Mais une demande fermee garde ses discussions, ses reponses
   // et la trace de son argent : on ne la supprime pas, on la range.
+  // Il ne lui reste que des demandes fermees. On en rouvre une, sinon
+  // il n y a rien a distinguer et la paire de titres ne se verifie pas.
+  await poster("/annonces", form({ titre: M + " vivante", metier: "menagere",
+                                  quartier: "Mvan", horaire: "L 8h", prix: "10000" }), emp.cookie);
   const profilAli = await (await lire("/mes-demandes", emp.cookie)).text();
   dire("la section des demandes terminees existe",
        profilAli.includes("Demandes termin"));
@@ -339,6 +343,23 @@ setTimeout(async () => {
   // milieu de celles qui sont closes.
   dire("elle vient apres le titre de la section",
        profilAli.indexOf("Demandes termin") < profilAli.lastIndexOf("retir\u00e9 cette demande"));
+
+  // LA PAIRE SE LIT ENSEMBLE. Un titre plus bas laissait entendre que
+  // ce qui precede est autre chose, sans jamais dire quoi.
+  dire("les demandes en cours ont leur titre aussi",
+       profilAli.includes("Demandes en cours"));
+  dire("et il vient avant celui des terminees",
+       profilAli.indexOf("Demandes en cours") < profilAli.indexOf("Demandes termin"));
+
+  // MAIS UN TITRE QUI NE DISTINGUE RIEN EST DU BRUIT : sans demande
+  // fermee, il surplomberait la seule liste de la page.
+  const neuf = await creerCompte("sanstitre", "employeur");
+  await poster("/annonces", form({ titre: M + " seule", metier: "menagere",
+                                  quartier: "Mvan", horaire: "L 8h", prix: "10000" }), neuf.cookie);
+  const sansFermee = await (await lire("/mes-demandes", neuf.cookie)).text();
+  dire("sans demande fermee, aucun titre ne surplombe la liste",
+       !sansFermee.includes("Demandes en cours") && !sansFermee.includes("Demandes termin"));
+  dire("mais la demande est bien la", sansFermee.includes(M + " seule"));
 
   console.log(String.fromCharCode(10) + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
