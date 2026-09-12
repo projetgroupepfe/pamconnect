@@ -123,6 +123,15 @@ setTimeout(async () => {
   dire("l'acceptation passe (302)", acceptation.code === 302, "code " + acceptation.code);
   dire("statut = 'acceptee'", statutCandidature() === "acceptee", statutCandidature());
 
+  // ET ON ATTERRIT LA OU L ON VIENT D AGIR. Le profil ne porte plus
+  // aucune demande : y renvoyer cachait le resultat du geste.
+  const apres = await fetch(RACINE + "/candidatures/statut", {
+    method: "POST", redirect: "manual", headers: { Cookie: cEmp },
+    body: form({ candidatureId: candidature.id, statut: "acceptee" }) });
+  dire("on revient sur Mes demandes, pas sur le profil",
+       apres.headers.get("location") === "/mes-demandes",
+       String(apres.headers.get("location")));
+
   console.log("\n--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");

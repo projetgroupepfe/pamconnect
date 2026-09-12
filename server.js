@@ -3940,7 +3940,9 @@ app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => 
     requetes.annulerAnnonce.run({ id: annonce.id });
   }
 
-  res.redirect("/mon-profil");
+  // SUR SES DEMANDES, PAS SUR SON PROFIL : il vient d'agir sur une
+  // demande, il doit voir le resultat de son geste.
+  res.redirect("/mes-demandes");
 });
 
 // --- La messagerie -------------------------------------------------
