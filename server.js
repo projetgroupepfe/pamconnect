@@ -1686,6 +1686,20 @@ function phraseCandidature(statut, jeSuisEmployeur, demande) {
   }
 
   if (statut === "refusee") {
+    // UN REFUS AUTOMATIQUE N'EST PAS UN REFUS PERSONNEL. Choisir
+    // quelqu'un refuse les autres reponses : personne n'a ete ecarte
+    // un par un, et le dire autrement accuse d'un rejet qui n'a pas
+    // eu lieu.
+    //
+    // La distinction est DEDUITE de l'existence d'une candidature
+    // acceptee sur la meme demande, jamais stockee : une information
+    // deduite ne peut pas se contredire.
+    if (demande && demande.quelquUnChoisi) {
+      return jeSuisEmployeur
+        ? "Vous avez choisi quelqu'un d'autre"
+        : "L'employeur a choisi une autre personne";
+    }
+
     return jeSuisEmployeur
       ? "Vous avez refusé cette candidature"
       : "L'employeur a refusé votre candidature";

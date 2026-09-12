@@ -144,8 +144,14 @@ setTimeout(async () => {
        listeChoisie.includes("Test emp2"));
   const listeRefusee = await (await lire("/messages", c2.cookie)).text();
   // EJS echappe l'apostrophe : on cherche un fragment qui n'en a pas.
-  dire("et dit a l'autre que sa candidature a ete refusee",
-       listeRefusee.includes("a refusé votre candidature"));
+  // UN REFUS AUTOMATIQUE N'EST PAS UN REFUS PERSONNEL : l'employeur a
+  // choisi c1, il n'a ecarte c2 par aucun geste. La liste dit donc la
+  // meme chose que la page des reponses, sinon deux ecrans racontent
+  // deux histoires du meme fait.
+  dire("et dit a l'autre que quelqu un d autre a ete choisi",
+       listeRefusee.includes("employeur a choisi une autre personne"));
+  dire("sans lui parler d un refus",
+       !listeRefusee.includes("a refusé votre candidature"));
 
   // La phrase ne suppose aucun genre : "Votre candidature" est feminin
   // quel que soit le genre de la personne, que la plateforme ignore.

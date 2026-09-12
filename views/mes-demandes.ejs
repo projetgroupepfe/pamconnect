@@ -164,7 +164,11 @@
                   <div class="portrait"><%= candidature.nomPrestataire.charAt(0) %></div>
                   <div>
                     <h3><%= candidature.nomPrestataire %></h3>
-                    <div class="metier"><%= phraseCandidature(candidature.statut, true) %></div>
+                    <%# "pourvue" est deduite plus haut, dans la meme
+                        boucle : la reutiliser evite de recalculer et
+                        garantit que les deux phrases de la page ne
+                        peuvent pas se contredire. %>
+                    <div class="metier"><%= phraseCandidature(candidature.statut, true, { quelquUnChoisi: pourvue }) %></div>
                   </div>
                 </div>
 

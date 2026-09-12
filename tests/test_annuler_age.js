@@ -184,16 +184,22 @@ setTimeout(async () => {
        !(await (await lire("/annonces")).text()).includes(M + " pourvue"));
   dire("l'employeur lit qu'il a choisi quelqu'un, pas que la demande est retiree",
        (await (await lire("/mes-demandes", emp2.cookie)).text()).includes("Vous avez choisi"));
-  // L'ecran doit dire QUI a refuse. "Refusee" seul, sous le nom de
-  // l'employeur, se lisait comme si c'etait LUI qui etait refuse.
-  dire("une candidate non retenue lit qui a refuse",
-       (await (await lire("/mes-reponses", candidats[1].cookie)).text())
-         // EJS echappe l'apostrophe en &#39; : on cherche donc un
-         // fragment qui n'en contient pas.
-         .includes("employeur a refusé votre candidature"));
-  dire("et l'employeur lit sa propre decision",
-       (await (await lire("/mes-demandes", emp2.cookie)).text())
-         .includes("Vous avez refusé cette candidature"));
+  // UN REFUS AUTOMATIQUE N'EST PAS UN REFUS PERSONNEL. Choisir
+  // quelqu'un refuse les autres reponses : ecrire a chacune que
+  // l'employeur l'a refusee lui attribue une decision qu'il n'a pas
+  // prise, et l'accuse d'un rejet qui n'a pas eu lieu.
+  const vueEcartee = await (await lire("/mes-reponses", candidats[1].cookie)).text();
+  dire("une candidate non retenue lit que quelqu un d autre a ete choisi",
+       // EJS echappe l'apostrophe en &#39; : on cherche donc un
+       // fragment qui n'en contient pas.
+       vueEcartee.includes("employeur a choisi une autre personne"));
+  dire("et on ne lui parle pas d un refus",
+       !vueEcartee.includes("a refusé votre candidature"));
+  const vueChoix = await (await lire("/mes-demandes", emp2.cookie)).text();
+  dire("l'employeur lit son choix, pas un refus qu'il n'a pas fait",
+       vueChoix.includes("choisi quelqu&#39;un d&#39;autre"));
+  dire("et le mot refus n apparait pas sur sa demande pourvue",
+       !vueChoix.includes("Vous avez refusé cette candidature"));
   dire("elle garde acces a la discussion",
        (await lire("/messages/" + statuts[1].id, candidats[1].cookie)).status === 200);
   dire("personne ne peut plus repondre",
@@ -230,6 +236,17 @@ setTimeout(async () => {
        (await (await lire("/annonces")).text()).includes(M + " horaires"));
   dire("la personne refusee garde sa discussion",
        (await lire("/messages/" + candid1.id, c1.cookie)).status === 200);
+
+  // MAIS UN VRAI REFUS GARDE SON NOM. Ici l'employeur a ecarte
+  // quelqu'un SANS choisir personne : la decision est bien la sienne,
+  // prise une par une. Sans cette moitie, rien n'empecherait la phrase
+  // du choix de s'etendre un jour a un refus reel.
+  dire("un refus individuel se dit comme tel, cote personne",
+       (await (await lire("/mes-reponses", c1.cookie)).text())
+         .includes("employeur a refusé votre candidature"));
+  dire("et cote employeur aussi",
+       (await (await lire("/mes-demandes", empR.cookie)).text())
+         .includes("Vous avez refusé cette candidature"));
 
   const secondeCandidature = await poster("/candidatures", form({ annonceId: String(aR.id) }), c2.cookie);
   dire("une autre personne peut encore postuler", secondeCandidature.code === 200,
