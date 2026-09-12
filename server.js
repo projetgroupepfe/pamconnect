@@ -5444,6 +5444,132 @@ app.post("/admin/verification", exigerAdmin, lireFormulaire, (req, res) => {
 // PARTIE 3 - Aucune route n'a repondu : la page n'existe pas.
 // Ce bloc doit imperativement rester EN DERNIER.
 // ============================================================
+// ============================================================
+// PARTIE 15 - L'API de l'application mobile
+// ============================================================
+//
+// L'application Flutter est ecrite en Dart : elle ne peut pas lire les
+// pages EJS, il lui faut des donnees.
+//
+// ELLE NE REFAIT AUCUNE REGLE. Elle demande, le serveur decide, elle
+// affiche. C'est le meme principe que pour les pages : cacher un bouton
+// n'est pas une regle. Une regle recopiee dans deux langages finit par
+// dire deux choses, et personne ne sait plus laquelle est la bonne.
+//
+// Le JSON n'est lu que sous /api : les formulaires des pages continuent
+// d'arriver exactement comme avant.
+app.use("/api", express.json());
+
+// TOUTE reponse d'API est du JSON, les erreurs comprises. Une
+// application qui attend des donnees et recoit une page HTML ne sait
+// pas quoi en faire : elle affiche une erreur incomprehensible.
+function erreurApi(res, code, message) {
+  return res.status(code).json({ erreur: message });
+}
+
+// Ce que l'application a le droit de savoir sur la personne connectee.
+// On choisit les champs UN PAR UN : renvoyer la ligne entiere ferait
+// sortir l'empreinte du mot de passe.
+function moiPourApi(u) {
+  return {
+    id: u.id,
+    nom: u.nom,
+    role: u.est_admin ? "equipe" : u.role,
+    quartier: u.quartier,
+    metier: u.metier,
+    verification: u.statut_verification,
+    // LE SOLDE ENTIER, PAS SEULEMENT LE TOTAL : les jetons offerts
+    // periment, les achetes jamais. Une application qui n'afficherait
+    // que la somme cacherait a la personne ce qui va disparaitre.
+    jetons: soldeJetonsDe(u.id),
+  };
+}
+
+// --- Se connecter --------------------------------------------------
+//
+// La meme session que le site : l'application garde le cookie et le
+// renvoie. Inventer un second mecanisme aurait fait deux portes a
+// surveiller au lieu d'une.
+app.post("/api/connexion", (req, res) => {
+  const email = String((req.body && req.body.email) || "").trim().toLowerCase();
+  const motdepasse = String((req.body && req.body.motdepasse) || "");
+  const utilisateur = requetes.utilisateurParEmail.get(email);
+
+  // Un compte suspendu garde un mot de passe valide, mais la porte reste
+  // fermee. On le DIT, sinon la personne croit a une panne et recommence.
+  if (utilisateur && utilisateur.suspendu &&
+      verifierMotDePasse(motdepasse, utilisateur.motdepasse)) {
+    return erreurApi(res, 403, "Votre compte a ete suspendu par l'equipe PamConnect" +
+      (utilisateur.suspendu_motif ? " : " + utilisateur.suspendu_motif : "") + ".");
+  }
+
+  if (!utilisateur || !verifierMotDePasse(motdepasse, utilisateur.motdepasse)) {
+    return erreurApi(res, 401, "Email ou mot de passe incorrect.");
+  }
+
+  const token = genererToken();
+  sessions[token] = utilisateur.id;
+  res.cookie("session", token, { httpOnly: true, path: "/" });
+
+  res.json({ moi: moiPourApi(utilisateur) });
+});
+
+// --- Se deconnecter ------------------------------------------------
+app.post("/api/deconnexion", (req, res) => {
+  const entete = req.headers.cookie || "";
+  const paire = entete.split("; ").find((c) => c.startsWith("session="));
+  if (paire) delete sessions[paire.split("=")[1]];
+  res.clearCookie("session", { path: "/" });
+  res.json({ deconnecte: true });
+});
+
+// --- Qui suis-je ? -------------------------------------------------
+//
+// L'application appelle ceci au demarrage : si la session tient encore,
+// elle evite de redemander le mot de passe.
+app.get("/api/moi", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecte.");
+  res.json({ moi: moiPourApi(moi) });
+});
+
+// --- Les demandes ouvertes -----------------------------------------
+//
+// LA MEME REQUETE QUE LA PAGE PUBLIQUE, et le meme tri : les demandes
+// du metier de la personne passent devant, sans masquer les autres. Si
+// l'application triait de son cote, les deux ecrans finiraient par ne
+// plus montrer la meme chose.
+app.get("/api/demandes", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  const toutes = requetes.toutesLesAnnonces.all();
+  const monMetier = moi && moi.role === "prestataire" ? moi.metier : null;
+
+  const pourLApplication = (a) => ({
+    id: a.id,
+    titre: a.titre,
+    metier: a.metier,
+    quartier: a.quartier,
+    arrondissement: a.arrondissement,
+    horaire: a.horaire,
+    prix: a.prix,
+    uniteTarif: a.unite_tarif,
+    dureeEstimee: a.duree_estimee,
+    // LA MEME MISE EN FORME QUE LES PAGES. prixEnClair est la
+    // fonction dont les vues se servent deja : l'application n'a pas a
+    // savoir comment on ecrit des francs CFA, et il n'existe qu'une
+    // seule facon de le faire.
+    prixLisible: prixEnClair(a),
+    misEnAvant: Boolean(a.mise_en_avant_jusqu_au &&
+                        a.mise_en_avant_jusqu_au > new Date().toISOString().slice(0, 10)),
+  });
+
+  res.json({
+    pourMoi: monMetier ? toutes.filter((a) => a.metier === monMetier).map(pourLApplication) : [],
+    autres: (monMetier ? toutes.filter((a) => a.metier !== monMetier) : toutes).map(pourLApplication),
+    monMetier,
+  });
+});
+
 app.use((req, res) => {
   res.status(404).render("message", {
     titre: "404 - Page introuvable",
