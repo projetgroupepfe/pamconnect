@@ -184,7 +184,7 @@ setTimeout(async () => {
   // Elle ouvre sa discussion : tout est a jour pour elle.
   await lire("/messages/" + cD.id, preD.cookie);
   dire("sa candidature attend une decision",
-       (await (await lire("/mon-profil", preD.cookie)).text()).includes("Votre candidature est en attente"));
+       (await (await lire("/mes-reponses", preD.cookie)).text()).includes("Votre candidature est en attente"));
   dire("et rien ne l'attend", await pastilleSur("/annonces", preD.cookie) === 0);
 
   // Les dates sont a la seconde pres : sans cette attente, le retrait
@@ -192,7 +192,7 @@ setTimeout(async () => {
   await new Promise(function (suite) { setTimeout(suite, 1100); });
   await poster("/annonces/" + aD.id + "/annuler", form({}), empD.cookie);
 
-  const profilD = await (await lire("/mon-profil", preD.cookie)).text();
+  const profilD = await (await lire("/mes-reponses", preD.cookie)).text();
   dire("elle apprend que la demande a ete retiree",
        profilD.includes("a retiré cette demande"));
   dire("et ne lit plus qu'elle attend",
@@ -206,7 +206,7 @@ setTimeout(async () => {
   await lire("/messages/" + cD.id, preD.cookie);
   dire("une fois lue, la pastille retombe", await pastilleSur("/annonces", preD.cookie) === 0);
   dire("mais l'information reste lisible",
-       (await (await lire("/mon-profil", preD.cookie)).text()).includes("a retiré cette demande"));
+       (await (await lire("/mes-reponses", preD.cookie)).text()).includes("a retiré cette demande"));
   // Rien n'est efface : la discussion et l'annonce restent consultables.
   dire("sa discussion reste accessible",
        (await lire("/messages/" + cD.id, preD.cookie)).status === 200);

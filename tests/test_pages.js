@@ -66,8 +66,10 @@ setTimeout(async () => {
 
   console.log("\n--- Pages connectees ---");
   for (const [chemin, cookie, attendu, nom] of [
-    ["/mon-profil", cEmp, "Mes demandes", "/mon-profil (employeur)"],
-    ["/mon-profil", cPre, "Mes candidatures", "/mon-profil (prestataire)"],
+    ["/mon-profil", cEmp, "Les avis reçus", "/mon-profil (employeur)"],
+    ["/mon-profil", cPre, "Les avis reçus", "/mon-profil (prestataire)"],
+    ["/mes-demandes", cEmp, "Ce que vous avez publié", "/mes-demandes"],
+    ["/mes-reponses", cPre, "vous avez répondu", "/mes-reponses"],
     ["/publier-annonce", cEmp, "Publier une demande", "/publier-annonce"],
     ["/verification", cPre, "Vérification d'identité", "/verification"],
     ["/admin", cAdm, "Espace équipe", "/admin"],
@@ -85,7 +87,7 @@ setTimeout(async () => {
   dire("connecte : 'Déconnexion' et pas 'Créer un compte'",
        connecte.corps.includes("Déconnexion") && !connecte.corps.includes("Créer un compte"));
   dire("employeur : acces a 'Publier une demande'",
-       (await page("/mon-profil", cEmp)).corps.includes("/publier-annonce") &&
+       (await page("/mes-demandes", cEmp)).corps.includes("/publier-annonce") &&
        (await page("/annonces", cEmp)).corps.includes("/publier-annonce"));
   dire("prestataire : aucun acces a 'Publier une demande'",
        !(await page("/annonces", cPre)).corps.includes("/publier-annonce"));

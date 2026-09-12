@@ -121,7 +121,7 @@ setTimeout(async () => {
   await fetch(RACINE + "/candidatures", { method: "POST", headers: { Cookie: pre.cookie },
     redirect: "manual", body: form({ annonceId: String(annonce.id) }) });
 
-  const profilEmp = await (await lire("/mon-profil", emp.cookie)).text();
+  const profilEmp = await (await lire("/mes-demandes", emp.cookie)).text();
   dire("depuis la candidature recue", profilEmp.includes("/personnes/" + u.id));
   dire("la candidature montre l'experience", profilEmp.includes("6 ans d&#39;expérience"));
   dire("et les jours de disponibilite", profilEmp.includes("lundi, samedi"));

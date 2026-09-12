@@ -124,7 +124,7 @@ setTimeout(async () => {
   dire("elle disparait de la liste publique",
        !(await (await lire("/annonces")).text()).includes(M + " a retirer"));
   dire("l'employeur la voit toujours sur son profil",
-       (await (await lire("/mon-profil", emp.cookie)).text()).includes(M + " a retirer"));
+       (await (await lire("/mes-demandes", emp.cookie)).text()).includes(M + " a retirer"));
 
   console.log("\n--- RETIRER N'EFFACE RIEN ---");
   // Supprimer ferait disparaitre des conversations que des gens ont eues.
@@ -183,16 +183,16 @@ setTimeout(async () => {
   dire("elle quitte la liste publique",
        !(await (await lire("/annonces")).text()).includes(M + " pourvue"));
   dire("l'employeur lit qu'il a choisi quelqu'un, pas que la demande est retiree",
-       (await (await lire("/mon-profil", emp2.cookie)).text()).includes("Vous avez choisi"));
+       (await (await lire("/mes-demandes", emp2.cookie)).text()).includes("Vous avez choisi"));
   // L'ecran doit dire QUI a refuse. "Refusee" seul, sous le nom de
   // l'employeur, se lisait comme si c'etait LUI qui etait refuse.
   dire("une candidate non retenue lit qui a refuse",
-       (await (await lire("/mon-profil", candidats[1].cookie)).text())
+       (await (await lire("/mes-reponses", candidats[1].cookie)).text())
          // EJS echappe l'apostrophe en &#39; : on cherche donc un
          // fragment qui n'en contient pas.
          .includes("employeur a refusé votre candidature"));
   dire("et l'employeur lit sa propre decision",
-       (await (await lire("/mon-profil", emp2.cookie)).text())
+       (await (await lire("/mes-demandes", emp2.cookie)).text())
          .includes("Vous avez refusé cette candidature"));
   dire("elle garde acces a la discussion",
        (await lire("/messages/" + statuts[1].id, candidats[1].cookie)).status === 200);
@@ -238,7 +238,7 @@ setTimeout(async () => {
        base.prepare("SELECT COUNT(*) n FROM candidatures WHERE annonce_id = ?").get(aR.id).n === 2);
 
   // Ce que l'ecran doit dire, sinon la question se repose a chaque fois.
-  const profilR = await (await lire("/mon-profil", empR.cookie)).text();
+  const profilR = await (await lire("/mes-demandes", empR.cookie)).text();
   dire("le bouton nomme ce qu'il refuse", profilR.includes("Refuser cette candidature"));
   dire("et l'ecran precise que la demande reste visible",
        profilR.includes("Refuser ne retire pas votre demande"));
@@ -329,7 +329,7 @@ setTimeout(async () => {
   // Ce qui est en cours et ce qui est fini ne se lisent pas au meme
   // moment. Mais une demande fermee garde ses discussions, ses reponses
   // et la trace de son argent : on ne la supprime pas, on la range.
-  const profilAli = await (await lire("/mon-profil", emp.cookie)).text();
+  const profilAli = await (await lire("/mes-demandes", emp.cookie)).text();
   dire("la section des demandes terminees existe",
        profilAli.includes("Demandes termin"));
   dire("elle dit pourquoi elles restent", profilAli.includes("y restent"));

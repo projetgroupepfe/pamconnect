@@ -1,0 +1,47 @@
+<%#
+  Le pendant exact de mes-demandes.ejs, cote personne qui travaille.
+  Les deux roles ont la meme chose a suivre : ce qui est parti, et
+  ce que c'est devenu.
+%>
+<%- include("partiels/tete") %>
+
+  <h1>Mes réponses</h1>
+
+  <p class="chapeau">Les demandes auxquelles vous avez répondu, et où elles en sont.</p>
+
+  <%# ---- Cote prestataire : les candidatures envoyees ---- %>
+  <% if (utilisateur.role === "prestataire") { %>
+    <% if (mesCandidatures.length === 0) { %>
+      <div class="vide">
+        <p>Vous n'avez répondu à aucune demande.</p>
+        <div class="actions">
+          <a class="bouton" href="/annonces">
+            <%- include("partiels/icone", { nom: "document" }) %>
+            Voir les demandes
+          </a>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="grille">
+        <% mesCandidatures.forEach(function (candidature) { %>
+          <div class="carte">
+            <h3><%= candidature.titreAnnonce %></h3>
+            <ul class="infos">
+              <li>
+                <%- include("partiels/icone", { nom: "disponibilite" }) %>
+                <span><strong><%= phraseCandidature(candidature.statut, false, candidature) %></strong></span>
+              </li>
+            </ul>
+            <div class="actions">
+              <a class="bouton bouton-secondaire" href="/messages/<%= candidature.id %>">
+                <%- include("partiels/icone", { nom: "message" }) %>
+                Discuter
+              </a>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+  <% } %>
+
+<%- include("partiels/pied") %>

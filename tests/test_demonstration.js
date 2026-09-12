@@ -179,7 +179,7 @@ setTimeout(async () => {
          .get(pre.id).detail).includes("garde des enfants"));
 
   console.log("\n--- ECRAN 5 : L'EMPLOYEUR LA CHOISIT ---");
-  const profilApres = await (await lire("/mon-profil", emp.cookie)).text();
+  const profilApres = await (await lire("/mes-demandes", emp.cookie)).text();
   dire("il voit la candidature", profilApres.includes("Demo personne"));
   dire("le badge est vert", profilApres.includes("Identité vérifiée"));
   dire("le bouton Choisir cette personne existe",
@@ -195,7 +195,7 @@ setTimeout(async () => {
   dire("une pastille apparait dans son menu",
        (await (await lire("/annonces", pre.cookie)).text()).includes('class="pastille"'));
   dire("et sa candidature dit qu'elle est acceptee",
-       (await (await lire("/mon-profil", pre.cookie)).text()).includes("Votre candidature a été acceptée"));
+       (await (await lire("/mes-reponses", pre.cookie)).text()).includes("Votre candidature a été acceptée"));
 
   console.log("\n--- ECRAN 6 : L'ARGENT ---");
   const compteEmp = await (await lire("/mon-compte", emp.cookie)).text();

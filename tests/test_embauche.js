@@ -70,7 +70,7 @@ setTimeout(async () => {
   console.log("\n--- 1. Prestataire NON verifie : l'embauche est bloquee ---");
   dire("le prestataire est bien 'non soumis'", qui(mailPres).statut_verification === "non soumis");
 
-  let profil = await (await lire("/mon-profil", cEmp)).text();
+  let profil = await (await lire("/mes-demandes", cEmp)).text();
   dire("l'employeur voit l'etat de verification du candidat",
        profil.includes("Identit&#233; non v&#233;rifi&#233;e") || profil.includes("Identité non vérifiée"));
   dire("aucune action d'acceptation proposee", !profil.includes('value="acceptee"'));
@@ -99,7 +99,7 @@ setTimeout(async () => {
   envoi.append("casier", fichier("casier.pdf", 1000, "application/pdf"));
   await poster("/verification", envoi, cPres);
 
-  profil = await (await lire("/mon-profil", cEmp)).text();
+  profil = await (await lire("/mes-demandes", cEmp)).text();
   // On verifie l'absence du lien REEL vers l'ecran de confirmation, et
   // non celle d'un fragment de formulaire qui n'existe plus : une
   // assertion vraie parce que le texte cherche a disparu ne verifie rien.
@@ -113,7 +113,7 @@ setTimeout(async () => {
     form({ utilisateurId: qui(mailPres).id, decision: "valider" }), cAdmin);
   dire("le prestataire est maintenant verifie", qui(mailPres).statut_verification === "verifie");
 
-  profil = await (await lire("/mon-profil", cEmp)).text();
+  profil = await (await lire("/mes-demandes", cEmp)).text();
   dire("l'action de choix APPARAIT", profil.includes(lienChoisir));
   dire("et l'ecran de confirmation s'ouvre",
        (await lire(lienChoisir, cEmp)).status === 200);

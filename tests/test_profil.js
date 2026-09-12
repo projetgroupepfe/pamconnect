@@ -79,7 +79,10 @@ setTimeout(async () => {
   // au nom officiel de la liste.
   v("le metier officiel est affiche", pp.corps.includes("Ménage à domicile"));
   v("le tarif est affiche avec sa monnaie", pp.corps.includes("5 000 FCFA"));
-  v("section 'Mes candidatures' presente", pp.corps.includes("Mes candidatures"));
+  v("le profil ne porte plus son travail", !pp.corps.includes("Mes candidatures"));
+  const ses = await requete("/mes-reponses", { cookie: coPre.cookie });
+  v("ses reponses ont leur propre page",
+    ses.code === 200 && ses.corps.includes("vous avez répondu"), "code " + ses.code);
 
   console.log("\n--- NETTOYAGE ---");
   const supprimes = base

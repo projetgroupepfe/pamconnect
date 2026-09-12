@@ -170,7 +170,7 @@ setTimeout(async () => {
   base.prepare("UPDATE utilisateurs SET statut_verification = 'non soumis' WHERE email = ?")
     .run(preMail.toLowerCase());
 
-  const profil2 = await requete("/mon-profil", { cookie: cookieEmp });
+  const profil2 = await requete("/mes-demandes", { cookie: cookieEmp });
   v("l'employeur voit la candidature recue", profil2.corps.includes("En attente"));
   // Nouvelle regle : pas d'embauche sans verification d'identite.
   v("Accepter n'est PAS propose (prestataire non verifie)", !profil2.corps.includes(">Accepter<"));
@@ -184,7 +184,7 @@ setTimeout(async () => {
     body: form({ candidatureId: maCand.id, statut: "acceptee" }) });
   v("accepter un prestataire non verifie -> 403", maj.code === 403, "code " + maj.code);
 
-  const profil3 = await requete("/mon-profil", { cookie: cookiePre });
+  const profil3 = await requete("/mes-reponses", { cookie: cookiePre });
   v("la candidature reste en attente, et l'ecran le dit a la personne",
     profil3.corps.includes("Votre candidature est en attente"));
 

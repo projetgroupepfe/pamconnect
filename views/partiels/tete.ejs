@@ -52,8 +52,20 @@
         if (!locals.moi || locals.jePeux.publier) {
           entrees.push({ url: "/recherche", icone: "recherche", texte: "Rechercher" });
         }
-        if (!locals.moi || !locals.jePeux.verifierDossiers) {
+        /* UN EMPLOYEUR NE REPOND PAS AUX DEMANDES, IL EN PUBLIE. Le
+           tableau public est la page de ceux qui repondent, et celle
+           qui fait decouvrir la plateforme a un visiteur. */
+        if (!locals.moi || locals.jePeux.repondre) {
           entrees.push({ url: "/annonces", icone: "document", texte: "Demandes" });
+        }
+        /* Ce sur quoi chacun travaille, a un clic et sous son vrai
+           nom. C'etait au fond du profil, sous les avis et les
+           informations : personne ne l'y trouvait. */
+        if (locals.moi && locals.jePeux.publier) {
+          entrees.push({ url: "/mes-demandes", icone: "document", texte: "Mes demandes" });
+        }
+        if (locals.moi && locals.jePeux.repondre) {
+          entrees.push({ url: "/mes-reponses", icone: "envoi", texte: "Mes réponses" });
         }
         if (locals.moi && !locals.jePeux.verifierDossiers) {
           /* La plateforme n'envoie ni email ni SMS. La seule notification

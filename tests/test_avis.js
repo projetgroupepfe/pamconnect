@@ -251,7 +251,7 @@ setTimeout(async () => {
     VALUES (?, ?, 'en attente', datetime('now'))
   `).run(aChoisir.id, elle.id);
 
-  const profilEmp = await (await lire("/mon-profil", emp.cookie)).text();
+  const profilEmp = await (await lire("/mes-demandes", emp.cookie)).text();
   dire("sa note apparait sous la candidature", profilEmp.includes("4,5 sur 5"));
   dire("avec le nombre d avis", profilEmp.includes("sur 2 avis"));
   dire("et les services termines", profilEmp.includes("services terminés"));

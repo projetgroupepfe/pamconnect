@@ -131,7 +131,7 @@ setTimeout(async () => {
   dire("une autre personne peut encore y repondre",
        (await poster("/candidatures", form({ annonceId: String(d.id) }), p2.cookie)).code === 200);
 
-  const mesDemandes = await (await lire("/mon-profil", emp.cookie)).text();
+  const mesDemandes = await (await lire("/mes-demandes", emp.cookie)).text();
   dire("l'ecran dit ce que RETIRER ferme", mesDemandes.includes("Retirer ferme votre demande"));
   dire("et vers quoi se tourner pour ecarter une seule personne",
        mesDemandes.includes("Refuser cette candidature</strong> plus bas"));

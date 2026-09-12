@@ -2888,34 +2888,69 @@ app.post("/connexion", lireFormulaire, (req, res) => {
 
 // --- Mon profil ----------------------------------------------------
 app.get("/mon-profil", exigerConnexion, (req, res) => {
-  const utilisateur = req.utilisateur;
-
-  // La route PREPARE les donnees, la vue se contente de les AFFICHER.
-  let mesAnnonces = [];
-  let mesCandidatures = [];
-
-  if (utilisateur.role === "employeur") {
-    mesAnnonces = requetes.annoncesDeEmployeur.all(utilisateur.id).map((annonce) => ({
-      ...annonce,
-      candidatures: requetes.candidaturesDeAnnonce.all(annonce.id),
-    }));
-  }
-
-  if (utilisateur.role === "prestataire") {
-    mesCandidatures = requetes.candidaturesDePrestataire.all(utilisateur.id);
-  }
-
+  // CETTE PAGE DIT QUI JE SUIS, PAS CE QUE JE FAIS. Ses demandes ou
+  // ses reponses ont leur propre page : melangees ici, elles
+  // repoussaient hors de l'ecran les informations et les avis.
   res.render("profil", {
     titre: "Mon profil",
-    utilisateur,
-    mesAnnonces,
-    mesCandidatures,
+    utilisateur: req.utilisateur,
 
     // Ce que les autres disent de moi. Signalable ici, et nulle part
     // ailleurs : c est mon profil, ce sont mes avis.
     reputation: reputationDe(req.utilisateur.id),
     mesAvis: requetes.avisRecus.all(req.utilisateur.id),
     servicesANoter: requetes.servicesANoter.get({ moi: req.utilisateur.id }).n,
+  });
+});
+
+// --- Mes demandes : la surface de travail de l'employeur -----------
+//
+// Une dizaine de boutons de ce fichier ecrivaient deja "Retour a mes
+// demandes" en menant au profil. Le texte promettait une page qui
+// n'existait pas.
+//
+// La verification n'est PAS exigee ici : un employeur dont le dossier
+// est en attente garde des demandes publiees et de l'argent bloque.
+// Lui cacher les siennes serait lui cacher son propre argent.
+app.get("/mes-demandes", exigerConnexion, interdireALEquipe, (req, res) => {
+  if (req.utilisateur.role !== "employeur") {
+    return res.status(403).render("message", {
+      titre: "Acces refuse",
+      texte: "Cette page est celle des employeurs. Les demandes " +
+             "auxquelles vous avez repondu sont sur Mes reponses.",
+      liens: [{ url: "/mes-reponses", texte: "Voir mes reponses" }],
+    });
+  }
+
+  // La route PREPARE les donnees, la vue se contente de les AFFICHER.
+  res.render("mes-demandes", {
+    titre: "Mes demandes",
+    mesAnnonces: requetes.annoncesDeEmployeur.all(req.utilisateur.id).map((annonce) => ({
+      ...annonce,
+      candidatures: requetes.candidaturesDeAnnonce.all(annonce.id),
+    })),
+  });
+});
+
+// --- Mes reponses : le pendant, cote personne qui travaille --------
+//
+// Le meme besoin des deux cotes : savoir ce qui est parti et ce que
+// c'est devenu. Ne le donner qu'a l'employeur aurait laisse la
+// moitie de la plateforme chercher ses reponses au fond du profil.
+app.get("/mes-reponses", exigerConnexion, interdireALEquipe, (req, res) => {
+  if (req.utilisateur.role !== "prestataire") {
+    return res.status(403).render("message", {
+      titre: "Acces refuse",
+      texte: "Cette page est celle des personnes qui repondent. Vos " +
+             "demandes publiees sont sur Mes demandes.",
+      liens: [{ url: "/mes-demandes", texte: "Voir mes demandes" }],
+    });
+  }
+
+  res.render("mes-reponses", {
+    titre: "Mes reponses",
+    utilisateur: req.utilisateur,
+    mesCandidatures: requetes.candidaturesDePrestataire.all(req.utilisateur.id),
   });
 });
 
@@ -3218,7 +3253,7 @@ app.get("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, (req, res)
     return res.status(404).render("message", {
       titre: "Demande introuvable",
       texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3236,7 +3271,7 @@ app.post("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, lireFormu
     return res.status(404).render("message", {
       titre: "Demande introuvable",
       texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3261,7 +3296,7 @@ app.post("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, lireFormu
   res.render("message", {
     titre: "Demande mise à jour",
     texte: "Les personnes qui consultent vos demandes voient la nouvelle version.",
-    liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
+    liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
   });
 });
 
@@ -3446,7 +3481,7 @@ app.post("/annonces/:id/annuler", exigerConnexion, interdireALEquipe, lireFormul
     return res.status(404).render("message", {
       titre: "Demande introuvable",
       texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3462,7 +3497,7 @@ app.post("/annonces/:id/annuler", exigerConnexion, interdireALEquipe, lireFormul
       texte: "Cette demande ne peut plus être retirée : vous avez retenu une " +
              "personne pour ce service. Si le service n'a pas eu lieu, signalez " +
              "le problème à l'équipe plutôt que de retirer la demande.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3476,7 +3511,7 @@ app.post("/annonces/:id/annuler", exigerConnexion, interdireALEquipe, lireFormul
     texte: "Votre demande n'apparaît plus dans la liste et personne ne peut " +
            "plus y répondre. Les personnes qui vous avaient déjà répondu gardent " +
            "accès à votre discussion.",
-    liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
+    liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
   });
 });
 
@@ -3644,7 +3679,7 @@ app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (
       titre: "Candidature déjà envoyée",
       texte: "Vous avez déjà répondu à cette demande. Elle attend la décision " +
              "de l'employeur.",
-      liens: [{ url: "/mon-profil", texte: "Voir mes candidatures" }],
+      liens: [{ url: "/mes-reponses", texte: "Voir mes candidatures" }],
     });
   }
 
@@ -3757,7 +3792,7 @@ app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (
       return res.status(409).render("message", {
         titre: "Candidature déjà envoyée",
         texte: "Vous avez déjà répondu à cette demande.",
-        liens: [{ url: "/mon-profil", texte: "Voir mes candidatures" }],
+        liens: [{ url: "/mes-reponses", texte: "Voir mes candidatures" }],
       });
     }
 
@@ -3799,7 +3834,7 @@ app.get("/candidatures/:id/confirmer", exigerConnexion, (req, res) => {
     return res.status(404).render("message", {
       titre: "Candidature introuvable",
       texte: "Cette candidature n'existe pas, ou elle ne concerne aucune de vos demandes.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3807,7 +3842,7 @@ app.get("/candidatures/:id/confirmer", exigerConnexion, (req, res) => {
     return res.status(409).render("message", {
       titre: "Décision déjà prise",
       texte: "Cette candidature a déjà reçu une réponse.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3818,7 +3853,7 @@ app.get("/candidatures/:id/confirmer", exigerConnexion, (req, res) => {
       titre: "Vérification requise",
       texte: "L'identité de cette personne n'a pas encore été vérifiée par PamConnect. " +
              "Vous pourrez la choisir dès que son dossier sera validé.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mes demandes" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3854,7 +3889,7 @@ app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => 
     return res.status(400).render("message", {
       titre: "Decision inconnue",
       texte: "Une candidature ne peut qu'etre acceptee ou refusee.",
-      liens: [{ url: "/mon-profil", texte: "Retour a mes demandes" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour a mes demandes" }],
     });
   }
 
@@ -3867,7 +3902,7 @@ app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => 
     return res.status(404).render("message", {
       titre: "Candidature introuvable",
       texte: "Cette candidature n'existe pas, ou elle ne concerne aucune de vos demandes.",
-      liens: [{ url: "/mon-profil", texte: "Retour a mes demandes" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour a mes demandes" }],
     });
   }
 
@@ -3879,7 +3914,7 @@ app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => 
       titre: "Verification requise",
       texte: "L'identité de cette personne n'a pas encore été vérifiée par PamConnect. " +
              "Vous pourrez la choisir dès que son dossier sera validé.",
-      liens: [{ url: "/mon-profil", texte: "Retour a mes demandes" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour a mes demandes" }],
     });
   }
 

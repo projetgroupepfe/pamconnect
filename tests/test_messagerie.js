@@ -200,10 +200,10 @@ setTimeout(async () => {
        vuePre.includes("Commission PamConnect") && vueEmp.includes("Commission PamConnect"));
 
   console.log("\n--- LES DEUX CÔTÉS ONT LE BOUTON ---");
-  dire("l'employeur voit 'Discuter' sur son profil",
-       (await (await lire("/mon-profil", emp.cookie)).text()).includes("/messages/" + conv.id));
-  dire("la personne aussi",
-       (await (await lire("/mon-profil", pre.cookie)).text()).includes("/messages/" + conv.id));
+  dire("l'employeur voit 'Discuter' sur ses demandes",
+       (await (await lire("/mes-demandes", emp.cookie)).text()).includes("/messages/" + conv.id));
+  dire("la personne aussi, sur ses reponses",
+       (await (await lire("/mes-reponses", pre.cookie)).text()).includes("/messages/" + conv.id));
 
   console.log("\n--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;

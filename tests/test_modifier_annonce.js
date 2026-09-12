@@ -128,9 +128,9 @@ setTimeout(async () => {
          quartier: "Mvan", horaire: "Lundi 8h", prix: "10000" }), emp.cookie)).code === 200);
 
   console.log("\n--- LE BOUTON EST SUR SES ANNONCES, PAS AILLEURS ---");
-  const profilEmp = await (await lire("/mon-profil", emp.cookie)).text();
+  const profilEmp = await (await lire("/mes-demandes", emp.cookie)).text();
   dire("l'employeur voit 'Modifier cette demande'", profilEmp.includes(url));
-  const profilPre = await (await lire("/mon-profil", pre.cookie)).text();
+  const profilPre = await (await lire("/mes-reponses", pre.cookie)).text();
   // On cherche l'adresse d'une MODIFICATION D'ANNONCE, pas la chaine
   // "/modifier" : elle apparait aussi dans /mon-profil/modifier, qui est
   // le bouton legitime "Modifier mon profil".
