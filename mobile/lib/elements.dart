@@ -209,3 +209,37 @@ class Pastille extends StatelessWidget {
     );
   }
 }
+
+/// Ce qui vient de reussir, par exemple une demande publiee.
+///
+/// liveRegion, pour la meme raison que l'avertissement : la personne qui
+/// utilise un lecteur d'ecran doit entendre que c'est fait.
+class Confirmation extends StatelessWidget {
+  const Confirmation({super.key, required this.texte});
+
+  final String texte;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Couleurs.vertFond,
+          borderRadius: BorderRadius.circular(rayon),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.check_circle_outline, color: Couleurs.vert),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(texte, style: const TextStyle(color: Couleurs.vert)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

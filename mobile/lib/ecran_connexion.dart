@@ -13,11 +13,15 @@ const messageSessionPerdue = "Votre session n'est plus valable, par exemple "
 /// Revient a l'ecran de connexion en gardant l'adresse du serveur, et en
 /// disant pourquoi. Partagee par tous les ecrans qui ont besoin d'une
 /// session.
+///
+/// Tous les ecrans ouverts sont fermes : le bouton retour ne doit pas
+/// rouvrir un ecran dont la session ne vaut plus rien.
 void revenirALaConnexion(BuildContext context, ApiPamConnect api, [String? message]) {
-  Navigator.of(context).pushReplacement(
+  Navigator.of(context).pushAndRemoveUntil(
     MaterialPageRoute<void>(
       builder: (_) => EcranConnexion(adresseInitiale: api.racine, message: message),
     ),
+    (_) => false,
   );
 }
 

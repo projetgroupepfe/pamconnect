@@ -294,3 +294,94 @@ class MesDemandes {
   List<DemandePubliee> get enCours => demandes.where((d) => !d.fermee).toList();
   List<DemandePubliee> get terminees => demandes.where((d) => d.fermee).toList();
 }
+
+List<String> _lireTextes(Map<String, dynamic> json, String champ) {
+  return _lire<List<dynamic>>(json, champ).map((element) {
+    if (element is String) return element;
+    throw FormeInattendue(champ);
+  }).toList();
+}
+
+/// Une facon de compter le prix, dans la liste fermee du serveur.
+class UniteTarif {
+  const UniteTarif({required this.valeur, required this.libelle});
+
+  factory UniteTarif.depuisJson(Map<String, dynamic> json) => UniteTarif(
+        valeur: _lire<String>(json, 'valeur'),
+        libelle: _lire<String>(json, 'libelle'),
+      );
+
+  /// Ce qui part au serveur : "horaire", "journalier" ou "forfaitaire".
+  final String valeur;
+
+  /// Ce que lit la personne : "de l'heure", "par jour"...
+  final String libelle;
+}
+
+/// Les listes du formulaire de publication, telles que le serveur les
+/// connait : ajouter un metier ou un quartier ne demande pas de
+/// refabriquer l'application.
+class FormulaireDemande {
+  const FormulaireDemande({
+    required this.metiers,
+    required this.quartiers,
+    required this.arrondissements,
+    required this.unitesTarif,
+    required this.uniteParDefaut,
+  });
+
+  factory FormulaireDemande.depuisJson(Map<String, dynamic> json) {
+    final formulaire = FormulaireDemande(
+      metiers: _lireTextes(json, 'metiers'),
+      quartiers: _lireTextes(json, 'quartiers'),
+      arrondissements: _lireTextes(json, 'arrondissements'),
+      unitesTarif: _lireListe(json, 'unitesTarif', UniteTarif.depuisJson),
+      uniteParDefaut: _lire<String>(json, 'uniteParDefaut'),
+    );
+    // La liste deroulante doit pouvoir montrer le choix par defaut : un
+    // choix absent de la liste la ferait planter.
+    if (!formulaire.unitesTarif.any((unite) => unite.valeur == formulaire.uniteParDefaut)) {
+      throw const FormeInattendue('uniteParDefaut');
+    }
+    return formulaire;
+  }
+
+  final List<String> metiers;
+  final List<String> quartiers;
+  final List<String> arrondissements;
+  final List<UniteTarif> unitesTarif;
+  final String uniteParDefaut;
+}
+
+/// La reponse de /api/quartier : l'arrondissement que le serveur retiendra.
+class LieuTrouve {
+  const LieuTrouve({required this.connu, this.quartier, this.arrondissement});
+
+  factory LieuTrouve.depuisJson(Map<String, dynamic> json) {
+    if (!_lire<bool>(json, 'connu')) return const LieuTrouve(connu: false);
+    return LieuTrouve(
+      connu: true,
+      quartier: _lire<String>(json, 'quartier'),
+      arrondissement: _lire<String>(json, 'arrondissement'),
+    );
+  }
+
+  final bool connu;
+  final String? quartier;
+  final String? arrondissement;
+}
+
+/// La confirmation d'une demande publiee, formulee par le serveur.
+class Publication {
+  const Publication({required this.id, required this.titre, required this.texte});
+
+  factory Publication.depuisJson(Map<String, dynamic> json) => Publication(
+        id: _lire<int>(json, 'id'),
+        titre: _lire<String>(json, 'titre'),
+        texte: _lire<String>(json, 'texte'),
+      );
+
+  final int id;
+  final String titre;
+  final String texte;
+}

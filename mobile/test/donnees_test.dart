@@ -234,4 +234,63 @@ void main() {
       expect(ApiPamConnect.normaliserAdresse('192.168.1.200'), 'http://192.168.1.200');
     });
   });
+
+  group('le formulaire de publication', () {
+    Map<String, dynamic> formulaire() => {
+          'metiers': ['metier 1', 'metier 2'],
+          'quartiers': ['quartier 1'],
+          'arrondissements': ['arrondissement 1'],
+          'unitesTarif': [
+            {'valeur': 'horaire', 'libelle': "de l'heure"},
+            {'valeur': 'forfaitaire', 'libelle': 'pour la prestation'},
+          ],
+          'uniteParDefaut': 'forfaitaire',
+        };
+
+    test('les listes du serveur sont lues telles quelles', () {
+      final lu = FormulaireDemande.depuisJson(formulaire());
+      expect(lu.metiers, ['metier 1', 'metier 2']);
+      expect(lu.unitesTarif.map((u) => u.libelle), ["de l'heure", 'pour la prestation']);
+      expect(lu.uniteParDefaut, 'forfaitaire');
+    });
+
+    test('un choix par defaut absent de la liste est signale', () {
+      final json = formulaire()..['uniteParDefaut'] = 'journalier';
+      expect(() => FormulaireDemande.depuisJson(json), throwsA(isA<FormeInattendue>()));
+    });
+
+    test('une liste qui contient autre chose que du texte est signalee', () {
+      final json = formulaire()..['quartiers'] = [1, 2];
+      expect(() => FormulaireDemande.depuisJson(json), throwsA(isA<FormeInattendue>()));
+    });
+  });
+
+  group("l'arrondissement d'un quartier", () {
+    test('un quartier connu donne son arrondissement', () {
+      final lieu = LieuTrouve.depuisJson(
+          {'connu': true, 'quartier': 'quartier 1', 'arrondissement': 'arrondissement 1'});
+      expect(lieu.connu, isTrue);
+      expect(lieu.arrondissement, 'arrondissement 1');
+    });
+
+    test("un quartier inconnu ne recoit pas d'arrondissement invente", () {
+      final lieu = LieuTrouve.depuisJson({'connu': false});
+      expect(lieu.connu, isFalse);
+      expect(lieu.arrondissement, isNull);
+    });
+
+    test('connu mais sans arrondissement : signale', () {
+      expect(() => LieuTrouve.depuisJson({'connu': true, 'quartier': 'quartier 1'}),
+          throwsA(isA<FormeInattendue>()));
+    });
+  });
+
+  test('la confirmation de publication est celle du serveur', () {
+    final publication =
+        Publication.depuisJson({'id': 3, 'titre': 'Demande publiée', 'texte': 'texte du serveur'});
+    expect(publication.id, 3);
+    expect(publication.texte, 'texte du serveur');
+    expect(() => Publication.depuisJson({'id': 3, 'titre': 'Demande publiée'}),
+        throwsA(isA<FormeInattendue>()));
+  });
 }

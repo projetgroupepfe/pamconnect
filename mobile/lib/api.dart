@@ -88,6 +88,26 @@ class ApiPamConnect {
     return _interpreter(() => MesDemandes.depuisJson(donnees));
   }
 
+  /// Les listes du formulaire de publication. Refuse (403) a qui ne peut
+  /// pas publier, avec la raison que donne aussi le site.
+  Future<FormulaireDemande> formulaireDemande() async {
+    final donnees = await _appeler('/api/formulaire-demande');
+    return _interpreter(() => FormulaireDemande.depuisJson(donnees));
+  }
+
+  /// L'arrondissement que le serveur retiendra pour ce quartier.
+  Future<LieuTrouve> quartier(String nom) async {
+    final donnees = await _appeler('/api/quartier?nom=${Uri.encodeQueryComponent(nom)}');
+    return _interpreter(() => LieuTrouve.depuisJson(donnees));
+  }
+
+  /// Publie une demande. Les champs partent tels que la personne les a
+  /// saisis : c'est le serveur qui verifie, et qui explique un refus.
+  Future<Publication> publierDemande(Map<String, String> champs) async {
+    final donnees = await _appeler('/api/demandes', corps: champs);
+    return _interpreter(() => Publication.depuisJson(donnees));
+  }
+
   /// La session est effacee cote serveur. Meme si le serveur ne repond pas,
   /// l'application oublie le jeton : la personne a demande a partir.
   Future<void> deconnexion() async {

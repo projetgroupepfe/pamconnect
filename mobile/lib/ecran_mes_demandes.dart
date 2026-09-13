@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'ecran_connexion.dart';
+import 'ecran_publier.dart';
 import 'elements.dart';
 import 'modeles.dart';
 import 'theme.dart';
@@ -10,9 +11,9 @@ import 'theme.dart';
 /// page Mes demandes du site, puisque les deux lisent la meme fonction du
 /// serveur.
 ///
-/// Cette premiere version se lit seulement. Publier, choisir, refuser,
-/// discuter ou modifier arrivent ensuite, chacun avec sa route testee. Aucun
-/// bouton n'est affiche avant de fonctionner.
+/// On peut y publier une demande. Choisir, refuser, discuter ou modifier
+/// arrivent ensuite, chacun avec sa route testee : aucun bouton n'est
+/// affiche avant de fonctionner.
 class EcranMesDemandes extends StatefulWidget {
   const EcranMesDemandes({super.key, required this.api, required this.moi});
 
@@ -28,6 +29,9 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
   MesDemandes? _mesDemandes;
   String? _erreur;
   bool _enCours = true;
+
+  /// La phrase du serveur apres une publication, gardee en haut de l'ecran.
+  String? _confirmation;
 
   @override
   void initState() {
@@ -69,6 +73,24 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
         _enCours = false;
       });
     }
+  }
+
+  Future<void> _ouvrirPublication() async {
+    final publication = await Navigator.of(context).push<Publication>(
+      MaterialPageRoute(builder: (_) => EcranPublier(api: widget.api)),
+    );
+    if (publication == null || !mounted) return;
+    setState(() => _confirmation = publication.texte);
+    await _actualiser();
+  }
+
+  /// L'action principale, comme sur le site : toujours a portee de main.
+  Widget _boutonPublier() {
+    return FilledButton.icon(
+      onPressed: _ouvrirPublication,
+      icon: const Icon(Icons.add),
+      label: const Text('Publier une demande'),
+    );
   }
 
   Future<void> _seDeconnecter() async {
@@ -114,6 +136,10 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
       const SizedBox(height: 12),
       Text('Ce que vous avez publié, et qui vous a répondu.', style: gris),
       const SizedBox(height: 16),
+      if (_confirmation != null) ...[
+        Confirmation(texte: _confirmation!),
+        const SizedBox(height: 16),
+      ],
       if (_erreur != null) ...[
         Avertissement(texte: _erreur!),
         const SizedBox(height: 16),
@@ -129,17 +155,21 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
 
   List<Widget> _listes(MesDemandes donnees, TextStyle? gris) {
     if (donnees.demandes.isEmpty) {
+      // Quand la liste est vide, le bouton est ici, et une seule fois.
       return [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 32),
           child: Text("Vous n'avez publié aucune demande.", textAlign: TextAlign.center, style: gris),
         ),
+        _boutonPublier(),
       ];
     }
 
     final enCours = donnees.enCours;
     final terminees = donnees.terminees;
     return [
+      _boutonPublier(),
+      const SizedBox(height: 16),
       // UN TITRE SERT A DISTINGUER : "Demandes en cours" n'apparait que s'il y
       // a aussi des demandes terminees. La meme regle que sur le site.
       if (enCours.isNotEmpty && terminees.isNotEmpty) const TitreSection('Demandes en cours'),
