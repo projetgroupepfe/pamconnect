@@ -1,8 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- L'application parle au serveur PamConnect : sans cette permission,
+         la version finale ne pourrait joindre aucune adresse. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- usesCleartextTraffic : Android refuse les adresses http:// par defaut.
+         Le serveur de demonstration tourne sur l'ordinateur, en http, sur le
+         reseau local du partage de connexion. A retirer le jour ou le serveur
+         sera servi en https. -->
     <application
-        android:label="pamconnect"
+        android:label="PamConnect"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
