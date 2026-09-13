@@ -1483,6 +1483,26 @@ function formaterTarif(tarif) {
 //
 // Renvoie null si tout va bien, sinon de quoi afficher le probleme.
 function verifierAnnonce(donnees) {
+  // Le formulaire du site exigeait deja ces deux champs, mais seul le
+  // navigateur le verifiait : un envoi fait a la main, ou depuis
+  // l'application, publiait une demande sans titre ni metier.
+  if (!String(donnees.titre || "").trim()) {
+    return {
+      titre: "Description obligatoire",
+      texte: "Décrivez en quelques mots le service dont vous avez besoin.",
+    };
+  }
+
+  // Le metier range la demande en tete de liste chez les personnes qui
+  // font ce travail : sans lui, elle ne serait la premiere pour personne.
+  if (!String(donnees.metier || "").trim()) {
+    return {
+      titre: "Métier obligatoire",
+      texte: "Indiquez qui vous cherchez. C'est ce qui place votre demande " +
+             "en tête de liste chez les personnes qui font ce travail.",
+    };
+  }
+
   // L'horaire est le critere sur lequel une personne decide de repondre
   // ou non : il est donc obligatoire.
   if (!String(donnees.horaire || "").trim()) {
@@ -1741,7 +1761,7 @@ function apresConnexion(utilisateur) {
   if (utilisateur.role === "employeur") {
     return {
       texte: "Retrouvez vos demandes et les réponses que vous avez reçues.",
-      lien: { url: "/mon-profil", texte: "Voir mon profil" },
+      lien: { url: "/mes-demandes", texte: "Voir mes demandes" },
     };
   }
 
@@ -3323,18 +3343,23 @@ app.post("/mon-profil/mot-de-passe", exigerConnexion, lireFormulaire, (req, res)
 // que la plateforme a controle qui il est.
 //
 // A placer APRES exigerConnexion, qui remplit req.utilisateur.
+// LA MEME REGLE, DEUX RAISONS. L'employeur fait venir quelqu'un chez
+// lui ; la personne qui repond se deplace chez un inconnu. Chacun doit
+// lire la raison qui le concerne, pas celle de l'autre. Ecrite ici pour
+// que le site et l'application disent la meme.
+function texteVerificationRequise(role) {
+  return role === "employeur"
+    ? "Avant de publier une demande, votre identité doit être vérifiée par " +
+      "PamConnect. Les personnes qui vous répondront se déplaceront chez vous : " +
+      "elles ont le droit de savoir qui vous êtes."
+    : "Avant de répondre à une demande, votre identité doit être vérifiée par " +
+      "PamConnect. Vous entrerez chez quelqu'un qui ne vous connaît pas : " +
+      "il a le droit de savoir qui vient.";
+}
+
 function exigerVerification(req, res, next) {
   if (req.utilisateur.statut_verification !== "verifie") {
-    // LA MEME REGLE, DEUX RAISONS. L'employeur fait venir quelqu'un chez
-    // lui ; la personne qui repond se deplace chez un inconnu. Chacun
-    // doit lire la raison qui le concerne, pas celle de l'autre.
-    const texte = req.utilisateur.role === "employeur"
-      ? "Avant de publier une demande, votre identité doit être vérifiée par " +
-        "PamConnect. Les personnes qui vous répondront se déplaceront chez vous : " +
-        "elles ont le droit de savoir qui vous êtes."
-      : "Avant de répondre à une demande, votre identité doit être vérifiée par " +
-        "PamConnect. Vous entrerez chez quelqu'un qui ne vous connaît pas : " +
-        "il a le droit de savoir qui vient.";
+    const texte = texteVerificationRequise(req.utilisateur.role);
 
     return res.status(403).render("message", {
       titre: "Vérification requise",
@@ -3359,18 +3384,15 @@ app.get("/publier-annonce", exigerConnexion, interdireALEquipe, exigerVerificati
 });
 
 // --- Enregistrer une annonce ---------------------------------------
-app.post("/annonces", exigerConnexion, interdireALEquipe, exigerVerification, lireFormulaire, (req, res) => {
-  const donnees = req.body;
-
+//
+// PUBLIER EST ECRIT UNE SEULE FOIS. Le site et l'application passent par
+// cette fonction : la meme verification, le meme enregistrement, la meme
+// somme bloquee, la meme phrase de confirmation.
+function publierDemande(employeurId, donnees) {
   const probleme = verifierAnnonce(donnees);
-  if (probleme) {
-    return res.status(400).render("message", Object.assign({}, probleme, {
-      liens: [{ url: "/publier-annonce", texte: "Retour au formulaire" }],
-    }));
-  }
+  if (probleme) return { probleme };
 
-  const creee = requetes.creerAnnonce.run(Object.assign(
-    { employeur_id: req.utilisateur.id }, champsAnnonce(donnees)));
+  const champs = champsAnnonce(donnees);
 
   // L'employeur n'a pas publie par plaisir : la somme qu'il annonce est
   // bloquee des maintenant. La personne qui repondra sait ainsi que
@@ -3378,17 +3400,48 @@ app.post("/annonces", exigerConnexion, interdireALEquipe, exigerVerification, li
   //
   // SIMULATION : rien n'est encaisse. La ligne enregistree dit ce qui
   // DEVRAIT se passer, et les ecrans le precisent.
-  requetes.bloquerVersement.run({
-    annonce: Number(creee.lastInsertRowid),
-    employeur: req.utilisateur.id,
-    montant: Math.round(Number(donnees.prix) || 0),
-  });
+  //
+  // LES DEUX OU AUCUNE : une demande en ligne sans sa somme bloquee
+  // annoncerait un argent qui n'existe pas.
+  const id = db.transaction(() => {
+    const creee = requetes.creerAnnonce.run(Object.assign({ employeur_id: employeurId }, champs));
+    const nouvelle = Number(creee.lastInsertRowid);
+    requetes.bloquerVersement.run({ annonce: nouvelle, employeur: employeurId, montant: champs.prix || 0 });
+    return nouvelle;
+  })();
+
+  return {
+    id,
+    titre: "Demande publiée",
+    texte: `Votre demande "${champs.titre}" est en ligne. La somme annoncée ` +
+           `est bloquée par PamConnect jusqu'à la fin du service.`,
+  };
+}
+
+app.post("/annonces", exigerConnexion, interdireALEquipe, exigerVerification, lireFormulaire, (req, res) => {
+  // Le formulaire ne s'ouvrait qu'aux employeurs, mais l'envoi ne
+  // verifiait pas le role : une personne verifiee qui repond aux demandes
+  // pouvait en publier une en envoyant le formulaire a la main.
+  if (req.utilisateur.role !== "employeur") {
+    return res.status(403).render("message", {
+      titre: "Acces refuse",
+      texte: "Seuls les employeurs peuvent publier une demande.",
+      liens: [{ url: "/", texte: "Retour a l'accueil" }],
+    });
+  }
+
+  const resultat = publierDemande(req.utilisateur.id, req.body);
+
+  if (resultat.probleme) {
+    return res.status(400).render("message", Object.assign({}, resultat.probleme, {
+      liens: [{ url: "/publier-annonce", texte: "Retour au formulaire" }],
+    }));
+  }
 
   res.render("message", {
-    titre: "Demande publiée",
-    texte: `Votre demande "${donnees.titre}" est en ligne. La somme annoncée ` +
-           `est bloquée par PamConnect jusqu'à la fin du service.`,
-    liens: [{ url: "/", texte: "Retour à l'accueil" }],
+    titre: resultat.titre,
+    texte: resultat.texte,
+    liens: [{ url: "/mes-demandes", texte: "Voir mes demandes" }],
   });
 });
 
@@ -3480,7 +3533,7 @@ function ecranMiseEnAvant(req, res, erreur) {
     return res.status(404).render("message", {
       titre: "Demande introuvable",
       texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3488,7 +3541,7 @@ function ecranMiseEnAvant(req, res, erreur) {
     return res.status(409).render("message", {
       titre: "Cette demande est fermée",
       texte: "Une demande retirée ou déjà pourvue ne peut pas être mise en avant.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3521,7 +3574,7 @@ app.post("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe,
     return res.status(404).render("message", {
       titre: "Demande introuvable",
       texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3529,7 +3582,7 @@ app.post("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe,
     return res.status(409).render("message", {
       titre: "Cette demande est fermée",
       texte: "Une demande retirée ou déjà pourvue ne peut pas être mise en avant.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3541,7 +3594,7 @@ app.post("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe,
       titre: "Cette demande est déjà en avant",
       texte: `Elle le reste jusqu'au ${dateLisible(annonce.mise_en_avant_jusqu_au)}. ` +
              `Vous pourrez la remettre en avant après cette date.`,
-      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3554,7 +3607,7 @@ app.post("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe,
     return res.status(503).render("message", {
       titre: "Option indisponible",
       texte: "Le prix de la mise en avant n'a pas encore été réglé par l'équipe.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
     });
   }
 
@@ -3598,7 +3651,7 @@ app.post("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe,
       return res.status(409).render("message", {
         titre: "Cette demande est fermée",
         texte: "Elle a été fermée entre-temps. Aucun jeton n'a été prélevé.",
-        liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+        liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
       });
     }
     throw erreur;
@@ -3622,7 +3675,7 @@ app.post("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe,
            `Après cette date, elle reprend sa place sans que vous ayez rien à faire.`,
     liens: [
       { url: "/annonces", texte: "Voir la liste des demandes" },
-      { url: "/mon-profil", texte: "Retour à mon profil" },
+      { url: "/mes-demandes", texte: "Retour à mes demandes" },
     ],
   });
 });
@@ -4148,7 +4201,7 @@ app.get("/messages/:id", exigerConnexion, (req, res) => {
     return res.status(403).render("message", {
       titre: "Conversation introuvable",
       texte: "Cette conversation n'existe pas, ou elle ne vous concerne pas.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+      liens: [{ url: "/messages", texte: "Mes messages" }],
     });
   }
 
@@ -4184,7 +4237,7 @@ app.post("/messages/:id", exigerConnexion, lireFormulaire, (req, res) => {
     return res.status(403).render("message", {
       titre: "Conversation introuvable",
       texte: "Cette conversation n'existe pas, ou elle ne vous concerne pas.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+      liens: [{ url: "/messages", texte: "Mes messages" }],
     });
   }
 
@@ -4235,7 +4288,7 @@ app.post("/messages/:id/signaler", exigerConnexion, lireFormulaire, (req, res) =
     return res.status(403).render("message", {
       titre: "Action impossible",
       texte: "Cette conversation ne vous concerne pas.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+      liens: [{ url: "/messages", texte: "Mes messages" }],
     });
   }
 
@@ -5768,6 +5821,80 @@ app.get("/api/mes-demandes", (req, res) => {
       })),
     })),
   });
+});
+
+// --- Publier une demande depuis l'application ----------------------
+//
+// Les memes portes que sur le site : un employeur, dont l'identite est
+// verifiee. Renvoie true si la reponse est deja partie.
+function refusDePublierApi(res, moi) {
+  if (!moi) {
+    erreurApi(res, 401, "Personne n'est connecté.");
+    return true;
+  }
+  if (moi.est_admin || moi.role !== "employeur") {
+    erreurApi(res, 403, "Seuls les employeurs peuvent publier une demande.");
+    return true;
+  }
+  if (moi.statut_verification !== "verifie") {
+    erreurApi(res, 403, texteVerificationRequise(moi.role));
+    return true;
+  }
+  return false;
+}
+
+// Les listes du formulaire viennent du serveur, comme sur le site :
+// ajouter un metier ou un quartier ne demandera pas de refabriquer
+// l'application.
+app.get("/api/formulaire-demande", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusDePublierApi(res, moi)) return;
+
+  res.json({
+    metiers: metiers.map((m) => m.nom),
+    quartiers: quartiers.map((q) => q.nom),
+    arrondissements: app.locals.arrondissements,
+    unitesTarif: Object.keys(UNITES_TARIF).map((valeur) => ({ valeur, libelle: UNITES_TARIF[valeur] })),
+    uniteParDefaut: "forfaitaire",
+  });
+});
+
+// L'arrondissement d'un quartier, tel que le serveur l'enregistrera.
+// Le site fait ce calcul dans le navigateur pour l'afficher avant
+// l'envoi ; l'application le demande ici plutot que de recopier la
+// regle, synonymes compris.
+app.get("/api/quartier", (req, res) => {
+  if (!utilisateurConnecte(req)) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const connu = trouverQuartier(String(req.query.nom || ""));
+  res.json(connu
+    ? { connu: true, quartier: connu.nom, arrondissement: connu.arrondissement }
+    : { connu: false });
+});
+
+const CHAMPS_DEMANDE = ["titre", "metier", "horaire", "quartier", "arrondissement",
+                        "prix", "unite_tarif", "duree_estimee", "conditions"];
+
+app.post("/api/demandes", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusDePublierApi(res, moi)) return;
+
+  // Un formulaire du site n'envoie que du texte. En JSON, un objet peut
+  // se glisser a la place d'un texte : on le refuse plutot que
+  // d'enregistrer "[object Object]" comme titre.
+  const corps = req.body;
+  const formeValide = Boolean(corps) && typeof corps === "object" && !Array.isArray(corps) &&
+    CHAMPS_DEMANDE.every((champ) => corps[champ] == null ||
+      typeof corps[champ] === "string" ||
+      (champ === "prix" && typeof corps[champ] === "number"));
+  if (!formeValide) {
+    return erreurApi(res, 400, "Le formulaire envoyé n'a pas la forme attendue.");
+  }
+
+  const resultat = publierDemande(moi.id, corps);
+  if (resultat.probleme) return erreurApi(res, 400, resultat.probleme.texte);
+
+  res.status(201).json({ id: resultat.id, titre: resultat.titre, texte: resultat.texte });
 });
 
 app.use((req, res) => {

@@ -160,6 +160,135 @@ setTimeout(async () => {
   dire("plus aucune decision a prendre",
        !choisie.peutChoisir && !choisie.peutRefuser && !ecartee.peutChoisir && !ecartee.peutRefuser);
 
+  console.log(SAUT + "--- LES LIENS MENENT A MES DEMANDES ---");
+  const reconnexion = await poster("/connexion", form({ email: emp.mail, motdepasse: "motdepasse123" }));
+  dire("apres la connexion, l'employeur est envoye sur ses demandes",
+       reconnexion.corps.includes("Voir mes demandes") && !reconnexion.corps.includes("Voir mon profil"));
+  const formulaireWeb = await (await lire("/publier-annonce", emp.cookie)).text();
+  dire("Annuler ramene a Mes demandes", formulaireWeb.includes('href="/mes-demandes">Annuler'));
+
+  // Les appels de l'application : du JSON, avec un cookie ou un jeton.
+  async function json(chemin, corps, entetes) {
+    const r = await fetch(RACINE + chemin, {
+      method: corps === undefined ? "GET" : "POST",
+      headers: Object.assign({ "Content-Type": "application/json" }, entetes || {}),
+      body: corps === undefined ? undefined : JSON.stringify(corps),
+    });
+    const brut = await r.text();
+    let donnees = null;
+    try { donnees = JSON.parse(brut); } catch (e) { donnees = null; }
+    return { code: r.status, donnees, brut };
+  }
+  const cookieDe = (c) => ({ Cookie: c });
+  const erreurDe = (r) => (r.donnees && r.donnees.erreur) || "";
+
+  // Un quartier de la vraie table, pour ne rien supposer de son contenu.
+  const unQuartier = base.prepare("SELECT nom, arrondissement FROM quartiers ORDER BY nom LIMIT 1").get();
+
+  console.log(SAUT + "--- PUBLIER DEPUIS L'APPLICATION : QUI PEUT ---");
+  dire("le formulaire sans session : 401", (await json("/api/formulaire-demande")).code === 401);
+  const formPre = await json("/api/formulaire-demande", undefined, cookieDe(verifiee.cookie));
+  dire("le formulaire refuse a une personne qui repond",
+       formPre.code === 403 && erreurDe(formPre) === "Seuls les employeurs peuvent publier une demande.",
+       formPre.code + " " + erreurDe(formPre));
+
+  const mailNonVerifie = M + "-nonverifie@example.com";
+  await poster("/inscription", form({ role: "employeur", nom: "Test nonverifie", email: mailNonVerifie,
+                                      motdepasse: "motdepasse123", quartier: "Bastos" }));
+  const nonVerifie = await poster("/connexion", form({ email: mailNonVerifie, motdepasse: "motdepasse123" }));
+  const formNonVerifie = await json("/api/formulaire-demande", undefined, cookieDe(nonVerifie.cookie));
+  dire("un employeur non verifie lit la meme raison que sur le site",
+       formNonVerifie.code === 403 && erreurDe(formNonVerifie).startsWith("Avant de publier une demande"),
+       formNonVerifie.code + " " + erreurDe(formNonVerifie));
+
+  const formEmp = await json("/api/formulaire-demande", undefined, cookieDe(emp.cookie));
+  const f = formEmp.donnees || {};
+  dire("l'employeur verifie recoit le formulaire", formEmp.code === 200, formEmp.brut.slice(0, 80));
+  dire("tous les metiers de la table",
+       Array.isArray(f.metiers) && f.metiers.length === base.prepare("SELECT COUNT(*) n FROM metiers").get().n);
+  dire("tous les quartiers de la table",
+       Array.isArray(f.quartiers) && f.quartiers.length === base.prepare("SELECT COUNT(*) n FROM quartiers").get().n);
+  dire("les arrondissements sont la", Array.isArray(f.arrondissements) && f.arrondissements.includes(unQuartier.arrondissement));
+  dire("les trois facons de compter le prix, forfaitaire par defaut",
+       Array.isArray(f.unitesTarif) &&
+       ["horaire", "journalier", "forfaitaire"].every((v) => f.unitesTarif.some((u) => u.valeur === v && u.libelle)) &&
+       f.uniteParDefaut === "forfaitaire");
+
+  console.log(SAUT + "--- L'ARRONDISSEMENT D'UN QUARTIER ---");
+  dire("sans session : 401", (await json("/api/quartier?nom=x")).code === 401);
+  const trouve = await json("/api/quartier?nom=" + encodeURIComponent(unQuartier.nom.toLowerCase()), undefined, cookieDe(emp.cookie));
+  dire("un quartier connu, meme ecrit en minuscules",
+       trouve.donnees && trouve.donnees.connu === true && trouve.donnees.quartier === unQuartier.nom &&
+       trouve.donnees.arrondissement === unQuartier.arrondissement, trouve.brut);
+  const inconnu = await json("/api/quartier?nom=" + encodeURIComponent(M + " inconnu"), undefined, cookieDe(emp.cookie));
+  dire("un quartier inconnu est dit inconnu", inconnu.donnees && inconnu.donnees.connu === false, inconnu.brut);
+
+  console.log(SAUT + "--- PUBLIER : CE QUI EST REFUSE ---");
+  const complet = (titre) => ({ titre, metier: "menagere", quartier: unQuartier.nom.toLowerCase(),
+                                horaire: "Mercredi 9h", prix: 8000, unite_tarif: "horaire",
+                                duree_estimee: "Environ 3 heures" });
+  const compter = (titre) => base.prepare("SELECT COUNT(*) n FROM annonces WHERE titre = ?").get(titre).n;
+
+  dire("publier sans session : 401", (await json("/api/demandes", complet(M + " sans session"))).code === 401);
+  const parPre2 = await json("/api/demandes", complet(M + " par une personne"), cookieDe(verifiee.cookie));
+  dire("publier par une personne qui repond : 403", parPre2.code === 403, String(parPre2.code));
+
+  const forme = await json("/api/demandes", Object.assign(complet(M + " forme"), { titre: { faux: true } }), cookieDe(emp.cookie));
+  dire("un objet a la place d'un texte : 400",
+       forme.code === 400 && erreurDe(forme) === "Le formulaire envoyé n'a pas la forme attendue.", forme.brut);
+
+  const sansTitre = await json("/api/demandes", Object.assign(complet(""), { titre: "   " }), cookieDe(emp.cookie));
+  dire("sans description : 400", sansTitre.code === 400 && erreurDe(sansTitre).length > 0, sansTitre.brut);
+  const sansTitreWeb = await poster("/annonces", form(Object.assign(complet(""), { titre: "", prix: "8000" })), emp.cookie);
+  dire("le site refuse aussi, avec la meme phrase",
+       sansTitreWeb.code === 400 && sansTitreWeb.corps.includes(erreurDe(sansTitre)), "code " + sansTitreWeb.code);
+
+  const sansMetier = await json("/api/demandes", Object.assign(complet(M + " sans metier"), { metier: "" }), cookieDe(emp.cookie));
+  dire("sans metier : 400", sansMetier.code === 400 && erreurDe(sansMetier).startsWith("Indiquez qui vous cherchez"), sansMetier.brut);
+  const sansPrix = await json("/api/demandes", Object.assign(complet(M + " sans prix"), { prix: "" }), cookieDe(emp.cookie));
+  dire("sans prix : 400", sansPrix.code === 400, sansPrix.brut);
+  dire("aucune de ces demandes n'a ete enregistree",
+       compter(M + " sans session") + compter(M + " par une personne") + compter(M + " forme") +
+       compter(M + " sans metier") + compter(M + " sans prix") === 0);
+
+  // Le trou qui existait sur le site : le role n'etait verifie qu'a
+  // l'ouverture du formulaire, pas a l'envoi.
+  const parPreWeb = await poster("/annonces", form(Object.assign(complet(M + " forcee"), { prix: "8000" })), verifiee.cookie);
+  dire("le site refuse l'envoi force par une personne qui repond",
+       parPreWeb.code === 403 && compter(M + " forcee") === 0, "code " + parPreWeb.code);
+
+  console.log(SAUT + "--- PUBLIER : LA MEME DEMANDE DES DEUX COTES ---");
+  const coAppli = await json("/api/connexion", { email: emp.mail, motdepasse: "motdepasse123" });
+  const jeton = coAppli.donnees && coAppli.donnees.jeton;
+  const publiee = await json("/api/demandes", complet(M + " appli"), { Authorization: "Bearer " + jeton });
+  dire("publiee depuis l'application, avec le jeton : 201",
+       publiee.code === 201 && Number.isInteger(publiee.donnees.id), publiee.brut);
+  dire("la confirmation reprend le titre",
+       publiee.donnees && publiee.donnees.titre === "Demande publiée" && String(publiee.donnees.texte).includes(M + " appli"));
+
+  const parSite = await poster("/annonces", form(Object.assign(complet(M + " site"), { prix: "8000" })), emp.cookie);
+  dire("publiee depuis le site, qui renvoie vers Mes demandes",
+       parSite.code === 200 && parSite.corps.includes("Voir mes demandes"), "code " + parSite.code);
+
+  const ligne = (titre) => base.prepare(`
+    SELECT metier, quartier, arrondissement, horaire, prix, unite_tarif, duree_estimee, annulee
+    FROM annonces WHERE titre = ?`).get(titre);
+  const deLAppli = ligne(M + " appli");
+  const duSite = ligne(M + " site");
+  dire("le site et l'application enregistrent exactement la meme demande",
+       JSON.stringify(deLAppli) === JSON.stringify(duSite), JSON.stringify(deLAppli) + " / " + JSON.stringify(duSite));
+  dire("le quartier est reconnu et son arrondissement trouve",
+       deLAppli.quartier === unQuartier.nom && deLAppli.arrondissement === unQuartier.arrondissement,
+       JSON.stringify(deLAppli));
+  const bloque = base.prepare("SELECT montant, etat FROM versements WHERE annonce_id = ?").get(publiee.donnees.id);
+  dire("la somme annoncee est bloquee", bloque && bloque.montant === 8000 && bloque.etat === "bloque", JSON.stringify(bloque));
+
+  const apresPublication = await mesDemandes(emp.cookie);
+  dire("elle apparait dans Mes demandes de l'application",
+       apresPublication.donnees.demandes.some((d) => d.id === publiee.donnees.id && !d.fermee));
+  dire("et sur la page du site",
+       (await (await lire("/mes-demandes", emp.cookie)).text()).includes(M + " appli"));
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");

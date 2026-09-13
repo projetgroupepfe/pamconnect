@@ -72,7 +72,7 @@ setTimeout(async () => {
   // On verifie que la personne est ORIENTEE, pas la formulation exacte :
   // un test accroche aux mots casse des qu'on reecrit une phrase.
   dire("la personne est renvoyee vers ses candidatures",
-       r2.corps.includes('href="/mon-profil"'));
+       r2.corps.includes('href="/mes-reponses"'));
   dire("annonce inexistante -> 404", r3.code === 404, "(code " + r3.code + ")");
   dire("une seule candidature en base", n === 1, "(" + n + " trouvee)");
 
