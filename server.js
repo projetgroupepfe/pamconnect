@@ -2628,15 +2628,54 @@ function calculerDistanceKm(lat1, lon1, lat2, lon2) {
 // Retrouve la personne connectee a partir du cookie, ou null.
 // La session ne retient que l'identifiant : les informations
 // affichees viennent toujours de la base, donc toujours a jour.
-function utilisateurConnecte(req) {
+// --- Le jeton de session, d'ou qu'il vienne ------------------------
+//
+// Le MEME jeton voyage de deux facons :
+//   - un navigateur l'envoie tout seul dans le cookie "session" ;
+//   - l'application mobile l'envoie dans l'en-tete Authorization: Bearer,
+//     parce que son outil d'appel ne garde pas les cookies.
+// Une seule liste de sessions : une seule porte, et deux facons de
+// presenter la meme cle.
+//
+// LE COOKIE EST LU EN PREMIER. Un navigateur n'envoie jamais d'en-tete
+// Authorization de lui-meme : pour une page du site, rien ne change.
+function jetonDeSession(req) {
   const enteteCookie = req.headers.cookie || "";
   const paire = enteteCookie.split("; ").find((c) => c.startsWith("session="));
-  if (!paire) return null;
+  if (paire) return paire.split("=")[1];
 
-  const identifiant = sessions[paire.split("=")[1]];
-  if (!identifiant) return null;
+  // genererToken produit 64 caracteres hexadecimaux : l'en-tete n'est
+  // accepte que sous cette forme, le reste est ecarte avant toute lecture.
+  const trouve = String(req.headers.authorization || "").match(/^Bearer\s+([0-9a-f]{64})$/i);
+  return trouve ? trouve[1].toLowerCase() : null;
+}
 
-  return requetes.utilisateurParId.get(identifiant) || null;
+// La session, et la personne a qui elle appartient, lues en UNE requete.
+//
+// LA LISTE DES SESSIONS EST UN OBJET ORDINAIRE : un jeton fabrique comme
+// "constructor" y trouvait une valeur heritee, et la requete plantait.
+// On ne lit que les cles posees par nous.
+function lireSession(req) {
+  const jeton = jetonDeSession(req);
+  if (!jeton || !Object.prototype.hasOwnProperty.call(sessions, jeton)) {
+    return { jeton: null, utilisateur: null };
+  }
+  return { jeton, utilisateur: requetes.utilisateurParId.get(sessions[jeton]) || null };
+}
+
+// Ce que lit une personne suspendue, a la connexion comme au clic qui
+// suit sa suspension : la meme phrase partout, avec le motif de l'equipe.
+function texteSuspension(utilisateur) {
+  return "Votre compte a été suspendu par l'équipe PamConnect" +
+    (utilisateur.suspendu_motif ? " : " + utilisateur.suspendu_motif : "") + ".";
+}
+
+function utilisateurConnecte(req) {
+  // Une personne suspendue n'est plus connectee, ou que la question soit
+  // posee. Le portier global lui explique pourquoi ; cette fonction
+  // garantit qu'aucune route ne la traite comme connectee entre-temps.
+  const { utilisateur } = lireSession(req);
+  return utilisateur && !utilisateur.suspendu ? utilisateur : null;
 }
 
 // ============================================================
@@ -2712,7 +2751,35 @@ app.use(express.static(path.join(__dirname, "public")));
 // le menu puisse s'adapter. Place apres express.static : inutile de
 // consulter la base pour servir une feuille de style.
 app.use((req, res, next) => {
-  const moi = utilisateurConnecte(req);
+  const { jeton, utilisateur } = lireSession(req);
+
+  // UNE SANCTION PREND EFFET AU CLIC SUIVANT. La suspension n'etait
+  // verifiee qu'a la connexion : une personne deja connectee gardait tout
+  // son acces jusqu'a ce qu'elle se deconnecte d'elle-meme, parfois des
+  // jours plus tard.
+  //
+  // Sa session est EFFACEE, pas seulement refusee : lever la sanction ne
+  // rouvre pas les sessions d'avant. Et elle lit POURQUOI, avec le motif
+  // de l'equipe : la renvoyer en silence vers la connexion lui ferait
+  // croire a une panne.
+  //
+  // La ligne lue contient deja la colonne suspendu : cette verification ne
+  // coute aucune requete de plus aux autres.
+  if (utilisateur && utilisateur.suspendu) {
+    delete sessions[jeton];
+    res.clearCookie("session", { path: "/" });
+    res.locals.moi = null;
+    if (req.path.startsWith("/api/")) {
+      return erreurApi(res, 403, texteSuspension(utilisateur));
+    }
+    return res.status(403).render("message", {
+      titre: "Compte suspendu",
+      texte: texteSuspension(utilisateur),
+      liens: [{ url: "/", texte: "Retour à l'accueil" }],
+    });
+  }
+
+  const moi = utilisateur;
   res.locals.moi = moi;
 
   // Ce que la personne connectee a le droit de FAIRE.
@@ -5499,8 +5566,7 @@ app.post("/api/connexion", (req, res) => {
   // fermee. On le DIT, sinon la personne croit a une panne et recommence.
   if (utilisateur && utilisateur.suspendu &&
       verifierMotDePasse(motdepasse, utilisateur.motdepasse)) {
-    return erreurApi(res, 403, "Votre compte a ete suspendu par l'equipe PamConnect" +
-      (utilisateur.suspendu_motif ? " : " + utilisateur.suspendu_motif : "") + ".");
+    return erreurApi(res, 403, texteSuspension(utilisateur));
   }
 
   if (!utilisateur || !verifierMotDePasse(motdepasse, utilisateur.motdepasse)) {
@@ -5511,14 +5577,20 @@ app.post("/api/connexion", (req, res) => {
   sessions[token] = utilisateur.id;
   res.cookie("session", token, { httpOnly: true, path: "/" });
 
-  res.json({ moi: moiPourApi(utilisateur) });
+  // LE JETON EST RENDU A L'APPLICATION, qui le renverra dans l'en-tete
+  // Authorization. Il n'apparait QUE dans cette reponse d'API : les pages
+  // du site ne l'affichent jamais, et leur cookie reste illisible par le
+  // JavaScript des pages (httpOnly).
+  res.json({ jeton: token, moi: moiPourApi(utilisateur) });
 });
 
 // --- Se deconnecter ------------------------------------------------
 app.post("/api/deconnexion", (req, res) => {
-  const entete = req.headers.cookie || "";
-  const paire = entete.split("; ").find((c) => c.startsWith("session="));
-  if (paire) delete sessions[paire.split("=")[1]];
+  // Cookie OU en-tete : la session est effacee quel que soit son
+  // transport. Sans cela, l'application croirait s'etre deconnectee
+  // alors que son jeton ouvrirait encore la porte.
+  const jeton = jetonDeSession(req);
+  if (jeton && Object.prototype.hasOwnProperty.call(sessions, jeton)) delete sessions[jeton];
   res.clearCookie("session", { path: "/" });
   res.json({ deconnecte: true });
 });

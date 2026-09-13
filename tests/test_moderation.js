@@ -119,6 +119,15 @@ setTimeout(async () => {
   dire("le signalement traite disparait de la liste", !page.includes(MARQUE));
 
   console.log("\n--- UN COMPTE SUSPENDU NE SE CONNECTE PLUS ---");
+  // LA SANCTION COUPE AUSSI LA SESSION DEJA OUVERTE. La suspension ci-dessus
+  // passe par la vraie route de l'equipe : la personne, encore connectee
+  // avec sa session d'avant, est arretee au clic suivant et lit le motif.
+  const clicSuivant = await lire("/mes-reponses", pre.cookie);
+  dire("sa session ouverte est coupee au clic suivant",
+       clicSuivant.status === 403, "code " + clicSuivant.status);
+  dire("et elle y lit le motif",
+       (await clicSuivant.text()).includes("tentative de paiement hors plateforme"));
+
   const tentative = await poster("/connexion", form({ email: pre.mail, motdepasse: "motdepasse123" }));
   dire("la connexion est refusee", tentative.code === 403, "code " + tentative.code);
   dire("la personne sait pourquoi", tentative.corps.includes("tentative de paiement hors plateforme"));
@@ -143,7 +152,16 @@ setTimeout(async () => {
   console.log("\n--- CLASSER SANS SUITE ---");
   await poster("/messages/" + conv.id, form({ texte: "Bonjour, quel est l'horaire exact ?", prix: "10000" }), emp.cookie);
   const msg2 = base.prepare("SELECT id FROM messages WHERE candidature_id = ? ORDER BY id DESC LIMIT 1").get(conv.id);
-  await poster("/messages/" + msg2.id + "/signaler", form({ candidatureId: String(conv.id) }), pre.cookie);
+  // La personne qui signale est celle que l'on vient de sanctionner. Sa
+  // session d'avant a ete effacee par la sanction, et lever la sanction ne
+  // la rouvre pas : elle doit se reconnecter, comme dans la vraie vie.
+  base.prepare("UPDATE utilisateurs SET suspendu = 0, suspendu_motif = NULL WHERE email = ?").run(pre.mail);
+  dire("sanction levee, l'ancienne session ne revient pas",
+       (await lire("/mes-reponses", pre.cookie)).status === 302);
+  const preReconnectee = await poster("/connexion", form({ email: pre.mail, motdepasse: "motdepasse123" }));
+  dire("elle se reconnecte", preReconnectee.code === 200 && Boolean(preReconnectee.cookie),
+       "code " + preReconnectee.code);
+  await poster("/messages/" + msg2.id + "/signaler", form({ candidatureId: String(conv.id) }), preReconnectee.cookie);
   await poster("/admin/signalements/" + msg2.id, form({ decision: "rien" }), eq.cookie);
   const classe = base.prepare("SELECT * FROM messages WHERE id = ?").get(msg2.id);
   dire("le signalement est classe", classe.signalement_decision === "rien");
