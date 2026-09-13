@@ -2,6 +2,11 @@
   Ce sur quoi un employeur travaille : ses demandes et les reponses
   recues. Sortie du profil, qui melangeait trois choses sans rapport.
 
+  TOUT CE QUI DEPEND DES DONNEES EST DECIDE PAR demandesDeLEmployeur, dans
+  server.js : demande pourvue ou retiree, mise en avant, phrases de statut,
+  note, boutons proposes. L'application mobile lit la meme fonction ; la
+  page ne recalcule rien, sinon les deux finiraient par se contredire.
+
   La garde jePeux.publier reste, bien que la route la verifie deja :
   une vue qui ne suppose rien ne peut pas fuir.
 %>
@@ -39,11 +44,10 @@
         </div>
       </div>
     <% } else { %>
-      <%# CE QUI EST EN COURS D'ABORD. Une demande fermee garde ses
-          discussions et la trace de son argent : on ne la supprime pas,
-          on la range. %>
-      <% const ouvertes = mesAnnonces.filter(function (a) { return !a.annulee; }); %>
-      <% const fermees  = mesAnnonces.filter(function (a) { return a.annulee; }); %>
+      <%# CE QUI EST EN COURS D'ABORD. La liste arrive deja rangee par le
+          serveur : les demandes fermees apres les ouvertes. %>
+      <% const ouvertes = mesAnnonces.filter(function (a) { return !a.fermee; }); %>
+      <% const fermees  = mesAnnonces.filter(function (a) { return a.fermee; }); %>
 
       <%# Le titre n'apparait que s'il y a une seconde section : seul,
           au-dessus de la seule liste de la page, il n'apprendrait rien. %>
@@ -55,7 +59,7 @@
         <p class="vide">Aucune demande en cours.</p>
       <% } %>
 
-      <% ouvertes.concat(fermees).forEach(function (annonce, rang) { %>
+      <% mesAnnonces.forEach(function (annonce, rang) { %>
         <%# Le titre de la section fermee, pose juste avant la premiere
             d'entre elles. %>
         <% if (fermees.length > 0 && rang === ouvertes.length) { %>
@@ -75,13 +79,13 @@
             </li>
             <li>
               <%- include("partiels/icone", { nom: "calendrier" }) %>
-              <span><%= annonce.horaire || "Horaire non précisé" %></span>
+              <span><%= annonce.horaireLisible %></span>
             </li>
-            <% if (prixEnClair(annonce)) { %>
+            <% if (annonce.prixLisible) { %>
               <li>
                 <%- include("partiels/icone", { nom: "remuneration" }) %>
                 <span>
-                  <%= prixEnClair(annonce) %>
+                  <%= annonce.prixLisible %>
                   <% if (annonce.duree_estimee) { %>
                     <span class="aide"><%= annonce.duree_estimee %></span>
                   <% } %>
@@ -90,54 +94,49 @@
             <% } %>
             <li>
               <%- include("partiels/icone", { nom: "lieu" }) %>
-              <span>
-                <% if (annonce.quartier) { %><%= annonce.quartier %>, <% } %><%= annonce.arrondissement %>
-              </span>
+              <span><%= annonce.lieu %></span>
             </li>
           </ul>
 
-          <%# Une demande fermee l'est pour deux raisons differentes : soit
-              quelqu'un a ete choisi, soit l'employeur l'a retiree. On le
-              DEDUIT des candidatures plutot que de le stocker : une
-              information deduite ne peut pas se contredire. %>
-          <% const pourvue = annonce.candidatures.some(function (c) { return c.statut === "acceptee"; }); %>
-          <% if (annonce.annulee) { %>
+          <% if (annonce.fermee) { %>
             <p class="aide">
-              <strong><%= pourvue ? "Vous avez choisi quelqu'un." : "Vous avez retiré cette demande." %></strong>
+              <strong><%= annonce.phraseFermeture %></strong>
               Elle n'apparaît plus dans la liste et n'accepte plus de réponse.
               Vos discussions restent accessibles.
             </p>
           <% } else { %>
-            <%# L'ETAT AVANT L'ACTION : une demande deja en avant n'a pas
-                besoin d'un bouton, elle a besoin d'une date. %>
             <% if (annonce.enAvant) { %>
               <p>
                 <span class="badge badge-info">Mise en avant</span>
                 <span class="aide">
-                  jusqu'au <%= dateLisible(annonce.mise_en_avant_jusqu_au) %>
+                  jusqu'au <%= annonce.enAvantJusquAu %>
                 </span>
               </p>
             <% } %>
 
             <div class="actions">
-              <a class="bouton bouton-secondaire" href="/annonces/<%= annonce.id %>/modifier">
-                <%- include("partiels/icone", { nom: "profil" }) %>
-                Modifier cette demande
-              </a>
-              <% if (!annonce.enAvant) { %>
+              <% if (annonce.peutModifier) { %>
+                <a class="bouton bouton-secondaire" href="/annonces/<%= annonce.id %>/modifier">
+                  <%- include("partiels/icone", { nom: "profil" }) %>
+                  Modifier cette demande
+                </a>
+              <% } %>
+              <% if (annonce.peutMettreEnAvant) { %>
                 <a class="bouton bouton-secondaire" href="/annonces/<%= annonce.id %>/mettre-en-avant">
                   <%- include("partiels/icone", { nom: "jeton" }) %>
                   Mettre en avant
                 </a>
               <% } %>
-              <%# Retirer n'efface rien : la demande sort de la liste
-                  publique, les discussions restent. %>
-              <form action="/annonces/<%= annonce.id %>/annuler" method="POST">
-                <button type="submit" class="bouton-danger">
-                  <%- include("partiels/icone", { nom: "refuser" }) %>
-                  Retirer cette demande
-                </button>
-              </form>
+              <% if (annonce.peutRetirer) { %>
+                <%# Retirer n'efface rien : la demande sort de la liste
+                    publique, les discussions restent. %>
+                <form action="/annonces/<%= annonce.id %>/annuler" method="POST">
+                  <button type="submit" class="bouton-danger">
+                    <%- include("partiels/icone", { nom: "refuser" }) %>
+                    Retirer cette demande
+                  </button>
+                </form>
+              <% } %>
             </div>
 
             <%# DEUX ACTIONS ROUGES SUR LE MEME ECRAN. "Retirer cette
@@ -164,11 +163,7 @@
                   <div class="portrait"><%= candidature.nomPrestataire.charAt(0) %></div>
                   <div>
                     <h3><%= candidature.nomPrestataire %></h3>
-                    <%# "pourvue" est deduite plus haut, dans la meme
-                        boucle : la reutiliser evite de recalculer et
-                        garantit que les deux phrases de la page ne
-                        peuvent pas se contredire. %>
-                    <div class="metier"><%= phraseCandidature(candidature.statut, true, { quelquUnChoisi: pourvue }) %></div>
+                    <div class="metier"><%= candidature.phrase %></div>
                   </div>
                 </div>
 
@@ -177,7 +172,7 @@
                     <% if (candidature.verificationPrestataire === "verifie") { %>
                       <%- include("partiels/icone", { nom: "verifie" }) %>
                     <% } %>
-                    <%= libelleVerification(candidature.verificationPrestataire) %>
+                    <%= candidature.libelleVerification %>
                   </span>
 
                   <%# SA NOTE, ICI. C'est sous sa demande que l'employeur
@@ -195,28 +190,27 @@
                   <li>
                     <%- include("partiels/icone", { nom: "remuneration" }) %>
                     <span>
-                      <%= prixEnClair(annonce) %>
+                      <%= annonce.prixLisible %>
                     </span>
                   </li>
                 </ul>
 
-                <% if (libelleExperience(candidature.experiencePrestataire)) { %>
+                <% if (candidature.experience) { %>
                   <ul class="infos">
                     <li>
                       <%- include("partiels/icone", { nom: "experience" }) %>
-                      <span><%= libelleExperience(candidature.experiencePrestataire) %></span>
+                      <span><%= candidature.experience %></span>
                     </li>
                   </ul>
                 <% } %>
 
-                <% const dispos = disponibilitesLisibles(candidature.disponibilitesPrestataire); %>
-                <% if (dispos.length > 0) { %>
+                <% if (candidature.disponibilites) { %>
                   <ul class="infos">
                     <li>
                       <%- include("partiels/icone", { nom: "calendrier" }) %>
                       <span>
                         Disponible
-                        <strong><%= dispos.map(function (d) { return d.jour; }).join(", ") %></strong>
+                        <strong><%= candidature.disponibilites %></strong>
                       </span>
                     </li>
                   </ul>
@@ -233,10 +227,9 @@
                   </a>
                 </div>
 
-                <% if (candidature.statut === "en attente") { %>
+                <% if (candidature.peutRefuser) { %>
 
-                  <%# On n'engage personne dont l'identite n'est pas verifiee. %>
-                  <% if (candidature.verificationPrestataire === "verifie") { %>
+                  <% if (candidature.peutChoisir) { %>
                     <div class="actions">
                       <%# Choisir quelqu'un est un engagement : on passe par
                           un ecran de confirmation. Refuser ne l'est pas. %>
@@ -254,10 +247,13 @@
                       </form>
                     </div>
                   <% } else { %>
-                    <p class="aide">
-                      Vous pourrez accepter cette candidature dès que PamConnect aura
-                      vérifié l'identité de cette personne.
-                    </p>
+                    <%# On n'engage personne dont l'identite n'est pas verifiee. %>
+                    <% if (candidature.attendVerification) { %>
+                      <p class="aide">
+                        Vous pourrez accepter cette candidature dès que PamConnect aura
+                        vérifié l'identité de cette personne.
+                      </p>
+                    <% } %>
                     <div class="actions">
                       <form action="/candidatures/statut" method="POST">
                         <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
@@ -271,7 +267,7 @@
                   <% } %>
 
                   <%# La question se pose exactement ici : refuser ferme-t-il la
-                      demande ? Non - seul un choix la pourvoit. On le dit plutot
+                      demande ? Non, seul un choix la pourvoit. On le dit plutot
                       que de laisser deviner. %>
                   <p class="aide">
                     Refuser ne retire pas votre demande : elle reste visible,

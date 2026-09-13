@@ -4,39 +4,20 @@
   Appelee ainsi :
     include("partiels/note-personne", { nbAvis: ..., moyenne: ..., services: ... })
 
-  TROIS ETATS, ET AUCUN N'EST UN VIDE :
+  Les trois etats et leurs phrases sont decides par notePersonne, dans
+  server.js : l'application mobile lit la meme fonction, et les deux ne
+  peuvent donc pas dire des choses differentes.
 
-    elle a des avis        sa moyenne et leur nombre
-    aucun avis, des
-      services termines    "Pas encore notee" - elle a deja travaille,
-                           elle n'est pas nouvelle
-    ni l'un ni l'autre     "Nouveau prestataire"
-
-  On n'ecrit JAMAIS "0 sur 5" : ce serait la condamner avant d'avoir
-  commence. Et on ne laisse jamais la place vide : un blanc a cote de
-  cartes notees se lit comme un probleme.
+  La balise d'affichage brute est volontaire : ces textes sont ecrits par
+  le serveur a partir de nombres, aucun ne vient d'un utilisateur. La balise
+  ordinaire changerait l'apostrophe de "l'a" en entite HTML.
 
   ATTENTION : ne jamais ecrire la sequence de fermeture EJS dans ce
   commentaire, elle terminerait le bloc au milieu d'une phrase.
 %>
-<% const faits = Number(locals.services) || 0; %>
-<% if (nbAvis > 0) { %>
-  <span class="badge badge-info">
-    <%- include("icone", { nom: "avis", taille: 15 }) %>
-    <%= moyenneLisible(moyenne) %> sur 5
-  </span>
-  <span class="aide">
-    sur <%= nbAvis %> avis<% if (faits > 0) { %>,
-    <%= faits %> service<%= faits > 1 ? "s" : "" %> terminé<%= faits > 1 ? "s" : "" %><% } %>
-  </span>
-<% } else if (faits > 0) { %>
-  <%# ELLE A DEJA TRAVAILLE. L'appeler "nouvelle" serait faux, et
-      effacerait la seule chose qu'elle a prouvee. %>
-  <span class="badge badge-info">Pas encore notée</span>
-  <span class="aide">
-    <%= faits %> service<%= faits > 1 ? "s" : "" %> terminé<%= faits > 1 ? "s" : "" %>
-  </span>
-<% } else { %>
-  <span class="badge badge-info">Nouveau prestataire</span>
-  <span class="aide">personne ne l'a encore notée</span>
-<% } %>
+<% const note = notePersonne({ nbAvis: nbAvis, moyenne: moyenne, services: locals.services }); %>
+<span class="badge badge-info">
+  <% if (note.etat === "notee") { %><%- include("icone", { nom: "avis", taille: 15 }) %><% } %>
+  <%- note.badge %>
+</span>
+<span class="aide"><%- note.detail %></span>

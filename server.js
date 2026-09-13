@@ -2090,6 +2090,32 @@ function moyenneLisible(moyenne) {
   return moyenne === null ? "" : String(moyenne).replace(".", ",");
 }
 
+// LA NOTE D'UNE PERSONNE, EN TROIS ETATS, ET AUCUN N'EST UN VIDE.
+//
+//   elle a des avis              sa moyenne et leur nombre
+//   aucun avis, des services     "Pas encore notee" : elle a deja travaille
+//   ni l'un ni l'autre           "Nouveau prestataire"
+//
+// On n'ecrit JAMAIS "0 sur 5" : ce serait la condamner avant d'avoir
+// commence. Ecrite ICI et non dans la page : le site et l'application
+// doivent dire exactement la meme chose.
+function notePersonne({ nbAvis, moyenne, services }) {
+  const faits = Number(services) || 0;
+  const pluriel = faits > 1 ? "s" : "";
+  const servicesTermines = `${faits} service${pluriel} terminé${pluriel}`;
+  if (nbAvis > 0) {
+    return {
+      etat: "notee",
+      badge: `${moyenneLisible(moyenne)} sur 5`,
+      detail: `sur ${nbAvis} avis` + (faits > 0 ? `, ${servicesTermines}` : ""),
+    };
+  }
+  if (faits > 0) {
+    return { etat: "pas-encore-notee", badge: "Pas encore notée", detail: servicesTermines };
+  }
+  return { etat: "nouveau", badge: "Nouveau prestataire", detail: "personne ne l'a encore notée" };
+}
+
 // Une note entre 1 et 5, ou null si la case a ete laissee vide.
 // FACULTATIF VEUT DIRE FACULTATIF : une valeur absente n'est pas une
 // erreur, elle n'est simplement pas enregistree.
@@ -2560,6 +2586,7 @@ app.locals.actionsPossibles = actionsPossibles;
 app.locals.uneAction = uneAction;
 app.locals.valeurDuJeton = valeurDuJeton;
 app.locals.moyenneLisible = moyenneLisible;
+app.locals.notePersonne = notePersonne;
 app.locals.criteresAvis = criteresAvis;
 app.locals.moments = MOMENTS;
 
@@ -2993,6 +3020,63 @@ app.get("/mon-profil", exigerConnexion, (req, res) => {
 // La verification n'est PAS exigee ici : un employeur dont le dossier
 // est en attente garde des demandes publiees et de l'argent bloque.
 // Lui cacher les siennes serait lui cacher son propre argent.
+// --- Les demandes d'un employeur, avec tout ce que l'ecran decide -----
+//
+// La page web et l'application montrent la MEME chose parce qu'elles
+// lisent cette fonction. Tout ce qui depend des donnees est decide ici :
+// demande pourvue ou retiree, mise en avant, phrases de statut, note,
+// boutons proposes. Rien de tout cela n'est recopie dans les ecrans.
+function demandesDeLEmployeur(employeurId) {
+  const annonces = requetes.annoncesDeEmployeur.all(employeurId).map((annonce) => {
+    const candidatures = requetes.candidaturesDeAnnonce.all(annonce.id);
+    // DEDUITE, JAMAIS STOCKEE : une information deduite ne peut pas se
+    // contredire.
+    const pourvue = candidatures.some((c) => c.statut === "acceptee");
+    const fermee = Boolean(annonce.annulee);
+    const enAvant = Boolean(annonce.enAvant);
+
+    return {
+      ...annonce,
+      fermee,
+      pourvue,
+      phraseFermeture: fermee
+        ? (pourvue ? "Vous avez choisi quelqu'un." : "Vous avez retiré cette demande.")
+        : null,
+      horaireLisible: annonce.horaire || "Horaire non précisé",
+      prixLisible: prixEnClair(annonce),
+      lieu: [annonce.quartier, annonce.arrondissement].filter(Boolean).join(", "),
+      enAvant,
+      enAvantJusquAu: enAvant ? dateLisible(annonce.mise_en_avant_jusqu_au) : null,
+      // L'ETAT AVANT L'ACTION : une demande deja en avant n'a pas besoin
+      // du bouton, elle a besoin d'une date.
+      peutModifier: !fermee,
+      peutMettreEnAvant: !fermee && !enAvant,
+      peutRetirer: !fermee,
+      candidatures: candidatures.map((c) => {
+        const enAttente = c.statut === "en attente";
+        const verifiee = c.verificationPrestataire === "verifie";
+        return {
+          ...c,
+          phrase: phraseCandidature(c.statut, true, { quelquUnChoisi: pourvue }),
+          libelleVerification: libelleVerification(c.verificationPrestataire),
+          note: notePersonne({ nbAvis: c.nbAvis, moyenne: c.moyenne, services: c.servicesTermines }),
+          experience: libelleExperience(c.experiencePrestataire),
+          disponibilites: disponibilitesLisibles(c.disponibilitesPrestataire).map((d) => d.jour).join(", "),
+          // On n'engage personne dont l'identite n'est pas verifiee ;
+          // refuser, en revanche, reste toujours possible.
+          peutChoisir: enAttente && verifiee,
+          peutRefuser: enAttente,
+          attendVerification: enAttente && !verifiee,
+        };
+      }),
+    };
+  });
+
+  // CE QUI EST EN COURS D'ABORD. Une demande fermee garde ses discussions
+  // et la trace de son argent : on ne la supprime pas, on la range.
+  return annonces.filter((a) => !a.fermee).concat(annonces.filter((a) => a.fermee));
+}
+
 app.get("/mes-demandes", exigerConnexion, interdireALEquipe, (req, res) => {
   if (req.utilisateur.role !== "employeur") {
     return res.status(403).render("message", {
@@ -3003,13 +3087,11 @@ app.get("/mes-demandes", exigerConnexion, interdireALEquipe, (req, res) => {
     });
   }
 
-  // La route PREPARE les donnees, la vue se contente de les AFFICHER.
+  // La route PREPARE les donnees, la vue se contente de les AFFICHER. Les
+  // decisions viennent de demandesDeLEmployeur, que l'API partage.
   res.render("mes-demandes", {
     titre: "Mes demandes",
-    mesAnnonces: requetes.annoncesDeEmployeur.all(req.utilisateur.id).map((annonce) => ({
-      ...annonce,
-      candidatures: requetes.candidaturesDeAnnonce.all(annonce.id),
-    })),
+    mesAnnonces: demandesDeLEmployeur(req.utilisateur.id),
   });
 });
 
@@ -5639,6 +5721,52 @@ app.get("/api/demandes", (req, res) => {
     pourMoi: monMetier ? toutes.filter((a) => a.metier === monMetier).map(pourLApplication) : [],
     autres: (monMetier ? toutes.filter((a) => a.metier !== monMetier) : toutes).map(pourLApplication),
     monMetier,
+  });
+});
+
+// --- Les demandes de l'employeur connecte -----------------------------
+//
+// EXACTEMENT ce que montre la page Mes demandes : la meme fonction decide
+// pour les deux. Les champs sont choisis un par un : aucune coordonnee des
+// personnes qui ont repondu ne sort d'ici.
+app.get("/api/mes-demandes", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+  if (moi.est_admin || moi.role !== "employeur") {
+    return erreurApi(res, 403, "Cette page est celle des employeurs.");
+  }
+
+  res.json({
+    demandes: demandesDeLEmployeur(moi.id).map((a) => ({
+      id: a.id,
+      titre: a.titre,
+      metier: a.metier,
+      horaire: a.horaireLisible,
+      prixLisible: a.prixLisible,
+      dureeEstimee: a.duree_estimee || null,
+      lieu: a.lieu || null,
+      fermee: a.fermee,
+      phraseFermeture: a.phraseFermeture,
+      enAvant: a.enAvant,
+      enAvantJusquAu: a.enAvantJusquAu,
+      peutModifier: a.peutModifier,
+      peutMettreEnAvant: a.peutMettreEnAvant,
+      peutRetirer: a.peutRetirer,
+      candidatures: a.candidatures.map((c) => ({
+        id: c.id,
+        prestataireId: c.prestataireId,
+        nom: c.nomPrestataire,
+        phrase: c.phrase,
+        verification: c.verificationPrestataire,
+        libelleVerification: c.libelleVerification,
+        note: { etat: c.note.etat, badge: c.note.badge, detail: c.note.detail },
+        experience: c.experience,
+        disponibilites: c.disponibilites || null,
+        peutChoisir: c.peutChoisir,
+        peutRefuser: c.peutRefuser,
+        attendVerification: c.attendVerification,
+      })),
+    })),
   });
 });
 
