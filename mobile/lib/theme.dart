@@ -13,9 +13,14 @@ abstract final class Couleurs {
   static const orangeFonce = Color(0xFF9E4B0E);
   static const encre = Color(0xFF1A2430);
   static const encreDouce = Color(0xFF4E5D6C);
+  static const encrePale = Color(0xFF67757F);
   static const trait = Color(0xFFE3DDD5);
   static const fond = Color(0xFFFAF8F5);
   static const surface = Color(0xFFFFFFFF);
+  static const vert = Color(0xFF1B6B3A);
+  static const vertFond = Color(0xFFE3F3E8);
+  static const ambre = Color(0xFF8A5A05);
+  static const ambreFond = Color(0xFFFBF0DA);
   static const rouge = Color(0xFFA32B33);
   static const rougeFond = Color(0xFFFBE7E8);
 }
@@ -64,39 +69,4 @@ ThemeData themePamConnect() {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(rayon)),
     ),
   );
-}
-
-/// Un message qui demande de l'attention : une erreur, un refus, une
-/// session perdue.
-///
-/// liveRegion : un lecteur d'ecran l'annonce des qu'il apparait, sinon une
-/// personne malvoyante ne saurait pas pourquoi rien ne se passe.
-class Avertissement extends StatelessWidget {
-  const Avertissement({super.key, required this.texte});
-
-  final String texte;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      liveRegion: true,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Couleurs.rougeFond,
-          borderRadius: BorderRadius.circular(rayon),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.info_outline, color: Couleurs.rouge),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(texte, style: const TextStyle(color: Couleurs.rouge)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

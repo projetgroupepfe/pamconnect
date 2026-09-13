@@ -2,7 +2,24 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'ecran_demandes.dart';
+import 'ecran_mes_demandes.dart';
+import 'elements.dart';
 import 'theme.dart';
+
+/// Ce que lit la personne quand le serveur ne reconnait plus sa session.
+const messageSessionPerdue = "Votre session n'est plus valable, par exemple "
+    'après un redémarrage du serveur. Reconnectez-vous.';
+
+/// Revient a l'ecran de connexion en gardant l'adresse du serveur, et en
+/// disant pourquoi. Partagee par tous les ecrans qui ont besoin d'une
+/// session.
+void revenirALaConnexion(BuildContext context, ApiPamConnect api, [String? message]) {
+  Navigator.of(context).pushReplacement(
+    MaterialPageRoute<void>(
+      builder: (_) => EcranConnexion(adresseInitiale: api.racine, message: message),
+    ),
+  );
+}
 
 /// L'ecran d'entree : l'adresse du serveur, puis les identifiants.
 ///
@@ -51,24 +68,25 @@ class _EcranConnexionState extends State<EcranConnexion> {
       final moi = await api.connexion(_email.text.trim(), _motdepasse.text);
       if (!mounted) return;
 
-      // LA SEPARATION DES ROLES VA JUSQU'A L'APPLICATION. Cette premiere
-      // version sert les personnes qui repondent aux demandes : un employeur
-      // ou l'equipe est deconnecte aussitot, et on lui dit ou aller.
-      if (!moi.repondAuxDemandes) {
+      // CHAQUE ROLE ARRIVE SUR SA PAGE DE TRAVAIL, comme sur le site : la
+      // personne qui repond sur les demandes ouvertes, l'employeur sur ses
+      // demandes. L'espace de l'equipe reste un outil du site.
+      final Widget accueil;
+      if (moi.repondAuxDemandes) {
+        accueil = EcranDemandes(api: api, moi: moi);
+      } else if (moi.publieDesDemandes) {
+        accueil = EcranMesDemandes(api: api, moi: moi);
+      } else {
         await api.deconnexion();
         if (!mounted) return;
         setState(() {
           _enCours = false;
-          _message = "Cette première version de l'application est réservée aux "
-              "personnes qui répondent aux demandes. Les employeurs et l'équipe "
-              "continuent d'utiliser le site.";
+          _message = "L'espace de l'équipe s'utilise sur le site, depuis un ordinateur.";
         });
         return;
       }
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => EcranDemandes(api: api, moi: moi)),
-      );
+      Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => accueil));
     } on ErreurApi catch (erreur) {
       if (!mounted) return;
       setState(() {
@@ -101,7 +119,7 @@ class _EcranConnexionState extends State<EcranConnexion> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Connectez-vous pour voir les demandes.',
+                    'Connectez-vous à votre compte.',
                     textAlign: TextAlign.center,
                     style: texte.bodyLarge?.copyWith(color: Couleurs.encreDouce),
                   ),

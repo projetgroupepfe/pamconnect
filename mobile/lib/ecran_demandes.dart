@@ -2,19 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'ecran_connexion.dart';
+import 'elements.dart';
 import 'modeles.dart';
 import 'theme.dart';
-
-/// "Vous avez 3 jetons, dont 3 offerts."
-///
-/// Les jetons offerts sont nommes parce qu'ils perissent, contrairement aux
-/// jetons achetes : ne donner que le total cacherait ce qui va disparaitre.
-String phraseJetons(Jetons jetons) {
-  if (jetons.total == 0) return "Vous n'avez aucun jeton.";
-  final base = 'Vous avez ${jetons.total} jeton${jetons.total > 1 ? 's' : ''}';
-  if (jetons.offerts == 0) return '$base.';
-  return '$base, dont ${jetons.offerts} offert${jetons.offerts > 1 ? 's' : ''}.';
-}
 
 /// Les demandes ouvertes, dans l'ordre que le serveur a decide : celles du
 /// metier de la personne d'abord, les autres ensuite.
@@ -65,12 +55,11 @@ class _EcranDemandesState extends State<EcranDemandes> {
     } on ErreurApi catch (erreur) {
       if (!mounted) return;
       if (erreur.sessionPerdue) {
-        _revenirALaConnexion("Votre session n'est plus valable, par exemple après "
-            'un redémarrage du serveur. Reconnectez-vous.');
+        revenirALaConnexion(context, widget.api, messageSessionPerdue);
         return;
       }
       if (erreur.refus) {
-        _revenirALaConnexion(erreur.message);
+        revenirALaConnexion(context, widget.api, erreur.message);
         return;
       }
       setState(() {
@@ -80,18 +69,10 @@ class _EcranDemandesState extends State<EcranDemandes> {
     }
   }
 
-  void _revenirALaConnexion(String? message) {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => EcranConnexion(adresseInitiale: widget.api.racine, message: message),
-      ),
-    );
-  }
-
   Future<void> _seDeconnecter() async {
     await widget.api.deconnexion();
     if (!mounted) return;
-    _revenirALaConnexion(null);
+    revenirALaConnexion(context, widget.api);
   }
 
   @override
@@ -131,7 +112,7 @@ class _EcranDemandesState extends State<EcranDemandes> {
     final deuxListes = liste != null && liste.pourMoi.isNotEmpty && liste.autres.isNotEmpty;
 
     return [
-      _EnTete(moi: _moi),
+      EnTetePersonne(moi: _moi),
       const SizedBox(height: 16),
       if (_erreur != null) ...[
         Avertissement(texte: _erreur!),
@@ -152,70 +133,12 @@ class _EcranDemandesState extends State<EcranDemandes> {
           ),
         ),
       if (liste != null) ...[
-        if (deuxListes) const _Titre('Pour votre métier'),
+        if (deuxListes) const TitreSection('Pour votre métier'),
         for (final demande in liste.pourMoi) _CarteDemande(demande: demande),
-        if (deuxListes) const _Titre('Les autres demandes'),
+        if (deuxListes) const TitreSection('Les autres demandes'),
         for (final demande in liste.autres) _CarteDemande(demande: demande),
       ],
     ];
-  }
-}
-
-class _EnTete extends StatelessWidget {
-  const _EnTete({required this.moi});
-
-  final Moi moi;
-
-  @override
-  Widget build(BuildContext context) {
-    final texte = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Couleurs.bleuClair,
-        borderRadius: BorderRadius.circular(rayon),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Bonjour ${moi.nom}',
-            style: texte.titleLarge?.copyWith(
-              color: Couleurs.bleuFonce,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            phraseJetons(moi.jetons),
-            style: texte.bodyMedium?.copyWith(color: Couleurs.encreDouce),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Titre extends StatelessWidget {
-  const _Titre(this.texte);
-
-  final String texte;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 12),
-      child: Semantics(
-        header: true,
-        child: Text(
-          texte,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Couleurs.bleuFonce,
-                fontWeight: FontWeight.w600,
-              ),
-        ),
-      ),
-    );
   }
 }
 
@@ -240,20 +163,7 @@ class _CarteDemande extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (demande.misEnAvant) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Couleurs.bleuClair,
-                    borderRadius: BorderRadius.circular(rayon),
-                  ),
-                  child: Text(
-                    'Mise en avant',
-                    style: texte.labelMedium?.copyWith(
-                      color: Couleurs.bleuFonce,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+                const Pastille(texte: 'Mise en avant'),
                 const SizedBox(height: 8),
               ],
               Text(
@@ -273,38 +183,11 @@ class _CarteDemande extends StatelessWidget {
                   ),
                 ),
               ],
-              if (lieu != null) _Detail(icone: Icons.place_outlined, texte: lieu),
-              if (horaire != null) _Detail(icone: Icons.schedule, texte: horaire),
+              if (lieu != null) LigneDetail(icone: Icons.place_outlined, texte: lieu),
+              if (horaire != null) LigneDetail(icone: Icons.schedule, texte: horaire),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Detail extends StatelessWidget {
-  const _Detail({required this.icone, required this.texte});
-
-  final IconData icone;
-  final String texte;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icone, size: 18, color: Couleurs.encreDouce),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              texte,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encreDouce),
-            ),
-          ),
-        ],
       ),
     );
   }

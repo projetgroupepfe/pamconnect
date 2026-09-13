@@ -81,6 +81,13 @@ class ApiPamConnect {
     return _interpreter(() => ListeDemandes.depuisJson(donnees));
   }
 
+  /// Les demandes de l'employeur connecte et les reponses recues : ce que
+  /// montre la page Mes demandes du site, decide par la meme fonction.
+  Future<MesDemandes> mesDemandes() async {
+    final donnees = await _appeler('/api/mes-demandes');
+    return _interpreter(() => MesDemandes.depuisJson(donnees));
+  }
+
   /// La session est effacee cote serveur. Meme si le serveur ne repond pas,
   /// l'application oublie le jeton : la personne a demande a partir.
   Future<void> deconnexion() async {

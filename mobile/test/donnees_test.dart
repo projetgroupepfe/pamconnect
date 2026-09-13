@@ -5,7 +5,7 @@
 // sans rien deviner.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pamconnect/api.dart';
-import 'package:pamconnect/ecran_demandes.dart';
+import 'package:pamconnect/elements.dart';
 import 'package:pamconnect/modeles.dart';
 
 Map<String, dynamic> _moi(String role) => {
@@ -16,6 +16,29 @@ Map<String, dynamic> _moi(String role) => {
       'metier': 'menagere',
       'verification': 'verifie',
       'jetons': {'offerts': 3, 'achetes': 0, 'total': 3},
+    };
+
+Map<String, dynamic> _reponse({
+  required int id,
+  required String nom,
+  required String phrase,
+  String verification = 'verifie',
+  bool peutChoisir = true,
+  bool attendVerification = false,
+}) =>
+    {
+      'id': id,
+      'prestataireId': id + 100,
+      'nom': nom,
+      'phrase': phrase,
+      'verification': verification,
+      'libelleVerification': verification == 'verifie' ? 'Identité vérifiée' : 'Identité non vérifiée',
+      'note': {'etat': 'nouveau', 'badge': 'Nouveau prestataire', 'detail': "personne ne l'a encore notée"},
+      'experience': null,
+      'disponibilites': 'lundi, mercredi',
+      'peutChoisir': peutChoisir,
+      'peutRefuser': true,
+      'attendVerification': attendVerification,
     };
 
 void main() {
@@ -40,18 +63,27 @@ void main() {
     });
   });
 
-  group('la separation des roles', () {
-    test('la personne qui repond aux demandes entre', () {
-      expect(Moi.depuisJson(_moi('prestataire')).repondAuxDemandes, isTrue);
+  group("l'ecran d'arrivee suit le role, comme le menu du site", () {
+    test('la personne qui repond arrive sur les demandes ouvertes', () {
+      final moi = Moi.depuisJson(_moi('prestataire'));
+      expect(moi.repondAuxDemandes, isTrue);
+      expect(moi.publieDesDemandes, isFalse);
     });
 
-    test("l'employeur et l'equipe n'entrent pas dans cette premiere version", () {
-      expect(Moi.depuisJson(_moi('employeur')).repondAuxDemandes, isFalse);
-      expect(Moi.depuisJson(_moi('equipe')).repondAuxDemandes, isFalse);
+    test("l'employeur arrive sur ses demandes", () {
+      final moi = Moi.depuisJson(_moi('employeur'));
+      expect(moi.publieDesDemandes, isTrue);
+      expect(moi.repondAuxDemandes, isFalse);
+    });
+
+    test("l'equipe n'a pas d'ecran dans l'application", () {
+      final moi = Moi.depuisJson(_moi('equipe'));
+      expect(moi.repondAuxDemandes, isFalse);
+      expect(moi.publieDesDemandes, isFalse);
     });
   });
 
-  group('une demande', () {
+  group('une demande ouverte', () {
     Map<String, dynamic> demande({String? quartier, String? arrondissement}) => {
           'id': 12,
           'titre': 'Menage deux fois par semaine',
@@ -98,6 +130,82 @@ void main() {
     expect(ListeDemandes.depuisJson({'pourMoi': [], 'autres': []}).vide, isTrue);
   });
 
+  group("les demandes de l'employeur", () {
+    Map<String, dynamic> reponseServeur() => {
+          'demandes': [
+            {
+              'id': 20,
+              'titre': 'Menage deux fois par semaine',
+              'metier': null,
+              'horaire': 'Mardi 8h',
+              'prixLisible': '12 000 FCFA pour la prestation',
+              'dureeEstimee': null,
+              'lieu': 'Manguier, Yaoundé 1',
+              'fermee': false,
+              'phraseFermeture': null,
+              'enAvant': false,
+              'enAvantJusquAu': null,
+              'peutModifier': true,
+              'peutMettreEnAvant': true,
+              'peutRetirer': true,
+              'candidatures': [
+                _reponse(id: 1, nom: 'Djenabou', phrase: 'En attente de votre décision'),
+                _reponse(
+                  id: 2,
+                  nom: 'Junior',
+                  phrase: 'En attente de votre décision',
+                  verification: 'non soumis',
+                  peutChoisir: false,
+                  attendVerification: true,
+                ),
+              ],
+            },
+            {
+              'id': 19,
+              'titre': 'Cuisine tous les jours',
+              'metier': null,
+              'horaire': 'Horaire non précisé',
+              'prixLisible': null,
+              'dureeEstimee': null,
+              'lieu': null,
+              'fermee': true,
+              'phraseFermeture': 'Vous avez retiré cette demande.',
+              'enAvant': false,
+              'enAvantJusquAu': null,
+              'peutModifier': false,
+              'peutMettreEnAvant': false,
+              'peutRetirer': false,
+              'candidatures': [],
+            },
+          ],
+        };
+
+    test("l'ordre du serveur est garde : en cours, puis terminees", () {
+      final mes = MesDemandes.depuisJson(reponseServeur());
+      expect(mes.enCours.map((d) => d.titre), ['Menage deux fois par semaine']);
+      expect(mes.terminees.map((d) => d.titre), ['Cuisine tous les jours']);
+      expect(mes.terminees.single.phraseFermeture, 'Vous avez retiré cette demande.');
+    });
+
+    test('les decisions du serveur sont lues telles quelles', () {
+      final reponses = MesDemandes.depuisJson(reponseServeur()).enCours.single.reponses;
+      expect(reponses[0].peutChoisir, isTrue);
+      expect(reponses[0].attendVerification, isFalse);
+      expect(reponses[1].peutChoisir, isFalse);
+      expect(reponses[1].attendVerification, isTrue);
+      expect(reponses[1].libelleVerification, 'Identité non vérifiée');
+      expect(reponses[0].note.badge, 'Nouveau prestataire');
+      expect(reponses[0].note.notee, isFalse);
+    });
+
+    test("une decision absente est signalee, jamais devinee", () {
+      final json = reponseServeur();
+      final premiere = (json['demandes'] as List).first as Map<String, dynamic>;
+      ((premiere['candidatures'] as List).first as Map<String, dynamic>).remove('peutChoisir');
+      expect(() => MesDemandes.depuisJson(json), throwsA(isA<FormeInattendue>()));
+    });
+  });
+
   group('la phrase des jetons', () {
     Jetons jetons(int offerts, int achetes) =>
         Jetons(offerts: offerts, achetes: achetes, total: offerts + achetes);
@@ -113,7 +221,7 @@ void main() {
   });
 
   group("l'adresse du serveur", () {
-    test("le http:// oublie est ajoute, et la barre finale retiree", () {
+    test('le http:// oublie est ajoute, et la barre finale retiree', () {
       expect(ApiPamConnect.normaliserAdresse(' 192.168.1.200:3000/ '), 'http://192.168.1.200:3000');
     });
 

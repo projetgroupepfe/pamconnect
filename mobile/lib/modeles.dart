@@ -2,8 +2,8 @@
 ///
 /// AUCUNE REGLE ICI : ces classes ne font que LIRE ce que le serveur a
 /// decide. Le prix arrive deja ecrit en toutes lettres, le tri par metier
-/// est deja fait. Si une reponse n'a pas la forme attendue, on le signale
-/// au lieu de deviner une valeur.
+/// est deja fait, les boutons a proposer sont deja choisis. Si une reponse
+/// n'a pas la forme attendue, on le signale au lieu de deviner une valeur.
 library;
 
 /// Levee quand un champ attendu manque ou n'a pas le bon type.
@@ -27,6 +27,17 @@ T? _lireFacultatif<T>(Map<String, dynamic> json, String champ) {
   if (valeur == null) return null;
   if (valeur is T) return valeur;
   throw FormeInattendue(champ);
+}
+
+List<T> _lireListe<T>(
+  Map<String, dynamic> json,
+  String champ,
+  T Function(Map<String, dynamic>) lecture,
+) {
+  return _lire<List<dynamic>>(json, champ).map((element) {
+    if (element is Map<String, dynamic>) return lecture(element);
+    throw FormeInattendue(champ);
+  }).toList();
 }
 
 /// Le solde de jetons, detaille : les jetons offerts perissent, les achetes
@@ -65,11 +76,11 @@ class Moi {
   final String role;
   final Jetons jetons;
 
-  /// La premiere version de l'application sert les personnes qui repondent
-  /// aux demandes. Ce n'est PAS un droit accorde ici : le serveur refuse de
-  /// lui-meme ce qu'un role ne peut pas faire. C'est seulement le choix de
-  /// l'ecran a montrer.
+  /// Ces deux questions choisissent l'ecran d'arrivee, comme le menu du
+  /// site. Ce ne sont PAS des droits accordes ici : le serveur refuse de
+  /// lui-meme ce qu'un role ne peut pas faire.
   bool get repondAuxDemandes => role == 'prestataire';
+  bool get publieDesDemandes => role == 'employeur';
 }
 
 /// Ce que renvoie /api/connexion : la session, et la personne.
@@ -131,8 +142,8 @@ class ListeDemandes {
   const ListeDemandes({required this.pourMoi, required this.autres});
 
   factory ListeDemandes.depuisJson(Map<String, dynamic> json) => ListeDemandes(
-        pourMoi: _lireDemandes(json, 'pourMoi'),
-        autres: _lireDemandes(json, 'autres'),
+        pourMoi: _lireListe(json, 'pourMoi', Demande.depuisJson),
+        autres: _lireListe(json, 'autres', Demande.depuisJson),
       );
 
   /// Les demandes du metier de la personne.
@@ -144,9 +155,142 @@ class ListeDemandes {
   bool get vide => pourMoi.isEmpty && autres.isEmpty;
 }
 
-List<Demande> _lireDemandes(Map<String, dynamic> json, String champ) {
-  return _lire<List<dynamic>>(json, champ).map((element) {
-    if (element is Map<String, dynamic>) return Demande.depuisJson(element);
-    throw FormeInattendue(champ);
-  }).toList();
+/// La note d'une personne, deja formulee par le serveur (notePersonne) :
+/// le telephone dit exactement ce que dit le site.
+class NotePersonne {
+  const NotePersonne({required this.etat, required this.badge, required this.detail});
+
+  factory NotePersonne.depuisJson(Map<String, dynamic> json) => NotePersonne(
+        etat: _lire<String>(json, 'etat'),
+        badge: _lire<String>(json, 'badge'),
+        detail: _lire<String>(json, 'detail'),
+      );
+
+  final String etat;
+  final String badge;
+  final String detail;
+
+  bool get notee => etat == 'notee';
+}
+
+/// Une reponse recue par l'employeur, avec les decisions du serveur.
+class ReponseRecue {
+  const ReponseRecue({
+    required this.id,
+    required this.prestataireId,
+    required this.nom,
+    required this.phrase,
+    required this.verification,
+    required this.libelleVerification,
+    required this.note,
+    required this.peutChoisir,
+    required this.peutRefuser,
+    required this.attendVerification,
+    this.experience,
+    this.disponibilites,
+  });
+
+  factory ReponseRecue.depuisJson(Map<String, dynamic> json) => ReponseRecue(
+        id: _lire<int>(json, 'id'),
+        prestataireId: _lire<int>(json, 'prestataireId'),
+        nom: _lire<String>(json, 'nom'),
+        phrase: _lire<String>(json, 'phrase'),
+        verification: _lire<String>(json, 'verification'),
+        libelleVerification: _lire<String>(json, 'libelleVerification'),
+        note: NotePersonne.depuisJson(_lire<Map<String, dynamic>>(json, 'note')),
+        peutChoisir: _lire<bool>(json, 'peutChoisir'),
+        peutRefuser: _lire<bool>(json, 'peutRefuser'),
+        attendVerification: _lire<bool>(json, 'attendVerification'),
+        experience: _lireFacultatif<String>(json, 'experience'),
+        disponibilites: _lireFacultatif<String>(json, 'disponibilites'),
+      );
+
+  final int id;
+  final int prestataireId;
+  final String nom;
+
+  /// "En attente de votre decision", "Vous avez choisi quelqu'un d'autre"...
+  final String phrase;
+
+  /// Le code ("verifie", "en attente"...) sert seulement a choisir la couleur
+  /// de l'etiquette ; le texte affiche est libelleVerification.
+  final String verification;
+  final String libelleVerification;
+  final NotePersonne note;
+  final bool peutChoisir;
+  final bool peutRefuser;
+  final bool attendVerification;
+  final String? experience;
+  final String? disponibilites;
+}
+
+/// Une demande publiee par l'employeur, avec ses reponses.
+class DemandePubliee {
+  const DemandePubliee({
+    required this.id,
+    required this.titre,
+    required this.horaire,
+    required this.fermee,
+    required this.enAvant,
+    required this.peutModifier,
+    required this.peutMettreEnAvant,
+    required this.peutRetirer,
+    required this.reponses,
+    this.metier,
+    this.prixLisible,
+    this.dureeEstimee,
+    this.lieu,
+    this.phraseFermeture,
+    this.enAvantJusquAu,
+  });
+
+  factory DemandePubliee.depuisJson(Map<String, dynamic> json) => DemandePubliee(
+        id: _lire<int>(json, 'id'),
+        titre: _lire<String>(json, 'titre'),
+        horaire: _lire<String>(json, 'horaire'),
+        fermee: _lire<bool>(json, 'fermee'),
+        enAvant: _lire<bool>(json, 'enAvant'),
+        peutModifier: _lire<bool>(json, 'peutModifier'),
+        peutMettreEnAvant: _lire<bool>(json, 'peutMettreEnAvant'),
+        peutRetirer: _lire<bool>(json, 'peutRetirer'),
+        reponses: _lireListe(json, 'candidatures', ReponseRecue.depuisJson),
+        metier: _lireFacultatif<String>(json, 'metier'),
+        prixLisible: _lireFacultatif<String>(json, 'prixLisible'),
+        dureeEstimee: _lireFacultatif<String>(json, 'dureeEstimee'),
+        lieu: _lireFacultatif<String>(json, 'lieu'),
+        phraseFermeture: _lireFacultatif<String>(json, 'phraseFermeture'),
+        enAvantJusquAu: _lireFacultatif<String>(json, 'enAvantJusquAu'),
+      );
+
+  final int id;
+  final String titre;
+  final String horaire;
+  final bool fermee;
+  final bool enAvant;
+  final bool peutModifier;
+  final bool peutMettreEnAvant;
+  final bool peutRetirer;
+  final List<ReponseRecue> reponses;
+  final String? metier;
+  final String? prixLisible;
+  final String? dureeEstimee;
+  final String? lieu;
+
+  /// "Vous avez choisi quelqu'un." ou "Vous avez retire cette demande."
+  final String? phraseFermeture;
+  final String? enAvantJusquAu;
+}
+
+/// La reponse de /api/mes-demandes, deja rangee par le serveur : les
+/// demandes en cours d'abord, les demandes fermees ensuite.
+class MesDemandes {
+  const MesDemandes({required this.demandes});
+
+  factory MesDemandes.depuisJson(Map<String, dynamic> json) =>
+      MesDemandes(demandes: _lireListe(json, 'demandes', DemandePubliee.depuisJson));
+
+  final List<DemandePubliee> demandes;
+
+  List<DemandePubliee> get enCours => demandes.where((d) => !d.fermee).toList();
+  List<DemandePubliee> get terminees => demandes.where((d) => d.fermee).toList();
 }
