@@ -494,8 +494,9 @@ class _LignePrix extends StatelessWidget {
   }
 }
 
-/// Un message. Le sien est decale et marque d'un trait bleu, comme sur le
-/// site.
+/// Un message, en bulle comme sur le site. Presentes en cartes blanches,
+/// les messages ressemblaient au champ pour ecrire. Le sien est a droite,
+/// dans le bleu clair de la marque ; celui de l'autre a gauche.
 class _Message extends StatelessWidget {
   const _Message({required this.message, required this.auSignalement, required this.occupe});
 
@@ -506,77 +507,78 @@ class _Message extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final texte = Theme.of(context).textTheme;
-    final aide = texte.bodySmall?.copyWith(color: Couleurs.encrePale);
+    // Sur ces fonds, le gris le plus pale ne se lirait pas assez.
+    final discret = texte.bodySmall?.copyWith(color: Couleurs.encreDouce);
+    const arrondi = Radius.circular(rayon);
+    const pointe = Radius.circular(4);
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: 12, left: message.deMoi ? 20 : 0),
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (message.deMoi) Container(width: 3, color: Couleurs.bleu),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, contraintes) => Align(
+        alignment: message.deMoi ? Alignment.centerRight : Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: contraintes.maxWidth * 0.85),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+            decoration: BoxDecoration(
+              color: message.deMoi ? Couleurs.bleuClair : Couleurs.trait,
+              borderRadius: message.deMoi
+                  ? const BorderRadius.only(
+                      topLeft: arrondi, topRight: arrondi, bottomLeft: arrondi, bottomRight: pointe)
+                  : const BorderRadius.only(
+                      topLeft: arrondi, topRight: arrondi, bottomLeft: pointe, bottomRight: arrondi),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  TextSpan(
                     children: [
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: message.auteur,
-                              style: const TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encreDouce),
-                            ),
-                            TextSpan(text: ' · ${message.quand}'),
-                            if (message.signale) const TextSpan(text: " · signalé à l'équipe"),
-                          ],
-                        ),
-                        style: aide,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(message.texte, style: texte.bodyLarge?.copyWith(color: Couleurs.encre)),
-                      // L'avertissement s'affiche aux DEUX personnes : celle
-                      // qui a ecrit prend un risque, elle aussi.
-                      if (message.risquePaiement)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text.rich(
-                            const TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: 'Pour votre sécurité, ne payez pas directement en dehors de la plateforme.',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                TextSpan(
-                                  text: ' Le paiement doit passer par PamConnect pour que la personne reçoive '
-                                      'son argent après confirmation de la prestation. En dehors, personne '
-                                      "n'a de recours en cas de problème.",
-                                ),
-                              ],
-                            ),
-                            style: texte.bodyMedium?.copyWith(color: Couleurs.encreDouce),
-                          ),
-                        ),
-                      // Une action rare : son poids a l'ecran suit sa
-                      // frequence, pas son importance.
-                      if (message.peutSignaler)
-                        TextButton(
-                          onPressed: occupe ? null : () => auSignalement(message),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Couleurs.encreDouce,
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(0, 36),
-                          ),
-                          child: const Text('Signaler ce message'),
-                        ),
+                      TextSpan(text: message.auteur, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      TextSpan(text: ' · ${message.quand}'),
+                      if (message.signale) const TextSpan(text: " · signalé à l'équipe"),
                     ],
                   ),
+                  style: discret,
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(message.texte, style: texte.bodyLarge?.copyWith(color: Couleurs.encre)),
+                // L'avertissement s'affiche aux DEUX personnes : celle qui a
+                // ecrit prend un risque, elle aussi.
+                if (message.risquePaiement)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text.rich(
+                      const TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Pour votre sécurité, ne payez pas directement en dehors de la plateforme.',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(
+                            text: ' Le paiement doit passer par PamConnect pour que la personne reçoive '
+                                'son argent après confirmation de la prestation. En dehors, personne '
+                                "n'a de recours en cas de problème.",
+                          ),
+                        ],
+                      ),
+                      style: texte.bodyMedium?.copyWith(color: Couleurs.encreDouce),
+                    ),
+                  ),
+                // Une action rare : son poids a l'ecran suit sa frequence, pas
+                // son importance.
+                if (message.peutSignaler)
+                  TextButton(
+                    onPressed: occupe ? null : () => auSignalement(message),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Couleurs.encreDouce,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 36),
+                    ),
+                    child: const Text('Signaler ce message'),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
