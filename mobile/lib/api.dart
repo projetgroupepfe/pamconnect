@@ -127,6 +127,23 @@ class ApiPamConnect {
     return _interpreter(() => MonProfil.depuisJson(donnees));
   }
 
+  /// Le formulaire Modifier mon profil, rempli par le serveur.
+  Future<FormulaireProfil> formulaireProfil() async {
+    final donnees = await _appeler('/api/mon-profil/modification');
+    return _interpreter(() => FormulaireProfil.depuisJson(donnees));
+  }
+
+  Future<TexteDuServeur> enregistrerProfil(Map<String, dynamic> champs) async {
+    final donnees = await _appeler('/api/mon-profil', corps: champs);
+    return _interpreter(() => TexteDuServeur.depuisJson(donnees));
+  }
+
+  /// Le detail d'un tarif pendant la saisie : la commission reste au serveur.
+  Future<TarifDuProfil> detailTarif(String montant) async {
+    final donnees = await _appeler('/api/detail-tarif?montant=${Uri.encodeQueryComponent(montant)}');
+    return _interpreter(() => TarifDuProfil.depuisJson(donnees));
+  }
+
   /// "J'ai lu" sous le message de l'equipe.
   Future<void> marquerMessageEquipeLu() async {
     await _appeler('/api/mon-profil/message-equipe/lu', corps: const {});

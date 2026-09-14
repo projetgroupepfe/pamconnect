@@ -1344,3 +1344,111 @@ class MonProfil {
   final ServicesANoter? servicesANoter;
   final String? motifRefus;
 }
+
+/// Une case de la grille des disponibilites.
+class CreneauChoix {
+  const CreneauChoix({required this.valeur, required this.libelle, required this.coche});
+
+  factory CreneauChoix.depuisJson(Map<String, dynamic> json) => CreneauChoix(
+        valeur: _lire<String>(json, 'valeur'),
+        libelle: _lire<String>(json, 'libelle'),
+        coche: _lire<bool>(json, 'coche'),
+      );
+
+  /// "lundi-matin", ce que le serveur enregistre.
+  final String valeur;
+  final String libelle;
+  final bool coche;
+}
+
+class JourDisponible {
+  const JourDisponible({required this.libelle, required this.creneaux});
+
+  factory JourDisponible.depuisJson(Map<String, dynamic> json) => JourDisponible(
+        libelle: _lire<String>(json, 'libelle'),
+        creneaux: _lireListe(json, 'creneaux', CreneauChoix.depuisJson),
+      );
+
+  final String libelle;
+  final List<CreneauChoix> creneaux;
+}
+
+class AnneesNaissance {
+  const AnneesNaissance({required this.de, required this.a});
+
+  factory AnneesNaissance.depuisJson(Map<String, dynamic> json) => AnneesNaissance(
+        de: _lire<int>(json, 'de'),
+        a: _lire<int>(json, 'a'),
+      );
+
+  final int de;
+  final int a;
+}
+
+/// Le formulaire Modifier mon profil (/api/mon-profil/modification).
+class FormulaireProfil {
+  const FormulaireProfil({
+    required this.nom,
+    required this.quartier,
+    required this.quartiers,
+    required this.arrondissements,
+    required this.pourPersonne,
+    required this.metiers,
+    required this.experienceAnnees,
+    required this.experienceMax,
+    required this.moments,
+    required this.jours,
+    required this.tarif,
+    this.arrondissement,
+    this.metier,
+    this.dateNaissance,
+    this.anneesNaissance,
+  });
+
+  factory FormulaireProfil.depuisJson(Map<String, dynamic> json) {
+    final formulaire = FormulaireProfil(
+      nom: _lire<String>(json, 'nom'),
+      quartier: _lire<String>(json, 'quartier'),
+      quartiers: _lireTextes(json, 'quartiers'),
+      arrondissements: _lireTextes(json, 'arrondissements'),
+      pourPersonne: _lire<bool>(json, 'pourPersonne'),
+      metiers: _lireTextes(json, 'metiers'),
+      experienceAnnees: _lire<String>(json, 'experienceAnnees'),
+      experienceMax: _lire<int>(json, 'experienceMax'),
+      moments: _lireTextes(json, 'moments'),
+      jours: _lireListe(json, 'jours', JourDisponible.depuisJson),
+      tarif: _lire<String>(json, 'tarif'),
+      arrondissement: _lireFacultatif<String>(json, 'arrondissement'),
+      metier: _lireFacultatif<String>(json, 'metier'),
+      dateNaissance: _lireFacultatif<String>(json, 'dateNaissance'),
+      anneesNaissance: _lireObjet(json, 'anneesNaissance', AnneesNaissance.depuisJson),
+    );
+    // La grille a une colonne par moment : un jour qui n'en aurait pas
+    // autant ne pourrait pas s'y afficher.
+    if (formulaire.jours.any((jour) => jour.creneaux.length != formulaire.moments.length)) {
+      throw const FormeInattendue('jours');
+    }
+    return formulaire;
+  }
+
+  final String nom;
+  final String quartier;
+  final List<String> quartiers;
+  final List<String> arrondissements;
+
+  /// La personne qui repond aux demandes : metier, date de naissance,
+  /// experience, disponibilites et tarif. Un employeur n'en a pas.
+  final bool pourPersonne;
+  final List<String> metiers;
+  final String experienceAnnees;
+  final int experienceMax;
+  final List<String> moments;
+  final List<JourDisponible> jours;
+  final String tarif;
+  final String? arrondissement;
+  final String? metier;
+
+  /// "1995-06-15", ou absente.
+  final String? dateNaissance;
+  final AnneesNaissance? anneesNaissance;
+}

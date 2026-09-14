@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'ecran_connexion.dart';
+import 'ecran_modifier_profil.dart';
 import 'elements.dart';
 import 'modeles.dart';
 import 'theme.dart';
@@ -9,8 +10,8 @@ import 'theme.dart';
 /// Mon profil : qui je suis, et ce que les autres disent de moi. La page du
 /// site, ecrite par le serveur.
 ///
-/// Modifier mon profil, Mon compte et Mes jetons arriveront avec leurs
-/// ecrans : un bouton qui ne mene nulle part n'a rien a faire ici.
+/// Mon compte et Mes jetons arriveront avec leurs ecrans : un bouton qui ne
+/// mene nulle part n'a rien a faire ici.
 class EcranMonProfil extends StatefulWidget {
   const EcranMonProfil({
     super.key,
@@ -118,6 +119,16 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
     if (!mounted) return;
     setState(() => _action = false);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _modifier() async {
+    final texte = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => EcranModifierProfil(api: widget.api)),
+    );
+    if (!mounted || texte == null) return;
+    await _charger();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
   }
 
   Future<void> _seDeconnecter() async {
@@ -360,6 +371,14 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
             ],
           ),
         ),
+      ),
+      const SizedBox(height: 12),
+      // L'icone du site pour ce bouton : le profil.
+      OutlinedButton.icon(
+        onPressed: _modifier,
+        icon: const Icon(Icons.person_outline),
+        label: const Text('Modifier mon profil'),
+        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
       ),
       const SizedBox(height: 8),
       const TitreSection('Les avis reçus'),

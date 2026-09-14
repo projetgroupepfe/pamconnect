@@ -381,3 +381,62 @@ class CarteAvis extends StatelessWidget {
     );
   }
 }
+
+/// Un champ avec la liste de suggestions du site (le datalist).
+///
+/// Un simple filtre d'affichage : on peut toujours ecrire un nom absent de
+/// la liste, comme sur le site.
+class ChampAvecSuggestions extends StatelessWidget {
+  const ChampAvecSuggestions({
+    super.key,
+    required this.liste,
+    required this.libelle,
+    required this.exemple,
+    required this.garder,
+    this.valeurDepart = '',
+    this.aide,
+    this.auChangement,
+  });
+
+  final List<String> liste;
+  final String libelle;
+  final String exemple;
+
+  /// Recoit le controleur du champ, pour lire la saisie a l'envoi.
+  final void Function(TextEditingController) garder;
+  final String valeurDepart;
+  final String? aide;
+  final void Function(String)? auChangement;
+
+  Iterable<String> _suggestions(String saisie) {
+    final cherche = saisie.trim().toLowerCase();
+    if (cherche.isEmpty) return const Iterable<String>.empty();
+    return liste.where((nom) => nom.toLowerCase().contains(cherche));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Autocomplete<String>(
+      initialValue: TextEditingValue(text: valeurDepart),
+      optionsBuilder: (saisie) => _suggestions(saisie.text),
+      onSelected: (choix) => auChangement?.call(choix),
+      fieldViewBuilder: (context, controleur, focus, valider) {
+        garder(controleur);
+        return TextField(
+          controller: controleur,
+          focusNode: focus,
+          autocorrect: false,
+          textInputAction: TextInputAction.next,
+          onChanged: auChangement,
+          onSubmitted: (_) => valider(),
+          decoration: InputDecoration(
+            labelText: libelle,
+            hintText: exemple,
+            helperText: aide,
+            helperMaxLines: 2,
+          ),
+        );
+      },
+    );
+  }
+}

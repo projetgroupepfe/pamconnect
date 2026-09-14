@@ -138,15 +138,6 @@ class _EcranPublierState extends State<EcranPublier> {
     _avertissement = modification.avertissement;
   }
 
-  /// Ce que la liste propose pendant la saisie. Un simple filtre
-  /// d'affichage : on peut toujours ecrire un nom absent de la liste,
-  /// comme sur le site.
-  Iterable<String> _suggestions(List<String> liste, String saisie) {
-    final cherche = saisie.trim().toLowerCase();
-    if (cherche.isEmpty) return const Iterable<String>.empty();
-    return liste.where((nom) => nom.toLowerCase().contains(cherche));
-  }
-
   /// L'arrondissement s'affiche avant l'envoi, comme sur le site. C'est le
   /// serveur qui le trouve, synonymes compris : l'application ne recopie
   /// pas sa regle. A l'envoi, il refait de toute facon le calcul.
@@ -321,7 +312,7 @@ class _EcranPublierState extends State<EcranPublier> {
         ),
       ),
       espace,
-      _champAvecSuggestions(
+      ChampAvecSuggestions(
         liste: formulaire.metiers,
         libelle: 'Qui cherchez-vous ?',
         exemple: 'ex : Ménage à domicile',
@@ -340,7 +331,7 @@ class _EcranPublierState extends State<EcranPublier> {
       ),
       espace,
       // Le nom du quartier suffit : jamais l'adresse exacte.
-      _champAvecSuggestions(
+      ChampAvecSuggestions(
         liste: formulaire.quartiers,
         libelle: 'Votre quartier',
         exemple: 'ex : Bastos, Mvan, Biyem-Assi...',
@@ -450,39 +441,6 @@ class _EcranPublierState extends State<EcranPublier> {
         child: const Text('Annuler'),
       ),
     ];
-  }
-
-  Widget _champAvecSuggestions({
-    required List<String> liste,
-    required String libelle,
-    required String exemple,
-    required void Function(TextEditingController) garder,
-    String valeurDepart = '',
-    String? aide,
-    void Function(String)? auChangement,
-  }) {
-    return Autocomplete<String>(
-      initialValue: TextEditingValue(text: valeurDepart),
-      optionsBuilder: (saisie) => _suggestions(liste, saisie.text),
-      onSelected: (choix) => auChangement?.call(choix),
-      fieldViewBuilder: (context, controleur, focus, valider) {
-        garder(controleur);
-        return TextField(
-          controller: controleur,
-          focusNode: focus,
-          autocorrect: false,
-          textInputAction: TextInputAction.next,
-          onChanged: auChangement,
-          onSubmitted: (_) => valider(),
-          decoration: InputDecoration(
-            labelText: libelle,
-            hintText: exemple,
-            helperText: aide,
-            helperMaxLines: 2,
-          ),
-        );
-      },
-    );
   }
 }
 

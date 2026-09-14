@@ -706,4 +706,34 @@ void main() {
   test('sans pastille de profil, rien n attend', () {
     expect(Moi.depuisJson(_moi('employeur')).aLire, 0);
   });
+
+  test('le formulaire de mon profil garde les cases cochees par le serveur', () {
+    Map<String, dynamic> formulaire(List<dynamic> creneaux) => {
+          'nom': 'nom 1',
+          'quartier': 'quartier 1',
+          'arrondissement': null,
+          'quartiers': ['quartier 1'],
+          'arrondissements': ['arrondissement 1'],
+          'pourPersonne': true,
+          'metier': 'metier 1',
+          'metiers': ['metier 1'],
+          'dateNaissance': null,
+          'anneesNaissance': {'de': 1, 'a': 2},
+          'experienceAnnees': '',
+          'experienceMax': 3,
+          'moments': ['moment 1'],
+          'jours': [
+            {'libelle': 'jour 1', 'creneaux': creneaux},
+          ],
+          'tarif': '',
+        };
+    final lu = FormulaireProfil.depuisJson(formulaire([
+      {'valeur': 'valeur 1', 'libelle': 'moment 1', 'coche': true},
+    ]));
+    expect(lu.jours.single.creneaux.single.coche, isTrue);
+    expect(lu.anneesNaissance?.a, 2);
+    expect(lu.arrondissement, isNull);
+    // Un jour sans case pour chaque moment ne tiendrait pas dans la grille.
+    expect(() => FormulaireProfil.depuisJson(formulaire([])), throwsA(isA<FormeInattendue>()));
+  });
 }

@@ -301,7 +301,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
                       onPressed: _signalementAvis ? null : () => _signalerAvis(avisRecu),
-                      icon: const Icon(Icons.info_outline),
+                      icon: const Icon(Icons.flag_outlined),
                       label: const Text('Signaler cet avis'),
                       style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                     ),
