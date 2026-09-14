@@ -166,6 +166,9 @@ setTimeout(async () => {
        reconnexion.corps.includes("Voir mes demandes") && !reconnexion.corps.includes("Voir mon profil"));
   const formulaireWeb = await (await lire("/publier-annonce", emp.cookie)).text();
   dire("Annuler ramene a Mes demandes", formulaireWeb.includes('href="/mes-demandes">Annuler'));
+  dire("le formulaire tire ses limites du serveur",
+       formulaireWeb.includes('min="500"') && formulaireWeb.includes('step="500"') &&
+       formulaireWeb.includes('maxlength="300"'));
 
   // Les appels de l'application : du JSON, avec un cookie ou un jeton.
   async function json(chemin, corps, entetes) {
@@ -288,6 +291,37 @@ setTimeout(async () => {
        apresPublication.donnees.demandes.some((d) => d.id === publiee.donnees.id && !d.fermee));
   dire("et sur la page du site",
        (await (await lire("/mes-demandes", emp.cookie)).text()).includes(M + " appli"));
+
+  console.log(SAUT + "--- LES MONTANTS : AU MOINS 500 FCFA, PAR TRANCHES DE 500 ---");
+  // Seul le navigateur de l'ordinateur les verifiait : le telephone, lui,
+  // publiait une demande a 750 FCFA.
+  let phrasePrix = "";
+  for (const prix of [250, 750, 10250]) {
+    const titre = M + " prix " + prix;
+    const r = await json("/api/demandes", Object.assign(complet(titre), { prix }), cookieDe(emp.cookie));
+    dire("un prix de " + prix + " FCFA est refuse", r.code === 400 && compter(titre) === 0, r.brut);
+    phrasePrix = erreurDe(r);
+  }
+  dire("la phrase dit la regle",
+       phrasePrix === "Le prix doit être au moins 500 FCFA, par tranches de 500 FCFA.", phrasePrix);
+  const prixWeb = await poster("/annonces", form(Object.assign(complet(M + " prix web"), { prix: "750" })), emp.cookie);
+  dire("le site refuse aussi, avec la meme phrase",
+       prixWeb.code === 400 && prixWeb.corps.includes(phrasePrix) && compter(M + " prix web") === 0,
+       "code " + prixWeb.code);
+  const prixRond = await json("/api/demandes", Object.assign(complet(M + " prix rond"), { prix: 10500 }), cookieDe(emp.cookie));
+  dire("un prix de 10500 FCFA est accepte", prixRond.code === 201, prixRond.brut);
+
+  const tropLong = await json("/api/demandes",
+    Object.assign(complet(M + " trop long"), { conditions: "x".repeat(301) }), cookieDe(emp.cookie));
+  dire("301 caracteres a savoir avant de venir : refuse",
+       tropLong.code === 400 && compter(M + " trop long") === 0, tropLong.brut);
+  const tropLongWeb = await poster("/annonces",
+    form(Object.assign(complet(M + " trop long web"), { prix: "8000", conditions: "x".repeat(301) })), emp.cookie);
+  dire("le site refuse aussi", tropLongWeb.code === 400 && compter(M + " trop long web") === 0,
+       "code " + tropLongWeb.code);
+  const juste = await json("/api/demandes",
+    Object.assign(complet(M + " juste"), { conditions: "x".repeat(300) }), cookieDe(emp.cookie));
+  dire("300 caracteres : accepte", juste.code === 201, juste.brut);
 
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;

@@ -105,6 +105,9 @@ setTimeout(async () => {
   const budgetNegatif = await poster(url, form({ titre: "x", metier: "menagere",
     quartier: "Mvan", horaire: "Lundi", prix: "-500" }), emp.cookie);
   dire("budget negatif : refuse", budgetNegatif.code === 400, "code " + budgetNegatif.code);
+  const horsTranche = await poster(url, form({ titre: "x", metier: "menagere",
+    quartier: "Mvan", horaire: "Lundi", prix: "10250" }), emp.cookie);
+  dire("prix hors tranche de 500 : refuse", horsTranche.code === 400, "code " + horsTranche.code);
   dire("aucun de ces essais n'a modifie l'annonce",
        base.prepare("SELECT titre FROM annonces WHERE id = ?").get(a.id).titre === M + " apres");
 

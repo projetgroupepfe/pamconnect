@@ -1457,6 +1457,30 @@ function formaterMontant(valeur) {
   return nombre.toLocaleString("fr-FR").replace(/[\u202f\u00a0]/g, " ") + " FCFA";
 }
 
+// LES MONTANTS ACCEPTES : au moins 500 FCFA, par tranches de 500. Ecrits
+// UNE fois : les formulaires du site en tirent leurs limites, et le
+// serveur les fait respecter pour le site comme pour l'application.
+// Avant, seul le navigateur de l'ordinateur les verifiait : depuis le
+// telephone, ou par un envoi fait a la main, une demande a 750 FCFA
+// passait.
+const MONTANT_MINIMUM_FCFA = 500;
+const PAS_MONTANT_FCFA = 500;
+
+// Ce que l'employeur signale avant une venue : court, pour etre lu en
+// entier par la personne qui se deplace.
+const CONDITIONS_MAX_CARACTERES = 300;
+
+function montantAccepte(montant) {
+  return montant >= MONTANT_MINIMUM_FCFA && montant % PAS_MONTANT_FCFA === 0;
+}
+
+// La meme phrase pour le prix d'une demande et pour le tarif d'une
+// personne : "au moins 500 FCFA, par tranches de 500 FCFA".
+function regleMontantLisible() {
+  return `au moins ${formaterMontant(MONTANT_MINIMUM_FCFA)}, ` +
+         `par tranches de ${formaterMontant(PAS_MONTANT_FCFA)}`;
+}
+
 // Detaille un tarif : ce qui est demande, ce que retient la
 // plateforme, et ce qui revient reellement a la personne.
 function detaillerTarif(tarifBrut) {
@@ -1538,6 +1562,22 @@ function verifierAnnonce(donnees) {
     };
   }
 
+  if (!montantAccepte(prix)) {
+    return {
+      titre: "Prix non accepté",
+      texte: `Le prix doit être ${regleMontantLisible()}.`,
+    };
+  }
+
+  if (String(donnees.conditions || "").trim().length > CONDITIONS_MAX_CARACTERES) {
+    return {
+      titre: "Texte trop long",
+      texte: `Ce qu'il faut savoir avant de venir tient en ${CONDITIONS_MAX_CARACTERES} ` +
+             "caractères au plus. Gardez l'essentiel : c'est ce que la personne lira " +
+             "avant de se déplacer.",
+    };
+  }
+
   return null;
 }
 
@@ -1574,6 +1614,13 @@ function verifierProfilPrestataire(donnees) {
       titre: "Tarif obligatoire",
       texte: "Indiquez le tarif que vous demandez pour une prestation. " +
              "C'est ce montant que l'employeur paiera.",
+    };
+  }
+
+  if (!montantAccepte(Math.round(Number(donnees.tarif)))) {
+    return {
+      titre: "Tarif non accepté",
+      texte: `Le tarif doit être ${regleMontantLisible()}.`,
     };
   }
 
@@ -2571,6 +2618,11 @@ function motifJetonsLisible(motif) {
 // app.locals : disponible dans TOUTES les vues .ejs sans le repasser.
 app.locals.formaterTarif = formaterTarif;
 app.locals.formaterMontant = formaterMontant;
+// Les limites des champs de montant, lues par les formulaires : les memes
+// valeurs que celles que le serveur fait respecter.
+app.locals.montantMinimum = MONTANT_MINIMUM_FCFA;
+app.locals.pasMontant = PAS_MONTANT_FCFA;
+app.locals.conditionsMax = CONDITIONS_MAX_CARACTERES;
 app.locals.detaillerTarif = detaillerTarif;
 app.locals.pourcentageCommission = Math.round(TAUX_COMMISSION * 100);
 app.locals.libelleVerification = libelleVerification;

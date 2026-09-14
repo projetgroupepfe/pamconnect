@@ -47,7 +47,7 @@
 
 <div class="champ">
   <label for="prix">Le prix (FCFA)</label>
-  <input type="number" id="prix" name="prix" min="500" step="500"
+  <input type="number" id="prix" name="prix" min="<%= montantMinimum %>" step="<%= pasMontant %>"
          value="<%= a.prix != null ? a.prix : "" %>"
          placeholder="ex : 10000" required>
 </div>
@@ -75,7 +75,7 @@
 
 <div class="champ">
   <label for="conditions">Quelque chose à savoir avant de venir ? <span class="aide">(facultatif)</span></label>
-  <input type="text" id="conditions" name="conditions" maxlength="300"
+  <input type="text" id="conditions" name="conditions" maxlength="<%= conditionsMax %>"
          value="<%= a.conditions || "" %>"
          placeholder="ex : Il y a un chien. Deuxième étage sans ascenseur.">
 </div>

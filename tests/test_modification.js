@@ -97,6 +97,12 @@ setTimeout(async () => {
   dire("tarif a zero -> 400", tarifZero.code === 400, "code " + tarifZero.code);
   dire("le tarif n'a pas bouge", qui(pre).tarif === 12000);
 
+  const horsTranche = await poster("/mon-profil/modifier", form({
+    nom: "Pre Apres", arrondissement: "Yaoundé 5", quartier: "Bastos",
+    metier: "MetierApres", tarif: "12250" }), cPre);
+  dire("tarif hors tranche de 500 -> 400", horsTranche.code === 400, "code " + horsTranche.code);
+  dire("le tarif n'a toujours pas bouge", qui(pre).tarif === 12000);
+
   const sansNom = await poster("/mon-profil/modifier", form({
     nom: "  ", arrondissement: "Yaoundé 5", metier: "MetierApres", tarif: "12000" }), cPre);
   dire("nom vide -> 400", sansNom.code === 400, "code " + sansNom.code);

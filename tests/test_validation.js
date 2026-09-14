@@ -82,6 +82,16 @@ setTimeout(async () => {
     arrondissement: "Yaounde 5", metier: "MetierTest", tarif: "0" }) });
   v("un tarif a zero est refuse aussi", r5.code === 400 && !compte(tarifZero), "code " + r5.code);
 
+  // Au moins 500 FCFA, par tranches de 500 : la regle du formulaire,
+  // desormais tenue par le serveur.
+  for (const tarif of ["250", "750"]) {
+    const mail = MARQUE + "-tarif" + tarif + "@example.com";
+    const r = await requete("/inscription", { method: "POST", body: form({
+      role: "prestataire", nom: "Tarif " + tarif, email: mail, motdepasse: mdp,
+      arrondissement: "Yaounde 5", metier: "MetierTest", tarif }) });
+    v("un tarif de " + tarif + " FCFA est refuse", r.code === 400 && !compte(mail), "code " + r.code);
+  }
+
   console.log("\n--- 4. Prestataire AVEC tarif : la commission est transparente ---");
   const tarifMail = MARQUE + "-tarif@example.com";
   await requete("/inscription", { method: "POST", body: form({

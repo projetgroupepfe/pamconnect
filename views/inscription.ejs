@@ -46,7 +46,7 @@
 
           <div class="champ">
             <label for="tarif">Le tarif que vous demandez (FCFA)</label>
-            <input type="number" id="tarif" name="tarif" placeholder="ex : 10000" min="500" step="500">
+            <input type="number" id="tarif" name="tarif" placeholder="ex : 10000" min="<%= montantMinimum %>" step="<%= pasMontant %>">
             <span class="aide">C'est ce que vous demandez pour vos services.</span>
           </div>
 
