@@ -485,6 +485,7 @@ setTimeout(async () => {
   // Des bulles, pas des cadres : presentes en cartes blanches, les
   // messages se confondaient avec le champ pour ecrire.
   dire("sur le site, les messages sont des bulles, la sienne a part",
+       pageDiscussion.includes('class="fil"') &&
        pageDiscussion.includes('class="bulle bulle-mienne"') && pageDiscussion.includes('class="bulle"') &&
        !pageDiscussion.includes("message-mien"));
 

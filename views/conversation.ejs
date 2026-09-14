@@ -75,6 +75,7 @@
         <p>Aucun message pour l'instant. Écrivez le premier.</p>
       </div>
     <% } else { %>
+      <div class="fil">
       <% messages.forEach(function (message) { %>
         <%
           // Le role de l'auteur n'est pas stocke : il se deduit en
@@ -115,6 +116,7 @@
           <% } %>
         </div>
       <% }); %>
+      </div>
     <% } %>
 
         <% if (conversation.terminee_le) { %>
