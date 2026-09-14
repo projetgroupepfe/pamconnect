@@ -976,6 +976,15 @@ setTimeout(async () => {
        detailVide.donnees.lignes.length === 0 && (await json("/api/detail-tarif?montant=15000")).code === 401,
        detailTarif.brut);
 
+  console.log(SAUT + "--- UNE ADRESSE D'API INCONNUE ---");
+  const inconnue = await json("/api/cet-ecran-n-existe-pas", undefined, { Authorization: "Bearer " + jeton });
+  dire("elle repond en JSON, avec une phrase qui dit quoi faire",
+       inconnue.code === 404 && inconnue.donnees !== null && String(inconnue.donnees.erreur).includes("relancez-le"),
+       inconnue.brut.slice(0, 120));
+  const pageInconnue = await lire("/cette-page-n-existe-pas", emp.cookie);
+  dire("une page inconnue du site reste une page",
+       pageInconnue.status === 404 && String(pageInconnue.headers.get("content-type")).includes("text/html"));
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");

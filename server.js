@@ -7213,6 +7213,15 @@ app.post("/api/discussions/:id/probleme", (req, res) => {
   res.status(201).json({ texte: resultat.texte });
 });
 
+// UNE ADRESSE /api INCONNUE REPOND EN JSON, comme toute l'API. Une page
+// HTML faisait croire a l'application qu'elle parlait a un autre serveur,
+// alors que, le plus souvent, le serveur avait ete lance avant la derniere
+// mise a jour et ne connaissait pas encore l'ecran demande.
+app.use("/api", (req, res) => {
+  erreurApi(res, 404, "Le serveur ne connaît pas cet écran. S'il a été lancé avant la " +
+    "dernière mise à jour, arrêtez-le puis relancez-le.");
+});
+
 app.use((req, res) => {
   res.status(404).render("message", {
     titre: "404 - Page introuvable",
