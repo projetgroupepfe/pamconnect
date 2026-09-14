@@ -899,6 +899,83 @@ setTimeout(async () => {
        luAvertissement.code === 200 && (await monProfilApi(cookieDe(verifiee.cookie))).donnees.avertissement === null);
   dire("sans session, J'ai lu : 401", (await json("/api/mon-profil/avertissement/lu", {})).code === 401);
 
+  console.log(SAUT + "--- MODIFIER MON PROFIL ---");
+  const formProfil = (entetes) => json("/api/mon-profil/modification", undefined, entetes);
+  const enregistrerProfil = (corps, entetes) => json("/api/mon-profil", corps, entetes);
+  const ligneDe = (id) => base.prepare(`
+    SELECT nom, quartier, arrondissement, metier, tarif, date_naissance, experience_annees, disponibilites
+    FROM utilisateurs WHERE id = ?`).get(id);
+  dire("sans session : 401", (await formProfil()).code === 401);
+  dire("un compte d'equipe : 403", (await formProfil(cookieDe(equipe.cookie))).code === 403);
+
+  const fe = await formProfil(cookieDe(emp.cookie));
+  dire("le formulaire de l'employeur : son nom et son quartier, sans metier ni disponibilites",
+       fe.code === 200 && fe.donnees.nom === "Test emp" && fe.donnees.quartier === "Bastos" &&
+       fe.donnees.pourPersonne === false && fe.donnees.metier === null && fe.donnees.jours.length === 0 &&
+       fe.donnees.arrondissements.includes(fe.donnees.arrondissement), fe.brut.slice(0, 300));
+  const nomVide = await enregistrerProfil({ nom: "  ", quartier: "Bastos" }, cookieDe(emp.cookie));
+  dire("sans nom : 400, rien ne change",
+       nomVide.code === 400 && erreurDe(nomVide).startsWith("Indiquez le nom") && ligneDe(emp.id).nom === "Test emp",
+       nomVide.brut);
+  dire("un objet a la place du nom : 400",
+       (await enregistrerProfil({ nom: { faux: true } }, cookieDe(emp.cookie))).code === 400);
+  const arrondissementBastos = base.prepare("SELECT arrondissement FROM quartiers WHERE nom = 'Bastos'").get().arrondissement;
+  const enrEmp = await enregistrerProfil({ nom: "Test emp", quartier: "bastos", arrondissement: "",
+                                           metier: "Ménage à domicile", tarif: "5000" },
+                                         { Authorization: "Bearer " + jeton });
+  const apresEmp = ligneDe(emp.id);
+  dire("l'employeur enregistre depuis l'application : quartier reconnu, ni metier ni tarif",
+       enrEmp.code === 200 && enrEmp.donnees.texte === "Vos informations ont bien été enregistrées." &&
+       apresEmp.quartier === "Bastos" && apresEmp.arrondissement === arrondissementBastos &&
+       apresEmp.metier === null && apresEmp.tarif === null, enrEmp.brut + " " + JSON.stringify(apresEmp));
+
+  const formulairePre = await formProfil(cookieDe(verifiee.cookie));
+  const formulairePreDonnees = formulairePre.donnees || {};
+  dire("le formulaire de la personne qui repond : metier, tarif, sept jours de trois moments",
+       formulairePre.code === 200 && formulairePreDonnees.pourPersonne === true && formulairePreDonnees.metier === metierEnBase && formulairePreDonnees.tarif === "15000" &&
+       formulairePreDonnees.jours.length === 7 && formulairePreDonnees.jours.every((j) => j.creneaux.length === formulairePreDonnees.moments.length) &&
+       formulairePreDonnees.anneesNaissance.a - formulairePreDonnees.anneesNaissance.de === 102, formulairePre.brut.slice(0, 300));
+  const profilDeBase = { nom: "Test verifiee", quartier: "Bastos", metier: metierEnBase, tarif: "15000" };
+  const avecChamp = (champs) => Object.assign({}, profilDeBase, champs);
+  const tranche = await enregistrerProfil(avecChamp({ tarif: "15250" }), cookieDe(verifiee.cookie));
+  dire("un tarif hors tranches : 400", tranche.code === 400 && tranche.brut.includes("par tranches de 500"), tranche.brut);
+  const experienceTrop = await enregistrerProfil(avecChamp({ experience_annees: "75" }), cookieDe(verifiee.cookie));
+  const experienceTexte = await enregistrerProfil(avecChamp({ experience_annees: "beaucoup" }), cookieDe(verifiee.cookie));
+  dire("une experience de 75 ans, ou en lettres : 400",
+       experienceTrop.code === 400 && experienceTexte.code === 400 && ligneDe(verifiee.id).experience_annees === null,
+       experienceTrop.brut);
+  const fevrier = await enregistrerProfil(avecChamp({ date_naissance: "1995-02-31" }), cookieDe(verifiee.cookie));
+  dire("une date qui n'existe pas, le 31 fevrier : 400",
+       fevrier.code === 400 && ligneDe(verifiee.id).date_naissance === null, fevrier.brut);
+  dire("des disponibilites qui ne sont pas une liste : 400",
+       (await enregistrerProfil(avecChamp({ disponibilites: "lundi-matin" }), cookieDe(verifiee.cookie))).code === 400);
+  const enrPre = await enregistrerProfil(avecChamp({
+    date_naissance: "1995-06-15", experience_annees: "4",
+    disponibilites: ["samedi-soir", "lundi-matin", "dimanche-nuit"] }), cookieDe(verifiee.cookie));
+  const apresPre = ligneDe(verifiee.id);
+  dire("la personne enregistre : un creneau inconnu est ecarte",
+       enrPre.code === 200 && apresPre.experience_annees === 4 && apresPre.date_naissance === "1995-06-15" &&
+       apresPre.disponibilites === "lundi-matin|samedi-soir", JSON.stringify(apresPre));
+  const fpApres = (await formProfil(cookieDe(verifiee.cookie))).donnees;
+  const pageModif = await (await lire("/mon-profil/modifier", verifiee.cookie)).text();
+  dire("le formulaire rouvert coche les memes cases que la page du site",
+       fpApres.jours[0].creneaux[0].coche === true && fpApres.jours[5].creneaux[2].coche === true &&
+       fpApres.jours[0].creneaux[1].coche === false &&
+       fpApres.experienceAnnees === "4" && fpApres.dateNaissance === "1995-06-15" &&
+       pageModif.includes('value="lundi-matin" checked') && pageModif.includes('value="1995-06-15"'));
+  const siteTrop = await poster("/mon-profil/modifier", form(avecChamp({ experience_annees: "75" })), verifiee.cookie);
+  const siteFevrier = await poster("/mon-profil/modifier", form(avecChamp({ date_naissance: "1995-02-31" })), verifiee.cookie);
+  dire("le site refuse aussi l'experience de 75 ans et le 31 fevrier",
+       siteTrop.code === 400 && siteFevrier.code === 400 && ligneDe(verifiee.id).experience_annees === 4 &&
+       ligneDe(verifiee.id).date_naissance === "1995-06-15", "codes " + siteTrop.code + " " + siteFevrier.code);
+
+  const detailTarif = await json("/api/detail-tarif?montant=15000", undefined, cookieDe(verifiee.cookie));
+  const detailVide = await json("/api/detail-tarif?montant=abc", undefined, cookieDe(verifiee.cookie));
+  dire("le detail du tarif pendant la saisie, calcule par le serveur",
+       detailTarif.code === 200 && detailTarif.donnees.lignes[2].montant === "13 500 FCFA" &&
+       detailVide.donnees.lignes.length === 0 && (await json("/api/detail-tarif?montant=15000")).code === 401,
+       detailTarif.brut);
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");

@@ -28,7 +28,7 @@
 <div class="champ">
   <label for="experience_annees">Depuis combien d'années faites-vous ce travail ?</label>
   <input type="number" id="experience_annees" name="experience_annees"
-         min="0" max="60" step="1" placeholder="ex : 4"
+         min="0" max="<%= experienceMaxAnnees %>" step="1" placeholder="ex : 4"
          value="<%= u.experience_annees != null ? u.experience_annees : "" %>">
 </div>
 

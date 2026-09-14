@@ -1606,6 +1606,19 @@ function champsAnnonce(donnees) {
   };
 }
 
+const EXPERIENCE_MAX_ANNEES = 60;
+
+// "2000-02-31" n'existe pas, mais JavaScript le reporte en silence au
+// 2 mars : sans ce controle, la date etait acceptee.
+function dateExiste(texte) {
+  const trouve = String(texte).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!trouve) return false;
+  const [annee, mois, jour] = trouve.slice(1).map(Number);
+  const date = new Date(Date.UTC(annee, mois - 1, jour));
+  return date.getUTCFullYear() === annee && date.getUTCMonth() === mois - 1 &&
+         date.getUTCDate() === jour;
+}
+
 function verifierProfilPrestataire(donnees) {
   if (!String(donnees.metier || "").trim()) {
     return {
@@ -1632,11 +1645,22 @@ function verifierProfilPrestataire(donnees) {
   // La date de naissance est facultative, mais si elle est donnee elle
   // doit correspondre a une personne majeure : la plateforme donne acces
   // au domicile de familles.
-  if (donnees.date_naissance && !ageValide(donnees.date_naissance)) {
+  if (donnees.date_naissance &&
+      (!dateExiste(donnees.date_naissance) || !ageValide(donnees.date_naissance))) {
     return {
       titre: "Date de naissance invalide",
       texte: "La plateforme est réservée aux personnes majeures. " +
              "Vérifiez la date que vous avez saisie.",
+    };
+  }
+
+  // L'experience n'etait bornee que par le navigateur : "beaucoup" ou
+  // 75 ans passaient par une autre porte.
+  const experience = String(donnees.experience_annees ?? "").trim();
+  if (experience && !(/^\d+$/.test(experience) && Number(experience) <= EXPERIENCE_MAX_ANNEES)) {
+    return {
+      titre: "Expérience non acceptée",
+      texte: `Indiquez un nombre entier d'années, entre 0 et ${EXPERIENCE_MAX_ANNEES}.`,
     };
   }
 
@@ -1926,6 +1950,11 @@ function resoudreMetier(texte) {
 // avec un nom et un quartier suffit a identifier quelqu'un ; une tranche
 // d'age dit ce qu'un employeur a besoin de savoir sans rien reveler de
 // plus.
+// La plateforme donne acces au domicile de familles : elle est reservee
+// aux personnes majeures. Au-dela de 120 ans, la date est une erreur.
+const AGE_MINIMUM = 18;
+const AGE_MAXIMUM = 120;
+
 const TRANCHES = [
   { jusqua: 24, libelle: "18 - 24 ans" },
   { jusqua: 34, libelle: "25 - 34 ans" },
@@ -1949,7 +1978,7 @@ function trancheAge(dateNaissance) {
     age--;
   }
 
-  if (age < 18 || age > 120) return null;
+  if (age < AGE_MINIMUM || age > AGE_MAXIMUM) return null;
 
   return TRANCHES.find((t) => age <= t.jusqua).libelle;
 }
@@ -2673,6 +2702,7 @@ app.locals.moyenneLisible = moyenneLisible;
 app.locals.notePersonne = notePersonne;
 app.locals.criteresAvis = criteresAvis;
 app.locals.moments = MOMENTS;
+app.locals.experienceMaxAnnees = EXPERIENCE_MAX_ANNEES;
 
 // ============================================================
 // RECEPTION DES DOCUMENTS DE VERIFICATION
@@ -3350,42 +3380,80 @@ app.get("/mes-reponses", exigerConnexion, interdireALEquipe, (req, res) => {
 });
 
 // --- Modifier son profil : le formulaire ---------------------------
-app.get("/mon-profil/modifier", exigerConnexion, (req, res) => {
-  res.render("modifier-profil", {
-    titre: "Modifier mon profil",
-    utilisateur: req.utilisateur,
-  });
-});
+// --- Modifier mon profil, UNE SEULE FOIS pour le site et l'application --
 
-// --- Modifier son profil : l'enregistrement ------------------------
-//
-// LIMITE CONNUE : le role d'un compte ne peut pas etre change.
-// Un employeur a des demandes publiees, une aide-menagere a des
-// candidatures envoyees : basculer de l'un a l'autre laisserait ces
-// lignes sans proprietaire. Il faut creer un second compte.
-app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => {
-  const donnees = req.body;
-  const moi = req.utilisateur;
+const CHAMPS_PROFIL = ["nom", "quartier", "arrondissement", "metier", "tarif",
+                       "date_naissance", "experience_annees"];
+
+// En JSON, un objet peut se glisser a la place d'un texte : on le refuse
+// plutot que d'enregistrer "[object Object]" comme nom.
+function formeDeProfilValide(corps) {
+  return Boolean(corps) && typeof corps === "object" && !Array.isArray(corps) &&
+    CHAMPS_PROFIL.every((champ) => corps[champ] == null ||
+      typeof corps[champ] === "string" || typeof corps[champ] === "number") &&
+    (corps.disponibilites == null ||
+      (Array.isArray(corps.disponibilites) &&
+       corps.disponibilites.every((creneau) => typeof creneau === "string")));
+}
+
+// Ce que le formulaire montre, rempli avec ce qui est enregistre.
+function formulaireMonProfil(u) {
+  const personne = u.role === "prestataire";
+  const coches = new Set(String(u.disponibilites || "").split("|"));
+  const annee = new Date().getFullYear();
+
+  return {
+    nom: u.nom,
+    quartier: u.quartier || "",
+    arrondissement: u.arrondissement || null,
+    quartiers: quartiers.map((q) => q.nom),
+    arrondissements: app.locals.arrondissements,
+    // Un employeur n'a ni metier, ni tarif, ni disponibilites a declarer.
+    pourPersonne: personne,
+    metier: personne ? u.metier || "" : null,
+    metiers: personne ? metiers.map((m) => m.nom) : [],
+    dateNaissance: personne ? u.date_naissance || null : null,
+    // Les annees que le serveur peut accepter.
+    anneesNaissance: personne ? { de: annee - AGE_MAXIMUM, a: annee - AGE_MINIMUM } : null,
+    experienceAnnees: personne && u.experience_annees != null ? String(u.experience_annees) : "",
+    experienceMax: EXPERIENCE_MAX_ANNEES,
+    moments: MOMENTS.map((m) => m.libelle),
+    jours: personne
+      ? JOURS.map((jour) => ({
+          libelle: jour.charAt(0).toUpperCase() + jour.slice(1),
+          creneaux: MOMENTS.map((m) => ({
+            valeur: `${jour}-${m.cle}`,
+            libelle: m.libelle,
+            coche: coches.has(`${jour}-${m.cle}`),
+          })),
+        }))
+      : [],
+    tarif: personne && u.tarif ? String(u.tarif) : "",
+  };
+}
+
+function enregistrerMonProfil(moi, donnees) {
+  const retour = { url: "/mon-profil/modifier", texte: "Retour au formulaire" };
 
   if (!String(donnees.nom || "").trim()) {
-    return res.status(400).render("message", {
-      titre: "Nom obligatoire",
-      texte: "Indiquez le nom sous lequel vous souhaitez apparaître.",
-      liens: [{ url: "/mon-profil/modifier", texte: "Retour au formulaire" }],
-    });
+    return {
+      probleme: {
+        code: 400,
+        titre: "Nom obligatoire",
+        texte: "Indiquez le nom sous lequel vous souhaitez apparaître.",
+        lien: retour,
+      },
+    };
   }
 
   // Les memes regles qu'a l'inscription, appelees au meme endroit.
   if (moi.role === "prestataire") {
     const probleme = verifierProfilPrestataire(donnees);
-    if (probleme) {
-      return res.status(400).render("message", Object.assign({}, probleme, {
-        liens: [{ url: "/mon-profil/modifier", texte: "Retour au formulaire" }],
-      }));
-    }
+    if (probleme) return { probleme: { code: 400, ...probleme, lien: retour } };
   }
 
   const lieu = resoudreLieu(donnees);
+  const experience = String(donnees.experience_annees ?? "").trim();
 
   requetes.majProfil.run({
     id: moi.id,
@@ -3402,8 +3470,7 @@ app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => 
     metier: moi.role === "prestataire" ? resoudreMetier(donnees.metier) : null,
     tarif: moi.role === "prestataire" ? Math.round(Number(donnees.tarif)) : null,
     date_naissance: moi.role === "prestataire" ? (donnees.date_naissance || null) : null,
-    experience_annees: moi.role === "prestataire" && donnees.experience_annees
-      ? Math.round(Number(donnees.experience_annees)) : null,
+    experience_annees: moi.role === "prestataire" && experience ? Number(experience) : null,
     disponibilites: moi.role === "prestataire" ? resoudreDisponibilites(donnees) : null,
   });
 
@@ -3415,9 +3482,29 @@ app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => 
     requetes.majPosition.run(latitude, longitude, moi.id);
   }
 
+  return { ok: true, titre: "Profil mis à jour", texte: "Vos informations ont bien été enregistrées." };
+}
+
+app.get("/mon-profil/modifier", exigerConnexion, (req, res) => {
+  res.render("modifier-profil", {
+    titre: "Modifier mon profil",
+    utilisateur: req.utilisateur,
+  });
+});
+
+// --- Modifier son profil : l'enregistrement ------------------------
+//
+// LIMITE CONNUE : le role d'un compte ne peut pas etre change.
+// Un employeur a des demandes publiees, une aide-menagere a des
+// candidatures envoyees : basculer de l'un a l'autre laisserait ces
+// lignes sans proprietaire. Il faut creer un second compte.
+app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => {
+  const resultat = enregistrerMonProfil(req.utilisateur, req.body);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
   res.render("message", {
-    titre: "Profil mis à jour",
-    texte: "Vos informations ont bien été enregistrées.",
+    titre: resultat.titre,
+    texte: resultat.texte,
     liens: [{ url: "/mon-profil", texte: "Voir mon profil" }],
   });
 });
@@ -7020,6 +7107,40 @@ app.post("/api/mon-profil/avertissement/lu", (req, res) => {
 
   requetes.marquerAvertissementLu.run(moi.id);
   res.json({ ok: true });
+});
+
+// --- Modifier mon profil depuis l'application -----------------------
+app.get("/api/mon-profil/modification", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  res.json(formulaireMonProfil(moi));
+});
+
+app.post("/api/mon-profil", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  if (!formeDeProfilValide(req.body)) {
+    return erreurApi(res, 400, "Le profil envoyé n'a pas la forme attendue.");
+  }
+
+  // La position vient du navigateur, sur le site. L'application ne la
+  // demande pas : le serveur garde celle qu'il connait.
+  const { latitude, longitude, ...donnees } = req.body;
+  const resultat = enregistrerMonProfil(moi, donnees);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.json({ texte: resultat.texte });
+});
+
+// Le detail d'un tarif pendant la saisie. Le site le calcule dans le
+// navigateur ; l'application le demande ici plutot que de recopier la
+// commission.
+app.get("/api/detail-tarif", (req, res) => {
+  if (!utilisateurConnecte(req)) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  res.json(tarifSurMonProfil(req.query.montant));
 });
 
 // --- La fiche d'une personne depuis l'application -------------------
