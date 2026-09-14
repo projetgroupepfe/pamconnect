@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
-import 'ecran_demandes.dart';
-import 'ecran_mes_demandes.dart';
+import 'ecran_principal.dart';
 import 'elements.dart';
 import 'theme.dart';
 
@@ -77,11 +76,10 @@ class _EcranConnexionState extends State<EcranConnexion> {
       // demandes. L'espace de l'equipe reste sur le site web : c'est une
       // decision prise avec l'encadreur. Il s'ouvre aussi dans le
       // navigateur d'un telephone.
+      // La barre de menu choisit ensuite les entrees de chaque role.
       final Widget accueil;
-      if (moi.repondAuxDemandes) {
-        accueil = EcranDemandes(api: api, moi: moi);
-      } else if (moi.publieDesDemandes) {
-        accueil = EcranMesDemandes(api: api, moi: moi);
+      if (moi.repondAuxDemandes || moi.publieDesDemandes) {
+        accueil = EcranPrincipal(api: api, moi: moi);
       } else {
         await api.deconnexion();
         if (!mounted) return;

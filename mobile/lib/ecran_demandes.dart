@@ -9,10 +9,16 @@ import 'theme.dart';
 /// Les demandes ouvertes, dans l'ordre que le serveur a decide : celles du
 /// metier de la personne d'abord, les autres ensuite.
 class EcranDemandes extends StatefulWidget {
-  const EcranDemandes({super.key, required this.api, required this.moi});
+  const EcranDemandes({super.key, required this.api, required this.moi, this.rafraichir = 0, this.auMoi});
 
   final ApiPamConnect api;
   final Moi moi;
+
+  /// Change quand l'onglet est rouvert : l'ecran se recharge.
+  final int rafraichir;
+
+  /// Donne la personne a jour a la barre de menu, pour sa pastille.
+  final void Function(Moi moi)? auMoi;
 
   @override
   State<EcranDemandes> createState() => _EcranDemandesState();
@@ -28,6 +34,12 @@ class _EcranDemandesState extends State<EcranDemandes> {
   void initState() {
     super.initState();
     _charger();
+  }
+
+  @override
+  void didUpdateWidget(EcranDemandes ancien) {
+    super.didUpdateWidget(ancien);
+    if (ancien.rafraichir != widget.rafraichir) _actualiser();
   }
 
   Future<void> _actualiser() async {
@@ -52,6 +64,7 @@ class _EcranDemandesState extends State<EcranDemandes> {
         _erreur = null;
         _enCours = false;
       });
+      widget.auMoi?.call(moi);
     } on ErreurApi catch (erreur) {
       if (!mounted) return;
       if (erreur.sessionPerdue) {

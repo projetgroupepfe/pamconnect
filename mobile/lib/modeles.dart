@@ -58,13 +58,20 @@ class Jetons {
 
 /// La personne connectee.
 class Moi {
-  const Moi({required this.id, required this.nom, required this.role, required this.jetons});
+  const Moi({
+    required this.id,
+    required this.nom,
+    required this.role,
+    required this.jetons,
+    this.aVoir = 0,
+  });
 
   factory Moi.depuisJson(Map<String, dynamic> json) => Moi(
         id: _lire<int>(json, 'id'),
         nom: _lire<String>(json, 'nom'),
         role: _lire<String>(json, 'role'),
         jetons: Jetons.depuisJson(_lire<Map<String, dynamic>>(json, 'jetons')),
+        aVoir: _lireFacultatif<int>(json, 'aVoir') ?? 0,
       );
 
   /// La reponse de /api/moi : { "moi": { ... } }.
@@ -75,6 +82,10 @@ class Moi {
   final String nom;
   final String role;
   final Jetons jetons;
+
+  /// Les messages non lus et les decisions pas encore vues : la pastille
+  /// de Messages.
+  final int aVoir;
 
   /// Ces deux questions choisissent l'ecran d'arrivee, comme le menu du
   /// site. Ce ne sont PAS des droits accordes ici : le serveur refuse de
@@ -908,4 +919,100 @@ class InfoMiseEnAvant {
   final int? jours;
   final String? cout;
   final String? resteApres;
+}
+
+/// Une ligne de la liste Mes messages, formulee par le serveur.
+class ResumeDiscussion {
+  const ResumeDiscussion({
+    required this.id,
+    required this.avec,
+    required this.titreDemande,
+    required this.phraseStatut,
+    required this.nouveau,
+    required this.phraseMessages,
+    required this.avisAttendu,
+    this.phraseNonLus,
+    this.dernierMessage,
+    this.termineeLe,
+  });
+
+  factory ResumeDiscussion.depuisJson(Map<String, dynamic> json) => ResumeDiscussion(
+        id: _lire<int>(json, 'id'),
+        avec: _lire<String>(json, 'avec'),
+        titreDemande: _lire<String>(json, 'titreDemande'),
+        phraseStatut: _lire<String>(json, 'phraseStatut'),
+        nouveau: _lire<bool>(json, 'nouveau'),
+        phraseMessages: _lire<String>(json, 'phraseMessages'),
+        avisAttendu: _lire<bool>(json, 'avisAttendu'),
+        phraseNonLus: _lireFacultatif<String>(json, 'phraseNonLus'),
+        dernierMessage: _lireFacultatif<String>(json, 'dernierMessage'),
+        termineeLe: _lireFacultatif<String>(json, 'termineeLe'),
+      );
+
+  final int id;
+  final String avec;
+  final String titreDemande;
+  final String phraseStatut;
+  final bool nouveau;
+  final String phraseMessages;
+  final bool avisAttendu;
+  final String? phraseNonLus;
+  final String? dernierMessage;
+
+  /// Present une fois le service termine : la discussion est une archive.
+  final String? termineeLe;
+}
+
+/// "2 services attendent votre avis." puis la suite de la phrase.
+class ChapeauTerminees {
+  const ChapeauTerminees({required this.suite, this.fort});
+
+  factory ChapeauTerminees.depuisJson(Map<String, dynamic> json) => ChapeauTerminees(
+        suite: _lire<String>(json, 'suite'),
+        fort: _lireFacultatif<String>(json, 'fort'),
+      );
+
+  final String suite;
+  final String? fort;
+}
+
+/// Pourquoi la liste est vide, dit selon le role.
+class ListeVide {
+  const ListeVide({required this.phrase, this.aide});
+
+  factory ListeVide.depuisJson(Map<String, dynamic> json) => ListeVide(
+        phrase: _lire<String>(json, 'phrase'),
+        aide: _lireFacultatif<String>(json, 'aide'),
+      );
+
+  final String phrase;
+  final String? aide;
+}
+
+/// La reponse de /api/discussions.
+class MesDiscussions {
+  const MesDiscussions({
+    required this.enCours,
+    required this.terminees,
+    required this.chapeauTerminees,
+    required this.aVoir,
+    this.vide,
+  });
+
+  factory MesDiscussions.depuisJson(Map<String, dynamic> json) {
+    final vide = _lireFacultatif<Map<String, dynamic>>(json, 'vide');
+    return MesDiscussions(
+      enCours: _lireListe(json, 'enCours', ResumeDiscussion.depuisJson),
+      terminees: _lireListe(json, 'terminees', ResumeDiscussion.depuisJson),
+      chapeauTerminees: ChapeauTerminees.depuisJson(_lire<Map<String, dynamic>>(json, 'chapeauTerminees')),
+      aVoir: _lire<int>(json, 'aVoir'),
+      vide: vide == null ? null : ListeVide.depuisJson(vide),
+    );
+  }
+
+  final List<ResumeDiscussion> enCours;
+  final List<ResumeDiscussion> terminees;
+  final ChapeauTerminees chapeauTerminees;
+  final int aVoir;
+  final ListeVide? vide;
 }

@@ -18,10 +18,16 @@ import 'theme.dart';
 /// choisit ou refuse une personne. Chaque bouton n'apparait que si le
 /// serveur l'autorise.
 class EcranMesDemandes extends StatefulWidget {
-  const EcranMesDemandes({super.key, required this.api, required this.moi});
+  const EcranMesDemandes({super.key, required this.api, required this.moi, this.rafraichir = 0, this.auMoi});
 
   final ApiPamConnect api;
   final Moi moi;
+
+  /// Change quand l'onglet est rouvert : l'ecran se recharge.
+  final int rafraichir;
+
+  /// Donne la personne a jour a la barre de menu, pour sa pastille.
+  final void Function(Moi moi)? auMoi;
 
   @override
   State<EcranMesDemandes> createState() => _EcranMesDemandesState();
@@ -46,6 +52,12 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
     _charger();
   }
 
+  @override
+  void didUpdateWidget(EcranMesDemandes ancien) {
+    super.didUpdateWidget(ancien);
+    if (ancien.rafraichir != widget.rafraichir) _actualiser();
+  }
+
   Future<void> _actualiser() async {
     setState(() {
       _enCours = true;
@@ -65,6 +77,7 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
         _erreur = null;
         _enCours = false;
       });
+      widget.auMoi?.call(moi);
     } on ErreurApi catch (erreur) {
       if (!mounted) return;
       if (erreur.sessionPerdue) {

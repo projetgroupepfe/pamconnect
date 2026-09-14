@@ -577,4 +577,50 @@ void main() {
     expect(indisponible.cout, isNull);
     expect(() => InfoMiseEnAvant.depuisJson({'titre': 'titre 1'}), throwsA(isA<FormeInattendue>()));
   });
+
+  group('la liste Mes messages', () {
+    Map<String, dynamic> ligne({String? termineeLe}) => {
+          'id': 4,
+          'avec': 'nom 1',
+          'titreDemande': 'titre 1',
+          'phraseStatut': 'phrase 1',
+          'nouveau': false,
+          'phraseNonLus': null,
+          'phraseMessages': 'messages 1',
+          'dernierMessage': null,
+          'termineeLe': termineeLe,
+          'avisAttendu': termineeLe != null,
+        };
+
+    test('en cours et termines arrivent ranges, avec le compteur', () {
+      final lu = MesDiscussions.depuisJson({
+        'enCours': [ligne()],
+        'terminees': [ligne(termineeLe: 'date 1')],
+        'chapeauTerminees': {'fort': 'fort 1', 'suite': 'suite 1'},
+        'vide': null,
+        'aVoir': 2,
+      });
+      expect(lu.enCours.single.termineeLe, isNull);
+      expect(lu.terminees.single.avisAttendu, isTrue);
+      expect(lu.aVoir, 2);
+      expect(lu.vide, isNull);
+    });
+
+    test('une liste vide dit pourquoi', () {
+      final lu = MesDiscussions.depuisJson({
+        'enCours': [],
+        'terminees': [],
+        'chapeauTerminees': {'fort': null, 'suite': 'suite 1'},
+        'vide': {'phrase': 'phrase 1', 'aide': null},
+        'aVoir': 0,
+      });
+      expect(lu.vide!.phrase, 'phrase 1');
+      expect(lu.chapeauTerminees.fort, isNull);
+    });
+  });
+
+  test("sans compteur, la personne n'a rien de nouveau", () {
+    expect(Moi.depuisJson(_moi('employeur')).aVoir, 0);
+    expect(Moi.depuisJson(_moi('employeur')..['aVoir'] = 3).aVoir, 3);
+  });
 }
