@@ -3,6 +3,7 @@
 // Ces tests tournent sur l'ordinateur, sans telephone ni serveur : ils
 // verifient que les reponses de l'API, sous leur forme reelle, sont lues
 // sans rien deviner.
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pamconnect/api.dart';
 import 'package:pamconnect/elements.dart';
@@ -341,5 +342,99 @@ void main() {
     expect(DecisionPrise.depuisJson({'ok': true}), isA<DecisionPrise>());
     expect(() => DecisionPrise.depuisJson({'ok': false}), throwsA(isA<FormeInattendue>()));
     expect(() => DecisionPrise.depuisJson({}), throwsA(isA<FormeInattendue>()));
+  });
+
+  group('la question avant de refuser', () {
+    Future<void> ouvrir(WidgetTester tester, void Function(bool) garder) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async => garder(await confirmerRefus(context, 'nom 1')),
+              child: const Text('ouvrir'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('ouvrir'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('elle nomme la personne, et Annuler ne refuse pas', (tester) async {
+      bool? resultat;
+      await ouvrir(tester, (valeur) => resultat = valeur);
+      expect(find.text('Voulez-vous vraiment refuser la candidature de nom 1 ?'), findsOneWidget);
+      await tester.tap(find.text('Annuler'));
+      await tester.pumpAndSettle();
+      expect(resultat, isFalse);
+    });
+
+    testWidgets('Refuser confirme', (tester) async {
+      bool? resultat;
+      await ouvrir(tester, (valeur) => resultat = valeur);
+      await tester.tap(find.text('Refuser'));
+      await tester.pumpAndSettle();
+      expect(resultat, isTrue);
+    });
+  });
+
+  group('une discussion', () {
+    Map<String, dynamic> discussion() => {
+          'id': 9,
+          'titreDemande': 'titre 1',
+          'avec': 'nom 1',
+          'metierAutre': null,
+          'horaire': 'Horaire non précisé',
+          'lieu': null,
+          'conditions': null,
+          'phraseStatut': 'En attente de votre décision',
+          'prix': {
+            'lignes': [
+              {'libelle': 'Vous payez', 'montant': '8 000 FCFA', 'fort': true},
+            ],
+            'phrase': 'phrase 1',
+          },
+          'messages': [
+            {
+              'id': 1,
+              'deMoi': true,
+              'auteur': 'Vous',
+              'quand': 'quand 1',
+              'texte': 'texte 1',
+              'risquePaiement': false,
+              'signale': false,
+              'peutSignaler': false,
+            },
+          ],
+          'serviceTermine': null,
+          'peutEcrire': true,
+          'exempleMessage': 'exemple 1',
+          'declarationDeLaPersonne': null,
+        };
+
+    test('elle se lit telle que le serveur la decrit', () {
+      final lu = Discussion.depuisJson(discussion());
+      expect(lu.avec, 'nom 1');
+      expect(lu.messages.single.auteur, 'Vous');
+      expect(lu.messages.single.peutSignaler, isFalse);
+      expect(lu.prix.lignes.single.montant, '8 000 FCFA');
+      expect(lu.serviceTermine, isNull);
+    });
+
+    test('un service termine dit qui l a declare, et quand', () {
+      final json = discussion()
+        ..['serviceTermine'] = {'par': 'nom 2', 'le': 'date 1'}
+        ..['peutEcrire'] = false;
+      final lu = Discussion.depuisJson(json);
+      expect(lu.serviceTermine!.nom, 'nom 2');
+      expect(lu.serviceTermine!.le, 'date 1');
+      expect(lu.peutEcrire, isFalse);
+    });
+
+    test('un message sans sa decision de signalement est signale, pas devine', () {
+      final json = discussion();
+      ((json['messages'] as List).first as Map<String, dynamic>).remove('peutSignaler');
+      expect(() => Discussion.depuisJson(json), throwsA(isA<FormeInattendue>()));
+    });
   });
 }

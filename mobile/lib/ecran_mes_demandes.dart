@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'ecran_confirmer_choix.dart';
 import 'ecran_connexion.dart';
+import 'ecran_discussion.dart';
 import 'ecran_publier.dart';
 import 'elements.dart';
 import 'modeles.dart';
@@ -12,9 +13,9 @@ import 'theme.dart';
 /// page Mes demandes du site, puisque les deux lisent la meme fonction du
 /// serveur.
 ///
-/// On peut y publier une demande, choisir ou refuser une personne.
-/// Discuter ou modifier arrivent ensuite, chacun avec sa route testee :
-/// aucun bouton n'est affiche avant de fonctionner.
+/// On peut y publier une demande, discuter, choisir ou refuser une
+/// personne. Modifier, mettre en avant ou retirer arrivent ensuite, chacun
+/// avec sa route testee : aucun bouton n'est affiche avant de fonctionner.
 class EcranMesDemandes extends StatefulWidget {
   const EcranMesDemandes({super.key, required this.api, required this.moi});
 
@@ -98,6 +99,16 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
     );
   }
 
+  Future<void> _discuter(ReponseRecue reponse) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => EcranDiscussion(api: widget.api, discussionId: reponse.id),
+      ),
+    );
+    if (!mounted) return;
+    await _actualiser();
+  }
+
   Future<void> _choisir(ReponseRecue reponse) async {
     setState(() {
       _confirmation = null;
@@ -113,10 +124,13 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
     await _actualiser();
   }
 
-  /// Refuser reste immediat, comme sur le site : on ne s'engage a rien en
-  /// refusant, et la demande reste ouverte.
+  /// Refuser ne passe pas par un ecran de relecture : on ne s'engage a
+  /// rien, et la demande reste ouverte. Mais un refus ne s'annule pas :
+  /// une question le precede, la meme que sur le site.
   Future<void> _refuser(ReponseRecue reponse) async {
     if (_decisionsEnCours.contains(reponse.id)) return;
+    if (!await confirmerRefus(context, reponse.nom)) return;
+    if (!mounted) return;
     setState(() {
       _decisionsEnCours.add(reponse.id);
       _confirmation = null;
@@ -236,6 +250,7 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
         ),
       for (final demande in enCours) _CarteDemandePubliee(
             demande: demande,
+            auDiscuter: _discuter,
             auChoix: _choisir,
             auRefus: _refuser,
             decisionsEnCours: _decisionsEnCours,
@@ -252,6 +267,7 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
         ),
         for (final demande in terminees) _CarteDemandePubliee(
             demande: demande,
+            auDiscuter: _discuter,
             auChoix: _choisir,
             auRefus: _refuser,
             decisionsEnCours: _decisionsEnCours,
@@ -264,12 +280,14 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
 class _CarteDemandePubliee extends StatelessWidget {
   const _CarteDemandePubliee({
     required this.demande,
+    required this.auDiscuter,
     required this.auChoix,
     required this.auRefus,
     required this.decisionsEnCours,
   });
 
   final DemandePubliee demande;
+  final void Function(ReponseRecue) auDiscuter;
   final void Function(ReponseRecue) auChoix;
   final void Function(ReponseRecue) auRefus;
   final Set<int> decisionsEnCours;
@@ -339,6 +357,7 @@ class _CarteDemandePubliee extends StatelessWidget {
                   _CarteReponse(
                     reponse: reponse,
                     prix: prix,
+                    auDiscuter: auDiscuter,
                     auChoix: auChoix,
                     auRefus: auRefus,
                     occupe: decisionsEnCours.contains(reponse.id),
@@ -355,12 +374,14 @@ class _CarteReponse extends StatelessWidget {
   const _CarteReponse({
     required this.reponse,
     required this.prix,
+    required this.auDiscuter,
     required this.auChoix,
     required this.auRefus,
     required this.occupe,
   });
 
   final ReponseRecue reponse;
+  final void Function(ReponseRecue) auDiscuter;
   final void Function(ReponseRecue) auChoix;
   final void Function(ReponseRecue) auRefus;
 
@@ -451,6 +472,17 @@ class _CarteReponse extends StatelessWidget {
           if (experience != null) LigneDetail(icone: Icons.work_history_outlined, texte: experience),
           if (disponibilites != null)
             LigneDetail(icone: Icons.calendar_today_outlined, texte: 'Disponible', enGras: disponibilites),
+          // Discuter reste possible dans tous les cas, comme sur le site :
+          // meme refusee ou sur une demande retiree, la discussion demeure.
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: OutlinedButton.icon(
+              onPressed: () => auDiscuter(reponse),
+              icon: const Icon(Icons.chat_bubble_outline),
+              label: const Text('Discuter'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            ),
+          ),
           if (reponse.attendVerification)
             Padding(
               padding: const EdgeInsets.only(top: 8),

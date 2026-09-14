@@ -123,18 +123,29 @@ class TitreSection extends StatelessWidget {
 /// [enGras] met la valeur en avant apres un debut de phrase ordinaire :
 /// "Disponible" puis les jours.
 class LigneDetail extends StatelessWidget {
-  const LigneDetail({super.key, required this.icone, required this.texte, this.aide, this.enGras});
+  const LigneDetail({
+    super.key,
+    required this.icone,
+    required this.texte,
+    this.aide,
+    this.enGras,
+    this.apresGras,
+  });
 
   final IconData icone;
   final String texte;
   final String? aide;
   final String? enGras;
 
+  /// Colle a la valeur en gras, sans espace : "Avec Awa, Menage".
+  final String? apresGras;
+
   @override
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encreDouce);
     final aide = this.aide;
     final enGras = this.enGras;
+    final apresGras = this.apresGras;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Row(
@@ -152,6 +163,7 @@ class LigneDetail extends StatelessWidget {
                       text: ' $enGras',
                       style: const TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre),
                     ),
+                  if (apresGras != null) TextSpan(text: apresGras),
                   if (aide != null)
                     TextSpan(text: ' $aide', style: const TextStyle(color: Couleurs.encrePale)),
                 ],
@@ -242,4 +254,31 @@ class Confirmation extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "Voulez-vous vraiment refuser ?" : la meme question que sur le site,
+/// avant un geste qui ne s'annule pas. Rend true seulement si la personne
+/// confirme ; fermer la fenetre vaut Annuler.
+Future<bool> confirmerRefus(BuildContext context, String nom) async {
+  final reponse = await showDialog<bool>(
+    context: context,
+    builder: (contexte) => AlertDialog(
+      title: Text('Voulez-vous vraiment refuser la candidature de $nom ?'),
+      content: const Text(
+        "Votre demande reste ouverte : d'autres personnes pourront encore y répondre.",
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(contexte).pop(false),
+          child: const Text('Annuler'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(contexte).pop(true),
+          style: TextButton.styleFrom(foregroundColor: Couleurs.rouge),
+          child: const Text('Refuser'),
+        ),
+      ],
+    ),
+  );
+  return reponse == true;
 }

@@ -121,6 +121,25 @@ class ApiPamConnect {
   /// Refuser une reponse : la demande reste ouverte.
   Future<void> refuserCandidature(int candidatureId) => _decider(candidatureId, 'refuser');
 
+  /// Ouvrir une discussion, c'est l'avoir lue : le serveur le note.
+  Future<Discussion> discussion(int discussionId) async {
+    final donnees = await _appeler('/api/discussions/$discussionId');
+    return _interpreter(() => Discussion.depuisJson(donnees));
+  }
+
+  Future<void> envoyerMessage(int discussionId, String texte) async {
+    final donnees = await _appeler('/api/discussions/$discussionId/messages', corps: {'texte': texte});
+    _interpreter(() => ActionFaite.depuisJson(donnees));
+  }
+
+  Future<void> signalerMessage(int discussionId, int messageId) async {
+    final donnees = await _appeler(
+      '/api/discussions/$discussionId/messages/$messageId/signaler',
+      corps: const {},
+    );
+    _interpreter(() => ActionFaite.depuisJson(donnees));
+  }
+
   Future<void> _decider(int candidatureId, String decision) async {
     final donnees = await _appeler('/api/candidatures/$candidatureId/$decision', corps: const {});
     _interpreter(() => DecisionPrise.depuisJson(donnees));

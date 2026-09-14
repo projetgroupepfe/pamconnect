@@ -487,3 +487,152 @@ class DecisionPrise {
     return const DecisionPrise();
   }
 }
+
+/// Une reponse du serveur qui dit seulement que c'est fait.
+class ActionFaite {
+  const ActionFaite();
+
+  factory ActionFaite.depuisJson(Map<String, dynamic> json) {
+    if (_lire<bool>(json, 'ok') != true) throw const FormeInattendue('ok');
+    return const ActionFaite();
+  }
+}
+
+/// Une ligne du prix, formulee par le serveur pour la personne qui lit.
+class LignePrix {
+  const LignePrix({required this.libelle, required this.montant, required this.fort});
+
+  factory LignePrix.depuisJson(Map<String, dynamic> json) => LignePrix(
+        libelle: _lire<String>(json, 'libelle'),
+        montant: _lire<String>(json, 'montant'),
+        fort: _lire<bool>(json, 'fort'),
+      );
+
+  final String libelle;
+  final String montant;
+  final bool fort;
+}
+
+/// Le prix de la demande vu depuis la discussion.
+class PrixDiscussion {
+  const PrixDiscussion({required this.lignes, required this.phrase});
+
+  factory PrixDiscussion.depuisJson(Map<String, dynamic> json) => PrixDiscussion(
+        lignes: _lireListe(json, 'lignes', LignePrix.depuisJson),
+        phrase: _lire<String>(json, 'phrase'),
+      );
+
+  /// Vide pour une demande publiee avant que le prix soit obligatoire.
+  final List<LignePrix> lignes;
+  final String phrase;
+}
+
+class MessageDiscussion {
+  const MessageDiscussion({
+    required this.id,
+    required this.deMoi,
+    required this.auteur,
+    required this.quand,
+    required this.texte,
+    required this.risquePaiement,
+    required this.signale,
+    required this.peutSignaler,
+  });
+
+  factory MessageDiscussion.depuisJson(Map<String, dynamic> json) => MessageDiscussion(
+        id: _lire<int>(json, 'id'),
+        deMoi: _lire<bool>(json, 'deMoi'),
+        auteur: _lire<String>(json, 'auteur'),
+        quand: _lire<String>(json, 'quand'),
+        texte: _lire<String>(json, 'texte'),
+        risquePaiement: _lire<bool>(json, 'risquePaiement'),
+        signale: _lire<bool>(json, 'signale'),
+        peutSignaler: _lire<bool>(json, 'peutSignaler'),
+      );
+
+  final int id;
+  final bool deMoi;
+
+  /// "Vous", ou le nom de l'autre personne.
+  final String auteur;
+  final String quand;
+  final String texte;
+  final bool risquePaiement;
+  final bool signale;
+  final bool peutSignaler;
+}
+
+/// Qui a declare le service effectue, et quand.
+class DateDeclaree {
+  const DateDeclaree({required this.nom, required this.le});
+
+  factory DateDeclaree.depuisJson(Map<String, dynamic> json, String champNom) => DateDeclaree(
+        nom: _lire<String>(json, champNom),
+        le: _lire<String>(json, 'le'),
+      );
+
+  final String nom;
+  final String le;
+}
+
+/// La reponse de /api/discussions/:id.
+class Discussion {
+  const Discussion({
+    required this.id,
+    required this.titreDemande,
+    required this.avec,
+    required this.horaire,
+    required this.phraseStatut,
+    required this.prix,
+    required this.messages,
+    required this.peutEcrire,
+    required this.exempleMessage,
+    this.metierAutre,
+    this.lieu,
+    this.conditions,
+    this.serviceTermine,
+    this.declarationDeLaPersonne,
+  });
+
+  factory Discussion.depuisJson(Map<String, dynamic> json) {
+    final termine = _lireFacultatif<Map<String, dynamic>>(json, 'serviceTermine');
+    final declaration = _lireFacultatif<Map<String, dynamic>>(json, 'declarationDeLaPersonne');
+    return Discussion(
+      id: _lire<int>(json, 'id'),
+      titreDemande: _lire<String>(json, 'titreDemande'),
+      avec: _lire<String>(json, 'avec'),
+      horaire: _lire<String>(json, 'horaire'),
+      phraseStatut: _lire<String>(json, 'phraseStatut'),
+      prix: PrixDiscussion.depuisJson(_lire<Map<String, dynamic>>(json, 'prix')),
+      messages: _lireListe(json, 'messages', MessageDiscussion.depuisJson),
+      peutEcrire: _lire<bool>(json, 'peutEcrire'),
+      exempleMessage: _lire<String>(json, 'exempleMessage'),
+      metierAutre: _lireFacultatif<String>(json, 'metierAutre'),
+      lieu: _lireFacultatif<String>(json, 'lieu'),
+      conditions: _lireFacultatif<String>(json, 'conditions'),
+      serviceTermine: termine == null ? null : DateDeclaree.depuisJson(termine, 'par'),
+      declarationDeLaPersonne: declaration == null ? null : DateDeclaree.depuisJson(declaration, 'nom'),
+    );
+  }
+
+  final int id;
+  final String titreDemande;
+
+  /// L'autre personne de la discussion.
+  final String avec;
+  final String horaire;
+  final String phraseStatut;
+  final PrixDiscussion prix;
+  final List<MessageDiscussion> messages;
+  final bool peutEcrire;
+  final String exempleMessage;
+  final String? metierAutre;
+  final String? lieu;
+  final String? conditions;
+
+  /// Present une fois le service declare effectue : on relit, on n'ecrit plus.
+  final DateDeclaree? serviceTermine;
+
+  /// Present pour l'employeur quand la personne dit avoir travaille.
+  final DateDeclaree? declarationDeLaPersonne;
+}
