@@ -785,6 +785,61 @@ setTimeout(async () => {
        String(listeVide.vide.aide).startsWith("Une discussion s'ouvre lorsque quelqu'un répond"),
        JSON.stringify(listeVide.vide));
 
+  console.log(SAUT + "--- VOIR LE PROFIL D'UNE PERSONNE ---");
+  const fiche = (id, entetes) => json("/api/personnes/" + id, undefined, entetes);
+  dire("un profil inexistant : 404", (await fiche(999999999, cookieDe(emp.cookie))).code === 404);
+  dire("un employeur n'a pas de fiche publique : 404", (await fiche(emp.id, cookieDe(emp.cookie))).code === 404);
+  const ficheVerifiee = await fiche(verifiee.id, cookieDe(emp.cookie));
+  const fv = ficheVerifiee.donnees || {};
+  dire("la fiche de la personne, avec ce que la plateforme a verifie",
+       ficheVerifiee.code === 200 && fv.nom === "Test verifiee" && fv.verifiee === true &&
+       fv.libelleVerification === "Identité et casier vérifiés" && fv.tarif === "15 000 FCFA" &&
+       fv.peutPublier === true, ficheVerifiee.brut.slice(0, 200));
+  dire("l'avis qu'elle a recu y figure, avec son auteur",
+       fv.avis && fv.avis.nombre >= 1 &&
+       fv.avis.liste.some((a) => a.auteur === "Test emp" && String(a.note).endsWith("sur 5")),
+       JSON.stringify(fv.avis));
+  dire("aucune coordonnee ne sort", !ficheVerifiee.brut.includes("@example.com") && !ficheVerifiee.brut.includes("date_naissance"));
+  const pageFiche = await (await lire("/personnes/" + verifiee.id, emp.cookie)).text();
+  dire("la page du site montre le meme tarif et la meme verification",
+       pageFiche.includes(fv.tarif) && pageFiche.includes(fv.libelleVerification));
+  const ficheVisiteur = await fiche(verifiee.id);
+  dire("un visiteur y accede aussi, comme sur le site, sans bouton pour publier",
+       ficheVisiteur.code === 200 && ficheVisiteur.donnees.peutPublier === false);
+  const confAvecFiche = await json("/api/candidatures/" + cRefusee + "/confirmation", undefined, cookieDe(emp.cookie));
+  dire("l'ecran de choix refuse toujours une decision deja prise", confAvecFiche.code === 409);
+
+  console.log(SAUT + "--- SIGNALER UN PROBLEME DEPUIS L'APPLICATION ---");
+  const formProbleme = (id, entetes) => json("/api/discussions/" + id + "/probleme", undefined, entetes);
+  const envoyerProbleme = (id, texte, entetes) => json("/api/discussions/" + id + "/probleme", { texte }, entetes);
+  const problemesDe = (id, auteurId) =>
+    base.prepare("SELECT COUNT(*) n FROM problemes WHERE candidature_id = ? AND auteur_id = ?").get(id, auteurId).n;
+
+  dire("sans session : 401", (await formProbleme(cRefusee)).code === 401);
+  dire("un tiers : 404", (await formProbleme(cRefusee, cookieDe(autreEmp.cookie))).code === 404);
+  const fp = await formProbleme(cRefusee, cookieDe(emp.cookie));
+  dire("le formulaire nomme la personne concernee et dit ce qui suivra",
+       fp.code === 200 && fp.donnees.autre === "Test trois" && fp.donnees.dejaSignale === false &&
+       fp.donnees.consequences.includes("avertissement à Test trois") &&
+       fp.donnees.apresSignalement.includes("votre demande"), fp.brut);
+  dire("la page du site dit la meme chose",
+       (await (await lire("/probleme/" + cRefusee, emp.cookie)).text()).includes("adresser un avertissement à Test trois"));
+  dire("un texte trop court : 400", (await envoyerProbleme(cRefusee, "court", cookieDe(emp.cookie))).code === 400);
+  const problemeTropLong = await envoyerProbleme(cRefusee, "x".repeat(2001), cookieDe(emp.cookie));
+  dire("un texte trop long est refuse, pas coupe : 400",
+       problemeTropLong.code === 400 && problemesDe(cRefusee, emp.id) === 0, problemeTropLong.brut);
+  const envoiProbleme = await envoyerProbleme(cRefusee, M + " il ne repond plus aux messages",
+                                              { Authorization: "Bearer " + jeton });
+  dire("le signalement part depuis l'application",
+       envoiProbleme.code === 201 && problemesDe(cRefusee, emp.id) === 1, envoiProbleme.brut);
+  dire("un second avant examen : 409",
+       (await envoyerProbleme(cRefusee, M + " encore une fois", cookieDe(emp.cookie))).code === 409);
+  dire("le formulaire dit qu'il est deja envoye", (await formProbleme(cRefusee, cookieDe(emp.cookie))).donnees.dejaSignale === true);
+  const fpPre = await formProbleme(cRefusee, cookieDe(pre3.cookie));
+  dire("de l'autre cote, la phrase parle de sa candidature",
+       fpPre.code === 200 && fpPre.donnees.autre === "Test emp" && fpPre.donnees.apresSignalement.includes("votre candidature"),
+       fpPre.brut);
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");

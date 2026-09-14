@@ -4672,38 +4672,52 @@ app.post("/messages/:id/signaler", exigerConnexion, lireFormulaire, (req, res) =
 // La fiche publique d'une personne porte desormais sa reputation. Elle
 // n'est pas un ornement : c'est la seule chose sur cette page qui vienne
 // d'ailleurs que de la personne elle-meme.
-app.get("/personnes/:id", (req, res) => {
-  const personne = requetes.fichePublique.get(Number(req.params.id));
+// La fiche d'une personne, reunie UNE SEULE FOIS pour le site et
+// l'application.
+function lireFichePublique(personneId, moi) {
+  const personne = requetes.fichePublique.get(personneId);
 
   if (!personne) {
-    return res.status(404).render("message", {
-      titre: "Profil introuvable",
-      texte: "Ce profil n'existe pas, ou il n'est plus disponible.",
-      liens: [{ url: "/recherche", texte: "Retour à la recherche" }],
-    });
+    return {
+      probleme: {
+        code: 404,
+        titre: "Profil introuvable",
+        texte: "Ce profil n'existe pas, ou il n'est plus disponible.",
+        lien: { url: "/recherche", texte: "Retour à la recherche" },
+      },
+    };
   }
 
   // La tranche d'age n'est PAS une information publique. Elle n'apparait
   // que pour l'employeur qui a deja embauche cette personne : a ce
   // moment-la, ils se connaissent et travaillent ensemble. Avant, la
   // divulguer serait exposer une donnee personnelle sans necessite.
-  const moi = res.locals.moi;
   const peutVoirAge = Boolean(moi && moi.role === "employeur" && !moi.est_admin &&
     requetes.embaucheEntre.get({ personne: personne.id, employeur: moi.id }));
 
-  res.render("fiche", {
-    titre: personne.nom,
+  return {
     personne,
     peutVoirAge,
-
     // LA SEULE CHOSE DE CETTE PAGE QUI NE VIENNE PAS D ELLE. Tout le
     // reste - metier, tarif, disponibilites - est declare par la
     // personne. Les avis viennent de ceux qui l ont employee.
-    reputation: Object.assign(reputationDe(Number(req.params.id)), {
-      services: requetes.reputationEtExperience
-        .get({ personne: Number(req.params.id) }).services,
+    reputation: Object.assign(reputationDe(personne.id), {
+      services: requetes.reputationEtExperience.get({ personne: personne.id }).services,
     }),
-    avis: requetes.avisRecus.all(Number(req.params.id)),
+    avis: requetes.avisRecus.all(personne.id),
+  };
+}
+
+app.get("/personnes/:id", (req, res) => {
+  const fiche = lireFichePublique(Number(req.params.id), res.locals.moi);
+  if (fiche.probleme) return afficherProbleme(res, fiche.probleme);
+
+  res.render("fiche", {
+    titre: fiche.personne.nom,
+    personne: fiche.personne,
+    peutVoirAge: fiche.peutVoirAge,
+    reputation: fiche.reputation,
+    avis: fiche.avis,
   });
 });
 
@@ -5046,76 +5060,131 @@ function autreCoteDe(conversation, utilisateur) {
     : { id: conversation.employeurId, nom: conversation.nomEmployeur };
 }
 
-app.get("/probleme/:id", exigerConnexion, (req, res) => {
-  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+// Au-dela, le texte est refuse plutot que coupe en silence : la personne
+// doit savoir que la fin de son message ne partirait pas.
+const PROBLEME_TEXTE_MAX = 2000;
 
-  if (!conversation) {
-    return res.status(404).render("message", {
-      titre: "Discussion introuvable",
-      texte: "Cette discussion n'existe pas, ou elle ne vous concerne pas.",
-      liens: [{ url: "/messages", texte: "Mes messages" }],
-    });
-  }
+const DISCUSSION_INTROUVABLE_PROBLEME = {
+  code: 404,
+  titre: "Discussion introuvable",
+  texte: "Cette discussion n'existe pas, ou elle ne vous concerne pas.",
+  lien: { url: "/messages", texte: "Mes messages" },
+};
 
-  res.render("probleme", {
-    titre: "Signaler un problème",
+function formulaireProbleme(candidatureId, utilisateur) {
+  const conversation = conversationDe(candidatureId, utilisateur);
+  if (!conversation) return { probleme: DISCUSSION_INTROUVABLE_PROBLEME };
+
+  const autre = autreCoteDe(conversation, utilisateur);
+  // Un employeur n'a pas de candidature, il a une demande. Sans cette
+  // information, l'ecran parlait a tout le monde comme s'il ecrivait a une
+  // personne qui cherche du travail.
+  const jeSuisEmployeur = utilisateur.id === conversation.employeurId;
+
+  return {
     conversation,
-    autre: autreCoteDe(conversation, req.utilisateur),
-    // Un employeur n'a pas de candidature, il a une demande. Sans cette
-    // information, l'ecran parlait a tout le monde comme s'il ecrivait a
-    // une personne qui cherche du travail.
-    jeSuisEmployeur: req.utilisateur.id === conversation.employeurId,
+    autre,
+    jeSuisEmployeur,
     dejaSignale: Boolean(requetes.problemeOuvertPour.get({
-      candidature: conversation.id, auteur: req.utilisateur.id,
+      candidature: conversation.id, auteur: utilisateur.id,
     })),
-  });
-});
+    // Ce que la plateforme fait de ce signalement, ecrit AVANT le bouton.
+    consequences: "L'équipe lit votre message et décide : elle peut classer sans suite, " +
+                  `adresser un avertissement à ${autre.nom}, ou suspendre son compte.`,
+    apresSignalement: "Votre discussion reste ouverte. Signaler ne retire pas " +
+                      (jeSuisEmployeur ? "votre demande" : "votre candidature") +
+                      ` et ne prévient pas ${autre.nom}.`,
+  };
+}
 
-app.post("/probleme/:id", exigerConnexion, lireFormulaire, (req, res) => {
-  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+function signalerUnProbleme(candidatureId, utilisateur, saisie) {
+  const formulaire = formulaireProbleme(candidatureId, utilisateur);
+  if (formulaire.probleme) return formulaire;
 
-  if (!conversation) {
-    return res.status(404).render("message", {
-      titre: "Discussion introuvable",
-      texte: "Cette discussion n'existe pas, ou elle ne vous concerne pas.",
-      liens: [{ url: "/messages", texte: "Mes messages" }],
-    });
-  }
-
-  const texte = String(req.body.texte || "").trim().slice(0, 2000);
+  const { conversation, autre } = formulaire;
+  const retourFormulaire = { url: "/probleme/" + conversation.id, texte: "Revenir au formulaire" };
+  const texte = String(saisie || "").trim();
 
   if (texte.length < 10) {
-    return res.status(400).render("message", {
-      titre: "Décrivez le problème",
-      texte: "Quelques mots suffisent, mais l'équipe doit comprendre ce qui " +
-             "s'est passé pour pouvoir agir.",
-      liens: [{ url: "/probleme/" + conversation.id, texte: "Revenir au formulaire" }],
-    });
+    return {
+      conversation,
+      probleme: {
+        code: 400,
+        titre: "Décrivez le problème",
+        texte: "Quelques mots suffisent, mais l'équipe doit comprendre ce qui " +
+               "s'est passé pour pouvoir agir.",
+        lien: retourFormulaire,
+      },
+    };
+  }
+
+  if (texte.length > PROBLEME_TEXTE_MAX) {
+    return {
+      conversation,
+      probleme: {
+        code: 400,
+        titre: "Message trop long",
+        texte: `Un signalement ne peut pas dépasser ${PROBLEME_TEXTE_MAX} caractères.`,
+        lien: retourFormulaire,
+      },
+    };
   }
 
   // Un second signalement sur la meme discussion, avant que le premier
   // ait ete examine, n'apprend rien de plus a l'equipe.
-  if (requetes.problemeOuvertPour.get({ candidature: conversation.id, auteur: req.utilisateur.id })) {
-    return res.status(409).render("message", {
-      titre: "Signalement déjà envoyé",
-      texte: "Vous avez déjà signalé un problème sur cette discussion. " +
-             "L'équipe ne l'a pas encore examiné.",
-      liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
-    });
+  if (formulaire.dejaSignale) {
+    return {
+      conversation,
+      probleme: {
+        code: 409,
+        titre: "Signalement déjà envoyé",
+        texte: "Vous avez déjà signalé un problème sur cette discussion. " +
+               "L'équipe ne l'a pas encore examiné.",
+        lien: { url: "/messages/" + conversation.id, texte: "Retour à la discussion" },
+      },
+    };
   }
 
   requetes.signalerProbleme.run({
     candidature: conversation.id,
-    auteur: req.utilisateur.id,
-    vise: autreCoteDe(conversation, req.utilisateur).id,
+    auteur: utilisateur.id,
+    vise: autre.id,
     texte,
   });
 
-  res.render("message", {
+  return {
+    conversation,
+    ok: true,
     titre: "Signalement envoyé",
     texte: "L'équipe PamConnect a reçu votre message et va l'examiner. " +
            "Votre discussion reste ouverte : rien n'a changé pour vous.",
-    liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
+  };
+}
+
+app.get("/probleme/:id", exigerConnexion, (req, res) => {
+  const formulaire = formulaireProbleme(Number(req.params.id), req.utilisateur);
+  if (formulaire.probleme) return afficherProbleme(res, formulaire.probleme);
+
+  res.render("probleme", {
+    titre: "Signaler un problème",
+    conversation: formulaire.conversation,
+    autre: formulaire.autre,
+    jeSuisEmployeur: formulaire.jeSuisEmployeur,
+    dejaSignale: formulaire.dejaSignale,
+    consequences: formulaire.consequences,
+    apresSignalement: formulaire.apresSignalement,
+    texteMax: PROBLEME_TEXTE_MAX,
+  });
+});
+
+app.post("/probleme/:id", exigerConnexion, lireFormulaire, (req, res) => {
+  const resultat = signalerUnProbleme(Number(req.params.id), req.utilisateur, req.body.texte);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
+  res.render("message", {
+    titre: resultat.titre,
+    texte: resultat.texte,
+    liens: [{ url: "/messages/" + resultat.conversation.id, texte: "Retour à la discussion" }],
   });
 });
 
@@ -6431,6 +6500,7 @@ app.get("/api/candidatures/:id/confirmation", (req, res) => {
   // adresse. Le lieu reste general, comme sur le site.
   res.json({
     candidatureId: c.id,
+    prestataireId: c.prestataireId,
     nom: c.nomPrestataire,
     metier: c.metierPrestataire || null,
     note: notePersonne({ nbAvis: reputation.nombre, moyenne: reputation.moyenne, services: reputation.services }),
@@ -6766,6 +6836,86 @@ app.post("/api/demandes/:id/retirer", (req, res) => {
   if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
 
   res.json({ texte: resultat.texte });
+});
+
+// --- La fiche d'une personne depuis l'application -------------------
+//
+// Publique, comme sur le site : l'application la montre a l'employeur
+// qui hesite, et elle ne contient que des informations choisies une par
+// une.
+app.get("/api/personnes/:id", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  const fiche = lireFichePublique(Number(req.params.id), moi);
+  if (fiche.probleme) return erreurApi(res, fiche.probleme.code, fiche.probleme.texte);
+
+  const { personne: p, peutVoirAge, reputation, avis } = fiche;
+  const verifiee = p.statut_verification === "verifie";
+
+  res.json({
+    id: p.id,
+    nom: p.nom,
+    metier: p.metier || null,
+    verifiee,
+    libelleVerification: verifiee ? "Identité et casier vérifiés" : "Identité non vérifiée",
+    note: notePersonne({ nbAvis: reputation.nombre, moyenne: reputation.moyenne, services: reputation.services }),
+    badges: badgesDe(p).filter((b) => b.cle !== "verifie").map((b) => b.texte),
+    trancheAge: peutVoirAge ? trancheAge(p.date_naissance) : null,
+    lieu: [p.quartier, p.arrondissement].filter(Boolean).join(", ") || null,
+    disponibilites: disponibilitesLisibles(p.disponibilites).map((c) => ({
+      jour: c.jour.charAt(0).toUpperCase() + c.jour.slice(1),
+      moments: c.moments.join(", "),
+    })),
+    tarif: formaterTarif(p.tarif),
+    avis: {
+      moyenne: reputation.nombre > 0 ? `${moyenneLisible(reputation.moyenne)} sur 5` : null,
+      nombre: reputation.nombre,
+      liste: avis.map((a) => ({
+        note: `${moyenneLisible(a.note)} sur 5`,
+        auteur: a.nomAuteur,
+        titreDemande: a.titreAnnonce || null,
+        commentaire: a.commentaire || null,
+        // Le sens d'un critere depend du role de celui qui a ECRIT l'avis.
+        criteres: criteresAvis(a.roleAuteur === "employeur")
+          .filter((critere) => a[critere.cle])
+          .map((critere) => `${critere.libelle} : ${a[critere.cle]} sur 5`),
+        date: dateLisible(a.cree_le),
+      })),
+    },
+    peutPublier: Boolean(moi && moi.role === "employeur" && !moi.est_admin),
+  });
+});
+
+// --- Signaler un probleme depuis l'application ----------------------
+app.get("/api/discussions/:id/probleme", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const formulaire = formulaireProbleme(Number(req.params.id), moi);
+  if (formulaire.probleme) return erreurApi(res, formulaire.probleme.code, formulaire.probleme.texte);
+
+  res.json({
+    titreDemande: formulaire.conversation.titreAnnonce,
+    autre: formulaire.autre.nom,
+    dejaSignale: formulaire.dejaSignale,
+    consequences: formulaire.consequences,
+    apresSignalement: formulaire.apresSignalement,
+    texteMax: PROBLEME_TEXTE_MAX,
+  });
+});
+
+app.post("/api/discussions/:id/probleme", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const saisie = req.body && req.body.texte;
+  if (saisie != null && typeof saisie !== "string") {
+    return erreurApi(res, 400, "Le signalement envoyé n'a pas la forme attendue.");
+  }
+
+  const resultat = signalerUnProbleme(Number(req.params.id), moi, saisie);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.status(201).json({ texte: resultat.texte });
 });
 
 app.use((req, res) => {

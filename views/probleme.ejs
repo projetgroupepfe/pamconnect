@@ -43,7 +43,7 @@
         <form action="/probleme/<%= conversation.id %>" method="POST">
           <div class="champ">
             <label for="texte">Que s'est-il passé ?</label>
-            <textarea id="texte" name="texte" rows="6" maxlength="2000" required
+            <textarea id="texte" name="texte" rows="6" maxlength="<%= texteMax %>" required
                       placeholder="Décrivez la situation avec vos mots."></textarea>
             <p class="aide">
               Vous n'avez pas besoin de montrer un message. Racontez ce qui
@@ -56,16 +56,10 @@
               qu'elle declenche, sinon elle n'ose pas le faire. %>
           <div class="carte confiance">
             <h3>Ce qui se passe ensuite</h3>
-            <p>
-              L'équipe lit votre message et décide : elle peut classer sans
-              suite, adresser un avertissement à <%= autre.nom %>, ou
-              suspendre son compte.
-            </p>
-            <p class="aide">
-              Votre discussion reste ouverte. Signaler ne retire pas
-              <% if (jeSuisEmployeur) { %>votre demande<% } else { %>votre candidature<% } %>
-              et ne prévient pas <%= autre.nom %>.
-            </p>
+            <%# Les deux phrases viennent de formulaireProbleme :
+                l'application lit les memes. %>
+            <p><%= consequences %></p>
+            <p class="aide"><%= apresSignalement %></p>
           </div>
 
           <div class="actions">
