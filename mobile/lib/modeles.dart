@@ -599,11 +599,13 @@ class Discussion {
     this.conditions,
     this.serviceTermine,
     this.declarationDeLaPersonne,
+    this.avis,
   });
 
   factory Discussion.depuisJson(Map<String, dynamic> json) {
     final termine = _lireFacultatif<Map<String, dynamic>>(json, 'serviceTermine');
     final declaration = _lireFacultatif<Map<String, dynamic>>(json, 'declarationDeLaPersonne');
+    final avis = _lireFacultatif<Map<String, dynamic>>(json, 'avis');
     return Discussion(
       id: _lire<int>(json, 'id'),
       titreDemande: _lire<String>(json, 'titreDemande'),
@@ -621,6 +623,7 @@ class Discussion {
       conditions: _lireFacultatif<String>(json, 'conditions'),
       serviceTermine: termine == null ? null : DateDeclaree.depuisJson(termine, 'par'),
       declarationDeLaPersonne: declaration == null ? null : DateDeclaree.depuisJson(declaration, 'nom'),
+      avis: avis == null ? null : AvisDuService.depuisJson(avis),
     );
   }
 
@@ -650,4 +653,145 @@ class Discussion {
 
   /// Present pour l'employeur quand la personne dit avoir travaille.
   final DateDeclaree? declarationDeLaPersonne;
+
+  /// Present une fois le service termine : les avis donnes et recus.
+  final AvisDuService? avis;
+}
+
+/// Une note de l'echelle : "5 sur 5, Excellent".
+class NiveauNote {
+  const NiveauNote({required this.note, required this.libelle});
+
+  factory NiveauNote.depuisJson(Map<String, dynamic> json) => NiveauNote(
+        note: _lire<int>(json, 'note'),
+        libelle: _lire<String>(json, 'libelle'),
+      );
+
+  final int note;
+  final String libelle;
+}
+
+/// Un critere facultatif, propre au role de la personne qui note.
+class CritereAvis {
+  const CritereAvis({required this.cle, required this.libelle});
+
+  factory CritereAvis.depuisJson(Map<String, dynamic> json) => CritereAvis(
+        cle: _lire<String>(json, 'cle'),
+        libelle: _lire<String>(json, 'libelle'),
+      );
+
+  /// Ce qui part au serveur : "critere1"...
+  final String cle;
+  final String libelle;
+}
+
+/// Le formulaire Donner mon avis, tel que le serveur le decrit.
+class FormulaireAvis {
+  const FormulaireAvis({
+    required this.nomVise,
+    required this.titreDemande,
+    required this.echelle,
+    required this.criteres,
+    required this.exempleCommentaire,
+    required this.commentaireMax,
+  });
+
+  factory FormulaireAvis.depuisJson(Map<String, dynamic> json) => FormulaireAvis(
+        nomVise: _lire<String>(json, 'nomVise'),
+        titreDemande: _lire<String>(json, 'titreDemande'),
+        echelle: _lireListe(json, 'echelle', NiveauNote.depuisJson),
+        criteres: _lireListe(json, 'criteres', CritereAvis.depuisJson),
+        exempleCommentaire: _lire<String>(json, 'exempleCommentaire'),
+        commentaireMax: _lire<int>(json, 'commentaireMax'),
+      );
+
+  final String nomVise;
+  final String titreDemande;
+  final List<NiveauNote> echelle;
+  final List<CritereAvis> criteres;
+  final String exempleCommentaire;
+  final int commentaireMax;
+}
+
+/// L'avis que la personne connectee a donne.
+class MonAvis {
+  const MonAvis({
+    required this.note,
+    required this.publieLe,
+    required this.masque,
+    this.commentaire,
+    this.motifMasquage,
+  });
+
+  factory MonAvis.depuisJson(Map<String, dynamic> json) => MonAvis(
+        note: _lire<int>(json, 'note'),
+        publieLe: _lire<String>(json, 'publieLe'),
+        masque: _lire<bool>(json, 'masque'),
+        commentaire: _lireFacultatif<String>(json, 'commentaire'),
+        motifMasquage: _lireFacultatif<String>(json, 'motifMasquage'),
+      );
+
+  final int note;
+  final String publieLe;
+  final bool masque;
+  final String? commentaire;
+  final String? motifMasquage;
+}
+
+/// L'avis que l'autre personne a ecrit sur la personne connectee.
+class AvisRecu {
+  const AvisRecu({
+    required this.id,
+    required this.note,
+    required this.auteur,
+    required this.masque,
+    required this.signale,
+    required this.peutSignaler,
+    this.commentaire,
+  });
+
+  factory AvisRecu.depuisJson(Map<String, dynamic> json) => AvisRecu(
+        id: _lire<int>(json, 'id'),
+        note: _lire<int>(json, 'note'),
+        auteur: _lire<String>(json, 'auteur'),
+        masque: _lire<bool>(json, 'masque'),
+        signale: _lire<bool>(json, 'signale'),
+        peutSignaler: _lire<bool>(json, 'peutSignaler'),
+        commentaire: _lireFacultatif<String>(json, 'commentaire'),
+      );
+
+  final int id;
+  final int note;
+  final String auteur;
+  final bool masque;
+  final bool signale;
+  final bool peutSignaler;
+  final String? commentaire;
+}
+
+/// Les deux avis d'un service termine, chacun absent tant qu'il n'est pas donne.
+class AvisDuService {
+  const AvisDuService({this.monAvis, this.avisRecu});
+
+  factory AvisDuService.depuisJson(Map<String, dynamic> json) {
+    final monAvis = _lireFacultatif<Map<String, dynamic>>(json, 'monAvis');
+    final avisRecu = _lireFacultatif<Map<String, dynamic>>(json, 'avisRecu');
+    return AvisDuService(
+      monAvis: monAvis == null ? null : MonAvis.depuisJson(monAvis),
+      avisRecu: avisRecu == null ? null : AvisRecu.depuisJson(avisRecu),
+    );
+  }
+
+  final MonAvis? monAvis;
+  final AvisRecu? avisRecu;
+}
+
+/// Une reponse du serveur qui porte seulement sa phrase.
+class TexteDuServeur {
+  const TexteDuServeur({required this.texte});
+
+  factory TexteDuServeur.depuisJson(Map<String, dynamic> json) =>
+      TexteDuServeur(texte: _lire<String>(json, 'texte'));
+
+  final String texte;
 }

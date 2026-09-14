@@ -469,4 +469,50 @@ void main() {
     await tester.pumpAndSettle();
     expect(resultat, isTrue);
   });
+
+  group("les avis", () {
+    test("le formulaire d'avis vient du serveur", () {
+      final lu = FormulaireAvis.depuisJson({
+        'nomVise': 'nom 1',
+        'titreDemande': 'titre 1',
+        'echelle': [
+          {'note': 5, 'libelle': 'Excellent'},
+          {'note': 1, 'libelle': 'Mauvais'},
+        ],
+        'criteres': [
+          {'cle': 'critere1', 'libelle': 'critere 1'},
+        ],
+        'exempleCommentaire': 'exemple 1',
+        'commentaireMax': 1000,
+      });
+      expect(lu.echelle.first.libelle, 'Excellent');
+      expect(lu.criteres.single.cle, 'critere1');
+      expect(lu.commentaireMax, 1000);
+    });
+
+    test('les avis d un service termine, chacun absent tant qu il n est pas donne', () {
+      final lu = AvisDuService.depuisJson({
+        'monAvis': null,
+        'avisRecu': {
+          'id': 3,
+          'note': 2,
+          'commentaire': null,
+          'auteur': 'nom 1',
+          'masque': false,
+          'signale': false,
+          'peutSignaler': true,
+        },
+      });
+      expect(lu.monAvis, isNull);
+      expect(lu.avisRecu!.peutSignaler, isTrue);
+      expect(lu.avisRecu!.commentaire, isNull);
+    });
+
+    test('un avis recu sans sa decision de signalement est signale, pas devine', () {
+      expect(
+        () => AvisRecu.depuisJson({'id': 3, 'note': 2, 'auteur': 'nom 1', 'masque': false, 'signale': false}),
+        throwsA(isA<FormeInattendue>()),
+      );
+    });
+  });
 }

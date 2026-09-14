@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'ecran_avis.dart';
 import 'ecran_connexion.dart';
 import 'elements.dart';
 import 'modeles.dart';
@@ -30,6 +31,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
   bool _envoi = false;
   String? _erreurEnvoi;
   bool _declaration = false;
+  bool _signalementAvis = false;
 
   /// Les messages dont le signalement est en cours d'envoi.
   final Set<int> _signalements = {};
@@ -131,6 +133,187 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
     }
   }
 
+  Future<void> _donnerAvis() async {
+    final texte = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => EcranAvis(api: widget.api, candidatureId: widget.discussionId)),
+    );
+    if (!mounted) return;
+    await _charger(allerEnBas: true);
+    if (!mounted || texte == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
+  }
+
+  Future<void> _signalerAvis(AvisRecu avis) async {
+    if (_signalementAvis) return;
+    setState(() => _signalementAvis = true);
+
+    // La phrase du serveur, qu'il ait accepte ou refuse : elle est toujours
+    // montree.
+    String message;
+    try {
+      message = (await widget.api.signalerAvis(avis.id)).texte;
+    } on ErreurApi catch (erreur) {
+      if (!mounted) return;
+      if (erreur.sessionPerdue) {
+        revenirALaConnexion(context, widget.api, messageSessionPerdue);
+        return;
+      }
+      message = erreur.message;
+    }
+
+    if (!mounted) return;
+    await _charger(allerEnBas: true);
+    if (!mounted) return;
+    setState(() => _signalementAvis = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// UN AVIS SUPPOSE UN SERVICE : cette partie n'existe qu'une fois le
+  /// service termine.
+  List<Widget> _sectionAvis(BuildContext context, Discussion discussion, AvisDuService avis) {
+    final texte = Theme.of(context).textTheme;
+    final gris = texte.bodyMedium?.copyWith(color: Couleurs.encreDouce);
+    final aide = texte.bodyMedium?.copyWith(color: Couleurs.encrePale);
+    const fort = TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre);
+    final monAvis = avis.monAvis;
+    final avisRecu = avis.avisRecu;
+
+    return [
+      const SizedBox(height: 16),
+      const TitreSection('Votre avis'),
+      if (monAvis != null)
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: '${monAvis.note} sur 5', style: fort),
+                      TextSpan(text: '  votre avis, publié le ${monAvis.publieLe}', style: aide),
+                    ],
+                  ),
+                ),
+                if (monAvis.commentaire != null) ...[
+                  const SizedBox(height: 8),
+                  Text(monAvis.commentaire!, style: texte.bodyLarge?.copyWith(color: Couleurs.encre)),
+                ],
+                const SizedBox(height: 8),
+                if (monAvis.masque) ...[
+                  const Pastille(texte: "Masqué par l'équipe", couleur: Couleurs.encreDouce),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Votre avis n'apparaît plus nulle part et ne compte plus dans la moyenne "
+                    'de cette personne.',
+                    style: aide,
+                  ),
+                  if (monAvis.motifMasquage != null)
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          const TextSpan(text: 'Motif : ', style: fort),
+                          TextSpan(text: monAvis.motifMasquage),
+                        ],
+                      ),
+                      style: aide,
+                    ),
+                  Text(
+                    "L'équipe masque un avis lorsqu'il est faux, insultant ou discriminatoire.",
+                    style: aide,
+                  ),
+                ] else
+                  Text(
+                    "Un seul avis par service, et il ne se modifie pas : un avis que l'on "
+                    'pourrait réécrire deviendrait un moyen de pression.',
+                    style: aide,
+                  ),
+              ],
+            ),
+          ),
+        )
+      else
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(text: "Ce service est terminé. Dites ce qui s'est passé à "),
+                      TextSpan(text: discussion.avec, style: fort),
+                      const TextSpan(text: '. Votre avis aidera les suivants à décider.'),
+                    ],
+                  ),
+                  style: gris,
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: _donnerAvis,
+                  icon: const Icon(Icons.star_border),
+                  label: const Text('Donner mon avis'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      // Ce que l'autre a ecrit, avec le seul recours possible : le signaler.
+      if (avisRecu != null) ...[
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: '${avisRecu.note} sur 5', style: fort),
+                      TextSpan(text: '  ce que ${avisRecu.auteur} a écrit sur vous', style: aide),
+                    ],
+                  ),
+                ),
+                if (avisRecu.commentaire != null) ...[
+                  const SizedBox(height: 8),
+                  Text(avisRecu.commentaire!, style: texte.bodyLarge?.copyWith(color: Couleurs.encre)),
+                ],
+                const SizedBox(height: 8),
+                if (avisRecu.masque) ...[
+                  const Pastille(texte: "Masqué par l'équipe", couleur: Couleurs.encreDouce),
+                  const SizedBox(height: 8),
+                  Text("Il n'apparaît plus nulle part et ne compte plus dans votre moyenne.", style: aide),
+                ] else if (avisRecu.signale) ...[
+                  const Pastille(texte: 'Signalé', fond: Couleurs.ambreFond, couleur: Couleurs.ambre),
+                  const SizedBox(height: 8),
+                  Text("L'équipe examine cet avis. Il reste visible en attendant.", style: aide),
+                ] else ...[
+                  Text(
+                    "Vous ne pouvez pas l'effacer. S'il est faux, insultant ou discriminatoire, "
+                    "l'équipe peut le masquer après examen.",
+                    style: aide,
+                  ),
+                  if (avisRecu.peutSignaler) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _signalementAvis ? null : () => _signalerAvis(avisRecu),
+                      icon: const Icon(Icons.info_outline),
+                      label: const Text('Signaler cet avis'),
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    ];
+  }
+
   Future<void> _signaler(MessageDiscussion message) async {
     if (_signalements.contains(message.id)) return;
     setState(() => _signalements.add(message.id));
@@ -215,6 +398,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
     final metierAutre = discussion.metierAutre;
     final serviceTermine = discussion.serviceTermine;
     final declaration = discussion.declarationDeLaPersonne;
+    final avis = discussion.avis;
     final erreurEnvoi = _erreurEnvoi;
 
     return [
@@ -465,6 +649,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
           ),
         ),
       ],
+      if (avis != null) ..._sectionAvis(context, discussion, avis),
     ];
   }
 }

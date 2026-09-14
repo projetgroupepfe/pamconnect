@@ -147,6 +147,24 @@ class ApiPamConnect {
     _interpreter(() => ActionFaite.depuisJson(donnees));
   }
 
+  /// Le formulaire Donner mon avis, apres un service termine.
+  Future<FormulaireAvis> formulaireAvis(int candidatureId) async {
+    final donnees = await _appeler('/api/avis/$candidatureId');
+    return _interpreter(() => FormulaireAvis.depuisJson(donnees));
+  }
+
+  /// Publie l'avis tel que la personne l'a saisi : c'est le serveur qui
+  /// verifie, et qui explique un refus.
+  Future<TexteDuServeur> donnerAvis(int candidatureId, Map<String, dynamic> champs) async {
+    final donnees = await _appeler('/api/avis/$candidatureId', corps: champs);
+    return _interpreter(() => TexteDuServeur.depuisJson(donnees));
+  }
+
+  Future<TexteDuServeur> signalerAvis(int avisId) async {
+    final donnees = await _appeler('/api/avis/$avisId/signaler', corps: const {});
+    return _interpreter(() => TexteDuServeur.depuisJson(donnees));
+  }
+
   Future<void> _decider(int candidatureId, String decision) async {
     final donnees = await _appeler('/api/candidatures/$candidatureId/$decision', corps: const {});
     _interpreter(() => DecisionPrise.depuisJson(donnees));
