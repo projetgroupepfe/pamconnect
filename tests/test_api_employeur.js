@@ -482,6 +482,11 @@ setTimeout(async () => {
   dire("la page du site montre les memes messages, le meme prix et le meme statut",
        pageDiscussion.includes(M + " bonjour depuis le telephone") && pageDiscussion.includes(M + " reponse depuis le site") &&
        pageDiscussion.includes(de.prix.lignes[2].montant) && pageDiscussion.includes(de.phraseStatut));
+  // Des bulles, pas des cadres : presentes en cartes blanches, les
+  // messages se confondaient avec le champ pour ecrire.
+  dire("sur le site, les messages sont des bulles, la sienne a part",
+       pageDiscussion.includes('class="bulle bulle-mienne"') && pageDiscussion.includes('class="bulle"') &&
+       !pageDiscussion.includes("message-mien"));
 
   const vuePre = await discussion(cChoisie, cookieDe(verifiee.cookie));
   const dp = vuePre.donnees || {};

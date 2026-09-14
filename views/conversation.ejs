@@ -82,8 +82,8 @@
           const deMoi = (jeSuisEmployeur && message.auteur_id === conversation.employeurId)
                      || (!jeSuisEmployeur && message.auteur_id === conversation.prestataireId);
         %>
-        <div class="carte<%= deMoi ? " message-mien" : "" %>">
-          <p class="aide">
+        <div class="bulle<%= deMoi ? " bulle-mienne" : "" %>">
+          <p class="bulle-auteur">
             <strong><%= deMoi ? "Vous" : message.nomAuteur %></strong>
             · <%= message.cree_le %>
             <% if (message.signale) { %> · signalé à l'équipe<% } %>

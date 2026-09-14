@@ -313,11 +313,32 @@ a:hover { color: var(--bleu-fonce); }
 }
 .en-ligne { display: inline; }
 
-/* Ses propres messages, distingues sans couleur criarde : un liseré
-   du côté de la marge suffit à savoir qui parle d'un coup d'œil. */
-.message-mien {
-  border-left: 3px solid var(--bleu);
-  margin-left: 1.25rem;
+/* LES MESSAGES SONT DES BULLES, PAS DES CARTES. Presentes comme des
+   cadres blancs bordes, ils ressemblaient au champ pour ecrire : on
+   croyait devoir les remplir. Une bulle sans cadre, collee a un bord, se
+   lit comme une parole ; le seul cadre blanc restant est celui ou l'on
+   ecrit. */
+.bulle {
+  width: fit-content;
+  max-width: 85%;
+  margin: 0 auto .75rem 0;
+  padding: .6rem .9rem .7rem;
+  background-color: var(--trait);
+  border-radius: var(--rayon) var(--rayon) var(--rayon) 4px;
+}
+.bulle p { margin: 0; }
+.bulle p + p { margin-top: .35rem; }
+/* Sur ces fonds, le gris le plus pale ne se lirait pas assez. */
+.bulle .aide,
+.bulle-auteur { color: var(--encre-douce); font-size: .85rem; }
+.bulle-auteur { margin-bottom: .2rem; }
+
+/* Ses propres messages, a droite et dans le bleu clair de la marque :
+   on sait qui parle d'un coup d'oeil, sans couleur criarde. */
+.bulle-mienne {
+  margin: 0 0 .75rem auto;
+  background-color: var(--bleu-clair);
+  border-radius: var(--rayon) var(--rayon) 4px var(--rayon);
 }
 
 .vide {
