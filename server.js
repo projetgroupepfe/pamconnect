@@ -543,7 +543,8 @@ const requetes = {
   // Verifie en UNE requete que la candidature existe ET que l'annonce
   // concernee appartient bien a l'employeur connecte.
   candidatureDeMonAnnonce: db.prepare(`
-    SELECT c.id, u.statut_verification AS verificationPrestataire
+    SELECT c.id, c.statut, a.id AS annonceId, a.annulee AS demandeFermee,
+           u.statut_verification AS verificationPrestataire
     FROM candidatures c
     JOIN annonces     a ON a.id = c.annonce_id
     JOIN utilisateurs u ON u.id = c.prestataire_id
@@ -557,6 +558,8 @@ const requetes = {
   candidatureAConfirmer: db.prepare(`
     SELECT c.id,
            c.statut,
+           a.id                  AS annonceId,
+           a.annulee             AS demandeFermee,
            p.id                  AS prestataireId,
            p.nom                 AS nomPrestataire,
            p.metier              AS metierPrestataire,
@@ -1772,7 +1775,14 @@ function phraseCandidature(statut, jeSuisEmployeur, demande) {
       : "L'employeur a refusé votre candidature";
   }
 
-  if (jeSuisEmployeur) return "En attente de votre décision";
+  // UNE DEMANDE RETIREE N'ATTEND PLUS DE DECISION. Ses reponses restent
+  // en attente, mais plus rien ne peut les trancher : lire "En attente de
+  // votre decision" ferait chercher un bouton qui n'existe plus.
+  if (jeSuisEmployeur) {
+    return demande && demande.demandeFermee
+      ? "Vous avez retiré cette demande"
+      : "En attente de votre décision";
+  }
 
   // ELLE ATTEND, MAIS QUOI ? Personne n'a tranche sa candidature, et
   // pourtant la demande a pu disparaitre entre-temps. Lui laisser lire
@@ -3125,20 +3135,24 @@ function demandesDeLEmployeur(employeurId) {
       peutMettreEnAvant: !fermee && !enAvant,
       peutRetirer: !fermee,
       candidatures: candidatures.map((c) => {
-        const enAttente = c.statut === "en attente";
+        // UNE DECISION NE SE PREND QU'UNE FOIS, ET SUR UNE DEMANDE OUVERTE.
+        // Retirer une demande laisse ses reponses en attente : sans la
+        // seconde condition, "Choisir" restait propose alors que la somme
+        // bloquee avait deja ete rendue.
+        const decidable = c.statut === "en attente" && !fermee;
         const verifiee = c.verificationPrestataire === "verifie";
         return {
           ...c,
-          phrase: phraseCandidature(c.statut, true, { quelquUnChoisi: pourvue }),
+          phrase: phraseCandidature(c.statut, true, { quelquUnChoisi: pourvue, demandeFermee: fermee }),
           libelleVerification: libelleVerification(c.verificationPrestataire),
           note: notePersonne({ nbAvis: c.nbAvis, moyenne: c.moyenne, services: c.servicesTermines }),
           experience: libelleExperience(c.experiencePrestataire),
           disponibilites: disponibilitesLisibles(c.disponibilitesPrestataire).map((d) => d.jour).join(", "),
           // On n'engage personne dont l'identite n'est pas verifiee ;
           // refuser, en revanche, reste toujours possible.
-          peutChoisir: enAttente && verifiee,
-          peutRefuser: enAttente,
-          attendVerification: enAttente && !verifiee,
+          peutChoisir: decidable && verifiee,
+          peutRefuser: decidable,
+          attendVerification: decidable && !verifiee,
         };
       }),
     };
@@ -4095,98 +4109,110 @@ app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (
 //
 // Refuser, en revanche, reste immediat : on ne s'engage a rien en
 // refusant, et faire confirmer un refus ne protegerait personne.
-app.get("/candidatures/:id/confirmer", exigerConnexion, (req, res) => {
-  const c = requetes.candidatureAConfirmer.get(Number(req.params.id), req.utilisateur.id);
+//
+// CONFIRMER ET DECIDER SONT ECRITS UNE SEULE FOIS. Le site et
+// l'application passent par les memes fonctions : les memes portes, les
+// memes consequences, les memes phrases.
 
-  if (!c) {
-    return res.status(404).render("message", {
+const TEXTE_IDENTITE_NON_VERIFIEE =
+  "L'identité de cette personne n'a pas encore été vérifiée par PamConnect. " +
+  "Vous pourrez la choisir dès que son dossier sera validé.";
+
+// Les portes d'une decision, dans l'ordre ou elles comptent. Renvoie null
+// si la decision peut etre prise.
+function problemeDeDecision(candidature, statut) {
+  if (!candidature) {
+    return {
+      code: 404,
       titre: "Candidature introuvable",
       texte: "Cette candidature n'existe pas, ou elle ne concerne aucune de vos demandes.",
-      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-    });
+    };
   }
 
-  if (c.statut !== "en attente") {
-    return res.status(409).render("message", {
+  // UNE DECISION NE SE REPREND PAS. L'ecran de confirmation le verifiait
+  // deja, mais pas l'envoi : un employeur pouvait choisir une deuxieme
+  // personne, ou refuser apres coup celle qu'il avait choisie.
+  if (candidature.statut !== "en attente") {
+    return {
+      code: 409,
       titre: "Décision déjà prise",
       texte: "Cette candidature a déjà reçu une réponse.",
-      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-    });
+    };
   }
 
-  // La meme regle qu'a l'acceptation, verifiee ici aussi : sans quoi
-  // l'ecran promettrait une action que le serveur refusera ensuite.
-  if (c.verificationPrestataire !== "verifie") {
-    return res.status(403).render("message", {
-      titre: "Vérification requise",
-      texte: "L'identité de cette personne n'a pas encore été vérifiée par PamConnect. " +
-             "Vous pourrez la choisir dès que son dossier sera validé.",
-      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-    });
-  }
-
-  // On dit AVANT ce qui va se passer : la demande sera retiree, et les
-  // autres personnes recevront un refus. Une consequence decouverte
-  // apres coup est une mauvaise surprise.
-  const autres = requetes.autresEnAttente.get({
-    annonce: requetes.annonceDeCandidature.get(c.id).id,
-    choisie: c.id,
-  }).n;
-
-  // LE MOMENT DE LA DECISION : sa note doit etre sur cet ecran, pas a
-  // un clic de la.
-  const saReputation = reputationDe(c.prestataireId);
-
-  res.render("confirmer-embauche", {
-    titre: "Confirmer votre choix",
-    c,
-    autres,
-    reputation: {
-      nombre: saReputation.nombre,
-      moyenne: saReputation.moyenne,
-      services: requetes.reputationEtExperience.get({ personne: c.prestataireId }).services,
-    },
-  });
-});
-
-app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => {
-  const candidatureId = Number(req.body.candidatureId);
-  const nouveauStatut = req.body.statut;
-
-  if (nouveauStatut !== "acceptee" && nouveauStatut !== "refusee") {
-    return res.status(400).render("message", {
-      titre: "Decision inconnue",
-      texte: "Une candidature ne peut qu'etre acceptee ou refusee.",
-      liens: [{ url: "/mes-demandes", texte: "Retour a mes demandes" }],
-    });
-  }
-
-  // Une seule requete verifie que la candidature existe, que l'annonce
-  // appartient bien a la personne connectee, et ramene au passage l'etat
-  // de verification du prestataire concerne.
-  const candidature = requetes.candidatureDeMonAnnonce.get(candidatureId, req.utilisateur.id);
-
-  if (!candidature) {
-    return res.status(404).render("message", {
-      titre: "Candidature introuvable",
-      texte: "Cette candidature n'existe pas, ou elle ne concerne aucune de vos demandes.",
-      liens: [{ url: "/mes-demandes", texte: "Retour a mes demandes" }],
-    });
+  // Retirer une demande rend la somme bloquee et laisse ses reponses en
+  // attente : choisir quelqu'un ensuite l'engagerait sans argent bloque.
+  if (candidature.demandeFermee) {
+    return {
+      code: 409,
+      titre: "Demande retirée",
+      texte: "Vous avez retiré cette demande : elle n'attend plus de décision. " +
+             "Les personnes qui vous avaient répondu gardent accès à la discussion.",
+    };
   }
 
   // REGLE METIER : on n'engage personne dont l'identite n'a pas ete verifiee.
   // C'est la promesse centrale de PamConnect ; elle est appliquee ICI,
   // cote serveur, et pas seulement en cachant un bouton dans la page.
-  if (nouveauStatut === "acceptee" && candidature.verificationPrestataire !== "verifie") {
-    return res.status(403).render("message", {
-      titre: "Verification requise",
-      texte: "L'identité de cette personne n'a pas encore été vérifiée par PamConnect. " +
-             "Vous pourrez la choisir dès que son dossier sera validé.",
-      liens: [{ url: "/mes-demandes", texte: "Retour a mes demandes" }],
-    });
+  if (statut === "acceptee" && candidature.verificationPrestataire !== "verifie") {
+    return { code: 403, titre: "Vérification requise", texte: TEXTE_IDENTITE_NON_VERIFIEE };
   }
 
-  requetes.changerStatutCandidature.run(nouveauStatut, candidatureId);
+  return null;
+}
+
+// Ce que l'employeur relit avant de s'engager.
+function confirmationDuChoix(employeurId, candidatureId) {
+  const c = requetes.candidatureAConfirmer.get(candidatureId, employeurId);
+  const probleme = problemeDeDecision(c, "acceptee");
+  if (probleme) return { probleme };
+
+  // On dit AVANT ce qui va se passer : la demande sera retiree, et les
+  // autres personnes recevront un refus. Une consequence decouverte
+  // apres coup est une mauvaise surprise.
+  const autres = requetes.autresEnAttente.get({ annonce: c.annonceId, choisie: c.id }).n;
+
+  // LE MOMENT DE LA DECISION : sa note doit etre sur cet ecran, pas a
+  // un clic de la.
+  const saReputation = reputationDe(c.prestataireId);
+
+  return {
+    c,
+    autres,
+    // Le nombre a part, pour qu'on puisse l'ecrire en gras.
+    refusAnnonces: autres > 0
+      ? {
+          nombre: autres,
+          suite: autres > 1
+            ? "autres personnes qui attendaient recevront un refus."
+            : "autre personne qui attendait recevra un refus.",
+        }
+      : null,
+    reputation: {
+      nombre: saReputation.nombre,
+      moyenne: saReputation.moyenne,
+      services: requetes.reputationEtExperience.get({ personne: c.prestataireId }).services,
+    },
+  };
+}
+
+function deciderCandidature(employeurId, candidatureId, statut) {
+  if (statut !== "acceptee" && statut !== "refusee") {
+    return {
+      probleme: {
+        code: 400,
+        titre: "Décision inconnue",
+        texte: "Une candidature ne peut qu'être acceptée ou refusée.",
+      },
+    };
+  }
+
+  // Une seule requete verifie que la candidature existe, que l'annonce
+  // appartient bien a la personne connectee, et ramene ce qu'il faut pour
+  // decider.
+  const candidature = requetes.candidatureDeMonAnnonce.get(candidatureId, employeurId);
+  const probleme = problemeDeDecision(candidature, statut);
+  if (probleme) return { probleme };
 
   // Choisir quelqu'un POURVOIT la demande. Deux consequences, et elles
   // protegent les memes personnes :
@@ -4197,15 +4223,43 @@ app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => 
   //     patienter reviendrait a leur voler du temps, alors qu'elles
   //     pourraient repondre ailleurs.
   //
-  // C'est ce que demande le cahier des charges : "les autres candidats
-  // recoivent une notification respectueuse de refus". La plateforme
-  // n'envoie pas encore de notification, mais le statut change - et
-  // chacune le voit sur son profil.
-  if (nouveauStatut === "acceptee") {
-    const annonce = requetes.annonceDeCandidature.get(candidatureId);
+  // TOUT OU RIEN : une personne choisie sur une demande restee ouverte
+  // serait exactement le desordre que ces deux consequences evitent.
+  db.transaction(() => {
+    requetes.changerStatutCandidature.run(statut, candidature.id);
+    if (statut === "acceptee") {
+      requetes.refuserLesAutres.run({ annonce: candidature.annonceId, choisie: candidature.id });
+      requetes.annulerAnnonce.run({ id: candidature.annonceId });
+    }
+  })();
 
-    requetes.refuserLesAutres.run({ annonce: annonce.id, choisie: candidatureId });
-    requetes.annulerAnnonce.run({ id: annonce.id });
+  return { ok: true };
+}
+
+app.get("/candidatures/:id/confirmer", exigerConnexion, (req, res) => {
+  const ecran = confirmationDuChoix(req.utilisateur.id, Number(req.params.id));
+
+  if (ecran.probleme) {
+    return res.status(ecran.probleme.code).render("message", {
+      titre: ecran.probleme.titre,
+      texte: ecran.probleme.texte,
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
+    });
+  }
+
+  res.render("confirmer-embauche", Object.assign({ titre: "Confirmer votre choix" }, ecran));
+});
+
+app.post("/candidatures/statut", exigerConnexion, lireFormulaire, (req, res) => {
+  const resultat = deciderCandidature(
+    req.utilisateur.id, Number(req.body.candidatureId), req.body.statut);
+
+  if (resultat.probleme) {
+    return res.status(resultat.probleme.code).render("message", {
+      titre: resultat.probleme.titre,
+      texte: resultat.probleme.texte,
+      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
+    });
   }
 
   // SUR SES DEMANDES, PAS SUR SON PROFIL : il vient d'agir sur une
@@ -5948,6 +6002,72 @@ app.post("/api/demandes", (req, res) => {
 
   res.status(201).json({ id: resultat.id, titre: resultat.titre, texte: resultat.texte });
 });
+
+// --- Choisir ou refuser depuis l'application -----------------------
+//
+// Les memes fonctions que le site : confirmationDuChoix pour l'ecran de
+// relecture, deciderCandidature pour la decision.
+function refusEmployeurApi(res, moi) {
+  if (!moi) {
+    erreurApi(res, 401, "Personne n'est connecté.");
+    return true;
+  }
+  if (moi.est_admin || moi.role !== "employeur") {
+    erreurApi(res, 403, "Cette page est celle des employeurs.");
+    return true;
+  }
+  return false;
+}
+
+app.get("/api/candidatures/:id/confirmation", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEmployeurApi(res, moi)) return;
+
+  const ecran = confirmationDuChoix(moi.id, Number(req.params.id));
+  if (ecran.probleme) return erreurApi(res, ecran.probleme.code, ecran.probleme.texte);
+
+  const { c, reputation, refusAnnonces } = ecran;
+  const detail = detaillerTarif(c.prixAnnonce);
+
+  // Les champs sont choisis un par un : ni email, ni telephone, ni
+  // adresse. Le lieu reste general, comme sur le site.
+  res.json({
+    candidatureId: c.id,
+    nom: c.nomPrestataire,
+    metier: c.metierPrestataire || null,
+    note: notePersonne({ nbAvis: reputation.nombre, moyenne: reputation.moyenne, services: reputation.services }),
+    experience: libelleExperience(c.experiencePrestataire),
+    service: c.metierAnnonce || null,
+    horaire: c.horaireAnnonce || "non précisé",
+    duree: c.dureeAnnonce || null,
+    lieu: [c.quartierAnnonce, c.arrondissementAnnonce].filter(Boolean).join(", ") || null,
+    conditions: c.conditionsAnnonce || null,
+    paiement: detail.brut > 0
+      ? {
+          vousPayez: formaterMontant(detail.brut),
+          commission: formaterMontant(detail.commission),
+          pourcentageCommission: Math.round(TAUX_COMMISSION * 100),
+          recoit: formaterMontant(detail.net),
+        }
+      : null,
+    refusAnnonces,
+  });
+});
+
+function routeDeDecisionApi(statut) {
+  return (req, res) => {
+    const moi = utilisateurConnecte(req);
+    if (refusEmployeurApi(res, moi)) return;
+
+    const resultat = deciderCandidature(moi.id, Number(req.params.id), statut);
+    if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+    res.json({ ok: true });
+  };
+}
+
+app.post("/api/candidatures/:id/choisir", routeDeDecisionApi("acceptee"));
+app.post("/api/candidatures/:id/refuser", routeDeDecisionApi("refusee"));
 
 app.use((req, res) => {
   res.status(404).render("message", {

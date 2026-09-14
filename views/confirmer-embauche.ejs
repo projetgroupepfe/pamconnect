@@ -112,14 +112,12 @@
           <%- include("partiels/icone", { nom: "document" }) %>
           <span>Votre demande sera <strong>retirée de la liste</strong> : quelqu'un a été choisi.</span>
         </li>
-        <% if (autres > 0) { %>
+        <%# La phrase vient de confirmationDuChoix : l'application la lit
+            aussi, et les deux ne peuvent pas diverger. %>
+        <% if (refusAnnonces) { %>
           <li>
             <%- include("partiels/icone", { nom: "refuser" }) %>
-            <span>
-              <strong><%= autres %></strong>
-              autre<%= autres > 1 ? "s personnes qui attendaient recevront" : " personne qui attendait recevra" %>
-              un refus.
-            </span>
+            <span><strong><%= refusAnnonces.nombre %></strong> <%= refusAnnonces.suite %></span>
           </li>
         <% } %>
         <li>

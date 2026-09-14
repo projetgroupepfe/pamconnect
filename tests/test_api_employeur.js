@@ -323,6 +323,118 @@ setTimeout(async () => {
     Object.assign(complet(M + " juste"), { conditions: "x".repeat(300) }), cookieDe(emp.cookie));
   dire("300 caracteres : accepte", juste.code === 201, juste.brut);
 
+  console.log(SAUT + "--- CHOISIR ET REFUSER DEPUIS L'APPLICATION : QUI PEUT ---");
+  const pre3 = await creerCompte("trois", "prestataire", { metier: "menagere", tarif: "15000" });
+  const pre4 = await creerCompte("quatre", "prestataire", { metier: "menagere", tarif: "15000" });
+  const autreEmp = await creerCompte("autreemp", "employeur");
+  crediter(pre3.id, 10);
+  crediter(pre4.id, 10);
+
+  const aChoisir = await json("/api/demandes", complet(M + " a choisir"), cookieDe(emp.cookie));
+  const idAChoisir = aChoisir.donnees.id;
+  for (const p of [verifiee, pre3, pre4]) {
+    await poster("/candidatures", form({ annonceId: String(idAChoisir) }), p.cookie);
+  }
+  const candDe = (p) => base.prepare(
+    "SELECT id FROM candidatures WHERE annonce_id = ? AND prestataire_id = ?").get(idAChoisir, p.id).id;
+  const cChoisie = candDe(verifiee);
+  const cRefusee = candDe(pre3);
+  const cNonVerifiee = candDe(pre4);
+  // Son identite n'est plus verifiee apres avoir repondu : on ne doit pas
+  // pouvoir la choisir.
+  base.prepare("UPDATE utilisateurs SET statut_verification = 'non soumis' WHERE id = ?").run(pre4.id);
+  const statutDe = (id) => base.prepare("SELECT statut FROM candidatures WHERE id = ?").get(id).statut;
+  const confirmation = (id, entetes) => json("/api/candidatures/" + id + "/confirmation", undefined, entetes);
+  const decider = (id, decision, entetes) => json("/api/candidatures/" + id + "/" + decision, {}, entetes);
+
+  dire("l'ecran de confirmation sans session : 401", (await confirmation(cChoisie)).code === 401);
+  dire("la personne elle-meme : 403", (await confirmation(cChoisie, cookieDe(verifiee.cookie))).code === 403);
+  dire("un autre employeur : 404", (await confirmation(cChoisie, cookieDe(autreEmp.cookie))).code === 404);
+  dire("un autre employeur ne peut pas refuser : 404",
+       (await decider(cRefusee, "refuser", cookieDe(autreEmp.cookie))).code === 404 && statutDe(cRefusee) === "en attente");
+  const confNonVerifiee = await confirmation(cNonVerifiee, cookieDe(emp.cookie));
+  const choixNonVerifiee = await decider(cNonVerifiee, "choisir", cookieDe(emp.cookie));
+  dire("choisir une personne non verifiee : 403, et rien ne bouge",
+       confNonVerifiee.code === 403 && choixNonVerifiee.code === 403 && statutDe(cNonVerifiee) === "en attente",
+       confNonVerifiee.code + " " + choixNonVerifiee.code);
+  dire("avec la phrase du site", erreurDe(choixNonVerifiee).startsWith("L'identité de cette personne"));
+
+  console.log(SAUT + "--- CE QUE L'EMPLOYEUR RELIT AVANT DE CHOISIR ---");
+  const conf = await confirmation(cChoisie, cookieDe(emp.cookie));
+  const d = conf.donnees || {};
+  dire("l'ecran s'ouvre", conf.code === 200, conf.brut.slice(0, 120));
+  dire("le nom de la personne", d.nom === "Test verifiee", String(d.nom));
+  dire("ce qu'il paie, la commission et ce que la personne recoit",
+       d.paiement && d.paiement.vousPayez === "8 000 FCFA" && d.paiement.commission === "800 FCFA" &&
+       d.paiement.pourcentageCommission === 10 && d.paiement.recoit === "7 200 FCFA",
+       JSON.stringify(d.paiement));
+  dire("combien de personnes recevront un refus",
+       d.refusAnnonces && d.refusAnnonces.nombre === 2 &&
+       d.refusAnnonces.suite === "autres personnes qui attendaient recevront un refus.",
+       JSON.stringify(d.refusAnnonces));
+  dire("l'horaire et le lieu general", d.horaire === "Mercredi 9h" && String(d.lieu).startsWith(unQuartier.nom),
+       d.horaire + " / " + d.lieu);
+  dire("aucune coordonnee ne sort", !conf.brut.includes("@example.com") && !conf.brut.includes("telephone"));
+  const pageConf = await (await lire("/candidatures/" + cChoisie + "/confirmer", emp.cookie)).text();
+  dire("la page du site dit la meme chose",
+       pageConf.includes(d.paiement.vousPayez) && pageConf.includes(d.paiement.recoit) &&
+       pageConf.includes("<strong>2</strong> " + d.refusAnnonces.suite));
+  dire("rien n'est decide tant qu'on n'a pas confirme", statutDe(cChoisie) === "en attente");
+
+  console.log(SAUT + "--- REFUSER DEPUIS L'APPLICATION ---");
+  const refus = await decider(cRefusee, "refuser", cookieDe(emp.cookie));
+  dire("le refus passe", refus.code === 200 && statutDe(cRefusee) === "refusee", refus.brut);
+  const apresRefus = (await mesDemandes(emp.cookie)).donnees.demandes.find((x) => x.id === idAChoisir);
+  const lueRefusee = apresRefus.candidatures.find((x) => x.id === cRefusee);
+  dire("l'employeur lit son refus, sans plus aucun bouton",
+       lueRefusee.phrase === "Vous avez refusé cette candidature" && !lueRefusee.peutChoisir && !lueRefusee.peutRefuser,
+       lueRefusee.phrase);
+  dire("la demande reste ouverte", apresRefus.fermee === false);
+  dire("refuser deux fois : 409", (await decider(cRefusee, "refuser", cookieDe(emp.cookie))).code === 409);
+
+  console.log(SAUT + "--- CHOISIR DEPUIS L'APPLICATION ---");
+  const choix = await decider(cChoisie, "choisir", { Authorization: "Bearer " + jeton });
+  dire("le choix passe, avec le jeton de l'application",
+       choix.code === 200 && statutDe(cChoisie) === "acceptee", choix.brut);
+  dire("la demande est pourvue et fermee",
+       base.prepare("SELECT annulee FROM annonces WHERE id = ?").get(idAChoisir).annulee === 1);
+  dire("la personne qui attendait encore recoit un refus", statutDe(cNonVerifiee) === "refusee");
+
+  const reprise = await decider(cChoisie, "refuser", cookieDe(emp.cookie));
+  dire("revenir sur son choix : 409, et rien ne bouge",
+       reprise.code === 409 && statutDe(cChoisie) === "acceptee", reprise.brut);
+  const deuxieme = await decider(cRefusee, "choisir", cookieDe(emp.cookie));
+  dire("choisir une deuxieme personne : 409", deuxieme.code === 409 && statutDe(cRefusee) === "refusee", deuxieme.brut);
+  const deuxiemeWeb = await poster("/candidatures/statut",
+    form({ candidatureId: String(cRefusee), statut: "acceptee" }), emp.cookie);
+  dire("le site le refuse aussi", deuxiemeWeb.code === 409 && statutDe(cRefusee) === "refusee",
+       "code " + deuxiemeWeb.code);
+  dire("l'ecran de confirmation repond 409", (await confirmation(cChoisie, cookieDe(emp.cookie))).code === 409);
+
+  console.log(SAUT + "--- UNE DEMANDE RETIREE N'ATTEND PLUS DE DECISION ---");
+  const aRetirer = await json("/api/demandes", complet(M + " a retirer"), cookieDe(emp.cookie));
+  await poster("/candidatures", form({ annonceId: String(aRetirer.donnees.id) }), pre3.cookie);
+  const cSurRetiree = base.prepare("SELECT id FROM candidatures WHERE annonce_id = ?").get(aRetirer.donnees.id).id;
+  await poster("/annonces/" + aRetirer.donnees.id + "/annuler", form({}), emp.cookie);
+
+  const lueRetiree = (await mesDemandes(emp.cookie)).donnees.demandes.find((x) => x.id === aRetirer.donnees.id);
+  const reponseRetiree = lueRetiree.candidatures[0];
+  dire("plus aucun bouton sur ses reponses",
+       lueRetiree.fermee && !reponseRetiree.peutChoisir && !reponseRetiree.peutRefuser && !reponseRetiree.attendVerification);
+  dire("et l'employeur ne lit plus qu'une decision l'attend",
+       reponseRetiree.phrase === "Vous avez retiré cette demande", reponseRetiree.phrase);
+  const choixRetiree = await decider(cSurRetiree, "choisir", cookieDe(emp.cookie));
+  dire("choisir sur une demande retiree : 409", choixRetiree.code === 409 && statutDe(cSurRetiree) === "en attente",
+       choixRetiree.brut);
+  const choixRetireeWeb = await poster("/candidatures/statut",
+    form({ candidatureId: String(cSurRetiree), statut: "acceptee" }), emp.cookie);
+  dire("le site le refuse aussi", choixRetireeWeb.code === 409 && statutDe(cSurRetiree) === "en attente",
+       "code " + choixRetireeWeb.code);
+  dire("la page du site ne propose plus Choisir",
+       !(await (await lire("/mes-demandes", emp.cookie)).text()).includes("/candidatures/" + cSurRetiree + "/confirmer"));
+  dire("la personne, elle, lit toujours que la demande a ete retiree",
+       (await (await lire("/mes-reponses", pre3.cookie)).text()).includes("employeur a retiré cette demande"));
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");

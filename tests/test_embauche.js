@@ -80,7 +80,7 @@ setTimeout(async () => {
   const force = await poster("/candidatures/statut",
     form({ candidatureId: candidature.id, statut: "acceptee" }), cEmp);
   dire("acceptation forcee hors formulaire -> 403", force.code === 403, "code " + force.code);
-  dire("le message explique la regle", force.corps.includes("erification requise") || force.corps.includes("Verification requise"));
+  dire("le message explique la regle", force.corps.includes("rification requise"));
   dire("le statut n'a PAS bouge", statutCandidature() === "en attente", statutCandidature());
 
   console.log("\n--- 2. Les autres controles tiennent toujours ---");
@@ -118,19 +118,24 @@ setTimeout(async () => {
   dire("et l'ecran de confirmation s'ouvre",
        (await lire(lienChoisir, cEmp)).status === 200);
 
-  const acceptation = await poster("/candidatures/statut",
-    form({ candidatureId: candidature.id, statut: "acceptee" }), cEmp);
-  dire("l'acceptation passe (302)", acceptation.code === 302, "code " + acceptation.code);
+  const acceptation = await fetch(RACINE + "/candidatures/statut", {
+    method: "POST", redirect: "manual", headers: { Cookie: cEmp },
+    body: form({ candidatureId: candidature.id, statut: "acceptee" }) });
+  dire("l'acceptation passe (302)", acceptation.status === 302, "code " + acceptation.status);
   dire("statut = 'acceptee'", statutCandidature() === "acceptee", statutCandidature());
 
   // ET ON ATTERRIT LA OU L ON VIENT D AGIR. Le profil ne porte plus
   // aucune demande : y renvoyer cachait le resultat du geste.
-  const apres = await fetch(RACINE + "/candidatures/statut", {
-    method: "POST", redirect: "manual", headers: { Cookie: cEmp },
-    body: form({ candidatureId: candidature.id, statut: "acceptee" }) });
   dire("on revient sur Mes demandes, pas sur le profil",
-       apres.headers.get("location") === "/mes-demandes",
-       String(apres.headers.get("location")));
+       acceptation.headers.get("location") === "/mes-demandes",
+       String(acceptation.headers.get("location")));
+
+  // UNE DECISION NE SE REPREND PAS. Renvoyer le formulaire suffisait a
+  // refuser apres coup la personne choisie.
+  const reprise = await poster("/candidatures/statut",
+    form({ candidatureId: candidature.id, statut: "refusee" }), cEmp);
+  dire("revenir sur un choix -> 409", reprise.code === 409, "code " + reprise.code);
+  dire("la personne reste choisie", statutCandidature() === "acceptee", statutCandidature());
 
   console.log("\n--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;

@@ -130,13 +130,30 @@ setTimeout(async () => {
   console.log("\n--- REFUSER RESTE IMMEDIAT ---");
   // On ne s'engage a rien en refusant : faire confirmer un refus ne
   // protegerait personne et ajouterait un clic.
+  //
+  // SUR UNE DEMANDE A ELLE, ENCORE OUVERTE. La precedente vient d'etre
+  // pourvue : la seconde personne ne pouvait plus y repondre, et ce test
+  // refusait en realite la personne deja choisie, ce que le serveur
+  // acceptait a tort.
   const pre2 = await creerCompte("pre2", "prestataire", { metier: "menagere", tarif: "10000" });
-  await poster("/candidatures", form({ annonceId: String(annonce.id) }), pre2.cookie);
-  const cand2 = base.prepare("SELECT id FROM candidatures WHERE annonce_id = ? ORDER BY id DESC LIMIT 1").get(annonce.id);
-  await poster("/candidatures/statut",
-    form({ candidatureId: String(cand2.id), statut: "refusee" }), emp.cookie);
-  dire("un refus passe sans ecran intermediaire",
-       base.prepare("SELECT statut FROM candidatures WHERE id = ?").get(cand2.id).statut === "refusee");
+  base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' WHERE email = ?").run(pre2.mail);
+  // Repondre coute un jeton ; ce n'est pas le sujet de cette serie.
+  base.prepare(`INSERT INTO jetons_mouvements (utilisateur_id, quantite, nature, motif, detail)
+                VALUES ((SELECT id FROM utilisateurs WHERE email = ?), 5, 'achete', 'achat', 'Credit de test')`)
+    .run(pre2.mail);
+  await poster("/annonces", form({ titre: M + " refus", metier: "menagere",
+    quartier: "Mvan", horaire: "Mardi 8h", prix: "12000" }), emp.cookie);
+  const annonceRefus = base.prepare("SELECT id FROM annonces WHERE titre = ?").get(M + " refus");
+  const reponse2 = await poster("/candidatures", form({ annonceId: String(annonceRefus.id) }), pre2.cookie);
+  const cand2 = base.prepare("SELECT id FROM candidatures WHERE annonce_id = ?").get(annonceRefus.id);
+  const statutDe = (id) => base.prepare("SELECT statut FROM candidatures WHERE id = ?").get(id).statut;
+  dire("la seconde personne a pu repondre", Boolean(cand2), "code " + reponse2.code);
+  if (cand2) {
+    await poster("/candidatures/statut",
+      form({ candidatureId: String(cand2.id), statut: "refusee" }), emp.cookie);
+    dire("un refus passe sans ecran intermediaire", statutDe(cand2.id) === "refusee");
+  }
+  dire("la personne choisie avant reste choisie", statutDe(cand.id) === "acceptee");
 
   console.log("\n--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
