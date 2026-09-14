@@ -237,7 +237,9 @@
                         <%- include("partiels/icone", { nom: "valider" }) %>
                         Choisir cette personne
                       </a>
-                      <form action="/candidatures/statut" method="POST">
+                      <form action="/candidatures/statut" method="POST"
+                            data-question="Voulez-vous vraiment refuser la candidature de <%= candidature.nomPrestataire %> ?"
+                            data-precision="Votre demande reste ouverte : d'autres personnes pourront encore y répondre.">
                         <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
                         <input type="hidden" name="statut" value="refusee">
                         <button type="submit" class="bouton-danger">
@@ -255,7 +257,9 @@
                       </p>
                     <% } %>
                     <div class="actions">
-                      <form action="/candidatures/statut" method="POST">
+                      <form action="/candidatures/statut" method="POST"
+                            data-question="Voulez-vous vraiment refuser la candidature de <%= candidature.nomPrestataire %> ?"
+                            data-precision="Votre demande reste ouverte : d'autres personnes pourront encore y répondre.">
                         <input type="hidden" name="candidatureId" value="<%= candidature.id %>">
                         <input type="hidden" name="statut" value="refusee">
                         <button type="submit" class="bouton-danger">

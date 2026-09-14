@@ -652,7 +652,8 @@ const requetes = {
   // Le signalement ne touche qu'un message dont on N'EST PAS l'auteur :
   // on signale ce qu'on recoit, pas ce qu'on ecrit.
   signalerMessage: db.prepare(`
-    UPDATE messages SET signale = 1 WHERE id = ? AND auteur_id != ?
+    UPDATE messages SET signale = 1
+    WHERE id = @message AND candidature_id = @discussion AND auteur_id != @moi
   `),
 
   // Toutes les discussions d'une personne, quel que soit son cote.
@@ -4300,25 +4301,127 @@ app.get("/messages", exigerConnexion, (req, res) => {
   });
 });
 
-app.get("/messages/:id", exigerConnexion, (req, res) => {
-  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+// OUVRIR, ECRIRE ET SIGNALER SONT ECRITS UNE SEULE FOIS. Le site et
+// l'application passent par les memes fonctions : les memes portes, les
+// memes phrases.
+//
+// Chaque refus porte le lien que le site affiche : l'application, elle,
+// n'en lit que le texte.
 
-  if (!conversation) {
-    return res.status(403).render("message", {
-      titre: "Conversation introuvable",
-      texte: "Cette conversation n'existe pas, ou elle ne vous concerne pas.",
-      liens: [{ url: "/messages", texte: "Mes messages" }],
-    });
-  }
+// Ouvrir une discussion, c'est l'avoir lue. Renvoie null si la personne
+// n'y participe pas.
+function ouvrirDiscussion(candidatureId, utilisateur) {
+  const conversation = conversationDe(candidatureId, utilisateur);
+  if (!conversation) return null;
 
-  const jeSuisEmployeur = req.utilisateur.id === conversation.employeurId;
-
-  // Ouvrir la discussion, c'est l'avoir lue. On enregistre le moment,
-  // puis on recalcule le compte du menu : sans cela, l'entete afficherait
-  // encore "1" sur la page meme qui vient d'etre lue.
+  const jeSuisEmployeur = utilisateur.id === conversation.employeurId;
   if (jeSuisEmployeur) requetes.marquerVuEmployeur.run(conversation.id);
   else requetes.marquerVuPrestataire.run(conversation.id);
 
+  return {
+    conversation,
+    jeSuisEmployeur,
+    messages: requetes.messagesDeConversation.all(conversation.id),
+    exempleMessage: auHasard(EXEMPLES_MESSAGE[jeSuisEmployeur ? "employeur" : "prestataire"]),
+  };
+}
+
+const CONVERSATION_INTROUVABLE = {
+  code: 403,
+  titre: "Conversation introuvable",
+  texte: "Cette conversation n'existe pas, ou elle ne vous concerne pas.",
+  lien: { url: "/messages", texte: "Mes messages" },
+};
+
+// Renvoie { probleme }, { vide } ou { ok }.
+function ecrireMessage(candidatureId, utilisateur, saisie) {
+  const conversation = conversationDe(candidatureId, utilisateur);
+  if (!conversation) return { probleme: CONVERSATION_INTROUVABLE };
+
+  // Une discussion terminee est un document d'archive. La regle est
+  // ici, pas seulement dans la vue : cacher un formulaire n'empeche
+  // personne d'envoyer la requete a la main.
+  if (conversation.terminee_le) {
+    return {
+      conversation,
+      probleme: {
+        code: 409,
+        titre: "Ce service est terminé",
+        texte: "Cette discussion est archivée. Vous pouvez la relire, mais " +
+               "plus y écrire.",
+        lien: { url: "/messages/" + conversation.id, texte: "Relire la discussion" },
+      },
+    };
+  }
+
+  const texte = String(saisie || "").trim();
+  if (!texte) return { conversation, vide: true };
+
+  // On refuse un message demesure : la base accepterait un roman entier,
+  // et la page deviendrait illisible.
+  if (texte.length > 2000) {
+    return {
+      conversation,
+      probleme: {
+        code: 400,
+        titre: "Message trop long",
+        texte: "Un message ne peut pas dépasser 2000 caractères.",
+        lien: { url: `/messages/${conversation.id}`, texte: "Retour à la discussion" },
+      },
+    };
+  }
+
+  requetes.creerMessage.run({
+    candidature_id: conversation.id,
+    auteur_id: utilisateur.id,
+    texte,
+    // Le calcul est fait UNE FOIS, a l'envoi, et son resultat conserve.
+    risque_paiement: risquePaiementHorsPlateforme(texte) ? 1 : 0,
+  });
+
+  return { conversation, ok: true };
+}
+
+function signalerUnMessage(messageId, candidatureId, utilisateur) {
+  const conversation = conversationDe(candidatureId, utilisateur);
+  if (!conversation) {
+    return {
+      probleme: {
+        code: 403,
+        titre: "Action impossible",
+        texte: "Cette conversation ne vous concerne pas.",
+        lien: { url: "/messages", texte: "Mes messages" },
+      },
+    };
+  }
+
+  // La requete elle-meme refuse de signaler un message dont on est
+  // l'auteur, ou qui n'appartient pas a CETTE discussion. Sans la seconde
+  // condition, il suffisait de participer a une discussion pour porter
+  // sous les yeux de l'equipe n'importe quel message prive de la
+  // plateforme. Une regle ecrite dans le SQL ne peut pas etre oubliee par
+  // une route.
+  requetes.signalerMessage.run({ message: messageId, discussion: conversation.id, moi: utilisateur.id });
+
+  return { conversation, ok: true };
+}
+
+app.get("/messages/:id", exigerConnexion, (req, res) => {
+  const discussion = ouvrirDiscussion(Number(req.params.id), req.utilisateur);
+
+  if (!discussion) {
+    return res.status(403).render("message", {
+      titre: CONVERSATION_INTROUVABLE.titre,
+      texte: CONVERSATION_INTROUVABLE.texte,
+      liens: [CONVERSATION_INTROUVABLE.lien],
+    });
+  }
+
+  const { conversation, jeSuisEmployeur } = discussion;
+
+  // La discussion vient d'etre marquee lue : on recalcule le compte du
+  // menu, sans quoi l'entete afficherait encore "1" sur la page meme qui
+  // vient d'etre lue.
   res.locals.messagesNonLus = requetes.messagesNonLus.get({ moi: req.utilisateur.id }).n;
   res.locals.decisionsNonVues = requetes.decisionsNonVues.get({ moi: req.utilisateur.id }).n;
   res.locals.aVoir = res.locals.messagesNonLus + res.locals.decisionsNonVues;
@@ -4329,81 +4432,43 @@ app.get("/messages/:id", exigerConnexion, (req, res) => {
       .find(function (a) { return a.vise_id === req.utilisateur.id; }) || null,
     titre: "Discussion",
     conversation,
-    messages: requetes.messagesDeConversation.all(conversation.id),
+    messages: discussion.messages,
     jeSuisEmployeur,
-    exempleMessage: auHasard(EXEMPLES_MESSAGE[jeSuisEmployeur ? "employeur" : "prestataire"]),
+    exempleMessage: discussion.exempleMessage,
     exempleRaison: auHasard(EXEMPLES_RAISON),
   });
 });
 
 app.post("/messages/:id", exigerConnexion, lireFormulaire, (req, res) => {
-  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+  const resultat = ecrireMessage(Number(req.params.id), req.utilisateur, req.body.texte);
 
-  if (!conversation) {
-    return res.status(403).render("message", {
-      titre: "Conversation introuvable",
-      texte: "Cette conversation n'existe pas, ou elle ne vous concerne pas.",
-      liens: [{ url: "/messages", texte: "Mes messages" }],
+  if (resultat.probleme) {
+    return res.status(resultat.probleme.code).render("message", {
+      titre: resultat.probleme.titre,
+      texte: resultat.probleme.texte,
+      liens: [resultat.probleme.lien],
     });
   }
 
-  // Une discussion terminee est un document d'archive. La regle est
-  // ici, pas seulement dans la vue : cacher un formulaire n'empeche
-  // personne d'envoyer la requete a la main.
-  if (conversation.terminee_le) {
-    return res.status(409).render("message", {
-      titre: "Ce service est terminé",
-      texte: "Cette discussion est archivée. Vous pouvez la relire, mais " +
-             "plus y écrire.",
-      liens: [{ url: "/messages/" + conversation.id, texte: "Relire la discussion" }],
-    });
-  }
-
-  const texte = String(req.body.texte || "").trim();
-
-  if (!texte) {
-    return res.redirect(`/messages/${conversation.id}`);
-  }
-
-  // On refuse un message demesure : la base accepterait un roman entier,
-  // et la page deviendrait illisible.
-  if (texte.length > 2000) {
-    return res.status(400).render("message", {
-      titre: "Message trop long",
-      texte: "Un message ne peut pas dépasser 2000 caractères.",
-      liens: [{ url: `/messages/${conversation.id}`, texte: "Retour à la discussion" }],
-    });
-  }
-
-  requetes.creerMessage.run({
-    candidature_id: conversation.id,
-    auteur_id: req.utilisateur.id,
-    texte,
-    // Le calcul est fait UNE FOIS, a l'envoi, et son resultat conserve.
-    risque_paiement: risquePaiementHorsPlateforme(texte) ? 1 : 0,
-  });
-
-  res.redirect(`/messages/${conversation.id}`);
+  // Un message vide ne s'enregistre pas : on revient simplement a la
+  // discussion.
+  res.redirect(`/messages/${resultat.conversation.id}`);
 });
 
 // --- Signaler un message a l'equipe ---------------------------------
 app.post("/messages/:id/signaler", exigerConnexion, lireFormulaire, (req, res) => {
-  const conversation = conversationDe(Number(req.body.candidatureId), req.utilisateur);
+  const resultat = signalerUnMessage(
+    Number(req.params.id), Number(req.body.candidatureId), req.utilisateur);
 
-  if (!conversation) {
-    return res.status(403).render("message", {
-      titre: "Action impossible",
-      texte: "Cette conversation ne vous concerne pas.",
-      liens: [{ url: "/messages", texte: "Mes messages" }],
+  if (resultat.probleme) {
+    return res.status(resultat.probleme.code).render("message", {
+      titre: resultat.probleme.titre,
+      texte: resultat.probleme.texte,
+      liens: [resultat.probleme.lien],
     });
   }
 
-  // La requete elle-meme refuse de signaler un message dont on est
-  // l'auteur (voir "auteur_id != ?"). Une regle ecrite dans le SQL ne
-  // peut pas etre oubliee par une route.
-  requetes.signalerMessage.run(Number(req.params.id), req.utilisateur.id);
-
-  res.redirect(`/messages/${conversation.id}`);
+  res.redirect(`/messages/${resultat.conversation.id}`);
 });
 
 // --- La fiche publique d'une personne ------------------------------
@@ -6068,6 +6133,110 @@ function routeDeDecisionApi(statut) {
 
 app.post("/api/candidatures/:id/choisir", routeDeDecisionApi("acceptee"));
 app.post("/api/candidatures/:id/refuser", routeDeDecisionApi("refusee"));
+
+// --- Discuter depuis l'application ---------------------------------
+//
+// Les memes fonctions que le site. Les deux personnes de la discussion y
+// ont acces, quel que soit leur role ; personne d'autre, pas meme
+// l'equipe (voir conversationDe).
+
+// Le detail du prix vu par chacun : le meme calcul et les memes mots que
+// le partiel detail-tarif du site.
+function prixDeLaDiscussion(conversation, jeSuisEmployeur) {
+  if (!conversation.prixAnnonce) {
+    return {
+      lignes: [],
+      phrase: "Cette demande a été publiée avant que le prix ne devienne obligatoire : " +
+              "elle n'en porte pas.",
+    };
+  }
+
+  const detail = detaillerTarif(conversation.prixAnnonce);
+  return {
+    lignes: [
+      { libelle: jeSuisEmployeur ? "Vous payez" : "L'employeur paie",
+        montant: formaterMontant(detail.brut), fort: true },
+      { libelle: `Commission PamConnect (${Math.round(TAUX_COMMISSION * 100)} %)`,
+        montant: "− " + formaterMontant(detail.commission), fort: false },
+      { libelle: jeSuisEmployeur ? `${conversation.nomPrestataire} reçoit` : "Vous recevez",
+        montant: formaterMontant(detail.net), fort: true },
+    ],
+    phrase: jeSuisEmployeur
+      ? "C'est le prix que vous avez annoncé dans votre demande."
+      : `C'est le prix annoncé par ${conversation.nomEmployeur} dans sa demande.`,
+  };
+}
+
+app.get("/api/discussions/:id", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const discussion = ouvrirDiscussion(Number(req.params.id), moi);
+  if (!discussion) return erreurApi(res, CONVERSATION_INTROUVABLE.code, CONVERSATION_INTROUVABLE.texte);
+
+  const { conversation: c, jeSuisEmployeur } = discussion;
+
+  // Les champs sont choisis un par un : ni email, ni telephone du compte,
+  // ni adresse. Le lieu reste general.
+  res.json({
+    id: c.id,
+    titreDemande: c.titreAnnonce,
+    avec: jeSuisEmployeur ? c.nomPrestataire : c.nomEmployeur,
+    metierAutre: jeSuisEmployeur ? (c.metierPrestataire || null) : null,
+    horaire: c.horaireAnnonce || "Horaire non précisé",
+    lieu: [c.quartierAnnonce, c.arrondissementAnnonce].filter(Boolean).join(", ") || null,
+    conditions: c.conditionsAnnonce || null,
+    phraseStatut: phraseCandidature(c.statut, jeSuisEmployeur, c),
+    prix: prixDeLaDiscussion(c, jeSuisEmployeur),
+    messages: discussion.messages.map((m) => {
+      const deMoi = m.auteur_id === moi.id;
+      return {
+        id: m.id,
+        deMoi,
+        auteur: deMoi ? "Vous" : m.nomAuteur,
+        quand: m.cree_le,
+        texte: m.texte,
+        risquePaiement: Boolean(m.risque_paiement),
+        signale: Boolean(m.signale),
+        peutSignaler: !deMoi && !m.signale,
+      };
+    }),
+    serviceTermine: c.terminee_le ? { par: c.nomEmployeur, le: c.terminee_le } : null,
+    peutEcrire: !c.terminee_le,
+    exempleMessage: discussion.exempleMessage,
+    // Elle a declare avoir travaille : l'employeur doit le savoir, c'est
+    // lui qui detient la cle du paiement.
+    declarationDeLaPersonne: jeSuisEmployeur && c.declaree_par_elle_le && !c.terminee_le
+      ? { nom: c.nomPrestataire, le: c.declaree_par_elle_le }
+      : null,
+  });
+});
+
+app.post("/api/discussions/:id/messages", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const saisie = req.body && req.body.texte;
+  if (saisie != null && typeof saisie !== "string") {
+    return erreurApi(res, 400, "Le message envoyé n'a pas la forme attendue.");
+  }
+
+  const resultat = ecrireMessage(Number(req.params.id), moi, saisie);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+  if (resultat.vide) return erreurApi(res, 400, "Écrivez un message avant de l'envoyer.");
+
+  res.status(201).json({ ok: true });
+});
+
+app.post("/api/discussions/:id/messages/:messageId/signaler", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const resultat = signalerUnMessage(Number(req.params.messageId), Number(req.params.id), moi);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.json({ ok: true });
+});
 
 app.use((req, res) => {
   res.status(404).render("message", {

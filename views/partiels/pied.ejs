@@ -3,5 +3,21 @@
     navigation, et sur grand ecran il ne portait aucune information utile. %>
   </main>
 
+  <%# UNE QUESTION AVANT UN GESTE QUI NE S'ANNULE PAS. Un formulaire qui
+      porte data-question la pose avant l'envoi. Sans script, il part
+      comme avant : la question evite un appui par erreur, elle ne
+      protege rien. Les regles, elles, sont verifiees par le serveur. %>
+  <script>
+    document.addEventListener("submit", function (evenement) {
+      var formulaire = evenement.target;
+      var question = formulaire.getAttribute && formulaire.getAttribute("data-question");
+      if (!question) return;
+      var precision = formulaire.getAttribute("data-precision");
+      if (!window.confirm(precision ? question + "\n\n" + precision : question)) {
+        evenement.preventDefault();
+      }
+    });
+  </script>
+
 </body>
 </html>

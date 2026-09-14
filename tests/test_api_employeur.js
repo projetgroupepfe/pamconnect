@@ -381,6 +381,11 @@ setTimeout(async () => {
        pageConf.includes("<strong>2</strong> " + d.refusAnnonces.suite));
   dire("rien n'est decide tant qu'on n'a pas confirme", statutDe(cChoisie) === "en attente");
 
+  const pageAvantRefus = await (await lire("/mes-demandes", emp.cookie)).text();
+  dire("le site demande confirmation avant de refuser",
+       pageAvantRefus.includes('data-question="Voulez-vous vraiment refuser la candidature de Test trois ?"') &&
+       pageAvantRefus.includes("window.confirm"));
+
   console.log(SAUT + "--- REFUSER DEPUIS L'APPLICATION ---");
   const refus = await decider(cRefusee, "refuser", cookieDe(emp.cookie));
   dire("le refus passe", refus.code === 200 && statutDe(cRefusee) === "refusee", refus.brut);
@@ -434,6 +439,94 @@ setTimeout(async () => {
        !(await (await lire("/mes-demandes", emp.cookie)).text()).includes("/candidatures/" + cSurRetiree + "/confirmer"));
   dire("la personne, elle, lit toujours que la demande a ete retiree",
        (await (await lire("/mes-reponses", pre3.cookie)).text()).includes("employeur a retiré cette demande"));
+
+  console.log(SAUT + "--- DISCUTER DEPUIS L'APPLICATION ---");
+  const discussion = (id, entetes) => json("/api/discussions/" + id, undefined, entetes);
+  const ecrireA = (id, texte, entetes) => json("/api/discussions/" + id + "/messages", { texte }, entetes);
+  const signaleEnBase = (id) => base.prepare("SELECT signale FROM messages WHERE id = ?").get(id).signale;
+
+  dire("sans session : 401", (await discussion(cChoisie)).code === 401);
+  dire("un autre employeur : 403", (await discussion(cChoisie, cookieDe(autreEmp.cookie))).code === 403);
+  dire("une personne qui n'y participe pas : 403", (await discussion(cChoisie, cookieDe(pre3.cookie))).code === 403);
+
+  const envoi = await ecrireA(cChoisie, M + " bonjour depuis le telephone", { Authorization: "Bearer " + jeton });
+  dire("l'employeur ecrit depuis l'application", envoi.code === 201, envoi.brut);
+  const depuisLeSite = await poster("/messages/" + cChoisie, form({ texte: M + " reponse depuis le site" }), verifiee.cookie);
+  dire("la personne repond depuis le site", depuisLeSite.code === 302, "code " + depuisLeSite.code);
+
+  const vueEmp = await discussion(cChoisie, cookieDe(emp.cookie));
+  const de = vueEmp.donnees || {};
+  const lesMessages = de.messages || [];
+  dire("la discussion s'ouvre", vueEmp.code === 200, vueEmp.brut.slice(0, 120));
+  dire("avec qui, et a propos de quoi", de.avec === "Test verifiee" && de.titreDemande === M + " a choisir",
+       de.avec + " / " + de.titreDemande);
+  dire("les deux messages, dans l'ordre",
+       lesMessages.length === 2 && lesMessages[0].texte === M + " bonjour depuis le telephone" &&
+       lesMessages[1].texte === M + " reponse depuis le site", JSON.stringify(lesMessages));
+  dire("le sien est dit Vous, l'autre porte son nom",
+       lesMessages[0].deMoi && lesMessages[0].auteur === "Vous" &&
+       !lesMessages[1].deMoi && lesMessages[1].auteur === "Test verifiee");
+  dire("seul le message de l'autre peut etre signale", !lesMessages[0].peutSignaler && lesMessages[1].peutSignaler);
+  dire("la phrase de statut de l'employeur", de.phraseStatut === "Vous avez accepté cette candidature", de.phraseStatut);
+  dire("le prix vu par l'employeur",
+       de.prix && de.prix.lignes.length === 3 && de.prix.lignes[0].libelle === "Vous payez" &&
+       de.prix.lignes[2].libelle === "Test verifiee reçoit" && de.prix.lignes[2].montant === "7 200 FCFA",
+       JSON.stringify(de.prix));
+  dire("aucune coordonnee ne sort", !vueEmp.brut.includes("@example.com") && !vueEmp.brut.includes("motdepasse"));
+
+  const pageDiscussion = await (await lire("/messages/" + cChoisie, emp.cookie)).text();
+  dire("la page du site montre les memes messages, le meme prix et le meme statut",
+       pageDiscussion.includes(M + " bonjour depuis le telephone") && pageDiscussion.includes(M + " reponse depuis le site") &&
+       pageDiscussion.includes(de.prix.lignes[2].montant) && pageDiscussion.includes(de.phraseStatut));
+
+  const vuePre = await discussion(cChoisie, cookieDe(verifiee.cookie));
+  const dp = vuePre.donnees || {};
+  dire("la personne lit la meme discussion, de son cote",
+       vuePre.code === 200 && dp.avec === "Test emp" && dp.messages[1].deMoi && dp.messages[0].auteur === "Test emp" &&
+       dp.prix.lignes[2].libelle === "Vous recevez" && dp.metierAutre === null,
+       JSON.stringify(dp.prix && dp.prix.lignes));
+
+  // Un numero de telephone dans un message : l'avertissement doit suivre.
+  await ecrireA(cChoisie, M + " appelez-moi au 600000000", cookieDe(verifiee.cookie));
+  const avecNumero = (await discussion(cChoisie, cookieDe(emp.cookie))).donnees.messages.pop();
+  dire("un numero de telephone declenche l'avertissement de paiement", avecNumero.risquePaiement === true,
+       JSON.stringify(avecNumero));
+
+  console.log(SAUT + "--- SIGNALER UN MESSAGE ---");
+  const aSignaler = lesMessages[1];
+  const signal = await json("/api/discussions/" + cChoisie + "/messages/" + aSignaler.id + "/signaler", {}, cookieDe(emp.cookie));
+  dire("signaler le message de l'autre", signal.code === 200 && signaleEnBase(aSignaler.id) === 1, signal.brut);
+  const apresSignal = (await discussion(cChoisie, cookieDe(emp.cookie))).donnees.messages.find((m) => m.id === aSignaler.id);
+  dire("il est dit signale, et ne se signale plus", apresSignal.signale && !apresSignal.peutSignaler);
+  await json("/api/discussions/" + cChoisie + "/messages/" + lesMessages[0].id + "/signaler", {}, cookieDe(emp.cookie));
+  dire("son propre message ne se signale pas", signaleEnBase(lesMessages[0].id) === 0);
+
+  // La faille : participer a UNE discussion suffisait pour signaler un
+  // message de n'importe quelle autre.
+  await json("/api/discussions/" + cRefusee + "/messages/" + lesMessages[0].id + "/signaler", {}, cookieDe(pre3.cookie));
+  dire("un message d'une autre discussion ne se signale pas depuis l'application", signaleEnBase(lesMessages[0].id) === 0);
+  await poster("/messages/" + lesMessages[0].id + "/signaler", form({ candidatureId: String(cRefusee) }), pre3.cookie);
+  dire("ni depuis le site", signaleEnBase(lesMessages[0].id) === 0);
+
+  console.log(SAUT + "--- CE QUI SE REFUSE, ET LA FIN DU SERVICE ---");
+  dire("un message vide : 400", (await ecrireA(cRefusee, "   ", cookieDe(emp.cookie))).code === 400);
+  dire("un message trop long : 400", (await ecrireA(cRefusee, "x".repeat(2001), cookieDe(emp.cookie))).code === 400);
+  dire("un objet a la place du texte : 400",
+       (await json("/api/discussions/" + cRefusee + "/messages", { texte: { faux: true } }, cookieDe(emp.cookie))).code === 400);
+
+  await poster("/candidatures/" + cChoisie + "/jai-effectue", form({}), verifiee.cookie);
+  const declaree = (await discussion(cChoisie, cookieDe(emp.cookie))).donnees;
+  dire("l'employeur voit que la personne dit avoir travaille",
+       declaree.declarationDeLaPersonne && declaree.declarationDeLaPersonne.nom === "Test verifiee",
+       JSON.stringify(declaree.declarationDeLaPersonne));
+
+  await poster("/candidatures/" + cChoisie + "/terminer", form({}), emp.cookie);
+  const archivee = (await discussion(cChoisie, cookieDe(emp.cookie))).donnees;
+  dire("une fois le service termine, on relit sans ecrire",
+       archivee.serviceTermine && archivee.serviceTermine.par === "Test emp" && archivee.peutEcrire === false &&
+       archivee.declarationDeLaPersonne === null, JSON.stringify(archivee.serviceTermine));
+  const tardif = await ecrireA(cChoisie, M + " trop tard", cookieDe(emp.cookie));
+  dire("ecrire dans une discussion archivee : 409", tardif.code === 409, tardif.brut);
 
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
