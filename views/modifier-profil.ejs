@@ -130,8 +130,8 @@
         <div class="champ">
           <label for="nouveau">Nouveau mot de passe</label>
           <input type="password" id="nouveau" name="nouveau"
-                 autocomplete="new-password" minlength="6" required>
-          <span class="aide">6 caractères au minimum.</span>
+                 autocomplete="new-password" minlength="<%= motDePasseMin %>" required>
+          <span class="aide"><%= motDePasseMin %> caractères au minimum.</span>
         </div>
         <div class="actions">
           <button type="submit" class="bouton-secondaire">Changer mon mot de passe</button>

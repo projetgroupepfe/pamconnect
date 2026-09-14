@@ -3429,6 +3429,9 @@ function formulaireMonProfil(u) {
         }))
       : [],
     tarif: personne && u.tarif ? String(u.tarif) : "",
+    // Les deux cles du compte, en bas du meme ecran.
+    email: u.email,
+    motDePasseMin: MOT_DE_PASSE_MIN,
   };
 }
 
@@ -3510,6 +3513,8 @@ app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => 
 });
 
 // --- Changer son adresse email -------------------------------------
+// Ecrit UNE SEULE FOIS pour le site et l'application.
+//
 // L'adresse sert a se connecter : la changer, c'est changer sa cle.
 // On exige donc le mot de passe actuel, exactement comme pour le
 // changement de mot de passe. Un ordinateur laisse ouvert ne suffit pas.
@@ -3518,67 +3523,82 @@ app.post("/mon-profil/modifier", exigerConnexion, lireFormulaire, (req, res) => 
 // plateforme n'envoie aucun email. Ce n'est pas genant ici : l'adresse
 // sert uniquement a se connecter, elle ne recoit rien. Cela le
 // deviendrait le jour ou la plateforme enverrait des notifications.
-app.post("/mon-profil/email", exigerConnexion, lireFormulaire, (req, res) => {
-  const moi = req.utilisateur;
-  const nouvelEmail = String(req.body.nouveau || "").trim().toLowerCase();
+function changerMonEmail(moi, saisie) {
+  const nouvelEmail = String(saisie.nouveau || "").trim().toLowerCase();
+  const retour = { url: "/mon-profil/modifier", texte: "Réessayer" };
+  const adresseDejaUtilisee = {
+    probleme: {
+      code: 409,
+      titre: "Adresse déjà utilisée",
+      texte: "Un autre compte utilise déjà cette adresse.",
+      lien: retour,
+    },
+  };
 
-  const retour = [{ url: "/mon-profil/modifier", texte: "Réessayer" }];
-
-  if (!verifierMotDePasse(req.body.motdepasse || "", moi.motdepasse)) {
-    return res.status(403).render("message", {
-      titre: "Mot de passe incorrect",
-      texte: "Pour changer votre adresse, il faut saisir votre mot de passe actuel.",
-      liens: retour,
-    });
+  if (!verifierMotDePasse(String(saisie.motdepasse || ""), moi.motdepasse)) {
+    return {
+      probleme: {
+        code: 403,
+        titre: "Mot de passe incorrect",
+        texte: "Pour changer votre adresse, il faut saisir votre mot de passe actuel.",
+        lien: retour,
+      },
+    };
   }
 
   // Un controle volontairement minimal : une adresse doit contenir un @
   // et un point apres. Trop strict, on refuserait des adresses valides.
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(nouvelEmail)) {
-    return res.status(400).render("message", {
-      titre: "Adresse invalide",
-      texte: "Vérifiez l'adresse saisie : il manque un @ ou le nom du site.",
-      liens: retour,
-    });
+    return {
+      probleme: {
+        code: 400,
+        titre: "Adresse invalide",
+        texte: "Vérifiez l'adresse saisie : il manque un @ ou le nom du site.",
+        lien: retour,
+      },
+    };
   }
 
   if (nouvelEmail === moi.email) {
-    return res.status(400).render("message", {
-      titre: "Adresse inchangée",
-      texte: "C'est déjà votre adresse actuelle.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
-    });
+    return {
+      probleme: {
+        code: 400,
+        titre: "Adresse inchangée",
+        texte: "C'est déjà votre adresse actuelle.",
+        lien: { url: "/mon-profil", texte: "Retour à mon profil" },
+      },
+    };
   }
 
-  if (requetes.utilisateurParEmail.get(nouvelEmail)) {
-    return res.status(409).render("message", {
-      titre: "Adresse déjà utilisée",
-      texte: "Un autre compte utilise déjà cette adresse.",
-      liens: retour,
-    });
-  }
+  if (requetes.utilisateurParEmail.get(nouvelEmail)) return adresseDejaUtilisee;
 
   try {
     requetes.majEmail.run(nouvelEmail, moi.id);
   } catch (erreur) {
     // La contrainte UNIQUE de la base est le dernier rempart, au cas ou
     // deux personnes viseraient la meme adresse au meme instant.
-    if (String(erreur.message).includes("UNIQUE")) {
-      return res.status(409).render("message", {
-        titre: "Adresse déjà utilisée",
-        texte: "Un autre compte utilise déjà cette adresse.",
-        liens: retour,
-      });
-    }
+    if (String(erreur.message).includes("UNIQUE")) return adresseDejaUtilisee;
     throw erreur;
   }
 
   // La session retient l'identifiant, pas l'adresse : la personne
   // reste connectee, elle n'a rien a refaire.
-  res.render("message", {
+  return {
+    ok: true,
+    email: nouvelEmail,
     titre: "Adresse modifiée",
     texte: "Votre nouvelle adresse est " + nouvelEmail +
            ". C'est désormais celle-ci qu'il faudra saisir pour vous connecter.",
+  };
+}
+
+app.post("/mon-profil/email", exigerConnexion, lireFormulaire, (req, res) => {
+  const resultat = changerMonEmail(req.utilisateur, req.body);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
+  res.render("message", {
+    titre: resultat.titre,
+    texte: resultat.texte,
     liens: [{ url: "/mon-profil", texte: "Voir mon profil" }],
   });
 });
@@ -3599,35 +3619,50 @@ app.post("/mon-profil/email", exigerConnexion, lireFormulaire, (req, res) => {
 // capacite de se connecter a la place de n'importe qui. Principe du
 // moindre privilege - l'equipe verifie des documents, elle n'a pas a
 // pouvoir agir au nom des utilisateurs.
-app.post("/mon-profil/mot-de-passe", exigerConnexion, lireFormulaire, (req, res) => {
-  const donnees = req.body;
-  const moi = req.utilisateur;
+const MOT_DE_PASSE_MIN = 6;
+app.locals.motDePasseMin = MOT_DE_PASSE_MIN;
+
+function changerMonMotDePasse(moi, saisie) {
+  const retour = { url: "/mon-profil/modifier", texte: "Réessayer" };
 
   // On redemande l'ancien mot de passe : sans cela, quelqu'un qui
   // trouverait un ordinateur ouvert pourrait s'approprier le compte.
-  if (!verifierMotDePasse(donnees.ancien || "", moi.motdepasse)) {
-    return res.status(403).render("message", {
-      titre: "Mot de passe actuel incorrect",
-      texte: "Pour changer votre mot de passe, il faut d'abord saisir l'ancien.",
-      liens: [{ url: "/mon-profil/modifier", texte: "Réessayer" }],
-    });
+  if (!verifierMotDePasse(String(saisie.ancien || ""), moi.motdepasse)) {
+    return {
+      probleme: {
+        code: 403,
+        titre: "Mot de passe actuel incorrect",
+        texte: "Pour changer votre mot de passe, il faut d'abord saisir l'ancien.",
+        lien: retour,
+      },
+    };
   }
 
-  const nouveau = String(donnees.nouveau || "");
+  const nouveau = String(saisie.nouveau || "");
 
-  if (nouveau.length < 6) {
-    return res.status(400).render("message", {
-      titre: "Mot de passe trop court",
-      texte: "Choisissez un mot de passe d'au moins 6 caractères.",
-      liens: [{ url: "/mon-profil/modifier", texte: "Réessayer" }],
-    });
+  if (nouveau.length < MOT_DE_PASSE_MIN) {
+    return {
+      probleme: {
+        code: 400,
+        titre: "Mot de passe trop court",
+        texte: `Choisissez un mot de passe d'au moins ${MOT_DE_PASSE_MIN} caractères.`,
+        lien: retour,
+      },
+    };
   }
 
   requetes.majMotDePasse.run(hacherMotDePasse(nouveau), moi.id);
 
+  return { ok: true, titre: "Mot de passe modifié", texte: "Votre nouveau mot de passe est actif dès maintenant." };
+}
+
+app.post("/mon-profil/mot-de-passe", exigerConnexion, lireFormulaire, (req, res) => {
+  const resultat = changerMonMotDePasse(req.utilisateur, req.body);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
   res.render("message", {
-    titre: "Mot de passe modifié",
-    texte: "Votre nouveau mot de passe est actif dès maintenant.",
+    titre: resultat.titre,
+    texte: resultat.texte,
     liens: [{ url: "/mon-profil", texte: "Voir mon profil" }],
   });
 });
@@ -7141,6 +7176,44 @@ app.get("/api/detail-tarif", (req, res) => {
   if (!utilisateurConnecte(req)) return erreurApi(res, 401, "Personne n'est connecté.");
 
   res.json(tarifSurMonProfil(req.query.montant));
+});
+
+// --- L'adresse et le mot de passe depuis l'application ---------------
+//
+// Comme a la connexion, le mot de passe voyage sans chiffrement sur le
+// reseau local, puisque le serveur s'ouvre en http://. Un vrai
+// deploiement passerait en https.
+function formeDeCleValide(corps, champs) {
+  return Boolean(corps) && typeof corps === "object" && !Array.isArray(corps) &&
+    champs.every((champ) => corps[champ] == null || typeof corps[champ] === "string");
+}
+
+app.post("/api/mon-profil/email", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  if (!formeDeCleValide(req.body, ["nouveau", "motdepasse"])) {
+    return erreurApi(res, 400, "La demande envoyée n'a pas la forme attendue.");
+  }
+
+  const resultat = changerMonEmail(moi, req.body);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.json({ texte: resultat.texte, email: resultat.email });
+});
+
+app.post("/api/mon-profil/mot-de-passe", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  if (!formeDeCleValide(req.body, ["ancien", "nouveau"])) {
+    return erreurApi(res, 400, "La demande envoyée n'a pas la forme attendue.");
+  }
+
+  const resultat = changerMonMotDePasse(moi, req.body);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.json({ texte: resultat.texte });
 });
 
 // --- La fiche d'une personne depuis l'application -------------------

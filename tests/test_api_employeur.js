@@ -985,6 +985,52 @@ setTimeout(async () => {
   dire("une page inconnue du site reste une page",
        pageInconnue.status === 404 && String(pageInconnue.headers.get("content-type")).includes("text/html"));
 
+  console.log(SAUT + "--- CHANGER L'ADRESSE ET LE MOT DE PASSE ---");
+  const changerEmail = (corps, entetes) => json("/api/mon-profil/email", corps, entetes);
+  const changerMotDePasse = (corps, entetes) => json("/api/mon-profil/mot-de-passe", corps, entetes);
+  const emailEnBase = (id) => base.prepare("SELECT email FROM utilisateurs WHERE id = ?").get(id).email;
+  dire("sans session : 401", (await changerEmail({})).code === 401 && (await changerMotDePasse({})).code === 401);
+  dire("un compte d'equipe : 403",
+       (await changerEmail({ nouveau: "equipe@example.com", motdepasse: "motdepasse123" }, cookieDe(equipe.cookie))).code === 403);
+  const formAvecCles = (await formProfil(cookieDe(emp.cookie))).donnees;
+  dire("le formulaire donne l'adresse actuelle et la longueur minimale",
+       formAvecCles.email === emp.mail && formAvecCles.motDePasseMin === 6, JSON.stringify(formAvecCles.email));
+
+  const NOUVEL_EMAIL = (M + "-emp-nouvelle@example.com").toLowerCase();
+  const emailSansMotDePasse = await changerEmail({ nouveau: NOUVEL_EMAIL, motdepasse: "pas-le-bon" }, cookieDe(emp.cookie));
+  dire("sans le bon mot de passe : 403, l'adresse ne change pas",
+       emailSansMotDePasse.code === 403 && emailEnBase(emp.id) === emp.mail, emailSansMotDePasse.brut);
+  dire("une adresse sans @ : 400",
+       (await changerEmail({ nouveau: "pas-une-adresse", motdepasse: "motdepasse123" }, cookieDe(emp.cookie))).code === 400);
+  dire("la meme adresse : 400",
+       (await changerEmail({ nouveau: emp.mail, motdepasse: "motdepasse123" }, cookieDe(emp.cookie))).code === 400);
+  dire("l'adresse d'un autre compte : 409",
+       (await changerEmail({ nouveau: verifiee.mail, motdepasse: "motdepasse123" }, cookieDe(emp.cookie))).code === 409);
+  dire("un objet a la place de l'adresse : 400",
+       (await changerEmail({ nouveau: { faux: true }, motdepasse: "motdepasse123" }, cookieDe(emp.cookie))).code === 400);
+  const emailChange = await changerEmail({ nouveau: NOUVEL_EMAIL.toUpperCase(), motdepasse: "motdepasse123" },
+                                         { Authorization: "Bearer " + jeton });
+  dire("la nouvelle adresse est enregistree en minuscules, et la session reste ouverte",
+       emailChange.code === 200 && emailChange.donnees.email === NOUVEL_EMAIL && emailEnBase(emp.id) === NOUVEL_EMAIL &&
+       (await monProfilApi({ Authorization: "Bearer " + jeton })).code === 200, emailChange.brut);
+  dire("on se connecte avec la nouvelle adresse",
+       (await json("/api/connexion", { email: NOUVEL_EMAIL, motdepasse: "motdepasse123" })).code === 200);
+
+  const motDePasseSansAncien = await changerMotDePasse({ ancien: "pas-le-bon", nouveau: "motdepasse456" }, cookieDe(emp.cookie));
+  dire("sans l'ancien mot de passe : 403", motDePasseSansAncien.code === 403, motDePasseSansAncien.brut);
+  const motDePasseCourt = await changerMotDePasse({ ancien: "motdepasse123", nouveau: "abc" }, cookieDe(emp.cookie));
+  dire("un mot de passe de 3 caracteres : 400",
+       motDePasseCourt.code === 400 && erreurDe(motDePasseCourt).includes("6 caractères"), motDePasseCourt.brut);
+  const motDePasseChange = await changerMotDePasse({ ancien: "motdepasse123", nouveau: "motdepasse456" }, cookieDe(emp.cookie));
+  dire("le nouveau mot de passe est actif, l'ancien ne marche plus",
+       motDePasseChange.code === 200 &&
+       (await json("/api/connexion", { email: NOUVEL_EMAIL, motdepasse: "motdepasse456" })).code === 200 &&
+       (await json("/api/connexion", { email: NOUVEL_EMAIL, motdepasse: "motdepasse123" })).code === 401,
+       motDePasseChange.brut);
+  const pageAvecCles = await (await lire("/mon-profil/modifier", emp.cookie)).text();
+  dire("la page du site montre la nouvelle adresse et la meme longueur minimale",
+       pageAvecCles.includes(NOUVEL_EMAIL) && pageAvecCles.includes('minlength="6"'));
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");
