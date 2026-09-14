@@ -3,7 +3,12 @@
   <h1>Mes messages</h1>
   <p class="chapeau">Vos discussions, la plus récente en premier.</p>
 
-  <% if (conversations.length === 0) { %>
+  <%# TOUT CE QUI DEPEND DES DONNEES EST ECRIT PAR mesDiscussions, dans
+      server.js : phrases de statut, messages non lus, pluriels, avis
+      attendus. L'application lit la meme fonction ; la page ne recalcule
+      rien, sinon les deux finiraient par se contredire. %>
+
+  <% if (liste.vide) { %>
 
     <%# Cet ecran n'est pas l'endroit ou l'on publie une demande. La
         messagerie sert a s'accorder sur les horaires une fois qu'une
@@ -11,20 +16,12 @@
         envoyait la personne ailleurs au lieu de lui expliquer pourquoi
         elle ne voit rien. %>
     <div class="vide">
-      <p>Aucune discussion pour le moment.</p>
+      <p><%= liste.vide.phrase %></p>
+      <% if (liste.vide.aide) { %>
+        <p class="aide"><%= liste.vide.aide %></p>
+      <% } %>
       <% if (jePeux.repondre) { %>
-        <p class="aide">
-          Une discussion s'ouvre lorsque vous répondez à une demande. Elle
-          sert à vous accorder sur les horaires avec l'employeur avant qu'il
-          fasse son choix.
-        </p>
         <p><a class="lien-discret" href="/annonces">Voir les demandes publiées</a></p>
-      <% } else if (jePeux.publier) { %>
-        <p class="aide">
-          Une discussion s'ouvre lorsque quelqu'un répond à l'une de vos
-          demandes. Elle sert à vous accorder sur les horaires avant de
-          choisir la personne.
-        </p>
       <% } %>
     </div>
 
@@ -32,60 +29,45 @@
 
     <%# Ce qui est en cours et ce qui appartient au passe ne se lisent
         pas au meme moment. Les melanger obligeait a trier de l'oeil. %>
-    <% const enCours = conversations.filter(function (c) { return !c.terminee_le; }); %>
-    <% const terminees = conversations.filter(function (c) { return c.terminee_le; }); %>
-
-    <% if (enCours.length === 0) { %>
+    <% if (liste.enCours.length === 0) { %>
       <p class="vide">Aucune discussion en cours.</p>
     <% } %>
 
     <div class="grille">
-      <% enCours.forEach(function (c) { %>
-        <%
-          // Avec qui je parle : l'autre personne, jamais moi.
-          const jeSuisEmployeur = moi.id === c.employeurId;
-          const autre = jeSuisEmployeur ? c.nomPrestataire : c.nomEmployeur;
-        %>
+      <% liste.enCours.forEach(function (c) { %>
         <div class="carte">
           <div class="fiche-tete">
-            <div class="portrait"><%= autre.charAt(0) %></div>
+            <div class="portrait"><%= c.avec.charAt(0) %></div>
             <div>
-              <h3><%= autre %></h3>
+              <h3><%= c.avec %></h3>
               <div class="metier"><%= c.titreAnnonce %></div>
             </div>
           </div>
 
           <ul class="infos">
-            <%# UNE SEULE LIGNE POUR L'ETAT. Un second bloc repetait la meme
-                information sous une autre forme, et il se trompait dans un cas :
-                une demande retiree n'est pas un refus. La marque "Nouveau" suffit
-                a distinguer ce qui vient d'arriver de ce qui etait deja su. %>
+            <%# UNE SEULE LIGNE POUR L'ETAT. La marque "Nouveau" suffit a
+                distinguer ce qui vient d'arriver de ce qui etait deja su. %>
             <li>
               <%- include("partiels/icone", { nom: "disponibilite" }) %>
               <span>
-                <strong><%= phraseCandidature(c.statut, jeSuisEmployeur, c) %></strong>
-                <% if (c.decisionNonVue) { %><span class="pastille">Nouveau</span><% } %>
+                <strong><%= c.phraseStatut %></strong>
+                <% if (c.nouveau) { %><span class="pastille">Nouveau</span><% } %>
               </span>
             </li>
 
             <%# Ce qui attend d'etre lu passe AVANT le compte total :
                 c'est la seule ligne qui demande une action. %>
-            <% if (c.nonLus > 0) { %>
+            <% if (c.phraseNonLus) { %>
               <li>
                 <%- include("partiels/icone", { nom: "info" }) %>
-                <span>
-                  <strong><%= c.nonLus %> nouveau<%= c.nonLus > 1 ? "x" : "" %>
-                  message<%= c.nonLus > 1 ? "s" : "" %></strong>
-                </span>
+                <span><strong><%= c.phraseNonLus %></strong></span>
               </li>
             <% } %>
             <li>
               <%- include("partiels/icone", { nom: "message" }) %>
               <span>
-                <% if (c.nbMessages === 0) { %>
-                  Aucun message échangé
-                <% } else { %>
-                  <%= c.nbMessages %> message<%= c.nbMessages > 1 ? "s" : "" %>
+                <%= c.phraseMessages %>
+                <% if (c.dernierMessage) { %>
                   <span class="aide">dernier le <%= c.dernierMessage %></span>
                 <% } %>
               </span>
@@ -102,31 +84,21 @@
       <% }); %>
     </div>
 
-    <% if (terminees.length > 0) { %>
+    <% if (liste.terminees.length > 0) { %>
       <h2>Services terminés</h2>
       <%# CE BLOC N'EST PAS QU'UNE ARCHIVE. Tant qu'un avis n'a pas ete
-          donne, quelque chose y attend - et le mot "archivees" disait
-          exactement le contraire. %>
-      <% const aNoter = terminees.filter(function (c) { return !c.jaiDonneMonAvis; }).length; %>
+          donne, quelque chose y attend. %>
       <p class="chapeau">
-        <% if (aNoter > 0) { %>
-          <strong><%= aNoter %> service<%= aNoter > 1 ? "s" : "" %> attend<%= aNoter > 1 ? "ent" : "" %> votre avis.</strong>
-          Ces discussions ne reçoivent plus de message, mais vous pouvez
-          encore dire ce qui s'est passé.
-        <% } else { %>
-          Ces discussions sont archivées : vous pouvez les relire, mais plus
-          y écrire.
-        <% } %>
+        <% if (liste.chapeauTerminees.fort) { %><strong><%= liste.chapeauTerminees.fort %></strong><% } %>
+        <%= liste.chapeauTerminees.suite %>
       </p>
       <div class="grille">
-        <% terminees.forEach(function (c) { %>
-          <% const jeSuisEmployeur = moi.id === c.employeurId; %>
-          <% const autre = jeSuisEmployeur ? c.nomPrestataire : c.nomEmployeur; %>
+        <% liste.terminees.forEach(function (c) { %>
           <div class="carte">
             <div class="fiche-tete">
-              <div class="portrait"><%= autre.charAt(0) %></div>
+              <div class="portrait"><%= c.avec.charAt(0) %></div>
               <div>
-                <h3><%= autre %></h3>
+                <h3><%= c.avec %></h3>
                 <div class="metier"><%= c.titreAnnonce %></div>
               </div>
             </div>
@@ -136,7 +108,7 @@
                 <%- include("partiels/icone", { nom: "valider" }) %>
                 <span>Service effectué le <strong><%= c.terminee_le %></strong></span>
               </li>
-              <% if (!c.jaiDonneMonAvis) { %>
+              <% if (c.avisAttendu) { %>
                 <li>
                   <%- include("partiels/icone", { nom: "avis" }) %>
                   <span><strong>Votre avis est attendu</strong></span>
@@ -144,13 +116,7 @@
               <% } %>
               <li>
                 <%- include("partiels/icone", { nom: "message" }) %>
-                <span>
-                  <% if (c.nbMessages === 0) { %>
-                    Aucun message échangé
-                  <% } else { %>
-                    <%= c.nbMessages %> message<%= c.nbMessages > 1 ? "s" : "" %> conservé<%= c.nbMessages > 1 ? "s" : "" %>
-                  <% } %>
-                </span>
+                <span><%= c.phraseMessages %></span>
               </li>
             </ul>
 
@@ -158,7 +124,7 @@
                 discussion marquee "relire" et descendre jusqu'en bas pour
                 le trouver. %>
             <div class="actions">
-              <% if (!c.jaiDonneMonAvis) { %>
+              <% if (c.avisAttendu) { %>
                 <a class="bouton" href="/avis/<%= c.id %>">
                   <%- include("partiels/icone", { nom: "avis" }) %>
                   Donner mon avis

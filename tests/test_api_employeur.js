@@ -736,6 +736,55 @@ setTimeout(async () => {
   dire("la personne qui avait repondu garde sa discussion",
        (await discussion(reponseDePre3, cookieDe(pre3.cookie))).code === 200);
 
+  console.log(SAUT + "--- MES MESSAGES DEPUIS L'APPLICATION ---");
+  const listeApi = (entetes) => json("/api/discussions", undefined, entetes);
+  dire("sans session : 401", (await listeApi()).code === 401);
+
+  const lEmp = await listeApi(cookieDe(emp.cookie));
+  const d3 = lEmp.donnees || {};
+  dire("la liste de l'employeur arrive rangee",
+       lEmp.code === 200 && Array.isArray(d3.enCours) && Array.isArray(d3.terminees) && d3.vide === null,
+       lEmp.brut.slice(0, 160));
+  const serviceTermine = (d3.terminees || []).find((x) => x.id === cChoisie);
+  dire("le service termine est range a part, avec sa date, et son avis deja donne",
+       serviceTermine && typeof serviceTermine.termineeLe === "string" && serviceTermine.avisAttendu === false,
+       JSON.stringify(serviceTermine));
+  const discussionEcartee = (d3.enCours || []).find((x) => x.id === cRefusee);
+  dire("une discussion en cours, avec la phrase de l'employeur et sans message",
+       discussionEcartee && discussionEcartee.avec === "Test trois" && discussionEcartee.phraseStatut === "Vous avez choisi quelqu'un d'autre" &&
+       discussionEcartee.phraseMessages === "Aucun message échangé", JSON.stringify(discussionEcartee));
+
+  await poster("/messages/" + cNonVerifiee, form({ texte: M + " premier" }), pre4.cookie);
+  await poster("/messages/" + cNonVerifiee, form({ texte: M + " second" }), pre4.cookie);
+  const avecNouveaux = (await listeApi(cookieDe(emp.cookie))).donnees;
+  const nonLue = avecNouveaux.enCours.find((x) => x.id === cNonVerifiee);
+  dire("deux messages non lus sont dits",
+       nonLue && nonLue.phraseNonLus === "2 nouveaux messages" && nonLue.phraseMessages === "2 messages" &&
+       typeof nonLue.dernierMessage === "string", JSON.stringify(nonLue));
+  const moiAvecNouveaux = (await json("/api/moi", undefined, cookieDe(emp.cookie))).donnees.moi;
+  dire("le compteur du menu les compte, comme la liste",
+       moiAvecNouveaux.aVoir >= 2 && moiAvecNouveaux.aVoir === avecNouveaux.aVoir,
+       moiAvecNouveaux.aVoir + " / " + avecNouveaux.aVoir);
+  const pageMessages = await (await lire("/messages", emp.cookie)).text();
+  dire("la page du site dit la meme chose",
+       pageMessages.includes("/messages/" + cNonVerifiee) && pageMessages.includes("2 nouveaux messages") &&
+       pageMessages.includes("Services terminés"));
+  await discussion(cNonVerifiee, cookieDe(emp.cookie));
+  const apresLecture = (await listeApi(cookieDe(emp.cookie))).donnees.enCours.find((x) => x.id === cNonVerifiee);
+  dire("une fois la discussion ouverte, plus rien de nouveau", apresLecture.phraseNonLus === null);
+
+  const listePre = (await listeApi(cookieDe(pre3.cookie))).donnees;
+  const pourPre3 = listePre.enCours.find((x) => x.id === reponseDePre3);
+  dire("la personne qui a repondu lit ses propres phrases",
+       pourPre3 && pourPre3.avec === "Test emp" && pourPre3.phraseStatut === "L'employeur a retiré cette demande",
+       JSON.stringify(pourPre3));
+
+  const listeVide = (await listeApi(cookieDe(autreEmp.cookie))).donnees;
+  dire("sans discussion, la liste dit pourquoi a l'employeur",
+       listeVide.vide && listeVide.vide.phrase === "Aucune discussion pour le moment." &&
+       String(listeVide.vide.aide).startsWith("Une discussion s'ouvre lorsque quelqu'un répond"),
+       JSON.stringify(listeVide.vide));
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");

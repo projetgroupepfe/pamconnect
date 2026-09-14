@@ -4393,10 +4393,81 @@ function conversationDe(candidatureId, utilisateur) {
 
 // La liste des discussions. Sans elle, retrouver une conversation
 // obligeait a passer par son profil et a chercher la bonne candidature.
+// La liste des discussions, formulee pour la personne connectee. ECRITE
+// UNE SEULE FOIS : la page Mes messages et l'application disent la meme
+// chose, au pluriel pres.
+function mesDiscussions(utilisateur) {
+  const lignes = requetes.mesConversations.all({ moi: utilisateur.id });
+
+  const toutes = lignes.map((c) => {
+    const jeSuisEmployeur = utilisateur.id === c.employeurId;
+    const n = c.nbMessages;
+    const s = n > 1 ? "s" : "";
+    return {
+      ...c,
+      // Avec qui je parle : l'autre personne, jamais moi.
+      avec: jeSuisEmployeur ? c.nomPrestataire : c.nomEmployeur,
+      phraseStatut: phraseCandidature(c.statut, jeSuisEmployeur, c),
+      // La marque "Nouveau" distingue ce qui vient d'arriver de ce qui
+      // etait deja su.
+      nouveau: Boolean(c.decisionNonVue),
+      phraseNonLus: c.nonLus > 0
+        ? `${c.nonLus} nouveau${c.nonLus > 1 ? "x" : ""} message${c.nonLus > 1 ? "s" : ""}`
+        : null,
+      phraseMessages: n === 0
+        ? "Aucun message échangé"
+        : (c.terminee_le ? `${n} message${s} conservé${s}` : `${n} message${s}`),
+      // UN AVIS ATTENDU N'EST PAS UNE ARCHIVE : tant qu'il n'est pas donne,
+      // quelque chose attend.
+      avisAttendu: Boolean(c.terminee_le) && !c.jaiDonneMonAvis,
+    };
+  });
+
+  const enCours = toutes.filter((c) => !c.terminee_le);
+  const terminees = toutes.filter((c) => c.terminee_le);
+  const aNoter = terminees.filter((c) => c.avisAttendu).length;
+
+  // Pourquoi la liste est vide, dit a chacun selon ce qu'il fait.
+  let vide = null;
+  if (toutes.length === 0) {
+    vide = { phrase: "Aucune discussion pour le moment.", aide: null };
+    if (utilisateur.role === "prestataire") {
+      vide.aide = "Une discussion s'ouvre lorsque vous répondez à une demande. Elle sert à " +
+                  "vous accorder sur les horaires avec l'employeur avant qu'il fasse son choix.";
+    } else if (utilisateur.role === "employeur" && !utilisateur.est_admin) {
+      vide.aide = "Une discussion s'ouvre lorsque quelqu'un répond à l'une de vos demandes. " +
+                  "Elle sert à vous accorder sur les horaires avant de choisir la personne.";
+    }
+  }
+
+  return {
+    enCours,
+    terminees,
+    chapeauTerminees: aNoter > 0
+      ? {
+          fort: `${aNoter} service${aNoter > 1 ? "s" : ""} attend${aNoter > 1 ? "ent" : ""} votre avis.`,
+          suite: "Ces discussions ne reçoivent plus de message, mais vous pouvez encore dire ce qui s'est passé.",
+        }
+      : {
+          fort: null,
+          suite: "Ces discussions sont archivées : vous pouvez les relire, mais plus y écrire.",
+        },
+    vide,
+  };
+}
+
+// Ce que la pastille du menu compte : les messages non lus et les
+// decisions pas encore vues. Le meme calcul pour le site et l'application.
+function nombreAVoir(utilisateur) {
+  if (!utilisateur || utilisateur.est_admin) return 0;
+  return requetes.messagesNonLus.get({ moi: utilisateur.id }).n +
+         requetes.decisionsNonVues.get({ moi: utilisateur.id }).n;
+}
+
 app.get("/messages", exigerConnexion, (req, res) => {
   res.render("messages", {
     titre: "Mes messages",
-    conversations: requetes.mesConversations.all({ moi: req.utilisateur.id }),
+    liste: mesDiscussions(req.utilisateur),
   });
 });
 
@@ -6104,6 +6175,8 @@ function moiPourApi(u) {
     // periment, les achetes jamais. Une application qui n'afficherait
     // que la somme cacherait a la personne ce qui va disparaitre.
     jetons: soldeJetonsDe(u.id),
+    // La pastille de Messages, comptee comme celle du menu du site.
+    aVoir: nombreAVoir(u),
   };
 }
 
@@ -6426,6 +6499,34 @@ function prixDeLaDiscussion(conversation, jeSuisEmployeur) {
       : `C'est le prix annoncé par ${conversation.nomEmployeur} dans sa demande.`,
   };
 }
+
+app.get("/api/discussions", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const liste = mesDiscussions(moi);
+  // Les champs sont choisis un par un : ni email, ni telephone.
+  const resume = (c) => ({
+    id: c.id,
+    avec: c.avec,
+    titreDemande: c.titreAnnonce,
+    phraseStatut: c.phraseStatut,
+    nouveau: c.nouveau,
+    phraseNonLus: c.phraseNonLus,
+    phraseMessages: c.phraseMessages,
+    dernierMessage: c.dernierMessage || null,
+    termineeLe: c.terminee_le || null,
+    avisAttendu: c.avisAttendu,
+  });
+
+  res.json({
+    enCours: liste.enCours.map(resume),
+    terminees: liste.terminees.map(resume),
+    chapeauTerminees: liste.chapeauTerminees,
+    vide: liste.vide,
+    aVoir: nombreAVoir(moi),
+  });
+});
 
 app.get("/api/discussions/:id", (req, res) => {
   const moi = utilisateurConnecte(req);
