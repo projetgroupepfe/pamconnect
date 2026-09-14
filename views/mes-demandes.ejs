@@ -130,7 +130,9 @@
               <% if (annonce.peutRetirer) { %>
                 <%# Retirer n'efface rien : la demande sort de la liste
                     publique, les discussions restent. %>
-                <form action="/annonces/<%= annonce.id %>/annuler" method="POST">
+                <form action="/annonces/<%= annonce.id %>/annuler" method="POST"
+                      data-question="Voulez-vous vraiment retirer cette demande ?"
+                      data-precision="Elle disparaîtra de la liste, personne ne pourra plus y répondre, et la somme bloquée vous sera rendue.">
                   <button type="submit" class="bouton-danger">
                     <%- include("partiels/icone", { nom: "refuser" }) %>
                     Retirer cette demande

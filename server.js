@@ -3533,61 +3533,119 @@ function chargerMonAnnonce(req, res) {
   return requetes.monAnnonce.get(Number(req.params.id), req.utilisateur.id) || null;
 }
 
-app.get("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, (req, res) => {
-  const annonce = chargerMonAnnonce(req, res);
+// MODIFIER, METTRE EN AVANT ET RETIRER SONT ECRITS UNE SEULE FOIS. Le
+// site et l'application passent par les memes fonctions : les memes
+// portes, les memes phrases.
 
-  if (!annonce) {
-    return res.status(404).render("message", {
-      titre: "Demande introuvable",
-      texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
-      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-    });
+// Une demande de l'employeur connecte, ou rien : la requete monAnnonce
+// exige l'identifiant ET le proprietaire.
+function maDemande(annonceId, utilisateur) {
+  if (utilisateur.est_admin || utilisateur.role !== "employeur") return null;
+  return requetes.monAnnonce.get(annonceId, utilisateur.id) || null;
+}
+
+const DEMANDE_INTROUVABLE = {
+  code: 404,
+  titre: "Demande introuvable",
+  texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
+  lien: { url: "/mes-demandes", texte: "Retour à mes demandes" },
+};
+
+// Des gens ont deja repondu : ils se sont decides sur ce qui etait ecrit.
+// On ne l'interdit pas - un horaire faux doit pouvoir etre corrige - mais
+// on le dit, et on rappelle qu'il faut les prevenir.
+function avertissementModification(nombre) {
+  if (!nombre) return null;
+  const plusieurs = nombre > 1;
+  return {
+    phrase: `${nombre} personne${plusieurs ? "s ont" : " a"} déjà répondu à cette demande. ` +
+            `Elle${plusieurs ? "s se sont décidées" : " s'est décidée"} sur ce qui est écrit aujourd'hui.`,
+    conseil: `Si vous changez l'horaire, le lieu ou le prix, prévenez-${plusieurs ? "les" : "la"} ` +
+             "dans la discussion : la plateforme ne le fait pas à votre place.",
+  };
+}
+
+function demandeAModifier(annonceId, utilisateur) {
+  const annonce = maDemande(annonceId, utilisateur);
+  if (!annonce) return { probleme: DEMANDE_INTROUVABLE };
+
+  // UNE DEMANDE FERMEE NE SE MODIFIE PLUS. Le bouton etait cache, mais
+  // l'adresse restait ouverte : apres avoir choisi quelqu'un, changer le
+  // prix changeait la somme bloquee que cette personne allait recevoir.
+  if (annonce.annulee) {
+    return {
+      annonce,
+      probleme: {
+        code: 409,
+        titre: "Cette demande est fermée",
+        texte: "Une demande retirée ou pourvue ne se modifie plus.",
+        lien: DEMANDE_INTROUVABLE.lien,
+      },
+    };
   }
+
+  return { annonce, avertissement: avertissementModification(requetes.nombreCandidatures.get(annonce.id).n) };
+}
+
+function modifierDemande(annonceId, utilisateur, donnees) {
+  const demande = demandeAModifier(annonceId, utilisateur);
+  if (demande.probleme) return demande;
+
+  const { annonce } = demande;
+
+  // Les memes regles qu'a la publication, appelees au meme endroit :
+  // ce que l'un refuse, l'autre le refuse aussi.
+  const probleme = verifierAnnonce(donnees);
+  if (probleme) {
+    return {
+      annonce,
+      probleme: Object.assign({
+        code: 400,
+        lien: { url: `/annonces/${annonce.id}/modifier`, texte: "Retour au formulaire" },
+      }, probleme),
+    };
+  }
+
+  const champs = champsAnnonce(donnees);
+
+  // Le prix a peut-etre change : la somme bloquee doit suivre, sinon les
+  // deux chiffres se contredisent. Les deux ensemble, ou aucun.
+  db.transaction(() => {
+    requetes.majAnnonce.run(Object.assign({ id: annonce.id }, champs));
+    requetes.ajusterVersement.run({ annonce: annonce.id, montant: champs.prix || 0 });
+  })();
+
+  return {
+    annonce,
+    ok: true,
+    titre: "Demande mise à jour",
+    texte: "Les personnes qui consultent vos demandes voient la nouvelle version.",
+  };
+}
+
+app.get("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, (req, res) => {
+  const demande = demandeAModifier(Number(req.params.id), req.utilisateur);
+  if (demande.probleme) return afficherProbleme(res, demande.probleme);
 
   res.render("modifier-annonce", {
     titre: "Modifier ma demande",
-    annonce,
-    candidatures: requetes.nombreCandidatures.get(annonce.id).n,
+    annonce: demande.annonce,
+    avertissement: demande.avertissement,
   });
 });
 
 app.post("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
-  const annonce = chargerMonAnnonce(req, res);
-
-  if (!annonce) {
-    return res.status(404).render("message", {
-      titre: "Demande introuvable",
-      texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
-      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-    });
-  }
-
-  // Les memes regles qu'a la publication, appelees au meme endroit :
-  // ce que l'un refuse, l'autre le refuse aussi.
-  const probleme = verifierAnnonce(req.body);
-  if (probleme) {
-    return res.status(400).render("message", Object.assign({}, probleme, {
-      liens: [{ url: `/annonces/${annonce.id}/modifier`, texte: "Retour au formulaire" }],
-    }));
-  }
-
-  requetes.majAnnonce.run(Object.assign({ id: annonce.id }, champsAnnonce(req.body)));
-
-  // Le prix a peut-etre change : la somme bloquee doit suivre, sinon les
-  // deux chiffres se contredisent d'un ecran a l'autre.
-  requetes.ajusterVersement.run({
-    annonce: annonce.id,
-    montant: Math.round(Number(req.body.prix) || 0),
-  });
+  const resultat = modifierDemande(Number(req.params.id), req.utilisateur, req.body);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
 
   res.render("message", {
-    titre: "Demande mise à jour",
-    texte: "Les personnes qui consultent vos demandes voient la nouvelle version.",
+    titre: resultat.titre,
+    texte: resultat.texte,
     liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
   });
 });
 
-// --- Mettre une demande en avant : l'ecran de confirmation ---------
+// --- Mettre une demande en avant -----------------------------------
 //
 // CE QUE LA MISE EN AVANT N'EST PAS. Elle ne fait pas passer devant les
 // demandes d'un autre metier : une aide-menagere voit d'abord les
@@ -3597,114 +3655,97 @@ app.post("/annonces/:id/modifier", exigerConnexion, interdireALEquipe, lireFormu
 // C'est la meme regle que du cote des personnes qui proposent leurs
 // services : aucune ne peut payer pour apparaitre en tete d'une
 // recherche.
-function ecranMiseEnAvant(req, res, erreur) {
-  const annonce = chargerMonAnnonce(req, res);
+const DEMANDE_FERMEE_POUR_LA_METTRE_EN_AVANT = {
+  code: 409,
+  titre: "Cette demande est fermée",
+  texte: "Une demande retirée ou déjà pourvue ne peut pas être mise en avant.",
+  lien: DEMANDE_INTROUVABLE.lien,
+};
 
-  if (!annonce) {
-    return res.status(404).render("message", {
-      titre: "Demande introuvable",
-      texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
-      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-    });
-  }
+function ecranDeMiseEnAvant(annonceId, utilisateur) {
+  const annonce = maDemande(annonceId, utilisateur);
+  if (!annonce) return { probleme: DEMANDE_INTROUVABLE };
+  if (annonce.annulee) return { annonce, probleme: DEMANDE_FERMEE_POUR_LA_METTRE_EN_AVANT };
 
-  if (annonce.annulee) {
-    return res.status(409).render("message", {
-      titre: "Cette demande est fermée",
-      texte: "Une demande retirée ou déjà pourvue ne peut pas être mise en avant.",
-      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-    });
-  }
+  mettreAJourLesJetons(utilisateur);
 
-  mettreAJourLesJetons(req.utilisateur);
-
-  const cout = parametreNombre("cout_mise_en_avant");
-  const jours = parametreNombre("duree_mise_en_avant_jours");
-  const solde = soldeJetonsDe(req.utilisateur.id);
-
-  return res.render("mettre-en-avant", {
-    titre: "Mettre cette demande en avant",
+  return {
     annonce,
-    cout,
-    jours,
-    solde: solde.total,
+    cout: parametreNombre("cout_mise_en_avant"),
+    jours: parametreNombre("duree_mise_en_avant_jours"),
+    solde: soldeJetonsDe(utilisateur.id).total,
     finActuelle: annonce.enAvant ? dateLisible(annonce.mise_en_avant_jusqu_au) : null,
-    erreur: erreur || null,
-  });
+  };
 }
 
-app.get("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe,
-  (req, res) => ecranMiseEnAvant(req, res));
+function mettreEnAvantDemande(annonceId, utilisateur) {
+  const annonce = maDemande(annonceId, utilisateur);
+  if (!annonce) return { probleme: DEMANDE_INTROUVABLE };
+  if (annonce.annulee) return { annonce, probleme: DEMANDE_FERMEE_POUR_LA_METTRE_EN_AVANT };
 
-// --- Mettre une demande en avant : le prelevement ------------------
-app.post("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe,
-  lireFormulaire, (req, res) => {
-  const annonce = chargerMonAnnonce(req, res);
-
-  if (!annonce) {
-    return res.status(404).render("message", {
-      titre: "Demande introuvable",
-      texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
-      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-    });
-  }
-
-  if (annonce.annulee) {
-    return res.status(409).render("message", {
-      titre: "Cette demande est fermée",
-      texte: "Une demande retirée ou déjà pourvue ne peut pas être mise en avant.",
-      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-    });
-  }
+  const retour = DEMANDE_INTROUVABLE.lien;
+  const versJetons = { url: "/mes-jetons", texte: "Voir mes jetons" };
 
   // DEJA EN AVANT : on refuse au lieu de prolonger. Prolonger
   // silencieusement ferait payer deux fois quelqu'un qui a clique deux
   // fois, et il n'aurait aucun moyen de s'en apercevoir.
   if (annonce.enAvant) {
-    return res.status(409).render("message", {
-      titre: "Cette demande est déjà en avant",
-      texte: `Elle le reste jusqu'au ${dateLisible(annonce.mise_en_avant_jusqu_au)}. ` +
-             `Vous pourrez la remettre en avant après cette date.`,
-      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-    });
+    return {
+      annonce,
+      probleme: {
+        code: 409,
+        titre: "Cette demande est déjà en avant",
+        texte: `Elle le reste jusqu'au ${dateLisible(annonce.mise_en_avant_jusqu_au)}. ` +
+               `Vous pourrez la remettre en avant après cette date.`,
+        lien: retour,
+      },
+    };
   }
 
-  mettreAJourLesJetons(req.utilisateur);
+  mettreAJourLesJetons(utilisateur);
 
   const cout = parametreNombre("cout_mise_en_avant");
   const jours = parametreNombre("duree_mise_en_avant_jours");
 
   if (!cout || !jours) {
-    return res.status(503).render("message", {
-      titre: "Option indisponible",
-      texte: "Le prix de la mise en avant n'a pas encore été réglé par l'équipe.",
-      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-    });
+    return {
+      annonce,
+      probleme: {
+        code: 503,
+        titre: "Option indisponible",
+        texte: "Le prix de la mise en avant n'a pas encore été réglé par l'équipe.",
+        lien: retour,
+      },
+    };
   }
 
-  const solde = soldeJetonsDe(req.utilisateur.id);
+  const solde = soldeJetonsDe(utilisateur.id);
 
   if (solde.total < cout) {
-    return res.status(402).render("message", {
-      titre: "Il vous manque des jetons",
-      texte: `Mettre une demande en avant coûte ${jetonsEnClair(cout)}. ` +
-             `Il vous reste ${jetonsEnClair(solde.total)}.`,
-      liens: [{ url: "/mes-jetons", texte: "Voir mes jetons" }],
-    });
+    return {
+      annonce,
+      probleme: {
+        code: 402,
+        titre: "Il vous manque des jetons",
+        texte: `Mettre une demande en avant coûte ${jetonsEnClair(cout)}. ` +
+               `Il vous reste ${jetonsEnClair(solde.total)}.`,
+        lien: versJetons,
+      },
+    };
   }
 
   // LES DEUX ECRITURES SONT INDIVISIBLES. Une demande mise en avant
   // sans jeton preleve serait gratuite ; un jeton preleve sans mise en
   // avant serait un vol.
   const poser = db.transaction(() => {
-    if (!depenserJetons(req.utilisateur, cout, "mise_en_avant",
+    if (!depenserJetons(utilisateur, cout, "mise_en_avant",
           `Mise en avant : ${annonce.titre}`, annonce.id)) {
       return false;
     }
 
     const fait = requetes.mettreEnAvant.run({
       id: annonce.id,
-      employeur: req.utilisateur.id,
+      employeur: utilisateur.id,
       duree: `+${Math.round(jours)} days`,
     });
 
@@ -3719,31 +3760,66 @@ app.post("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe,
     pose = poser();
   } catch (erreur) {
     if (String(erreur.message) === "DEMANDE_FERMEE") {
-      return res.status(409).render("message", {
-        titre: "Cette demande est fermée",
-        texte: "Elle a été fermée entre-temps. Aucun jeton n'a été prélevé.",
-        liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-      });
+      return {
+        annonce,
+        probleme: {
+          code: 409,
+          titre: "Cette demande est fermée",
+          texte: "Elle a été fermée entre-temps. Aucun jeton n'a été prélevé.",
+          lien: retour,
+        },
+      };
     }
     throw erreur;
   }
 
   if (!pose) {
-    return res.status(402).render("message", {
-      titre: "Il vous manque des jetons",
-      texte: `Mettre une demande en avant coûte ${jetonsEnClair(cout)}.`,
-      liens: [{ url: "/mes-jetons", texte: "Voir mes jetons" }],
-    });
+    return {
+      annonce,
+      probleme: {
+        code: 402,
+        titre: "Il vous manque des jetons",
+        texte: `Mettre une demande en avant coûte ${jetonsEnClair(cout)}.`,
+        lien: versJetons,
+      },
+    };
   }
 
-  const apres = requetes.monAnnonce.get(annonce.id, req.utilisateur.id);
+  const apres = requetes.monAnnonce.get(annonce.id, utilisateur.id);
 
-  res.render("message", {
+  return {
+    annonce,
+    ok: true,
     titre: "Votre demande est mise en avant",
     texte: `Elle passe devant les autres demandes de ${annonce.metier} ` +
            `jusqu'au ${dateLisible(apres.mise_en_avant_jusqu_au)}, et porte le badge ` +
            `« Mise en avant ». ${jetonsEnClair(cout)} a été prélevé. ` +
            `Après cette date, elle reprend sa place sans que vous ayez rien à faire.`,
+  };
+}
+
+app.get("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe, (req, res) => {
+  const ecran = ecranDeMiseEnAvant(Number(req.params.id), req.utilisateur);
+  if (ecran.probleme) return afficherProbleme(res, ecran.probleme);
+
+  res.render("mettre-en-avant", {
+    titre: "Mettre cette demande en avant",
+    annonce: ecran.annonce,
+    cout: ecran.cout,
+    jours: ecran.jours,
+    solde: ecran.solde,
+    finActuelle: ecran.finActuelle,
+    erreur: null,
+  });
+});
+
+app.post("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
+  const resultat = mettreEnAvantDemande(Number(req.params.id), req.utilisateur);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
+  res.render("message", {
+    titre: resultat.titre,
+    texte: resultat.texte,
     liens: [
       { url: "/annonces", texte: "Voir la liste des demandes" },
       { url: "/mes-demandes", texte: "Retour à mes demandes" },
@@ -3761,43 +3837,62 @@ app.post("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe,
 // eues, et la trace de ce qui avait ete convenu. Une personne qui a
 // discute pendant une semaine ne doit pas voir l'echange disparaitre
 // parce que l'autre a change d'avis.
-app.post("/annonces/:id/annuler", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
-  const annonce = chargerMonAnnonce(req, res);
+function retirerDemande(annonceId, utilisateur) {
+  const annonce = maDemande(annonceId, utilisateur);
+  if (!annonce) return { probleme: DEMANDE_INTROUVABLE };
 
-  if (!annonce) {
-    return res.status(404).render("message", {
-      titre: "Demande introuvable",
-      texte: "Cette demande n'existe pas, ou elle n'est pas la vôtre.",
-      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-    });
-  }
-
-  // ON NE RETIRE PAS UNE DEMANDE OU QUELQU'UN A ETE CHOISI.
-  //
-  // Le bouton est cache dans ce cas, mais cacher un bouton n'est pas une
-  // regle. Sans ce controle, un employeur pouvait fermer sa demande APRES
-  // avoir embauche et recuperer sa somme : la personne avait travaille
-  // pour rien. C'est exactement ce que le sequestre doit empecher.
+  // ON NE REPREND PAS SON ARGENT APRES AVOIR CHOISI. Retirer rend la somme
+  // bloquee : une demande pourvue ne se retire donc pas, sinon la personne
+  // choisie travaillerait pour rien.
   if (requetes.annonceEstPourvue.get(annonce.id)) {
-    return res.status(409).render("message", {
-      titre: "Vous avez déjà choisi quelqu'un",
-      texte: "Cette demande ne peut plus être retirée : vous avez retenu une " +
-             "personne pour ce service. Si le service n'a pas eu lieu, signalez " +
-             "le problème à l'équipe plutôt que de retirer la demande.",
-      liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
-    });
+    return {
+      annonce,
+      probleme: {
+        code: 409,
+        titre: "Vous avez déjà choisi quelqu'un",
+        texte: "Cette demande ne peut plus être retirée : vous avez retenu une " +
+               "personne pour ce service. Si le service n'a pas eu lieu, signalez " +
+               "le problème à l'équipe plutôt que de retirer la demande.",
+        lien: DEMANDE_INTROUVABLE.lien,
+      },
+    };
   }
 
-  requetes.annulerAnnonce.run({ id: annonce.id });
+  if (annonce.annulee) {
+    return {
+      annonce,
+      probleme: {
+        code: 409,
+        titre: "Demande déjà retirée",
+        texte: "Cette demande est déjà retirée : elle n'apparaît plus dans la liste.",
+        lien: DEMANDE_INTROUVABLE.lien,
+      },
+    };
+  }
 
-  // Personne n'a ete choisi : la somme n'a plus de raison d'attendre.
-  requetes.rembourserVersement.run({ annonce: annonce.id });
+  // Fermer la demande et rendre la somme : les deux ensemble, ou aucun.
+  db.transaction(() => {
+    requetes.annulerAnnonce.run({ id: annonce.id });
+    requetes.rembourserVersement.run({ annonce: annonce.id });
+  })();
 
-  res.render("message", {
+  return {
+    annonce,
+    ok: true,
     titre: "Demande retirée",
     texte: "Votre demande n'apparaît plus dans la liste et personne ne peut " +
            "plus y répondre. Les personnes qui vous avaient déjà répondu gardent " +
            "accès à votre discussion.",
+  };
+}
+
+app.post("/annonces/:id/annuler", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
+  const resultat = retirerDemande(Number(req.params.id), req.utilisateur);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
+  res.render("message", {
+    titre: resultat.titre,
+    texte: resultat.texte,
     liens: [{ url: "/mes-demandes", texte: "Retour à mes demandes" }],
   });
 });
@@ -6172,17 +6267,21 @@ function refusDePublierApi(res, moi) {
 // Les listes du formulaire viennent du serveur, comme sur le site :
 // ajouter un metier ou un quartier ne demandera pas de refabriquer
 // l'application.
-app.get("/api/formulaire-demande", (req, res) => {
-  const moi = utilisateurConnecte(req);
-  if (refusDePublierApi(res, moi)) return;
-
-  res.json({
+function listesDuFormulaireDemande() {
+  return {
     metiers: metiers.map((m) => m.nom),
     quartiers: quartiers.map((q) => q.nom),
     arrondissements: app.locals.arrondissements,
     unitesTarif: Object.keys(UNITES_TARIF).map((valeur) => ({ valeur, libelle: UNITES_TARIF[valeur] })),
     uniteParDefaut: "forfaitaire",
-  });
+  };
+}
+
+app.get("/api/formulaire-demande", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusDePublierApi(res, moi)) return;
+
+  res.json(listesDuFormulaireDemande());
 });
 
 // L'arrondissement d'un quartier, tel que le serveur l'enregistrera.
@@ -6201,6 +6300,16 @@ app.get("/api/quartier", (req, res) => {
 const CHAMPS_DEMANDE = ["titre", "metier", "horaire", "quartier", "arrondissement",
                         "prix", "unite_tarif", "duree_estimee", "conditions"];
 
+// Un formulaire du site n'envoie que du texte. En JSON, un objet peut se
+// glisser a la place d'un texte : on le refuse plutot que d'enregistrer
+// "[object Object]" comme titre.
+function formeDeDemandeValide(corps) {
+  return Boolean(corps) && typeof corps === "object" && !Array.isArray(corps) &&
+    CHAMPS_DEMANDE.every((champ) => corps[champ] == null ||
+      typeof corps[champ] === "string" ||
+      (champ === "prix" && typeof corps[champ] === "number"));
+}
+
 app.post("/api/demandes", (req, res) => {
   const moi = utilisateurConnecte(req);
   if (refusDePublierApi(res, moi)) return;
@@ -6209,11 +6318,7 @@ app.post("/api/demandes", (req, res) => {
   // se glisser a la place d'un texte : on le refuse plutot que
   // d'enregistrer "[object Object]" comme titre.
   const corps = req.body;
-  const formeValide = Boolean(corps) && typeof corps === "object" && !Array.isArray(corps) &&
-    CHAMPS_DEMANDE.every((champ) => corps[champ] == null ||
-      typeof corps[champ] === "string" ||
-      (champ === "prix" && typeof corps[champ] === "number"));
-  if (!formeValide) {
+  if (!formeDeDemandeValide(corps)) {
     return erreurApi(res, 400, "Le formulaire envoyé n'a pas la forme attendue.");
   }
 
@@ -6474,6 +6579,89 @@ app.post("/api/avis/:id/signaler", (req, res) => {
   if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
 
   const resultat = signalerUnAvis(Number(req.params.id), moi);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.json({ texte: resultat.texte });
+});
+
+// --- Modifier, mettre en avant, retirer depuis l'application --------
+app.get("/api/demandes/:id/modification", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEmployeurApi(res, moi)) return;
+
+  const demande = demandeAModifier(Number(req.params.id), moi);
+  if (demande.probleme) return erreurApi(res, demande.probleme.code, demande.probleme.texte);
+
+  const a = demande.annonce;
+  res.json(Object.assign(listesDuFormulaireDemande(), {
+    valeurs: {
+      titre: a.titre || "",
+      metier: a.metier || "",
+      horaire: a.horaire || "",
+      quartier: a.quartier || "",
+      arrondissement: a.arrondissement || null,
+      prix: a.prix != null ? String(a.prix) : "",
+      unite_tarif: a.unite_tarif || "forfaitaire",
+      duree_estimee: a.duree_estimee || "",
+      conditions: a.conditions || "",
+    },
+    avertissement: demande.avertissement,
+  }));
+});
+
+app.post("/api/demandes/:id", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEmployeurApi(res, moi)) return;
+
+  if (!formeDeDemandeValide(req.body)) {
+    return erreurApi(res, 400, "Le formulaire envoyé n'a pas la forme attendue.");
+  }
+
+  const resultat = modifierDemande(Number(req.params.id), moi, req.body);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.json({ texte: resultat.texte });
+});
+
+app.get("/api/demandes/:id/mise-en-avant", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEmployeurApi(res, moi)) return;
+
+  const ecran = ecranDeMiseEnAvant(Number(req.params.id), moi);
+  if (ecran.probleme) return erreurApi(res, ecran.probleme.code, ecran.probleme.texte);
+
+  const { annonce: a, cout, jours, solde, finActuelle } = ecran;
+  const disponible = Boolean(cout && jours);
+
+  res.json({
+    titre: a.titre,
+    metier: a.metier || null,
+    lieu: [a.quartier, a.arrondissement].filter(Boolean).join(", ") || null,
+    finActuelle,
+    disponible,
+    jours: disponible ? Math.round(jours) : null,
+    cout: disponible ? jetonsEnClair(cout) : null,
+    resteApres: disponible ? jetonsEnClair(Math.max(0, solde - cout)) : null,
+    solde: jetonsEnClair(solde),
+    soldeSuffit: disponible && solde >= cout,
+  });
+});
+
+app.post("/api/demandes/:id/mise-en-avant", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEmployeurApi(res, moi)) return;
+
+  const resultat = mettreEnAvantDemande(Number(req.params.id), moi);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.json({ texte: resultat.texte });
+});
+
+app.post("/api/demandes/:id/retirer", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEmployeurApi(res, moi)) return;
+
+  const resultat = retirerDemande(Number(req.params.id), moi);
   if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
 
   res.json({ texte: resultat.texte });

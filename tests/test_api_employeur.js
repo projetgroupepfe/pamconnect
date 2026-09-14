@@ -629,6 +629,113 @@ setTimeout(async () => {
   dire("la page du site dit la meme chose",
        (await (await lire("/messages/" + cChoisie, emp.cookie)).text()).includes("Signalé"));
 
+  console.log(SAUT + "--- MODIFIER UNE DEMANDE DEPUIS L'APPLICATION ---");
+  const aModifier = await json("/api/demandes", complet(M + " a modifier"), cookieDe(emp.cookie));
+  const idAModifier = aModifier.donnees.id;
+  const modification = (id, entetes) => json("/api/demandes/" + id + "/modification", undefined, entetes);
+  const modifier = (id, corps, entetes) => json("/api/demandes/" + id, corps, entetes);
+  const ligneDemande = (id) =>
+    base.prepare("SELECT titre, prix, annulee, mise_en_avant_jusqu_au FROM annonces WHERE id = ?").get(id);
+  const sommeBloquee = (id) => base.prepare("SELECT montant, etat FROM versements WHERE annonce_id = ?").get(id);
+
+  dire("sans session : 401", (await modification(idAModifier)).code === 401);
+  dire("une personne qui repond : 403", (await modification(idAModifier, cookieDe(verifiee.cookie))).code === 403);
+  dire("un autre employeur : 404", (await modification(idAModifier, cookieDe(autreEmp.cookie))).code === 404);
+  const mod = await modification(idAModifier, cookieDe(emp.cookie));
+  dire("le formulaire arrive prerempli, avec ses listes",
+       mod.code === 200 && mod.donnees.valeurs.titre === M + " a modifier" && mod.donnees.valeurs.prix === "8000" &&
+       mod.donnees.valeurs.horaire === "Mercredi 9h" && Array.isArray(mod.donnees.metiers) &&
+       mod.donnees.avertissement === null, mod.brut.slice(0, 200));
+
+  await poster("/candidatures", form({ annonceId: String(idAModifier) }), pre3.cookie);
+  const modAvecReponse = (await modification(idAModifier, cookieDe(emp.cookie))).donnees;
+  dire("une fois quelqu'un a repondu, l'employeur est prevenu",
+       modAvecReponse.avertissement && modAvecReponse.avertissement.phrase.startsWith("1 personne a déjà répondu") &&
+       modAvecReponse.avertissement.conseil.includes("prévenez-la"), JSON.stringify(modAvecReponse.avertissement));
+  dire("la page du site dit la meme chose",
+       (await (await lire("/annonces/" + idAModifier + "/modifier", emp.cookie)).text())
+         .includes("1 personne a déjà répondu à cette demande."));
+
+  const horsRegle = await modifier(idAModifier, Object.assign(complet(M + " a modifier"), { prix: 750 }), cookieDe(emp.cookie));
+  dire("un prix hors regle : 400", horsRegle.code === 400 && ligneDemande(idAModifier).prix === 8000, horsRegle.brut);
+  const modOk = await modifier(idAModifier, Object.assign(complet(M + " modifiee"), { prix: 9000 }),
+                               { Authorization: "Bearer " + jeton });
+  dire("la modification passe depuis l'application",
+       modOk.code === 200 && ligneDemande(idAModifier).titre === M + " modifiee" && ligneDemande(idAModifier).prix === 9000,
+       modOk.brut);
+  dire("la somme bloquee suit le nouveau prix", sommeBloquee(idAModifier).montant === 9000,
+       JSON.stringify(sommeBloquee(idAModifier)));
+
+  // La faille : une demande pourvue se modifiait encore, et la somme promise avec.
+  const modPourvue = await modifier(idAChoisir, Object.assign(complet(M + " a choisir"), { prix: 500 }), cookieDe(emp.cookie));
+  dire("une demande pourvue ne se modifie plus : 409", modPourvue.code === 409 && ligneDemande(idAChoisir).prix === 8000,
+       modPourvue.brut);
+  const modPourvueWeb = await poster("/annonces/" + idAChoisir + "/modifier",
+    form(Object.assign(complet(M + " a choisir"), { prix: "500" })), emp.cookie);
+  dire("le site le refuse aussi", modPourvueWeb.code === 409 && ligneDemande(idAChoisir).prix === 8000,
+       "code " + modPourvueWeb.code);
+  dire("et son formulaire ne s'ouvre plus", (await lire("/annonces/" + idAChoisir + "/modifier", emp.cookie)).status === 409);
+
+  console.log(SAUT + "--- METTRE EN AVANT DEPUIS L'APPLICATION ---");
+  const infoMiseEnAvant = (id, entetes) => json("/api/demandes/" + id + "/mise-en-avant", undefined, entetes);
+  const mettreEnAvantApi = (id, entetes) => json("/api/demandes/" + id + "/mise-en-avant", {}, entetes);
+  const reglage = (cle) => Number((base.prepare("SELECT valeur FROM parametres WHERE cle = ?").get(cle) || {}).valeur);
+  const coutReel = reglage("cout_mise_en_avant");
+  const joursReels = reglage("duree_mise_en_avant_jours");
+  const jetonsDeEmp = async () => (await json("/api/moi", undefined, cookieDe(emp.cookie))).donnees.moi.jetons.total;
+
+  dire("un autre employeur : 404", (await infoMiseEnAvant(idAModifier, cookieDe(autreEmp.cookie))).code === 404);
+  dire("une demande fermee : 409", (await infoMiseEnAvant(idAChoisir, cookieDe(emp.cookie))).code === 409);
+  const ecranAvant = await infoMiseEnAvant(idAModifier, cookieDe(emp.cookie));
+
+  if (coutReel > 0 && joursReels > 0) {
+    dire("l'ecran dit le cout, la duree et ce qu'il restera",
+         ecranAvant.code === 200 && ecranAvant.donnees.disponible === true &&
+         ecranAvant.donnees.jours === Math.round(joursReels) && ecranAvant.donnees.finActuelle === null &&
+         typeof ecranAvant.donnees.cout === "string" && typeof ecranAvant.donnees.resteApres === "string",
+         ecranAvant.brut);
+    let soldeAvant = await jetonsDeEmp();
+    if (soldeAvant < coutReel) {
+      dire("sans assez de jetons, l'ecran le dit", ecranAvant.donnees.soldeSuffit === false);
+      const sansJetons = await mettreEnAvantApi(idAModifier, cookieDe(emp.cookie));
+      dire("et l'envoi est refuse : 402",
+           sansJetons.code === 402 && ligneDemande(idAModifier).mise_en_avant_jusqu_au === null, sansJetons.brut);
+      crediter(emp.id, coutReel);
+      soldeAvant = await jetonsDeEmp();
+    }
+    const posee = await mettreEnAvantApi(idAModifier, { Authorization: "Bearer " + jeton });
+    dire("la mise en avant passe depuis l'application",
+         posee.code === 200 && Boolean(ligneDemande(idAModifier).mise_en_avant_jusqu_au), posee.brut);
+    const soldeApres = await jetonsDeEmp();
+    dire("son cout est preleve", soldeApres === soldeAvant - coutReel, soldeAvant + " -> " + soldeApres);
+    const dejaEnAvant = await mettreEnAvantApi(idAModifier, cookieDe(emp.cookie));
+    dire("deja en avant : 409, sans payer deux fois",
+         dejaEnAvant.code === 409 && (await jetonsDeEmp()) === soldeApres, dejaEnAvant.brut);
+    dire("l'ecran dit jusqu'a quand",
+         typeof (await infoMiseEnAvant(idAModifier, cookieDe(emp.cookie))).donnees.finActuelle === "string");
+    const lueEnAvant = (await mesDemandes(emp.cookie)).donnees.demandes.find((x) => x.id === idAModifier);
+    dire("Mes demandes la dit en avant, sans le bouton", lueEnAvant.enAvant === true && lueEnAvant.peutMettreEnAvant === false);
+  } else {
+    dire("sans reglage de l'equipe, l'option est dite indisponible",
+         ecranAvant.code === 200 && ecranAvant.donnees.disponible === false);
+  }
+
+  console.log(SAUT + "--- RETIRER UNE DEMANDE DEPUIS L'APPLICATION ---");
+  const retirerApi = (id, entetes) => json("/api/demandes/" + id + "/retirer", {}, entetes);
+  dire("le site demande confirmation avant de retirer",
+       (await (await lire("/mes-demandes", emp.cookie)).text())
+         .includes('data-question="Voulez-vous vraiment retirer cette demande ?"'));
+  dire("un autre employeur : 404", (await retirerApi(idAModifier, cookieDe(autreEmp.cookie))).code === 404);
+  dire("une demande pourvue ne se retire pas : 409", (await retirerApi(idAChoisir, cookieDe(emp.cookie))).code === 409);
+  const retraitApi = await retirerApi(idAModifier, { Authorization: "Bearer " + jeton });
+  dire("le retrait passe depuis l'application", retraitApi.code === 200 && ligneDemande(idAModifier).annulee === 1,
+       retraitApi.brut);
+  dire("la somme bloquee est rendue", sommeBloquee(idAModifier).etat === "rembourse", JSON.stringify(sommeBloquee(idAModifier)));
+  dire("retirer deux fois : 409", (await retirerApi(idAModifier, cookieDe(emp.cookie))).code === 409);
+  const reponseDePre3 = base.prepare("SELECT id FROM candidatures WHERE annonce_id = ?").get(idAModifier).id;
+  dire("la personne qui avait repondu garde sa discussion",
+       (await discussion(reponseDePre3, cookieDe(pre3.cookie))).code === 200);
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");

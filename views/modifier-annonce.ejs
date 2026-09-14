@@ -11,18 +11,12 @@
         fait la votre : ils se sont decides sur ce qui etait ecrit. On ne
         l'interdit pas - un horaire faux doit pouvoir etre corrige - mais on
         le dit, et on rappelle qu'il faut les prevenir. %>
-    <% if (candidatures > 0) { %>
+    <%# La phrase vient de avertissementModification : l'application lit la
+        meme. %>
+    <% if (avertissement) { %>
       <div class="carte">
-        <p>
-          <strong><%= candidatures %></strong>
-          personne<%= candidatures > 1 ? "s ont" : " a" %> déjà répondu à cette demande.
-          Elle<%= candidatures > 1 ? "s se sont décidées" : " s'est décidée" %>
-          sur ce qui est écrit aujourd'hui.
-        </p>
-        <p class="aide">
-          Si vous changez l'horaire, le lieu ou le prix, prévenez-<%= candidatures > 1 ? "les" : "la" %>
-          dans la discussion : la plateforme ne le fait pas à votre place.
-        </p>
+        <p><%= avertissement.phrase %></p>
+        <p class="aide"><%= avertissement.conseil %></p>
       </div>
     <% } %>
 
