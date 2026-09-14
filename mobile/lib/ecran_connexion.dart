@@ -74,7 +74,9 @@ class _EcranConnexionState extends State<EcranConnexion> {
 
       // CHAQUE ROLE ARRIVE SUR SA PAGE DE TRAVAIL, comme sur le site : la
       // personne qui repond sur les demandes ouvertes, l'employeur sur ses
-      // demandes. L'espace de l'equipe reste un outil du site.
+      // demandes. L'espace de l'equipe reste sur le site web : c'est une
+      // decision prise avec l'encadreur. Il s'ouvre aussi dans le
+      // navigateur d'un telephone.
       final Widget accueil;
       if (moi.repondAuxDemandes) {
         accueil = EcranDemandes(api: api, moi: moi);
@@ -85,7 +87,7 @@ class _EcranConnexionState extends State<EcranConnexion> {
         if (!mounted) return;
         setState(() {
           _enCours = false;
-          _message = "L'espace de l'équipe s'utilise sur le site, depuis un ordinateur.";
+          _message = "L'espace de l'équipe s'utilise sur le site PamConnect, depuis un navigateur.";
         });
         return;
       }
