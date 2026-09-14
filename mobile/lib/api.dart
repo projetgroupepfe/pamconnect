@@ -138,6 +138,17 @@ class ApiPamConnect {
     return _interpreter(() => TexteDuServeur.depuisJson(donnees));
   }
 
+  /// Le mot de passe actuel est exige : le serveur le verifie.
+  Future<AdresseChangee> changerEmail(String nouveau, String motdepasse) async {
+    final donnees = await _appeler('/api/mon-profil/email', corps: {'nouveau': nouveau, 'motdepasse': motdepasse});
+    return _interpreter(() => AdresseChangee.depuisJson(donnees));
+  }
+
+  Future<TexteDuServeur> changerMotDePasse(String ancien, String nouveau) async {
+    final donnees = await _appeler('/api/mon-profil/mot-de-passe', corps: {'ancien': ancien, 'nouveau': nouveau});
+    return _interpreter(() => TexteDuServeur.depuisJson(donnees));
+  }
+
   /// Le detail d'un tarif pendant la saisie : la commission reste au serveur.
   Future<TarifDuProfil> detailTarif(String montant) async {
     final donnees = await _appeler('/api/detail-tarif?montant=${Uri.encodeQueryComponent(montant)}');

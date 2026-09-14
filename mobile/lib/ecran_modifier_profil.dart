@@ -289,6 +289,14 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
             ),
           ),
         ),
+        // L'adresse et le mot de passe sont les deux cles du compte : chacune
+        // a sa section, et chacune exige le mot de passe actuel.
+        const SizedBox(height: 8),
+        const TitreSection('Changer mon adresse email'),
+        _CarteEmail(api: widget.api, emailActuel: formulaire.email),
+        const SizedBox(height: 8),
+        const TitreSection('Changer mon mot de passe'),
+        _CarteMotDePasse(api: widget.api, minimum: formulaire.motDePasseMin),
       ],
     );
   }
@@ -559,6 +567,252 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
             ],
           ),
       ],
+    );
+  }
+}
+
+/// Changer mon adresse email. Elle a son propre bouton : l'enregistrer ne
+/// touche pas au reste du formulaire.
+class _CarteEmail extends StatefulWidget {
+  const _CarteEmail({required this.api, required this.emailActuel});
+
+  final ApiPamConnect api;
+  final String emailActuel;
+
+  @override
+  State<_CarteEmail> createState() => _CarteEmailState();
+}
+
+class _CarteEmailState extends State<_CarteEmail> {
+  late String _actuelle = widget.emailActuel;
+  final _nouvelle = TextEditingController();
+  final _motdepasse = TextEditingController();
+  bool _envoi = false;
+  String? _erreur;
+  String? _reussite;
+
+  @override
+  void dispose() {
+    _nouvelle.dispose();
+    _motdepasse.dispose();
+    super.dispose();
+  }
+
+  Future<void> _envoyer() async {
+    if (_envoi) return;
+    setState(() {
+      _envoi = true;
+      _erreur = null;
+      _reussite = null;
+    });
+
+    try {
+      final resultat = await widget.api.changerEmail(_nouvelle.text, _motdepasse.text);
+      if (!mounted) return;
+      setState(() {
+        _envoi = false;
+        _actuelle = resultat.email;
+        _reussite = resultat.texte;
+        _nouvelle.clear();
+        _motdepasse.clear();
+      });
+    } on ErreurApi catch (erreur) {
+      if (!mounted) return;
+      if (erreur.sessionPerdue) {
+        revenirALaConnexion(context, widget.api, messageSessionPerdue);
+        return;
+      }
+      // Un mot de passe refuse ne reste pas affiche dans le champ.
+      setState(() {
+        _envoi = false;
+        _erreur = erreur.message;
+        _motdepasse.clear();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const espace = SizedBox(height: 16);
+    final gris = Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encreDouce);
+    final erreur = _erreur;
+    final reussite = _reussite;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(text: 'Adresse actuelle : '),
+                  TextSpan(
+                    text: _actuelle,
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre),
+                  ),
+                ],
+              ),
+              style: gris,
+            ),
+            espace,
+            TextField(
+              controller: _nouvelle,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              autofillHints: const [AutofillHints.email],
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Nouvelle adresse',
+                helperText: "C'est cette adresse qu'il faudra saisir pour vous connecter.",
+                helperMaxLines: 2,
+              ),
+            ),
+            espace,
+            TextField(
+              controller: _motdepasse,
+              obscureText: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              autofillHints: const [AutofillHints.password],
+              decoration: const InputDecoration(labelText: 'Votre mot de passe'),
+            ),
+            espace,
+            if (erreur != null) ...[
+              Avertissement(texte: erreur),
+              espace,
+            ],
+            if (reussite != null) ...[
+              Confirmation(texte: reussite),
+              espace,
+            ],
+            OutlinedButton(
+              onPressed: _envoi ? null : _envoyer,
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              child: _envoi
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
+                  : const Text('Changer mon adresse'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Changer mon mot de passe, avec l'ancien : sans lui, quelqu'un qui
+/// trouverait le telephone deverrouille pourrait s'approprier le compte.
+class _CarteMotDePasse extends StatefulWidget {
+  const _CarteMotDePasse({required this.api, required this.minimum});
+
+  final ApiPamConnect api;
+
+  /// La longueur que le serveur exige, affichee sous le champ.
+  final int minimum;
+
+  @override
+  State<_CarteMotDePasse> createState() => _CarteMotDePasseState();
+}
+
+class _CarteMotDePasseState extends State<_CarteMotDePasse> {
+  final _ancien = TextEditingController();
+  final _nouveau = TextEditingController();
+  bool _envoi = false;
+  String? _erreur;
+  String? _reussite;
+
+  @override
+  void dispose() {
+    _ancien.dispose();
+    _nouveau.dispose();
+    super.dispose();
+  }
+
+  Future<void> _envoyer() async {
+    if (_envoi) return;
+    setState(() {
+      _envoi = true;
+      _erreur = null;
+      _reussite = null;
+    });
+
+    try {
+      final resultat = await widget.api.changerMotDePasse(_ancien.text, _nouveau.text);
+      if (!mounted) return;
+      setState(() {
+        _envoi = false;
+        _reussite = resultat.texte;
+        _ancien.clear();
+        _nouveau.clear();
+      });
+    } on ErreurApi catch (erreur) {
+      if (!mounted) return;
+      if (erreur.sessionPerdue) {
+        revenirALaConnexion(context, widget.api, messageSessionPerdue);
+        return;
+      }
+      setState(() {
+        _envoi = false;
+        _erreur = erreur.message;
+        _ancien.clear();
+        _nouveau.clear();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const espace = SizedBox(height: 16);
+    final erreur = _erreur;
+    final reussite = _reussite;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _ancien,
+              obscureText: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              autofillHints: const [AutofillHints.password],
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'Mot de passe actuel'),
+            ),
+            espace,
+            TextField(
+              controller: _nouveau,
+              obscureText: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              autofillHints: const [AutofillHints.newPassword],
+              decoration: InputDecoration(
+                labelText: 'Nouveau mot de passe',
+                helperText: '${widget.minimum} caractères au minimum.',
+              ),
+            ),
+            espace,
+            if (erreur != null) ...[
+              Avertissement(texte: erreur),
+              espace,
+            ],
+            if (reussite != null) ...[
+              Confirmation(texte: reussite),
+              espace,
+            ],
+            OutlinedButton(
+              onPressed: _envoi ? null : _envoyer,
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              child: _envoi
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
+                  : const Text('Changer mon mot de passe'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

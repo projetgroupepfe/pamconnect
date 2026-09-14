@@ -726,6 +726,8 @@ void main() {
             {'libelle': 'jour 1', 'creneaux': creneaux},
           ],
           'tarif': '',
+          'email': 'email 1',
+          'motDePasseMin': 4,
         };
     final lu = FormulaireProfil.depuisJson(formulaire([
       {'valeur': 'valeur 1', 'libelle': 'moment 1', 'coche': true},
@@ -735,5 +737,11 @@ void main() {
     expect(lu.arrondissement, isNull);
     // Un jour sans case pour chaque moment ne tiendrait pas dans la grille.
     expect(() => FormulaireProfil.depuisJson(formulaire([])), throwsA(isA<FormeInattendue>()));
+  });
+
+  test("un changement d'adresse rend la phrase et la nouvelle adresse", () {
+    final lu = AdresseChangee.depuisJson({'texte': 'phrase 1', 'email': 'email 2'});
+    expect(lu.email, 'email 2');
+    expect(() => AdresseChangee.depuisJson({'texte': 'phrase 1'}), throwsA(isA<FormeInattendue>()));
   });
 }

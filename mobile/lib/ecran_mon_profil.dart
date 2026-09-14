@@ -125,9 +125,10 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
     final texte = await Navigator.of(context).push<String>(
       MaterialPageRoute(builder: (_) => EcranModifierProfil(api: widget.api)),
     );
-    if (!mounted || texte == null) return;
-    await _charger();
     if (!mounted) return;
+    // Recharge meme sans enregistrement : l'adresse email a pu changer.
+    await _charger();
+    if (!mounted || texte == null) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
   }
 

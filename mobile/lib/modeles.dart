@@ -1399,6 +1399,8 @@ class FormulaireProfil {
     required this.moments,
     required this.jours,
     required this.tarif,
+    required this.email,
+    required this.motDePasseMin,
     this.arrondissement,
     this.metier,
     this.dateNaissance,
@@ -1418,6 +1420,8 @@ class FormulaireProfil {
       moments: _lireTextes(json, 'moments'),
       jours: _lireListe(json, 'jours', JourDisponible.depuisJson),
       tarif: _lire<String>(json, 'tarif'),
+      email: _lire<String>(json, 'email'),
+      motDePasseMin: _lire<int>(json, 'motDePasseMin'),
       arrondissement: _lireFacultatif<String>(json, 'arrondissement'),
       metier: _lireFacultatif<String>(json, 'metier'),
       dateNaissance: _lireFacultatif<String>(json, 'dateNaissance'),
@@ -1451,4 +1455,21 @@ class FormulaireProfil {
   /// "1995-06-15", ou absente.
   final String? dateNaissance;
   final AnneesNaissance? anneesNaissance;
+
+  /// L'adresse actuelle, pour la section Changer mon adresse email.
+  final String email;
+  final int motDePasseMin;
+}
+
+/// La reponse a un changement d'adresse : la phrase et la nouvelle adresse.
+class AdresseChangee {
+  const AdresseChangee({required this.texte, required this.email});
+
+  factory AdresseChangee.depuisJson(Map<String, dynamic> json) => AdresseChangee(
+        texte: _lire<String>(json, 'texte'),
+        email: _lire<String>(json, 'email'),
+      );
+
+  final String texte;
+  final String email;
 }
