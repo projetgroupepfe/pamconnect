@@ -293,4 +293,53 @@ void main() {
     expect(() => Publication.depuisJson({'id': 3, 'titre': 'Demande publiée'}),
         throwsA(isA<FormeInattendue>()));
   });
+
+  group("l'ecran de confirmation d'un choix", () {
+    Map<String, dynamic> ecran() => {
+          'candidatureId': 5,
+          'nom': 'nom 1',
+          'metier': null,
+          'note': {'etat': 'nouveau', 'badge': 'Nouveau prestataire', 'detail': "personne ne l'a encore notée"},
+          'experience': null,
+          'service': 'service 1',
+          'horaire': 'non précisé',
+          'duree': null,
+          'lieu': null,
+          'conditions': null,
+          'paiement': {
+            'vousPayez': '8 000 FCFA',
+            'commission': '800 FCFA',
+            'pourcentageCommission': 10,
+            'recoit': '7 200 FCFA',
+          },
+          'refusAnnonces': {'nombre': 2, 'suite': 'autres personnes qui attendaient recevront un refus.'},
+        };
+
+    test('les montants arrivent tels que le serveur les a calcules', () {
+      final lu = ConfirmationChoix.depuisJson(ecran());
+      expect(lu.paiement!.vousPayez, '8 000 FCFA');
+      expect(lu.paiement!.recoit, '7 200 FCFA');
+      expect(lu.refusAnnonces!.nombre, 2);
+    });
+
+    test('sans prix ni autre personne en attente, rien n est invente', () {
+      final json = ecran()
+        ..['paiement'] = null
+        ..['refusAnnonces'] = null;
+      final lu = ConfirmationChoix.depuisJson(json);
+      expect(lu.paiement, isNull);
+      expect(lu.refusAnnonces, isNull);
+    });
+
+    test('un nom absent est signale', () {
+      final json = ecran()..remove('nom');
+      expect(() => ConfirmationChoix.depuisJson(json), throwsA(isA<FormeInattendue>()));
+    });
+  });
+
+  test("une decision n'est prise que si le serveur le dit", () {
+    expect(DecisionPrise.depuisJson({'ok': true}), isA<DecisionPrise>());
+    expect(() => DecisionPrise.depuisJson({'ok': false}), throwsA(isA<FormeInattendue>()));
+    expect(() => DecisionPrise.depuisJson({}), throwsA(isA<FormeInattendue>()));
+  });
 }

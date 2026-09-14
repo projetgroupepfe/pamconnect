@@ -385,3 +385,105 @@ class Publication {
   final String titre;
   final String texte;
 }
+
+/// Ce que paie l'employeur, calcule par le serveur : la commission n'est
+/// jamais recalculee dans l'application.
+class Paiement {
+  const Paiement({
+    required this.vousPayez,
+    required this.commission,
+    required this.pourcentageCommission,
+    required this.recoit,
+  });
+
+  factory Paiement.depuisJson(Map<String, dynamic> json) => Paiement(
+        vousPayez: _lire<String>(json, 'vousPayez'),
+        commission: _lire<String>(json, 'commission'),
+        pourcentageCommission: _lire<int>(json, 'pourcentageCommission'),
+        recoit: _lire<String>(json, 'recoit'),
+      );
+
+  final String vousPayez;
+  final String commission;
+  final int pourcentageCommission;
+  final String recoit;
+}
+
+/// "2 autres personnes qui attendaient recevront un refus." : le nombre a
+/// part, pour l'ecrire en gras comme sur le site.
+class RefusAnnonces {
+  const RefusAnnonces({required this.nombre, required this.suite});
+
+  factory RefusAnnonces.depuisJson(Map<String, dynamic> json) => RefusAnnonces(
+        nombre: _lire<int>(json, 'nombre'),
+        suite: _lire<String>(json, 'suite'),
+      );
+
+  final int nombre;
+  final String suite;
+}
+
+/// L'ecran de relecture avant de choisir quelqu'un.
+class ConfirmationChoix {
+  const ConfirmationChoix({
+    required this.candidatureId,
+    required this.nom,
+    required this.note,
+    required this.horaire,
+    this.metier,
+    this.experience,
+    this.service,
+    this.duree,
+    this.lieu,
+    this.conditions,
+    this.paiement,
+    this.refusAnnonces,
+  });
+
+  factory ConfirmationChoix.depuisJson(Map<String, dynamic> json) {
+    final paiement = _lireFacultatif<Map<String, dynamic>>(json, 'paiement');
+    final refus = _lireFacultatif<Map<String, dynamic>>(json, 'refusAnnonces');
+    return ConfirmationChoix(
+      candidatureId: _lire<int>(json, 'candidatureId'),
+      nom: _lire<String>(json, 'nom'),
+      note: NotePersonne.depuisJson(_lire<Map<String, dynamic>>(json, 'note')),
+      horaire: _lire<String>(json, 'horaire'),
+      metier: _lireFacultatif<String>(json, 'metier'),
+      experience: _lireFacultatif<String>(json, 'experience'),
+      service: _lireFacultatif<String>(json, 'service'),
+      duree: _lireFacultatif<String>(json, 'duree'),
+      lieu: _lireFacultatif<String>(json, 'lieu'),
+      conditions: _lireFacultatif<String>(json, 'conditions'),
+      paiement: paiement == null ? null : Paiement.depuisJson(paiement),
+      refusAnnonces: refus == null ? null : RefusAnnonces.depuisJson(refus),
+    );
+  }
+
+  final int candidatureId;
+  final String nom;
+  final NotePersonne note;
+  final String horaire;
+  final String? metier;
+  final String? experience;
+  final String? service;
+  final String? duree;
+  final String? lieu;
+  final String? conditions;
+
+  /// Absent si la demande n'a pas de prix : l'ecran le dit, sans inventer.
+  final Paiement? paiement;
+
+  /// Absent si personne d'autre n'attendait.
+  final RefusAnnonces? refusAnnonces;
+}
+
+/// La reponse d'une decision. Le serveur dit seulement que c'est fait :
+/// Mes demandes se recharge ensuite et montre l'etat qu'il a decide.
+class DecisionPrise {
+  const DecisionPrise();
+
+  factory DecisionPrise.depuisJson(Map<String, dynamic> json) {
+    if (_lire<bool>(json, 'ok') != true) throw const FormeInattendue('ok');
+    return const DecisionPrise();
+  }
+}

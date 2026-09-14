@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'ecran_confirmer_choix.dart';
 import 'ecran_connexion.dart';
 import 'ecran_publier.dart';
 import 'elements.dart';
@@ -11,9 +12,9 @@ import 'theme.dart';
 /// page Mes demandes du site, puisque les deux lisent la meme fonction du
 /// serveur.
 ///
-/// On peut y publier une demande. Choisir, refuser, discuter ou modifier
-/// arrivent ensuite, chacun avec sa route testee : aucun bouton n'est
-/// affiche avant de fonctionner.
+/// On peut y publier une demande, choisir ou refuser une personne.
+/// Discuter ou modifier arrivent ensuite, chacun avec sa route testee :
+/// aucun bouton n'est affiche avant de fonctionner.
 class EcranMesDemandes extends StatefulWidget {
   const EcranMesDemandes({super.key, required this.api, required this.moi});
 
@@ -32,6 +33,10 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
 
   /// La phrase du serveur apres une publication, gardee en haut de l'ecran.
   String? _confirmation;
+
+  /// Les reponses dont le refus est en cours d'envoi : leurs boutons sont
+  /// desactives, pour qu'un double appui n'envoie pas deux fois.
+  final Set<int> _decisionsEnCours = {};
 
   @override
   void initState() {
@@ -91,6 +96,57 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
       icon: const Icon(Icons.add),
       label: const Text('Publier une demande'),
     );
+  }
+
+  Future<void> _choisir(ReponseRecue reponse) async {
+    setState(() {
+      _confirmation = null;
+      _erreur = null;
+    });
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => EcranConfirmerChoix(api: widget.api, candidatureId: reponse.id),
+      ),
+    );
+    // Au retour, choix fait ou non, on relit l'etat decide par le serveur.
+    if (!mounted) return;
+    await _actualiser();
+  }
+
+  /// Refuser reste immediat, comme sur le site : on ne s'engage a rien en
+  /// refusant, et la demande reste ouverte.
+  Future<void> _refuser(ReponseRecue reponse) async {
+    if (_decisionsEnCours.contains(reponse.id)) return;
+    setState(() {
+      _decisionsEnCours.add(reponse.id);
+      _confirmation = null;
+      _erreur = null;
+    });
+
+    String? probleme;
+    try {
+      await widget.api.refuserCandidature(reponse.id);
+    } on ErreurApi catch (erreur) {
+      if (!mounted) return;
+      if (erreur.sessionPerdue) {
+        revenirALaConnexion(context, widget.api, messageSessionPerdue);
+        return;
+      }
+      probleme = erreur.message;
+    }
+
+    if (!mounted) return;
+    await _charger();
+    if (!mounted) return;
+    setState(() {
+      _decisionsEnCours.remove(reponse.id);
+      if (probleme != null) _erreur = probleme;
+    });
+    // Le refus du serveur s'affiche en haut de la liste : la personne,
+    // elle, regarde la carte plus bas. On le lui montre la ou elle est.
+    if (probleme != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(probleme)));
+    }
   }
 
   Future<void> _seDeconnecter() async {
@@ -178,7 +234,12 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
           padding: const EdgeInsets.only(bottom: 16),
           child: Text('Aucune demande en cours.', style: gris),
         ),
-      for (final demande in enCours) _CarteDemandePubliee(demande: demande),
+      for (final demande in enCours) _CarteDemandePubliee(
+            demande: demande,
+            auChoix: _choisir,
+            auRefus: _refuser,
+            decisionsEnCours: _decisionsEnCours,
+          ),
       if (terminees.isNotEmpty) ...[
         const TitreSection('Demandes terminées'),
         Padding(
@@ -189,16 +250,29 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
             style: gris,
           ),
         ),
-        for (final demande in terminees) _CarteDemandePubliee(demande: demande),
+        for (final demande in terminees) _CarteDemandePubliee(
+            demande: demande,
+            auChoix: _choisir,
+            auRefus: _refuser,
+            decisionsEnCours: _decisionsEnCours,
+          ),
       ],
     ];
   }
 }
 
 class _CarteDemandePubliee extends StatelessWidget {
-  const _CarteDemandePubliee({required this.demande});
+  const _CarteDemandePubliee({
+    required this.demande,
+    required this.auChoix,
+    required this.auRefus,
+    required this.decisionsEnCours,
+  });
 
   final DemandePubliee demande;
+  final void Function(ReponseRecue) auChoix;
+  final void Function(ReponseRecue) auRefus;
+  final Set<int> decisionsEnCours;
 
   @override
   Widget build(BuildContext context) {
@@ -261,7 +335,14 @@ class _CarteDemandePubliee extends StatelessWidget {
               if (demande.reponses.isEmpty)
                 Text("Personne n'a encore répondu.", style: gris)
               else
-                for (final reponse in demande.reponses) _CarteReponse(reponse: reponse, prix: prix),
+                for (final reponse in demande.reponses)
+                  _CarteReponse(
+                    reponse: reponse,
+                    prix: prix,
+                    auChoix: auChoix,
+                    auRefus: auRefus,
+                    occupe: decisionsEnCours.contains(reponse.id),
+                  ),
             ],
           ),
         ),
@@ -271,9 +352,20 @@ class _CarteDemandePubliee extends StatelessWidget {
 }
 
 class _CarteReponse extends StatelessWidget {
-  const _CarteReponse({required this.reponse, required this.prix});
+  const _CarteReponse({
+    required this.reponse,
+    required this.prix,
+    required this.auChoix,
+    required this.auRefus,
+    required this.occupe,
+  });
 
   final ReponseRecue reponse;
+  final void Function(ReponseRecue) auChoix;
+  final void Function(ReponseRecue) auRefus;
+
+  /// Un refus est en cours d'envoi pour cette reponse.
+  final bool occupe;
 
   /// Le montant retenu pour cette reponse, comme sur le site.
   final String? prix;
@@ -368,6 +460,39 @@ class _CarteReponse extends StatelessWidget {
                 style: gris,
               ),
             ),
+          // Les boutons suivent les decisions du serveur : ni sur une reponse
+          // deja tranchee, ni sur une demande retiree.
+          if (reponse.peutChoisir || reponse.peutRefuser) const SizedBox(height: 12),
+          if (reponse.peutChoisir) ...[
+            FilledButton.icon(
+              onPressed: occupe ? null : () => auChoix(reponse),
+              icon: const Icon(Icons.check),
+              label: const Text('Choisir cette personne'),
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (reponse.peutRefuser) ...[
+            OutlinedButton.icon(
+              onPressed: occupe ? null : () => auRefus(reponse),
+              icon: const Icon(Icons.close),
+              label: const Text('Refuser cette candidature'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Couleurs.rouge,
+                side: const BorderSide(color: Couleurs.rouge),
+                minimumSize: const Size.fromHeight(48),
+              ),
+            ),
+            // La question se pose exactement ici : refuser ferme-t-il la
+            // demande ? Non, seul un choix la pourvoit.
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                "Refuser ne retire pas votre demande : elle reste visible, et d'autres "
+                'personnes peuvent encore y répondre.',
+                style: gris,
+              ),
+            ),
+          ],
         ],
       ),
     );

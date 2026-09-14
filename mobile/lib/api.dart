@@ -108,6 +108,24 @@ class ApiPamConnect {
     return _interpreter(() => Publication.depuisJson(donnees));
   }
 
+  /// Ce que l'employeur relit avant de choisir quelqu'un.
+  Future<ConfirmationChoix> confirmationChoix(int candidatureId) async {
+    final donnees = await _appeler('/api/candidatures/$candidatureId/confirmation');
+    return _interpreter(() => ConfirmationChoix.depuisJson(donnees));
+  }
+
+  /// Choisir la personne. C'est le serveur qui ferme la demande et refuse
+  /// les autres reponses en attente.
+  Future<void> choisirCandidature(int candidatureId) => _decider(candidatureId, 'choisir');
+
+  /// Refuser une reponse : la demande reste ouverte.
+  Future<void> refuserCandidature(int candidatureId) => _decider(candidatureId, 'refuser');
+
+  Future<void> _decider(int candidatureId, String decision) async {
+    final donnees = await _appeler('/api/candidatures/$candidatureId/$decision', corps: const {});
+    _interpreter(() => DecisionPrise.depuisJson(donnees));
+  }
+
   /// La session est effacee cote serveur. Meme si le serveur ne repond pas,
   /// l'application oublie le jeton : la personne a demande a partir.
   Future<void> deconnexion() async {
