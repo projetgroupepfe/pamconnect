@@ -36,36 +36,32 @@
       <div class="grille">
         <% envoyes.forEach(function (v) { %>
           <div class="carte">
-            <h3><%= v.titreAnnonce %></h3>
+            <h3><%= v.titreDemande %></h3>
 
             <p>
-              <% if (v.etat === "bloque") { %>
-                <span class="badge badge-en-attente">Bloqué par PamConnect</span>
-              <% } else if (v.etat === "rembourse") { %>
-                <span class="badge badge-non-soumis">Rendu</span>
-              <% } else { %>
-                <span class="badge badge-verifie">Versé à <%= v.nomBeneficiaire %></span>
-              <% } %>
+              <%# La couleur suit l'etat ; les mots viennent de monCompte,
+                  que l'application lit aussi. %>
+              <span class="badge <%= { bloque: "badge-en-attente", rembourse: "badge-non-soumis" }[v.etat] || "badge-verifie" %>"><%= v.libelleEtat %></span>
             </p>
 
             <ul class="infos">
               <li>
                 <%- include("partiels/icone", { nom: "remuneration" }) %>
-                <span><strong><%= formaterMontant(v.montant) %></strong></span>
+                <span><strong><%= v.montant %></strong></span>
               </li>
               <li>
                 <%- include("partiels/icone", { nom: "calendrier" }) %>
-                <span>Bloqué le <%= v.cree_le %></span>
+                <span>Bloqué le <%= v.bloqueLe %></span>
               </li>
-              <% if (v.denoue_le) { %>
+              <% if (v.denoue) { %>
                 <li>
                   <%- include("partiels/icone", { nom: "valider" }) %>
-                  <span><%= v.etat === "rembourse" ? "Rendu" : "Versé" %> le <%= v.denoue_le %></span>
+                  <span><%= v.denoue %></span>
                 </li>
               <% } %>
             </ul>
 
-            <% if (v.etat === "bloque") { %>
+            <% if (v.rappelDeclaration) { %>
               <%# L'OBLIGATION, ecrite la ou la somme est encore bloquee.
                   Un employeur qui oublie de declarer laisse une personne
                   sans paiement, et cree un desaccord que rien ne justifiait. %>
@@ -89,7 +85,7 @@
       <div class="detail-tarif">
         <div class="ligne-tarif total">
           <span>Total reçu</span>
-          <strong><%= formaterMontant(solde) %></strong>
+          <strong><%= totalRecu %></strong>
         </div>
       </div>
       <p class="aide">
@@ -112,28 +108,26 @@
       <div class="grille">
         <% recus.forEach(function (v) { %>
           <div class="carte">
-            <h3><%= v.titreAnnonce %></h3>
-            <div class="metier">Chez <%= v.nomEmployeur %></div>
+            <h3><%= v.titreDemande %></h3>
+            <div class="metier">Chez <%= v.chez %></div>
 
             <div class="detail-tarif">
-              <div class="ligne-tarif">
-                <span>Somme annoncée</span>
-                <strong><%= formaterMontant(v.montant) %></strong>
-              </div>
-              <div class="ligne-tarif">
-                <span>Commission PamConnect (<%= pourcentageCommission %> %)</span>
-                <span class="retenue">− <%= formaterMontant(v.commission) %></span>
-              </div>
-              <div class="ligne-tarif total">
-                <span>Vous avez reçu</span>
-                <strong><%= formaterMontant(v.net) %></strong>
-              </div>
+              <% v.lignes.forEach(function (ligne) { %>
+                <div class="ligne-tarif<%= ligne.total ? " total" : "" %>">
+                  <span><%= ligne.libelle %></span>
+                  <% if (ligne.retenue) { %>
+                    <span class="retenue"><%= ligne.montant %></span>
+                  <% } else { %>
+                    <strong><%= ligne.montant %></strong>
+                  <% } %>
+                </div>
+              <% }); %>
             </div>
 
             <ul class="infos">
               <li>
                 <%- include("partiels/icone", { nom: "calendrier" }) %>
-                <span>Versé le <%= v.denoue_le %></span>
+                <span>Versé le <%= v.verseLe %></span>
               </li>
             </ul>
           </div>

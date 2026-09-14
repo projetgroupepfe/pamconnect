@@ -1031,6 +1031,40 @@ setTimeout(async () => {
   dire("la page du site montre la nouvelle adresse et la meme longueur minimale",
        pageAvecCles.includes(NOUVEL_EMAIL) && pageAvecCles.includes('minlength="6"'));
 
+  console.log(SAUT + "--- MON COMPTE ---");
+  const monCompteApi = (entetes) => json("/api/mon-compte", undefined, entetes);
+  dire("sans session : 401", (await monCompteApi()).code === 401);
+  dire("un compte d'equipe : 403", (await monCompteApi(cookieDe(equipe.cookie))).code === 403);
+
+  const compteEmp = await monCompteApi({ Authorization: "Bearer " + jeton });
+  const ce = compteEmp.donnees || {};
+  const versementsEmp = base.prepare("SELECT etat FROM versements WHERE employeur_id = ?").all(emp.id);
+  dire("l'employeur voit chaque somme posee, avec son etat et ses dates",
+       compteEmp.code === 200 && ce.jeSuisEmployeur === true && ce.totalRecu === null && ce.recus.length === 0 &&
+       versementsEmp.length > 0 && ce.envoyes.length === versementsEmp.length &&
+       ce.envoyes.some((v) => v.etat === "verse" && v.libelleEtat === "Versé à Test verifiee" && v.denoue.startsWith("Versé le ")) &&
+       ce.envoyes.filter((v) => v.etat === "bloque").every((v) => v.rappelDeclaration === true && v.denoue === null) &&
+       versementsEmp.some((v) => v.etat === "rembourse") === ce.envoyes.some((v) => v.libelleEtat === "Rendu"),
+       compteEmp.brut.slice(0, 300));
+  const pageCompteEmp = await (await lire("/mon-compte", emp.cookie)).text();
+  dire("la page du site montre les memes etats et les memes dates",
+       ce.envoyes.every((v) => pageCompteEmp.includes(v.libelleEtat) && pageCompteEmp.includes("Bloqué le " + v.bloqueLe)));
+
+  const comptePre = await monCompteApi(cookieDe(verifiee.cookie));
+  const cp = comptePre.donnees || {};
+  const soldePre = base.prepare(
+    "SELECT COALESCE(SUM(net), 0) AS s FROM versements WHERE beneficiaire_id = ? AND etat = 'verse'").get(verifiee.id).s;
+  dire("la personne voit le total recu et le detail de chaque service",
+       comptePre.code === 200 && cp.jeSuisEmployeur === false && cp.envoyes.length === 0 && soldePre > 0 &&
+       cp.totalRecu === soldePre.toLocaleString("fr-FR").replace(/[\u202f\u00a0]/g, " ") + " FCFA" &&
+       cp.recus.length >= 1 && cp.recus[0].chez === "Test emp" && cp.recus[0].lignes.length === 3 &&
+       cp.recus[0].lignes[1].retenue === true && cp.recus[0].lignes[2].total === true,
+       comptePre.brut.slice(0, 300));
+  const pageComptePre = await (await lire("/mon-compte", verifiee.cookie)).text();
+  dire("la page du site montre le meme total, le meme montant recu et la meme date",
+       pageComptePre.includes(cp.totalRecu) && pageComptePre.includes(cp.recus[0].lignes[2].montant) &&
+       pageComptePre.includes("Versé le " + cp.recus[0].verseLe));
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");

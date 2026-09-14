@@ -5788,15 +5788,52 @@ app.post("/admin/problemes/:id", exigerAdmin, lireFormulaire, (req, res) => {
 // de telephone est une donnee personnelle et un moyen de contact direct,
 // et la plateforme n'en demande pas. Le solde est un montant du, pas un
 // portefeuille : le versement reel se ferait ailleurs.
+// Ecrit UNE SEULE FOIS pour le site et l'application : l'etat de chaque
+// somme, ses mots et ses dates.
+function monCompte(u) {
+  const jeSuisEmployeur = u.role === "employeur";
+  const pourcentage = Math.round(TAUX_COMMISSION * 100);
+
+  return {
+    jeSuisEmployeur,
+    totalRecu: jeSuisEmployeur ? null : formaterMontant(requetes.soldeDe.get(u.id).solde),
+    recus: jeSuisEmployeur ? [] : requetes.mesVersementsRecus.all(u.id).map((v) => ({
+      titreDemande: v.titreAnnonce,
+      chez: v.nomEmployeur,
+      lignes: [
+        { libelle: "Somme annoncée", montant: formaterMontant(v.montant), retenue: false, total: false },
+        { libelle: `Commission PamConnect (${pourcentage} %)`,
+          montant: "− " + formaterMontant(v.commission), retenue: true, total: false },
+        { libelle: "Vous avez reçu", montant: formaterMontant(v.net), retenue: false, total: true },
+      ],
+      verseLe: dateLisible(v.denoue_le),
+    })),
+    envoyes: jeSuisEmployeur ? requetes.mesVersementsEnvoyes.all(u.id).map((v) => ({
+      titreDemande: v.titreAnnonce,
+      etat: v.etat,
+      libelleEtat: v.etat === "bloque" ? "Bloqué par PamConnect"
+        : v.etat === "rembourse" ? "Rendu"
+        : `Versé à ${v.nomBeneficiaire}`,
+      montant: formaterMontant(v.montant),
+      bloqueLe: dateLisible(v.cree_le),
+      denoue: v.denoue_le
+        ? `${v.etat === "rembourse" ? "Rendu" : "Versé"} le ${dateLisible(v.denoue_le)}`
+        : null,
+      // L'OBLIGATION, ecrite la ou la somme est encore bloquee.
+      rappelDeclaration: v.etat === "bloque",
+    })) : [],
+  };
+}
+
 app.get("/mon-compte", exigerConnexion, interdireALEquipe, (req, res) => {
-  const jeSuisEmployeur = req.utilisateur.role === "employeur";
+  const compte = monCompte(req.utilisateur);
 
   res.render("compte", {
     titre: "Mon compte",
-    jeSuisEmployeur,
-    solde: jeSuisEmployeur ? 0 : requetes.soldeDe.get(req.utilisateur.id).solde,
-    recus: jeSuisEmployeur ? [] : requetes.mesVersementsRecus.all(req.utilisateur.id),
-    envoyes: jeSuisEmployeur ? requetes.mesVersementsEnvoyes.all(req.utilisateur.id) : [],
+    jeSuisEmployeur: compte.jeSuisEmployeur,
+    totalRecu: compte.totalRecu,
+    recus: compte.recus,
+    envoyes: compte.envoyes,
   });
 });
 
@@ -7214,6 +7251,14 @@ app.post("/api/mon-profil/mot-de-passe", (req, res) => {
   if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
 
   res.json({ texte: resultat.texte });
+});
+
+// --- Mon compte depuis l'application ---------------------------------
+app.get("/api/mon-compte", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  res.json(monCompte(moi));
 });
 
 // --- La fiche d'une personne depuis l'application -------------------
