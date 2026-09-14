@@ -661,20 +661,29 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
       if (avis != null) ..._sectionAvis(context, discussion, avis),
       // Ecrire au support n'a pas besoin d'un message a montrer du doigt :
       // les vrais problemes se passent souvent ailleurs.
+      // UN VRAI BOUTON. En simple texte gris, sur le telephone, rien ne
+      // disait qu'on pouvait appuyer dessus.
       const SizedBox(height: 16),
-      Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text(
-            'Un problème avec cette personne ou avec ce service ?',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encrePale),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Un problème avec cette personne ou avec ce service ?',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encreDouce),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _signalerProbleme,
+                icon: const Icon(Icons.flag_outlined),
+                label: const Text("Signaler à l'équipe PamConnect"),
+                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: _signalerProbleme,
-            style: TextButton.styleFrom(foregroundColor: Couleurs.encreDouce),
-            child: const Text("Signaler à l'équipe PamConnect"),
-          ),
-        ],
+        ),
       ),
     ];
   }
