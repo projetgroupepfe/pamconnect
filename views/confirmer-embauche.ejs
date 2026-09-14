@@ -67,8 +67,9 @@
         <% } %>
         <li>
           <%- include("partiels/icone", { nom: "lieu" }) %>
-          <%# Le LIEU GENERAL, jamais l'adresse exacte : elle ne sera
-              transmise qu'apres confirmation du paiement. %>
+          <%# Le LIEU GENERAL, jamais l'adresse exacte : la plateforme ne la
+              demande pas. L'employeur la donne a la personne choisie, dans
+              la discussion. %>
           <span>
             Lieu :
             <strong><% if (c.quartierAnnonce) { %><%= c.quartierAnnonce %>, <% } %><%= c.arrondissementAnnonce %></strong>

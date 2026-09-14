@@ -477,6 +477,7 @@ const requetes = {
   candidaturesDeAnnonce: db.prepare(`
     SELECT c.id,
            c.statut,
+           c.terminee_le,
            u.id                  AS prestataireId,
            u.nom                 AS nomPrestataire,
            u.experience_annees   AS experiencePrestataire,
@@ -3154,6 +3155,9 @@ function demandesDeLEmployeur(employeurId) {
           peutChoisir: decidable && verifiee,
           peutRefuser: decidable,
           attendVerification: decidable && !verifiee,
+          // UNE DISCUSSION ARCHIVEE SE RELIT. Le mot du bouton dit ce
+          // qu'elle permet encore, comme sur la page Mes messages.
+          libelleDiscussion: c.terminee_le ? "Relire la discussion" : "Discuter",
         };
       }),
     };
@@ -4310,6 +4314,20 @@ app.get("/messages", exigerConnexion, (req, res) => {
 
 // Ouvrir une discussion, c'est l'avoir lue. Renvoie null si la personne
 // n'y participe pas.
+// CE QUE L'ON CONSEILLE D'ECRIRE. Le prix ne se discute plus : il est
+// fixe dans la demande, et la somme est bloquee des la publication.
+// L'adresse exacte n'est ni demandee ni conservee par la plateforme :
+// c'est a l'employeur de la donner, et seulement a la personne choisie.
+// La phrase precedente promettait qu'elle serait "transmise
+// automatiquement apres le paiement", ce qui n'existe pas.
+function conseilPourEcrire(conversation, jeSuisEmployeur) {
+  const base = "Accordez-vous sur l'horaire et le déroulement du service : le prix est déjà fixé.";
+  if (!jeSuisEmployeur) return base;
+  return conversation.statut === "acceptee"
+    ? `${base} Vous pouvez maintenant donner votre adresse exacte à ${conversation.nomPrestataire}.`
+    : `${base} N'indiquez votre adresse exacte qu'à la personne que vous choisirez.`;
+}
+
 function ouvrirDiscussion(candidatureId, utilisateur) {
   const conversation = conversationDe(candidatureId, utilisateur);
   if (!conversation) return null;
@@ -4323,6 +4341,7 @@ function ouvrirDiscussion(candidatureId, utilisateur) {
     jeSuisEmployeur,
     messages: requetes.messagesDeConversation.all(conversation.id),
     exempleMessage: auHasard(EXEMPLES_MESSAGE[jeSuisEmployeur ? "employeur" : "prestataire"]),
+    conseil: conseilPourEcrire(conversation, jeSuisEmployeur),
   };
 }
 
@@ -4435,6 +4454,7 @@ app.get("/messages/:id", exigerConnexion, (req, res) => {
     messages: discussion.messages,
     jeSuisEmployeur,
     exempleMessage: discussion.exempleMessage,
+    conseil: discussion.conseil,
     exempleRaison: auHasard(EXEMPLES_RAISON),
   });
 });
@@ -4744,55 +4764,102 @@ app.post("/candidatures/:id/jai-effectue", exigerConnexion, lireFormulaire, (req
 // c'est donc lui qui le clot. La discussion n'est pas supprimee, elle
 // passe dans l'historique - les deux personnes la relisent, personne n'y
 // ecrit plus.
-app.post("/candidatures/:id/terminer", exigerConnexion, lireFormulaire, (req, res) => {
-  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+//
+// ECRIT UNE SEULE FOIS pour le site et l'application.
+function declarerServiceEffectue(candidatureId, utilisateur) {
+  const conversation = conversationDe(candidatureId, utilisateur);
 
   if (!conversation) {
-    return res.status(404).render("message", {
-      titre: "Discussion introuvable",
-      texte: "Cette discussion n'existe pas, ou elle ne vous concerne pas.",
-      liens: [{ url: "/messages", texte: "Mes messages" }],
-    });
+    return {
+      probleme: {
+        code: 404,
+        titre: "Discussion introuvable",
+        texte: "Cette discussion n'existe pas, ou elle ne vous concerne pas.",
+        lien: { url: "/messages", texte: "Mes messages" },
+      },
+    };
   }
+
+  const retour = { url: "/messages/" + conversation.id, texte: "Retour à la discussion" };
 
   // La personne qui a travaille ne clot pas le service a la place de
   // celui qui l'a recu.
-  if (req.utilisateur.id !== conversation.employeurId) {
-    return res.status(403).render("message", {
-      titre: "Vous ne pouvez pas clore ce service",
-      texte: "Seule la personne qui a demandé le service peut déclarer " +
-             "qu'il a été effectué.",
-      liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
-    });
+  if (utilisateur.id !== conversation.employeurId) {
+    return {
+      conversation,
+      probleme: {
+        code: 403,
+        titre: "Vous ne pouvez pas clore ce service",
+        texte: "Seule la personne qui a demandé le service peut déclarer " +
+               "qu'il a été effectué.",
+        lien: retour,
+      },
+    };
   }
 
   if (conversation.statut !== "acceptee") {
-    return res.status(409).render("message", {
-      titre: "Aucun service à clore",
-      texte: "Un service ne peut être déclaré effectué que si vous avez " +
-             "accepté la candidature de cette personne.",
-      liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
-    });
+    return {
+      conversation,
+      probleme: {
+        code: 409,
+        titre: "Aucun service à clore",
+        texte: "Un service ne peut être déclaré effectué que si vous avez " +
+               "accepté la candidature de cette personne.",
+        lien: retour,
+      },
+    };
   }
 
-  requetes.terminerService.run({ id: conversation.id });
+  // Deja declare : la requete ne changerait rien. On le dit, plutot que de
+  // laisser croire a une seconde declaration.
+  if (conversation.terminee_le) {
+    return {
+      conversation,
+      probleme: {
+        code: 409,
+        titre: "Service déjà déclaré",
+        texte: "Vous avez déjà déclaré ce service effectué.",
+        lien: retour,
+      },
+    };
+  }
 
   // Le service est fait : la somme bloquee part chez la personne qui a
   // travaille, commission deduite. C'est le seul chemin par lequel elle
   // y arrive - aucun bouton ne verse de l'argent directement.
-  const versement = requetes.versementDeLAnnonce.get(conversation.annonceId);
+  //
+  // TOUT OU RIEN : un service clos sans son versement laisserait la
+  // personne impayee, dans une discussion qu'on ne peut plus rouvrir.
+  db.transaction(() => {
+    requetes.terminerService.run({ id: conversation.id });
 
-  if (versement && versement.etat === "bloque") {
-    const detail = detaillerTarif(versement.montant);
-    requetes.verserVersement.run({
-      annonce: conversation.annonceId,
-      beneficiaire: conversation.prestataireId,
-      commission: detail.commission,
-      net: detail.net,
+    const versement = requetes.versementDeLAnnonce.get(conversation.annonceId);
+    if (versement && versement.etat === "bloque") {
+      const detail = detaillerTarif(versement.montant);
+      requetes.verserVersement.run({
+        annonce: conversation.annonceId,
+        beneficiaire: conversation.prestataireId,
+        commission: detail.commission,
+        net: detail.net,
+      });
+    }
+  })();
+
+  return { conversation, ok: true };
+}
+
+app.post("/candidatures/:id/terminer", exigerConnexion, lireFormulaire, (req, res) => {
+  const resultat = declarerServiceEffectue(Number(req.params.id), req.utilisateur);
+
+  if (resultat.probleme) {
+    return res.status(resultat.probleme.code).render("message", {
+      titre: resultat.probleme.titre,
+      texte: resultat.probleme.texte,
+      liens: [resultat.probleme.lien],
     });
   }
 
-  res.redirect("/messages/" + conversation.id);
+  res.redirect("/messages/" + resultat.conversation.id);
 });
 
 // SIGNALER UN PROBLEME AU SUPPORT.
@@ -5989,6 +6056,7 @@ app.get("/api/mes-demandes", (req, res) => {
         peutChoisir: c.peutChoisir,
         peutRefuser: c.peutRefuser,
         attendVerification: c.attendVerification,
+        libelleDiscussion: c.libelleDiscussion,
       })),
     })),
   });
@@ -6203,6 +6271,10 @@ app.get("/api/discussions/:id", (req, res) => {
     }),
     serviceTermine: c.terminee_le ? { par: c.nomEmployeur, le: c.terminee_le } : null,
     peutEcrire: !c.terminee_le,
+    conseilEcriture: discussion.conseil,
+    // Clore le service appartient a celui qui l'a recu, une fois quelqu'un
+    // choisi, et une seule fois.
+    peutDeclarerService: jeSuisEmployeur && c.statut === "acceptee" && !c.terminee_le,
     exempleMessage: discussion.exempleMessage,
     // Elle a declare avoir travaille : l'employeur doit le savoir, c'est
     // lui qui detient la cle du paiement.
@@ -6233,6 +6305,17 @@ app.post("/api/discussions/:id/messages/:messageId/signaler", (req, res) => {
   if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
 
   const resultat = signalerUnMessage(Number(req.params.messageId), Number(req.params.id), moi);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.json({ ok: true });
+});
+
+// --- Declarer le service effectue depuis l'application --------------
+app.post("/api/candidatures/:id/terminer", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const resultat = declarerServiceEffectue(Number(req.params.id), moi);
   if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
 
   res.json({ ok: true });

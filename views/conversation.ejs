@@ -143,11 +143,8 @@
             <label for="texte">Écrire à <%= jeSuisEmployeur ? conversation.nomPrestataire : conversation.nomEmployeur %></label>
             <textarea id="texte" name="texte" rows="4" maxlength="2000" required
                       placeholder="ex : <%= exempleMessage %>"></textarea>
-            <p class="aide">
-              Parlez du service, du tarif et des horaires. N'indiquez pas
-              votre adresse exacte : elle sera transmise automatiquement
-              après le paiement.
-            </p>
+            <%# Le conseil vient de conseilPourEcrire : l'application lit le meme. %>
+            <p class="aide"><%= conseil %></p>
           </div>
           <div class="actions">
             <button type="submit">
@@ -230,7 +227,9 @@
             Cette discussion rejoindra vos services terminés : vous pourrez
             la relire, mais plus y écrire.
           </p>
-          <form action="/candidatures/<%= conversation.id %>/terminer" method="POST">
+          <form action="/candidatures/<%= conversation.id %>/terminer" method="POST"
+                data-question="Confirmez-vous que le service a été effectué ?"
+                data-precision="La somme bloquée sera versée à <%= conversation.nomPrestataire %>. Cette déclaration ne s'annule pas.">
             <div class="actions">
               <button type="submit" class="bouton-secondaire">
                 <%- include("partiels/icone", { nom: "valider" }) %>

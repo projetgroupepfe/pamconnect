@@ -473,6 +473,10 @@ setTimeout(async () => {
        de.prix.lignes[2].libelle === "Test verifiee reçoit" && de.prix.lignes[2].montant === "7 200 FCFA",
        JSON.stringify(de.prix));
   dire("aucune coordonnee ne sort", !vueEmp.brut.includes("@example.com") && !vueEmp.brut.includes("motdepasse"));
+  dire("le conseil ne parle plus du prix a negocier, et l'adresse va a la personne choisie",
+       de.conseilEcriture === "Accordez-vous sur l'horaire et le déroulement du service : le prix est déjà fixé. " +
+         "Vous pouvez maintenant donner votre adresse exacte à Test verifiee.", de.conseilEcriture);
+  dire("l'employeur peut declarer le service effectue", de.peutDeclarerService === true);
 
   const pageDiscussion = await (await lire("/messages/" + cChoisie, emp.cookie)).text();
   dire("la page du site montre les memes messages, le meme prix et le meme statut",
@@ -485,6 +489,13 @@ setTimeout(async () => {
        vuePre.code === 200 && dp.avec === "Test emp" && dp.messages[1].deMoi && dp.messages[0].auteur === "Test emp" &&
        dp.prix.lignes[2].libelle === "Vous recevez" && dp.metierAutre === null,
        JSON.stringify(dp.prix && dp.prix.lignes));
+  dire("la personne ne declare pas a la place de l'employeur, et son conseil ne parle pas d'adresse",
+       dp.peutDeclarerService === false &&
+       dp.conseilEcriture === "Accordez-vous sur l'horaire et le déroulement du service : le prix est déjà fixé.",
+       dp.conseilEcriture);
+  dire("la page du site donne le meme conseil, et demande confirmation avant de declarer",
+       pageDiscussion.includes("le prix est déjà fixé. Vous pouvez maintenant donner votre adresse exacte à Test verifiee.") &&
+       pageDiscussion.includes('data-question="Confirmez-vous que le service a été effectué ?"'));
 
   // Un numero de telephone dans un message : l'avertissement doit suivre.
   await ecrireA(cChoisie, M + " appelez-moi au 600000000", cookieDe(verifiee.cookie));
@@ -520,11 +531,32 @@ setTimeout(async () => {
        declaree.declarationDeLaPersonne && declaree.declarationDeLaPersonne.nom === "Test verifiee",
        JSON.stringify(declaree.declarationDeLaPersonne));
 
-  await poster("/candidatures/" + cChoisie + "/terminer", form({}), emp.cookie);
+  const terminer = (id, entetes) => json("/api/candidatures/" + id + "/terminer", {}, entetes);
+  const reponseDansMesDemandes = async (id) =>
+    (await mesDemandes(emp.cookie)).donnees.demandes.find((x) => x.id === idAChoisir).candidatures.find((x) => x.id === id);
+
+  dire("tant que le service n'est pas declare, le bouton dit Discuter",
+       (await reponseDansMesDemandes(cChoisie)).libelleDiscussion === "Discuter");
+  dire("la personne qui a travaille ne declare pas a sa place : 403",
+       (await terminer(cChoisie, cookieDe(verifiee.cookie))).code === 403);
+  dire("un autre employeur : 404", (await terminer(cChoisie, cookieDe(autreEmp.cookie))).code === 404);
+  dire("une reponse refusee n'a pas de service a clore : 409",
+       (await terminer(cRefusee, cookieDe(emp.cookie))).code === 409);
+
+  const finService = await terminer(cChoisie, { Authorization: "Bearer " + jeton });
+  dire("l'employeur declare le service effectue depuis l'application", finService.code === 200, finService.brut);
+  const verse = base.prepare("SELECT etat, beneficiaire_id, net FROM versements WHERE annonce_id = ?").get(idAChoisir);
+  dire("la somme est versee a la personne, commission deduite",
+       verse.etat === "verse" && verse.beneficiaire_id === verifiee.id && verse.net === 7200, JSON.stringify(verse));
+  dire("declarer deux fois : 409", (await terminer(cChoisie, cookieDe(emp.cookie))).code === 409);
+  dire("dans Mes demandes, le bouton dit maintenant Relire la discussion",
+       (await reponseDansMesDemandes(cChoisie)).libelleDiscussion === "Relire la discussion");
+  dire("sur le site aussi", (await (await lire("/mes-demandes", emp.cookie)).text()).includes("Relire la discussion"));
   const archivee = (await discussion(cChoisie, cookieDe(emp.cookie))).donnees;
   dire("une fois le service termine, on relit sans ecrire",
        archivee.serviceTermine && archivee.serviceTermine.par === "Test emp" && archivee.peutEcrire === false &&
-       archivee.declarationDeLaPersonne === null, JSON.stringify(archivee.serviceTermine));
+       archivee.declarationDeLaPersonne === null && archivee.peutDeclarerService === false,
+       JSON.stringify(archivee.serviceTermine));
   const tardif = await ecrireA(cChoisie, M + " trop tard", cookieDe(emp.cookie));
   dire("ecrire dans une discussion archivee : 409", tardif.code === 409, tardif.brut);
 
