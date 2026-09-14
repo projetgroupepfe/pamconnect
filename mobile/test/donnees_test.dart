@@ -299,6 +299,7 @@ void main() {
   group("l'ecran de confirmation d'un choix", () {
     Map<String, dynamic> ecran() => {
           'candidatureId': 5,
+          'prestataireId': 6,
           'nom': 'nom 1',
           'metier': null,
           'note': {'etat': 'nouveau', 'badge': 'Nouveau prestataire', 'detail': "personne ne l'a encore notée"},
@@ -622,5 +623,42 @@ void main() {
   test("sans compteur, la personne n'a rien de nouveau", () {
     expect(Moi.depuisJson(_moi('employeur')).aVoir, 0);
     expect(Moi.depuisJson(_moi('employeur')..['aVoir'] = 3).aVoir, 3);
+  });
+
+  test("la fiche d'une personne se lit telle que le serveur l'ecrit", () {
+    final lu = FichePersonne.depuisJson({
+      'id': 6,
+      'nom': 'nom 1',
+      'metier': null,
+      'verifiee': true,
+      'libelleVerification': 'libelle 1',
+      'note': {'etat': 'nouveau', 'badge': 'badge 1', 'detail': 'detail 1'},
+      'badges': ['badge 2'],
+      'trancheAge': null,
+      'lieu': null,
+      'disponibilites': [
+        {'jour': 'Lundi', 'moments': 'Matin'},
+      ],
+      'tarif': 'tarif 1',
+      'avis': {'moyenne': null, 'nombre': 0, 'liste': []},
+      'peutPublier': true,
+    });
+    expect(lu.disponibilites.single.jour, 'Lundi');
+    expect(lu.avis.moyenne, isNull);
+    expect(lu.trancheAge, isNull);
+  });
+
+  test('le formulaire de signalement porte les phrases du serveur', () {
+    final lu = FormulaireProbleme.depuisJson({
+      'titreDemande': 'titre 1',
+      'autre': 'nom 1',
+      'dejaSignale': false,
+      'consequences': 'phrase 1',
+      'apresSignalement': 'phrase 2',
+      'texteMax': 2000,
+    });
+    expect(lu.autre, 'nom 1');
+    expect(lu.texteMax, 2000);
+    expect(() => FormulaireProbleme.depuisJson({'autre': 'nom 1'}), throwsA(isA<FormeInattendue>()));
   });
 }

@@ -121,6 +121,22 @@ class ApiPamConnect {
   /// Refuser une reponse : la demande reste ouverte.
   Future<void> refuserCandidature(int candidatureId) => _decider(candidatureId, 'refuser');
 
+  /// La fiche d'une personne, formulee par le serveur.
+  Future<FichePersonne> fiche(int personneId) async {
+    final donnees = await _appeler('/api/personnes/$personneId');
+    return _interpreter(() => FichePersonne.depuisJson(donnees));
+  }
+
+  Future<FormulaireProbleme> formulaireProbleme(int discussionId) async {
+    final donnees = await _appeler('/api/discussions/$discussionId/probleme');
+    return _interpreter(() => FormulaireProbleme.depuisJson(donnees));
+  }
+
+  Future<TexteDuServeur> signalerProbleme(int discussionId, String texte) async {
+    final donnees = await _appeler('/api/discussions/$discussionId/probleme', corps: {'texte': texte});
+    return _interpreter(() => TexteDuServeur.depuisJson(donnees));
+  }
+
   /// La liste Mes messages, deja rangee et formulee par le serveur.
   Future<MesDiscussions> mesDiscussions() async {
     final donnees = await _appeler('/api/discussions');

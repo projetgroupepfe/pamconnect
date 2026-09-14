@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'ecran_avis.dart';
 import 'ecran_connexion.dart';
+import 'ecran_probleme.dart';
 import 'elements.dart';
 import 'modeles.dart';
 import 'theme.dart';
@@ -312,6 +313,14 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
         ),
       ],
     ];
+  }
+
+  Future<void> _signalerProbleme() async {
+    final texte = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => EcranProbleme(api: widget.api, discussionId: widget.discussionId)),
+    );
+    if (!mounted || texte == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
   }
 
   Future<void> _signaler(MessageDiscussion message) async {
@@ -650,6 +659,23 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
         ),
       ],
       if (avis != null) ..._sectionAvis(context, discussion, avis),
+      // Ecrire au support n'a pas besoin d'un message a montrer du doigt :
+      // les vrais problemes se passent souvent ailleurs.
+      const SizedBox(height: 16),
+      Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            'Un problème avec cette personne ou avec ce service ?',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encrePale),
+          ),
+          TextButton(
+            onPressed: _signalerProbleme,
+            style: TextButton.styleFrom(foregroundColor: Couleurs.encreDouce),
+            child: const Text("Signaler à l'équipe PamConnect"),
+          ),
+        ],
+      ),
     ];
   }
 }

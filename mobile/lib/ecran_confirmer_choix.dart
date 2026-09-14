@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'ecran_connexion.dart';
+import 'ecran_fiche.dart';
 import 'elements.dart';
 import 'modeles.dart';
 import 'theme.dart';
@@ -181,6 +182,16 @@ class _EcranConfirmerChoixState extends State<EcranConfirmerChoix> {
                     if (experience != null)
                       Pastille(texte: experience, icone: Icons.work_history_outlined),
                   ],
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => EcranFiche(api: widget.api, personneId: ecran.prestataireId),
+                    ),
+                  ),
+                  icon: const Icon(Icons.person_outline),
+                  label: const Text('Voir son profil'),
                 ),
               ],
             ),

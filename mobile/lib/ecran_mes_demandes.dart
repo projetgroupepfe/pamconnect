@@ -4,6 +4,7 @@ import 'api.dart';
 import 'ecran_confirmer_choix.dart';
 import 'ecran_connexion.dart';
 import 'ecran_discussion.dart';
+import 'ecran_fiche.dart';
 import 'ecran_mise_en_avant.dart';
 import 'ecran_publier.dart';
 import 'elements.dart';
@@ -161,6 +162,12 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
     );
   }
 
+  Future<void> _voirProfil(ReponseRecue reponse) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => EcranFiche(api: widget.api, personneId: reponse.prestataireId)),
+    );
+  }
+
   Future<void> _discuter(ReponseRecue reponse) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -315,6 +322,7 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
             auModifier: (demande) => _ouvrirFormulaire(demandeId: demande.id),
             auMettreEnAvant: _mettreEnAvant,
             auRetirer: _retirer,
+            auVoirProfil: _voirProfil,
             auDiscuter: _discuter,
             auChoix: _choisir,
             auRefus: _refuser,
@@ -335,6 +343,7 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
             auModifier: (demande) => _ouvrirFormulaire(demandeId: demande.id),
             auMettreEnAvant: _mettreEnAvant,
             auRetirer: _retirer,
+            auVoirProfil: _voirProfil,
             auDiscuter: _discuter,
             auChoix: _choisir,
             auRefus: _refuser,
@@ -351,6 +360,7 @@ class _CarteDemandePubliee extends StatelessWidget {
     required this.auModifier,
     required this.auMettreEnAvant,
     required this.auRetirer,
+    required this.auVoirProfil,
     required this.auDiscuter,
     required this.auChoix,
     required this.auRefus,
@@ -361,6 +371,7 @@ class _CarteDemandePubliee extends StatelessWidget {
   final void Function(DemandePubliee) auModifier;
   final void Function(DemandePubliee) auMettreEnAvant;
   final void Function(DemandePubliee) auRetirer;
+  final void Function(ReponseRecue) auVoirProfil;
   final void Function(ReponseRecue) auDiscuter;
   final void Function(ReponseRecue) auChoix;
   final void Function(ReponseRecue) auRefus;
@@ -487,6 +498,7 @@ class _CarteDemandePubliee extends StatelessWidget {
                   _CarteReponse(
                     reponse: reponse,
                     prix: prix,
+                    auVoirProfil: auVoirProfil,
                     auDiscuter: auDiscuter,
                     auChoix: auChoix,
                     auRefus: auRefus,
@@ -504,6 +516,7 @@ class _CarteReponse extends StatelessWidget {
   const _CarteReponse({
     required this.reponse,
     required this.prix,
+    required this.auVoirProfil,
     required this.auDiscuter,
     required this.auChoix,
     required this.auRefus,
@@ -511,6 +524,7 @@ class _CarteReponse extends StatelessWidget {
   });
 
   final ReponseRecue reponse;
+  final void Function(ReponseRecue) auVoirProfil;
   final void Function(ReponseRecue) auDiscuter;
   final void Function(ReponseRecue) auChoix;
   final void Function(ReponseRecue) auRefus;
@@ -602,6 +616,16 @@ class _CarteReponse extends StatelessWidget {
           if (experience != null) LigneDetail(icone: Icons.work_history_outlined, texte: experience),
           if (disponibilites != null)
             LigneDetail(icone: Icons.calendar_today_outlined, texte: 'Disponible', enGras: disponibilites),
+          // Sa fiche, avant de decider : sa note et ses avis y sont en entier.
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: OutlinedButton.icon(
+              onPressed: () => auVoirProfil(reponse),
+              icon: const Icon(Icons.person_outline),
+              label: const Text('Voir le profil'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            ),
+          ),
           // Discuter reste possible dans tous les cas, comme sur le site :
           // meme refusee ou sur une demande retiree, la discussion demeure.
           Padding(

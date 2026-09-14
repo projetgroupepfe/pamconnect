@@ -443,6 +443,7 @@ class RefusAnnonces {
 class ConfirmationChoix {
   const ConfirmationChoix({
     required this.candidatureId,
+    required this.prestataireId,
     required this.nom,
     required this.note,
     required this.horaire,
@@ -461,6 +462,7 @@ class ConfirmationChoix {
     final refus = _lireFacultatif<Map<String, dynamic>>(json, 'refusAnnonces');
     return ConfirmationChoix(
       candidatureId: _lire<int>(json, 'candidatureId'),
+      prestataireId: _lire<int>(json, 'prestataireId'),
       nom: _lire<String>(json, 'nom'),
       note: NotePersonne.depuisJson(_lire<Map<String, dynamic>>(json, 'note')),
       horaire: _lire<String>(json, 'horaire'),
@@ -476,6 +478,9 @@ class ConfirmationChoix {
   }
 
   final int candidatureId;
+
+  /// Pour ouvrir sa fiche.
+  final int prestataireId;
   final String nom;
   final NotePersonne note;
   final String horaire;
@@ -1015,4 +1020,142 @@ class MesDiscussions {
   final ChapeauTerminees chapeauTerminees;
   final int aVoir;
   final ListeVide? vide;
+}
+
+/// Un jour ou la personne est disponible, et ses moments.
+class Creneau {
+  const Creneau({required this.jour, required this.moments});
+
+  factory Creneau.depuisJson(Map<String, dynamic> json) => Creneau(
+        jour: _lire<String>(json, 'jour'),
+        moments: _lire<String>(json, 'moments'),
+      );
+
+  final String jour;
+  final String moments;
+}
+
+/// Un avis tel qu'il s'affiche sur une fiche, deja formule.
+class AvisPublic {
+  const AvisPublic({
+    required this.note,
+    required this.auteur,
+    required this.criteres,
+    required this.date,
+    this.titreDemande,
+    this.commentaire,
+  });
+
+  factory AvisPublic.depuisJson(Map<String, dynamic> json) => AvisPublic(
+        note: _lire<String>(json, 'note'),
+        auteur: _lire<String>(json, 'auteur'),
+        criteres: _lireTextes(json, 'criteres'),
+        date: _lire<String>(json, 'date'),
+        titreDemande: _lireFacultatif<String>(json, 'titreDemande'),
+        commentaire: _lireFacultatif<String>(json, 'commentaire'),
+      );
+
+  final String note;
+  final String auteur;
+  final List<String> criteres;
+  final String date;
+  final String? titreDemande;
+  final String? commentaire;
+}
+
+class AvisDeLaFiche {
+  const AvisDeLaFiche({required this.nombre, required this.liste, this.moyenne});
+
+  factory AvisDeLaFiche.depuisJson(Map<String, dynamic> json) => AvisDeLaFiche(
+        nombre: _lire<int>(json, 'nombre'),
+        liste: _lireListe(json, 'liste', AvisPublic.depuisJson),
+        moyenne: _lireFacultatif<String>(json, 'moyenne'),
+      );
+
+  final int nombre;
+  final List<AvisPublic> liste;
+
+  /// Absente tant que personne n'a note : on n'affiche pas "0 sur 5".
+  final String? moyenne;
+}
+
+/// La fiche d'une personne (/api/personnes/:id).
+class FichePersonne {
+  const FichePersonne({
+    required this.id,
+    required this.nom,
+    required this.verifiee,
+    required this.libelleVerification,
+    required this.note,
+    required this.badges,
+    required this.disponibilites,
+    required this.tarif,
+    required this.avis,
+    required this.peutPublier,
+    this.metier,
+    this.trancheAge,
+    this.lieu,
+  });
+
+  factory FichePersonne.depuisJson(Map<String, dynamic> json) => FichePersonne(
+        id: _lire<int>(json, 'id'),
+        nom: _lire<String>(json, 'nom'),
+        verifiee: _lire<bool>(json, 'verifiee'),
+        libelleVerification: _lire<String>(json, 'libelleVerification'),
+        note: NotePersonne.depuisJson(_lire<Map<String, dynamic>>(json, 'note')),
+        badges: _lireTextes(json, 'badges'),
+        disponibilites: _lireListe(json, 'disponibilites', Creneau.depuisJson),
+        tarif: _lire<String>(json, 'tarif'),
+        avis: AvisDeLaFiche.depuisJson(_lire<Map<String, dynamic>>(json, 'avis')),
+        peutPublier: _lire<bool>(json, 'peutPublier'),
+        metier: _lireFacultatif<String>(json, 'metier'),
+        trancheAge: _lireFacultatif<String>(json, 'trancheAge'),
+        lieu: _lireFacultatif<String>(json, 'lieu'),
+      );
+
+  final int id;
+  final String nom;
+  final bool verifiee;
+  final String libelleVerification;
+  final NotePersonne note;
+  final List<String> badges;
+  final List<Creneau> disponibilites;
+  final String tarif;
+  final AvisDeLaFiche avis;
+  final bool peutPublier;
+  final String? metier;
+
+  /// Seulement pour l'employeur qui l'a deja embauchee.
+  final String? trancheAge;
+  final String? lieu;
+}
+
+/// Le formulaire Signaler un probleme, avec ses phrases.
+class FormulaireProbleme {
+  const FormulaireProbleme({
+    required this.titreDemande,
+    required this.autre,
+    required this.dejaSignale,
+    required this.consequences,
+    required this.apresSignalement,
+    required this.texteMax,
+  });
+
+  factory FormulaireProbleme.depuisJson(Map<String, dynamic> json) => FormulaireProbleme(
+        titreDemande: _lire<String>(json, 'titreDemande'),
+        autre: _lire<String>(json, 'autre'),
+        dejaSignale: _lire<bool>(json, 'dejaSignale'),
+        consequences: _lire<String>(json, 'consequences'),
+        apresSignalement: _lire<String>(json, 'apresSignalement'),
+        texteMax: _lire<int>(json, 'texteMax'),
+      );
+
+  final String titreDemande;
+
+  /// La personne concernee par le signalement.
+  final String autre;
+  final bool dejaSignale;
+  final String consequences;
+  final String apresSignalement;
+  final int texteMax;
 }
