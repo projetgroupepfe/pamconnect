@@ -840,6 +840,65 @@ setTimeout(async () => {
        fpPre.code === 200 && fpPre.donnees.autre === "Test emp" && fpPre.donnees.apresSignalement.includes("votre candidature"),
        fpPre.brut);
 
+  console.log(SAUT + "--- MON PROFIL ---");
+  const monProfilApi = (entetes) => json("/api/mon-profil", undefined, entetes);
+  dire("sans session : 401", (await monProfilApi()).code === 401);
+  const equipe = await creerCompte("equipe", "employeur");
+  base.prepare("UPDATE utilisateurs SET est_admin = 1 WHERE id = ?").run(equipe.id);
+  dire("un compte d'equipe : 403, son espace reste sur le site", (await monProfilApi(cookieDe(equipe.cookie))).code === 403);
+
+  const TEXTE_EQUIPE = M + " merci de confirmer le versement";
+  base.prepare(`UPDATE utilisateurs SET message_equipe = ?, message_equipe_le = datetime('now'),
+                message_equipe_lu = 0 WHERE id = ?`).run(TEXTE_EQUIPE, emp.id);
+  const profilEmp = await monProfilApi(cookieDe(emp.cookie));
+  const pe = profilEmp.donnees || {};
+  dire("le profil de l'employeur, formule par le serveur",
+       profilEmp.code === 200 && pe.nom === "Test emp" && pe.fonction === "Employeur" && pe.email === emp.mail &&
+       pe.verification && pe.verification.libelle === "Identité vérifiée" && pe.tarif === null &&
+       pe.badges.length === 0 && pe.avis.vide.includes("Les personnes que vous embauchez"),
+       profilEmp.brut.slice(0, 300));
+  dire("le message de l'equipe y attend, et compte dans la pastille",
+       pe.messageEquipe && pe.messageEquipe.texte === TEXTE_EQUIPE && pe.aLire === 1 &&
+       (await json("/api/moi", undefined, cookieDe(emp.cookie))).donnees.moi.aLire === 1);
+  dire("l'avis de la personne employee y figure, avec son signalement",
+       pe.avis.nombre >= 1 && pe.avis.liste.some((a) => a.auteur === "Test verifiee" && a.signale === true && a.id > 0),
+       JSON.stringify(pe.avis));
+  const pageProfilEmp = await (await lire("/mon-profil", emp.cookie)).text();
+  dire("la page du site montre le meme message, la meme verification et la meme note",
+       pageProfilEmp.includes(TEXTE_EQUIPE) && pageProfilEmp.includes(pe.verification.libelle) &&
+       pageProfilEmp.includes(pe.avis.liste[0].note));
+
+  const MOTIF = M + " le prix ne se negocie pas";
+  base.prepare(`UPDATE utilisateurs SET avertissement_motif = ?, avertissement_le = date('now'),
+                avertissement_lu = 0 WHERE id = ?`).run(MOTIF, verifiee.id);
+  const profilPre = await monProfilApi(cookieDe(verifiee.cookie));
+  const pp = profilPre.donnees || {};
+  const metierEnBase = base.prepare("SELECT metier FROM utilisateurs WHERE id = ?").get(verifiee.id).metier;
+  dire("le profil de la personne qui repond : son metier, ses badges, son tarif detaille",
+       profilPre.code === 200 && pp.fonction === metierEnBase &&
+       pp.badges.some((b) => b.verifie === true && b.texte === "Identité et casier vérifiés") &&
+       pp.tarif.lignes.length === 3 && pp.tarif.lignes[0].montant === "15 000 FCFA" &&
+       pp.tarif.lignes[1].retenue === true && pp.tarif.lignes[2].total === true &&
+       pp.tarif.lignes[2].montant === "13 500 FCFA" && pp.tarif.aide.startsWith("Ce tarif est indicatif"),
+       profilPre.brut.slice(0, 400));
+  dire("l'avertissement y attend", pp.avertissement && pp.avertissement.motif === MOTIF && pp.aLire === 1);
+  dire("l'avis recu de l'employeur, pas signale",
+       pp.avis.liste.some((a) => a.auteur === "Test emp" && a.signale === false), JSON.stringify(pp.avis));
+  const pageProfilPre = await (await lire("/mon-profil", verifiee.cookie)).text();
+  dire("la page du site montre le meme metier, le meme montant recu et le meme avertissement",
+       pageProfilPre.includes(pp.fonction) && pageProfilPre.includes(pp.tarif.lignes[2].montant) &&
+       pageProfilPre.includes(MOTIF));
+
+  const luEquipe = await json("/api/mon-profil/message-equipe/lu", {}, { Authorization: "Bearer " + jeton });
+  const apresLu = (await monProfilApi(cookieDe(emp.cookie))).donnees;
+  dire("J'ai lu, depuis l'application : le message disparait, sur le site aussi",
+       luEquipe.code === 200 && apresLu.messageEquipe === null && apresLu.aLire === 0 &&
+       !(await (await lire("/mon-profil", emp.cookie)).text()).includes(TEXTE_EQUIPE), luEquipe.brut);
+  const luAvertissement = await json("/api/mon-profil/avertissement/lu", {}, cookieDe(verifiee.cookie));
+  dire("l'avertissement aussi",
+       luAvertissement.code === 200 && (await monProfilApi(cookieDe(verifiee.cookie))).donnees.avertissement === null);
+  dire("sans session, J'ai lu : 401", (await json("/api/mon-profil/avertissement/lu", {})).code === 401);
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");

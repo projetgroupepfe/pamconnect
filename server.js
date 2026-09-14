@@ -2929,10 +2929,7 @@ app.use((req, res, next) => {
   // un avertissement. Sans ce compte, un message pouvait rester des
   // semaines sans etre vu - et une question que personne ne lit ne sert
   // a rien. Aucune requete de plus : les colonnes sont deja chargees.
-  res.locals.aLireSurMonProfil = moi && !moi.est_admin
-    ? (moi.message_equipe && !moi.message_equipe_lu ? 1 : 0)
-      + (moi.avertissement_motif && !moi.avertissement_lu ? 1 : 0)
-    : 0;
+  res.locals.aLireSurMonProfil = nombreALireSurMonProfil(moi);
 
   res.locals.jePeux = {
     // Un membre de l'equipe est enregistre comme employeur pour une
@@ -3079,6 +3076,149 @@ app.post("/connexion", lireFormulaire, (req, res) => {
 });
 
 // --- Mon profil ----------------------------------------------------
+// --- Mon profil, reuni UNE SEULE FOIS pour le site et l'application --
+
+// Ce qui attend la personne SUR SON PROFIL : un message de l'equipe, un
+// avertissement. La pastille du menu du site et celle de l'application
+// comptent la meme chose.
+function nombreALireSurMonProfil(moi) {
+  if (!moi || moi.est_admin) return 0;
+  return (moi.message_equipe && !moi.message_equipe_lu ? 1 : 0)
+    + (moi.avertissement_motif && !moi.avertissement_lu ? 1 : 0);
+}
+
+// Un avis tel qu'il s'affiche, deja formule : sur la fiche d'une
+// personne et sur Mon profil.
+function avisLisibles(avis) {
+  return avis.map((a) => ({
+    note: `${moyenneLisible(a.note)} sur 5`,
+    auteur: a.nomAuteur,
+    titreDemande: a.titreAnnonce || null,
+    commentaire: a.commentaire || null,
+    // Le sens d'un critere depend du role de celui qui a ECRIT l'avis.
+    criteres: criteresAvis(a.roleAuteur === "employeur")
+      .filter((critere) => a[critere.cle])
+      .map((critere) => `${critere.libelle} : ${a[critere.cle]} sur 5`),
+    date: dateLisible(a.cree_le),
+  }));
+}
+
+function phraseAttenteVerification(envoyeLe) {
+  const attente = attenteVerification(envoyeLe);
+  if (attente === null) {
+    return `Notre équipe examine votre dossier sous ${DELAI_VERIFICATION_HEURES} heures.`;
+  }
+  if (attente.depasse) {
+    return `Envoyé ${attenteLisible(envoyeLe)}. Le délai de ${DELAI_VERIFICATION_HEURES} heures ` +
+           "est dépassé, votre dossier reste en tête de la liste.";
+  }
+  return `Envoyé ${attenteLisible(envoyeLe)}. Réponse attendue d'ici ${attente.restantes} ` +
+         `heure${attente.restantes > 1 ? "s" : ""}.`;
+}
+
+// Le tarif sur SON profil, avec les montants du bloc detail-tarif du site.
+function tarifSurMonProfil(tarifBrut) {
+  const detail = detaillerTarif(tarifBrut);
+  const pourcentage = Math.round(TAUX_COMMISSION * 100);
+
+  if (detail.brut <= 0) {
+    return {
+      lignes: [],
+      phrase: "Vous n'avez pas encore indiqué votre tarif.",
+      aide: "Sans tarif, les employeurs ne savent pas ce que vous demandez.",
+    };
+  }
+
+  return {
+    lignes: [
+      { libelle: "Vous demandez", montant: formaterMontant(detail.brut), retenue: false, total: false },
+      { libelle: `Commission PamConnect (${pourcentage} %)`,
+        montant: "− " + formaterMontant(detail.commission), retenue: true, total: false },
+      { libelle: "Vous recevez", montant: formaterMontant(detail.net), retenue: false, total: true },
+    ],
+    phrase: null,
+    // Sur SON profil, ce montant n'est qu'une indication : le prix paye
+    // est celui de la demande a laquelle elle repond.
+    aide: "Ce tarif est indicatif. Le montant réellement reçu dépend de la demande " +
+          `à laquelle vous répondez : la commission de ${pourcentage} % s'applique ` +
+          "au prix annoncé par l'employeur.",
+  };
+}
+
+function monProfil(u) {
+  const equipe = Boolean(u.est_admin);
+  const personne = u.role === "prestataire";
+  const statut = u.statut_verification;
+  const reputation = reputationDe(u.id);
+  const recus = equipe ? [] : requetes.avisRecus.all(u.id);
+  const aNoter = equipe ? 0 : requetes.servicesANoter.get({ moi: u.id }).n;
+  const pluriel = aNoter > 1;
+
+  return {
+    nom: u.nom,
+    // Un message de l'equipe n'est PAS une sanction ; un avertissement,
+    // si. Chacun reste affiche tant que la personne ne l'a pas lu.
+    messageEquipe: u.message_equipe && !u.message_equipe_lu
+      ? { texte: u.message_equipe, le: u.message_equipe_le }
+      : null,
+    avertissement: u.avertissement_motif && !u.avertissement_lu
+      ? { motif: u.avertissement_motif, le: u.avertissement_le }
+      : null,
+    // Pour un membre de l'equipe, on annonce sa FONCTION.
+    fonction: equipe
+      ? "Vérifie les dossiers d'identité"
+      : (u.role === "employeur" ? "Employeur" : u.metier || "Prestataire"),
+    // LES DEUX COTES passent par la verification ; seule l'equipe en est
+    // dispensee, puisqu'elle ne rencontre personne.
+    verification: equipe ? null : {
+      statut,
+      libelle: libelleVerification(statut),
+      attente: statut === "en attente" ? phraseAttenteVerification(u.documents_envoyes_le) : null,
+    },
+    lieu: equipe ? null : [u.arrondissement, u.quartier].filter(Boolean).join(", ") || null,
+    email: u.email,
+    badges: personne
+      ? badgesDe(u).map((b) => ({ texte: b.texte, verifie: b.cle === "verifie" }))
+      : [],
+    trancheAge: personne ? trancheAge(u.date_naissance) : null,
+    disponibilites: personne
+      ? disponibilitesLisibles(u.disponibilites).map((c) => ({
+          jour: c.jour.charAt(0).toUpperCase() + c.jour.slice(1),
+          moments: c.moments.join(", "),
+        }))
+      : [],
+    tarif: personne ? tarifSurMonProfil(u.tarif) : null,
+    // CE QUE LES AUTRES DISENT DE MOI, avec le seul recours possible : le
+    // signaler.
+    avis: equipe ? null : {
+      moyenne: reputation.nombre > 0 ? `${moyenneLisible(reputation.moyenne)} sur 5` : null,
+      nombre: reputation.nombre,
+      liste: avisLisibles(recus).map((a, i) => ({
+        ...a,
+        id: recus[i].id,
+        signale: Boolean(recus[i].signale),
+      })),
+      // LE MEME ECRAN, DEUX METIERS : un employeur est note par la
+      // personne qu'il a embauchee.
+      vide: u.role === "employeur"
+        ? "Personne ne vous a encore noté. Les personnes que vous embauchez pourront le faire une fois le service terminé."
+        : "Personne ne vous a encore noté. Cela viendra après votre premier service terminé.",
+    },
+    // Cette page ne sert qu'a lire : elle dit que l'autre chemin existe.
+    servicesANoter: aNoter > 0
+      ? {
+          phrase: `${aNoter} service${pluriel ? "s" : ""} attend${pluriel ? "ent" : ""} votre avis.`,
+          suite: "Cette page montre ce que les autres ont dit de vous ; c'est dans vos " +
+                 "messages que vous dites ce que vous pensez d'eux.",
+        }
+      : null,
+    motifRefus: personne && statut === "refuse" && u.motif_refus ? u.motif_refus : null,
+    boutonVerification: personne && statut !== "verifie"
+      ? (statut === "non soumis" ? "Faire vérifier mon identité" : "Voir mon dossier")
+      : null,
+  };
+}
+
 app.get("/mon-profil", exigerConnexion, (req, res) => {
   // CETTE PAGE DIT QUI JE SUIS, PAS CE QUE JE FAIS. Ses demandes ou
   // ses reponses ont leur propre page : melangees ici, elles
@@ -3091,7 +3231,8 @@ app.get("/mon-profil", exigerConnexion, (req, res) => {
     // ailleurs : c est mon profil, ce sont mes avis.
     reputation: reputationDe(req.utilisateur.id),
     mesAvis: requetes.avisRecus.all(req.utilisateur.id),
-    servicesANoter: requetes.servicesANoter.get({ moi: req.utilisateur.id }).n,
+    // Les phrases et les decisions de la page, lues aussi par l'application.
+    profil: monProfil(req.utilisateur),
   });
 });
 
@@ -6246,6 +6387,8 @@ function moiPourApi(u) {
     jetons: soldeJetonsDe(u.id),
     // La pastille de Messages, comptee comme celle du menu du site.
     aVoir: nombreAVoir(u),
+    // La pastille de Mon profil.
+    aLire: nombreALireSurMonProfil(u),
   };
 }
 
@@ -6838,6 +6981,47 @@ app.post("/api/demandes/:id/retirer", (req, res) => {
   res.json({ texte: resultat.texte });
 });
 
+// --- Mon profil depuis l'application ---------------------------------
+//
+// L'espace equipe reste sur le site : un compte d'equipe n'a pas de
+// profil dans l'application.
+function refusEquipeApi(res, moi) {
+  if (!moi) {
+    erreurApi(res, 401, "Personne n'est connecté.");
+    return true;
+  }
+  if (moi.est_admin) {
+    erreurApi(res, 403, "L'espace équipe s'utilise sur le site.");
+    return true;
+  }
+  return false;
+}
+
+app.get("/api/mon-profil", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  res.json({ ...monProfil(moi), aLire: nombreALireSurMonProfil(moi) });
+});
+
+// "J'ai lu" : la personne reconnait le message ou l'avertissement, comme
+// avec les boutons du site.
+app.post("/api/mon-profil/message-equipe/lu", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  requetes.marquerMessageEquipeLu.run(moi.id);
+  res.json({ ok: true });
+});
+
+app.post("/api/mon-profil/avertissement/lu", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  requetes.marquerAvertissementLu.run(moi.id);
+  res.json({ ok: true });
+});
+
 // --- La fiche d'une personne depuis l'application -------------------
 //
 // Publique, comme sur le site : l'application la montre a l'employeur
@@ -6869,17 +7053,7 @@ app.get("/api/personnes/:id", (req, res) => {
     avis: {
       moyenne: reputation.nombre > 0 ? `${moyenneLisible(reputation.moyenne)} sur 5` : null,
       nombre: reputation.nombre,
-      liste: avis.map((a) => ({
-        note: `${moyenneLisible(a.note)} sur 5`,
-        auteur: a.nomAuteur,
-        titreDemande: a.titreAnnonce || null,
-        commentaire: a.commentaire || null,
-        // Le sens d'un critere depend du role de celui qui a ECRIT l'avis.
-        criteres: criteresAvis(a.roleAuteur === "employeur")
-          .filter((critere) => a[critere.cle])
-          .map((critere) => `${critere.libelle} : ${a[critere.cle]} sur 5`),
-        date: dateLisible(a.cree_le),
-      })),
+      liste: avisLisibles(avis),
     },
     peutPublier: Boolean(moi && moi.role === "employeur" && !moi.est_admin),
   });

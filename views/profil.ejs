@@ -5,7 +5,7 @@
   <%# Un message de l'equipe n'est PAS une sanction : il n'a donc pas la
       couleur d'un avertissement. Elle s'en sert pour poser une question,
       le plus souvent avant de trancher un desaccord sur de l'argent. %>
-  <% if (utilisateur.message_equipe && !utilisateur.message_equipe_lu) { %>
+  <% if (profil.messageEquipe) { %>
     <div class="carte confiance">
       <h3>L'équipe PamConnect vous écrit</h3>
       <p class="aide">Le <%= utilisateur.message_equipe_le %></p>
@@ -24,7 +24,7 @@
   <%# Un avertissement se lit avant tout le reste, et ne disparait que
       lorsque la personne l'a reconnu. Le compte, lui, fonctionne
       normalement : ce n'est pas une suspension. %>
-  <% if (utilisateur.avertissement_motif && !utilisateur.avertissement_lu) { %>
+  <% if (profil.avertissement) { %>
     <div class="carte avertissement">
       <h3>Un avertissement de l'équipe PamConnect</h3>
       <p>
@@ -57,7 +57,7 @@
         <div class="metier">
           <%# Pour un membre de l'equipe, on annonce sa FONCTION. Repeter
             "Equipe PamConnect" juste sous le nom du compte n'apprenait rien. %>
-        <% if (utilisateur.est_admin) { %>Vérifie les dossiers d'identité<% } else { %><%= utilisateur.role === "employeur" ? "Employeur" : utilisateur.metier || "Prestataire" %><% } %>
+        <%= profil.fonction %>
         </div>
       </div>
     </div>
@@ -76,20 +76,8 @@
         </span>
       </p>
 
-      <% if (utilisateur.statut_verification === "en attente") { %>
-        <% const att = attenteVerification(utilisateur.documents_envoyes_le); %>
-        <p class="aide">
-          <% if (att === null) { %>
-            Notre équipe examine votre dossier sous <%= delaiVerificationHeures %> heures.
-          <% } else if (att.depasse) { %>
-            Envoyé <%= attenteLisible(utilisateur.documents_envoyes_le) %>.
-            Le délai de <%= delaiVerificationHeures %> heures est dépassé, votre
-            dossier reste en tête de la liste.
-          <% } else { %>
-            Envoyé <%= attenteLisible(utilisateur.documents_envoyes_le) %>.
-            Réponse attendue d'ici <%= att.restantes %> heure<%= att.restantes > 1 ? "s" : "" %>.
-          <% } %>
-        </p>
+      <% if (profil.verification.attente) { %>
+        <p class="aide"><%= profil.verification.attente %></p>
       <% } %>
     <% } %>
 
@@ -192,20 +180,16 @@
             avis: mesAvis,
             titre: "Les avis reçus",
             signalable: true,
-            vide: utilisateur.role === "employeur"
-              ? "Personne ne vous a encore noté. Les personnes que vous embauchez pourront le faire une fois le service terminé."
-              : "Personne ne vous a encore noté. Cela viendra après votre premier service terminé." }) %>
+            vide: profil.avis.vide }) %>
 
       <%# CETTE PAGE NE SERT QU'A LIRE. Quelqu'un qui y voit un avis et
           cherche comment repondre ne trouvait rien : l'ecran ne disait
           pas que l'autre chemin existe. %>
-      <% if (servicesANoter > 0) { %>
+      <% if (profil.servicesANoter) { %>
         <div class="carte">
           <p>
-            <strong><%= servicesANoter %> service<%= servicesANoter > 1 ? "s" : "" %>
-            attend<%= servicesANoter > 1 ? "ent" : "" %> votre avis.</strong>
-            Cette page montre ce que les autres ont dit de vous ; c'est dans
-            vos messages que vous dites ce que vous pensez d'eux.
+            <strong><%= profil.servicesANoter.phrase %></strong>
+            <%= profil.servicesANoter.suite %>
           </p>
           <div class="actions">
             <a class="bouton" href="/messages">
@@ -217,19 +201,15 @@
       <% } %>
     <% } %>
 
-    <% if (utilisateur.role === "prestataire" && utilisateur.statut_verification === "refuse" && utilisateur.motif_refus) { %>
-      <p class="aide">Motif du refus : <%= utilisateur.motif_refus %></p>
+    <% if (profil.motifRefus) { %>
+      <p class="aide">Motif du refus : <%= profil.motifRefus %></p>
     <% } %>
 
-    <% if (utilisateur.role === "prestataire" && utilisateur.statut_verification !== "verifie") { %>
+    <% if (profil.boutonVerification) { %>
       <div class="actions">
         <a class="bouton" href="/verification">
           <%- include("partiels/icone", { nom: "envoi" }) %>
-          <% if (utilisateur.statut_verification === "non soumis") { %>
-            Faire vérifier mon identité
-          <% } else { %>
-            Voir mon dossier
-          <% } %>
+          <%= profil.boutonVerification %>
         </a>
       </div>
     <% } %>
