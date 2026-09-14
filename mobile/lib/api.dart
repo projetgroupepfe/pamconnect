@@ -121,6 +121,22 @@ class ApiPamConnect {
   /// Refuser une reponse : la demande reste ouverte.
   Future<void> refuserCandidature(int candidatureId) => _decider(candidatureId, 'refuser');
 
+  /// Mon profil, formule par le serveur.
+  Future<MonProfil> monProfil() async {
+    final donnees = await _appeler('/api/mon-profil');
+    return _interpreter(() => MonProfil.depuisJson(donnees));
+  }
+
+  /// "J'ai lu" sous le message de l'equipe.
+  Future<void> marquerMessageEquipeLu() async {
+    await _appeler('/api/mon-profil/message-equipe/lu', corps: const {});
+  }
+
+  /// "J'ai lu cet avertissement".
+  Future<void> marquerAvertissementLu() async {
+    await _appeler('/api/mon-profil/avertissement/lu', corps: const {});
+  }
+
   /// La fiche d'une personne, formulee par le serveur.
   Future<FichePersonne> fiche(int personneId) async {
     final donnees = await _appeler('/api/personnes/$personneId');

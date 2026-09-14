@@ -64,6 +64,7 @@ class Moi {
     required this.role,
     required this.jetons,
     this.aVoir = 0,
+    this.aLire = 0,
   });
 
   factory Moi.depuisJson(Map<String, dynamic> json) => Moi(
@@ -72,6 +73,7 @@ class Moi {
         role: _lire<String>(json, 'role'),
         jetons: Jetons.depuisJson(_lire<Map<String, dynamic>>(json, 'jetons')),
         aVoir: _lireFacultatif<int>(json, 'aVoir') ?? 0,
+        aLire: _lireFacultatif<int>(json, 'aLire') ?? 0,
       );
 
   /// La reponse de /api/moi : { "moi": { ... } }.
@@ -86,6 +88,10 @@ class Moi {
   /// Les messages non lus et les decisions pas encore vues : la pastille
   /// de Messages.
   final int aVoir;
+
+  /// Un message de l'equipe ou un avertissement pas encore lu : la pastille
+  /// de Mon profil.
+  final int aLire;
 
   /// Ces deux questions choisissent l'ecran d'arrivee, comme le menu du
   /// site. Ce ne sont PAS des droits accordes ici : le serveur refuse de
@@ -1044,6 +1050,8 @@ class AvisPublic {
     required this.date,
     this.titreDemande,
     this.commentaire,
+    this.id,
+    this.signale = false,
   });
 
   factory AvisPublic.depuisJson(Map<String, dynamic> json) => AvisPublic(
@@ -1053,6 +1061,8 @@ class AvisPublic {
         date: _lire<String>(json, 'date'),
         titreDemande: _lireFacultatif<String>(json, 'titreDemande'),
         commentaire: _lireFacultatif<String>(json, 'commentaire'),
+        id: _lireFacultatif<int>(json, 'id'),
+        signale: _lireFacultatif<bool>(json, 'signale') ?? false,
       );
 
   final String note;
@@ -1061,15 +1071,22 @@ class AvisPublic {
   final String date;
   final String? titreDemande;
   final String? commentaire;
+
+  /// Seulement sur son propre profil : on ne signale que les avis qui nous
+  /// visent.
+  final int? id;
+  final bool signale;
 }
 
+/// Les avis d'une fiche, ou ceux de Mon profil.
 class AvisDeLaFiche {
-  const AvisDeLaFiche({required this.nombre, required this.liste, this.moyenne});
+  const AvisDeLaFiche({required this.nombre, required this.liste, this.moyenne, this.vide});
 
   factory AvisDeLaFiche.depuisJson(Map<String, dynamic> json) => AvisDeLaFiche(
         nombre: _lire<int>(json, 'nombre'),
         liste: _lireListe(json, 'liste', AvisPublic.depuisJson),
         moyenne: _lireFacultatif<String>(json, 'moyenne'),
+        vide: _lireFacultatif<String>(json, 'vide'),
       );
 
   final int nombre;
@@ -1077,6 +1094,9 @@ class AvisDeLaFiche {
 
   /// Absente tant que personne n'a note : on n'affiche pas "0 sur 5".
   final String? moyenne;
+
+  /// La phrase quand personne n'a encore note, sur Mon profil.
+  final String? vide;
 }
 
 /// La fiche d'une personne (/api/personnes/:id).
@@ -1158,4 +1178,169 @@ class FormulaireProbleme {
   final String consequences;
   final String apresSignalement;
   final int texteMax;
+}
+
+T? _lireObjet<T>(Map<String, dynamic> json, String champ, T Function(Map<String, dynamic>) lecture) {
+  final objet = _lireFacultatif<Map<String, dynamic>>(json, champ);
+  return objet == null ? null : lecture(objet);
+}
+
+class MessageDeLEquipe {
+  const MessageDeLEquipe({required this.texte, required this.le});
+
+  factory MessageDeLEquipe.depuisJson(Map<String, dynamic> json) => MessageDeLEquipe(
+        texte: _lire<String>(json, 'texte'),
+        le: _lire<String>(json, 'le'),
+      );
+
+  final String texte;
+  final String le;
+}
+
+class AvertissementDeLEquipe {
+  const AvertissementDeLEquipe({required this.motif, required this.le});
+
+  factory AvertissementDeLEquipe.depuisJson(Map<String, dynamic> json) => AvertissementDeLEquipe(
+        motif: _lire<String>(json, 'motif'),
+        le: _lire<String>(json, 'le'),
+      );
+
+  final String motif;
+  final String le;
+}
+
+class VerificationDuProfil {
+  const VerificationDuProfil({required this.statut, required this.libelle, this.attente});
+
+  factory VerificationDuProfil.depuisJson(Map<String, dynamic> json) => VerificationDuProfil(
+        statut: _lire<String>(json, 'statut'),
+        libelle: _lire<String>(json, 'libelle'),
+        attente: _lireFacultatif<String>(json, 'attente'),
+      );
+
+  final String statut;
+  final String libelle;
+
+  /// Pendant l'examen du dossier : depuis quand, et jusqu'a quand.
+  final String? attente;
+}
+
+class BadgeDuProfil {
+  const BadgeDuProfil({required this.texte, required this.verifie});
+
+  factory BadgeDuProfil.depuisJson(Map<String, dynamic> json) => BadgeDuProfil(
+        texte: _lire<String>(json, 'texte'),
+        verifie: _lire<bool>(json, 'verifie'),
+      );
+
+  final String texte;
+
+  /// Ce que l'equipe a controle, en vert.
+  final bool verifie;
+}
+
+/// Une ligne du detail d'un tarif : "Vous demandez 15 000 FCFA".
+class LigneTarif {
+  const LigneTarif({required this.libelle, required this.montant, required this.retenue, required this.total});
+
+  factory LigneTarif.depuisJson(Map<String, dynamic> json) => LigneTarif(
+        libelle: _lire<String>(json, 'libelle'),
+        montant: _lire<String>(json, 'montant'),
+        retenue: _lire<bool>(json, 'retenue'),
+        total: _lire<bool>(json, 'total'),
+      );
+
+  final String libelle;
+  final String montant;
+
+  /// La commission, retiree du montant.
+  final bool retenue;
+  final bool total;
+}
+
+class TarifDuProfil {
+  const TarifDuProfil({required this.lignes, this.phrase, this.aide});
+
+  factory TarifDuProfil.depuisJson(Map<String, dynamic> json) => TarifDuProfil(
+        lignes: _lireListe(json, 'lignes', LigneTarif.depuisJson),
+        phrase: _lireFacultatif<String>(json, 'phrase'),
+        aide: _lireFacultatif<String>(json, 'aide'),
+      );
+
+  final List<LigneTarif> lignes;
+
+  /// Quand aucun tarif n'est indique.
+  final String? phrase;
+  final String? aide;
+}
+
+class ServicesANoter {
+  const ServicesANoter({required this.phrase, required this.suite});
+
+  factory ServicesANoter.depuisJson(Map<String, dynamic> json) => ServicesANoter(
+        phrase: _lire<String>(json, 'phrase'),
+        suite: _lire<String>(json, 'suite'),
+      );
+
+  final String phrase;
+  final String suite;
+}
+
+/// Mon profil (/api/mon-profil), formule par le serveur.
+class MonProfil {
+  const MonProfil({
+    required this.nom,
+    required this.fonction,
+    required this.email,
+    required this.badges,
+    required this.disponibilites,
+    required this.avis,
+    required this.aLire,
+    this.messageEquipe,
+    this.avertissement,
+    this.verification,
+    this.lieu,
+    this.trancheAge,
+    this.tarif,
+    this.servicesANoter,
+    this.motifRefus,
+  });
+
+  factory MonProfil.depuisJson(Map<String, dynamic> json) => MonProfil(
+        nom: _lire<String>(json, 'nom'),
+        fonction: _lire<String>(json, 'fonction'),
+        email: _lire<String>(json, 'email'),
+        badges: _lireListe(json, 'badges', BadgeDuProfil.depuisJson),
+        disponibilites: _lireListe(json, 'disponibilites', Creneau.depuisJson),
+        avis: AvisDeLaFiche.depuisJson(_lire<Map<String, dynamic>>(json, 'avis')),
+        aLire: _lire<int>(json, 'aLire'),
+        messageEquipe: _lireObjet(json, 'messageEquipe', MessageDeLEquipe.depuisJson),
+        avertissement: _lireObjet(json, 'avertissement', AvertissementDeLEquipe.depuisJson),
+        verification: _lireObjet(json, 'verification', VerificationDuProfil.depuisJson),
+        lieu: _lireFacultatif<String>(json, 'lieu'),
+        trancheAge: _lireFacultatif<String>(json, 'trancheAge'),
+        tarif: _lireObjet(json, 'tarif', TarifDuProfil.depuisJson),
+        servicesANoter: _lireObjet(json, 'servicesANoter', ServicesANoter.depuisJson),
+        motifRefus: _lireFacultatif<String>(json, 'motifRefus'),
+      );
+
+  final String nom;
+
+  /// "Employeur", ou le metier de la personne qui repond.
+  final String fonction;
+  final String email;
+  final List<BadgeDuProfil> badges;
+  final List<Creneau> disponibilites;
+  final AvisDeLaFiche avis;
+  final int aLire;
+  final MessageDeLEquipe? messageEquipe;
+  final AvertissementDeLEquipe? avertissement;
+  final VerificationDuProfil? verification;
+  final String? lieu;
+  final String? trancheAge;
+
+  /// Seulement pour la personne qui repond aux demandes.
+  final TarifDuProfil? tarif;
+  final ServicesANoter? servicesANoter;
+  final String? motifRefus;
 }

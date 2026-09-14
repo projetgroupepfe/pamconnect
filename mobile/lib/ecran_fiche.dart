@@ -280,39 +280,7 @@ class _EcranFicheState extends State<EcranFiche> {
                 ],
               ),
             ),
-          for (final avis in fiche.avis.liste)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(text: avis.note, style: fort),
-                            TextSpan(
-                              text: avis.titreDemande == null
-                                  ? '  par ${avis.auteur}'
-                                  : '  par ${avis.auteur}, après « ${avis.titreDemande} »',
-                              style: aide,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (avis.commentaire != null) ...[
-                        const SizedBox(height: 8),
-                        Text(avis.commentaire!, style: texte.bodyLarge?.copyWith(color: Couleurs.encre)),
-                      ],
-                      for (final critere in avis.criteres) LigneDetail(icone: Icons.star_border, texte: critere),
-                      LigneDetail(icone: Icons.calendar_today_outlined, texte: avis.date),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          for (final avis in fiche.avis.liste) CarteAvis(avis: avis),
         ],
       ],
     );

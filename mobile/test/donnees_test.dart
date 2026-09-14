@@ -661,4 +661,49 @@ void main() {
     expect(lu.texteMax, 2000);
     expect(() => FormulaireProbleme.depuisJson({'autre': 'nom 1'}), throwsA(isA<FormeInattendue>()));
   });
+
+  test('Mon profil se lit tel que le serveur l ecrit', () {
+    final lu = MonProfil.depuisJson({
+      'nom': 'nom 1',
+      'fonction': 'fonction 1',
+      'messageEquipe': {'texte': 'texte 1', 'le': 'date 1'},
+      'avertissement': null,
+      'verification': {'statut': 'verifie', 'libelle': 'libelle 1', 'attente': null},
+      'lieu': null,
+      'email': 'email 1',
+      'badges': [],
+      'trancheAge': null,
+      'disponibilites': [],
+      'tarif': null,
+      'avis': {'moyenne': null, 'nombre': 0, 'liste': [], 'vide': 'phrase 1'},
+      'servicesANoter': null,
+      'motifRefus': null,
+      'aLire': 1,
+    });
+    expect(lu.messageEquipe?.texte, 'texte 1');
+    expect(lu.avertissement, isNull);
+    expect(lu.tarif, isNull);
+    expect(lu.avis.vide, 'phrase 1');
+    expect(lu.aLire, 1);
+    expect(() => MonProfil.depuisJson({'nom': 'nom 1'}), throwsA(isA<FormeInattendue>()));
+  });
+
+  test('un avis de son profil dit s il est deja signale', () {
+    final avis = AvisPublic.depuisJson({
+      'id': 3,
+      'signale': true,
+      'note': 'note 1',
+      'auteur': 'nom 1',
+      'criteres': [],
+      'date': 'date 1',
+      'titreDemande': null,
+      'commentaire': null,
+    });
+    expect(avis.id, 3);
+    expect(avis.signale, isTrue);
+  });
+
+  test('sans pastille de profil, rien n attend', () {
+    expect(Moi.depuisJson(_moi('employeur')).aLire, 0);
+  });
 }

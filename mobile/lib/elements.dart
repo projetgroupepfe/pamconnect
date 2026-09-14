@@ -304,3 +304,80 @@ Future<bool> confirmerDeclarationService(BuildContext context, String nom) => de
       precision: "La somme bloquée sera versée à $nom. Cette déclaration ne s'annule pas.",
       action: 'Déclarer',
     );
+
+/// Un avis recu, comme le site l'affiche : la note, son auteur, le
+/// commentaire et les criteres.
+///
+/// Sur son propre profil, le seul recours possible : le signaler. On ne
+/// peut pas effacer un avis qui nous vise.
+class CarteAvis extends StatelessWidget {
+  const CarteAvis({super.key, required this.avis, this.auSignaler, this.signalementEnCours = false});
+
+  final AvisPublic avis;
+
+  /// Absent sur la fiche d'une autre personne.
+  final void Function(AvisPublic avis)? auSignaler;
+  final bool signalementEnCours;
+
+  @override
+  Widget build(BuildContext context) {
+    final texte = Theme.of(context).textTheme;
+    final aide = texte.bodyMedium?.copyWith(color: Couleurs.encrePale);
+    const fort = TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre);
+    final commentaire = avis.commentaire;
+    final titreDemande = avis.titreDemande;
+    final auSignaler = this.auSignaler;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: avis.note, style: fort),
+                    TextSpan(
+                      text: titreDemande == null
+                          ? '  par ${avis.auteur}'
+                          : '  par ${avis.auteur}, après « $titreDemande »',
+                      style: aide,
+                    ),
+                  ],
+                ),
+              ),
+              if (commentaire != null) ...[
+                const SizedBox(height: 8),
+                Text(commentaire, style: texte.bodyLarge?.copyWith(color: Couleurs.encre)),
+              ],
+              for (final critere in avis.criteres) LigneDetail(icone: Icons.star_border, texte: critere),
+              LigneDetail(icone: Icons.calendar_today_outlined, texte: avis.date),
+              if (auSignaler != null && avis.id != null) ...[
+                const SizedBox(height: 12),
+                if (avis.signale)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Pastille(texte: 'Signalé', fond: Couleurs.ambreFond, couleur: Couleurs.ambre),
+                      Text("L'équipe examine cet avis. Il reste visible en attendant.", style: aide),
+                    ],
+                  )
+                else
+                  OutlinedButton.icon(
+                    onPressed: signalementEnCours ? null : () => auSignaler(avis),
+                    icon: const Icon(Icons.flag_outlined),
+                    label: const Text('Signaler cet avis'),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
