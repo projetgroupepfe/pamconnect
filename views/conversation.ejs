@@ -71,9 +71,10 @@
     <h2>Les messages</h2>
 
     <% if (messages.length === 0) { %>
-      <div class="vide">
-        <p>Aucun message pour l'instant. Écrivez le premier.</p>
-      </div>
+      <%# PAS DE CADRE ICI. Encadree en pointilles, cette phrase ressemblait
+          a une case ou l'on ne pouvait pas ecrire, posee au-dessus de la
+          vraie. C'est un simple texte, qui dit ou ecrire. %>
+      <p class="fil-vide">Aucun message pour l'instant. Écrivez le premier ci-dessous.</p>
     <% } else { %>
       <div class="fil">
       <% messages.forEach(function (message) { %>

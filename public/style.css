@@ -345,6 +345,8 @@ a:hover { color: var(--bleu-fonce); }
 
 /* Ses propres messages, a droite et dans le bleu clair de la marque :
    on sait qui parle d'un coup d'oeil, sans couleur criarde. */
+.fil-vide { color: var(--encre-douce); margin: 0 0 1rem; }
+
 .bulle-mienne {
   align-self: flex-end;
   background-color: var(--bleu-clair);

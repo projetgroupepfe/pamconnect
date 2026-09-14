@@ -467,7 +467,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
       if (discussion.messages.isEmpty)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Text("Aucun message pour l'instant. Écrivez le premier.", style: gris),
+          child: Text("Aucun message pour l'instant. Écrivez le premier ci-dessous.", style: gris),
         ),
       for (final message in discussion.messages)
         _Message(
