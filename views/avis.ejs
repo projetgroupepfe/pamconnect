@@ -29,18 +29,13 @@
             telephone, cinq etoiles cote a cote se touchent mal, et un
             chiffre seul ne dit pas ce qu'il vaut. %>
         <div class="champ">
-          <% const echelle = [
-               [5, "Excellent"],
-               [4, "Bien"],
-               [3, "Correct"],
-               [2, "Décevant"],
-               [1, "Mauvais"],
-             ]; %>
-          <% echelle.forEach(function (ligne) { %>
+          <%# L'echelle vient du serveur (ECHELLE_NOTES) : l'application
+              affiche les memes mots. %>
+          <% echelle.forEach(function (niveau) { %>
             <label class="choix-note">
-              <input type="radio" name="note" value="<%= ligne[0] %>" required>
+              <input type="radio" name="note" value="<%= niveau.note %>" required>
               <span>
-                <strong><%= ligne[0] %></strong> sur 5, <%= ligne[1] %>
+                <strong><%= niveau.note %></strong> sur 5, <%= niveau.libelle %>
               </span>
             </label>
           <% }); %>
@@ -51,10 +46,8 @@
       <div class="carte">
         <div class="champ">
           <label for="commentaire">Votre commentaire, si vous le souhaitez</label>
-          <textarea id="commentaire" name="commentaire" rows="4" maxlength="1000"
-                    placeholder="<%= jeSuisEmployeur
-                      ? 'Ce qui s est bien passé, ce qui pourrait être mieux.'
-                      : 'Les conditions étaient-elles celles annoncées ?' %>"></textarea>
+          <textarea id="commentaire" name="commentaire" rows="4" maxlength="<%= commentaireMax %>"
+                    placeholder="<%= exempleCommentaire %>"></textarea>
           <small class="aide">
             Facultatif. Écrivez ce que vous diriez à quelqu'un qui hésite.
           </small>

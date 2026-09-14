@@ -4342,6 +4342,9 @@ function ouvrirDiscussion(candidatureId, utilisateur) {
     messages: requetes.messagesDeConversation.all(conversation.id),
     exempleMessage: auHasard(EXEMPLES_MESSAGE[jeSuisEmployeur ? "employeur" : "prestataire"]),
     conseil: conseilPourEcrire(conversation, jeSuisEmployeur),
+    monAvis: requetes.monAvisPour.get(conversation.id, utilisateur.id) || null,
+    avisRecu: requetes.avisDeLaCandidature.all(conversation.id)
+      .find((a) => a.vise_id === utilisateur.id) || null,
   };
 }
 
@@ -4446,9 +4449,8 @@ app.get("/messages/:id", exigerConnexion, (req, res) => {
   res.locals.aVoir = res.locals.messagesNonLus + res.locals.decisionsNonVues;
 
   res.render("conversation", {
-    monAvis: requetes.monAvisPour.get(conversation.id, req.utilisateur.id) || null,
-    avisRecu: requetes.avisDeLaCandidature.all(conversation.id)
-      .find(function (a) { return a.vise_id === req.utilisateur.id; }) || null,
+    monAvis: discussion.monAvis,
+    avisRecu: discussion.avisRecu,
     titre: "Discussion",
     conversation,
     messages: discussion.messages,
@@ -4951,137 +4953,222 @@ app.post("/probleme/:id", exigerConnexion, lireFormulaire, (req, res) => {
   });
 });
 
-// --- Donner son avis : l'ecran ------------------------------------
+// --- Donner son avis ------------------------------------------------
 //
 // UN AVIS SUPPOSE UN SERVICE. Trois conditions, dans cet ordre :
 // la discussion existe, elle me concerne, et le service est TERMINE.
 // Sans la troisieme, on noterait une rencontre qui n'a pas eu lieu.
-function chargerServiceANoter(req, res) {
-  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+//
+// ECRIT UNE SEULE FOIS pour le site et l'application.
+
+// Les notes proposees, de la meilleure a la moins bonne. Des mots avec
+// les chiffres : un chiffre seul ne dit pas ce qu'il vaut.
+const ECHELLE_NOTES = [
+  { note: 5, libelle: "Excellent" },
+  { note: 4, libelle: "Bien" },
+  { note: 3, libelle: "Correct" },
+  { note: 2, libelle: "Décevant" },
+  { note: 1, libelle: "Mauvais" },
+];
+
+// Au-dela, le commentaire est refuse plutot que coupe en silence : la
+// personne doit savoir que la fin de son texte ne serait pas publiee.
+const AVIS_COMMENTAIRE_MAX = 1000;
+
+// L'exemple du champ de commentaire. Ecrit ici, il garde son apostrophe :
+// dans la page, il etait devenu "Ce qui s est bien passe".
+function exempleCommentaireAvis(jeSuisEmployeur) {
+  return jeSuisEmployeur
+    ? "Ce qui s'est bien passé, ce qui pourrait être mieux."
+    : "Les conditions étaient-elles celles annoncées ?";
+}
+
+function avisDejaDonne(conversation) {
+  return {
+    code: 409,
+    titre: "Vous avez déjà donné votre avis",
+    texte: "Un seul avis par service. Il ne peut pas être modifié : " +
+           "un avis que l'on pourrait réécrire deviendrait un moyen de pression.",
+    lien: { url: "/messages/" + conversation.id, texte: "Ouvrir la discussion" },
+  };
+}
+
+function serviceANoter(candidatureId, utilisateur) {
+  const conversation = conversationDe(candidatureId, utilisateur);
 
   if (!conversation) {
-    res.status(404).render("message", {
-      titre: "Service introuvable",
-      texte: "Ce service n'existe pas, ou il ne vous concerne pas.",
-      liens: [{ url: "/messages", texte: "Retour aux discussions" }],
-    });
-    return null;
+    return {
+      probleme: {
+        code: 404,
+        titre: "Service introuvable",
+        texte: "Ce service n'existe pas, ou il ne vous concerne pas.",
+        lien: { url: "/messages", texte: "Retour aux discussions" },
+      },
+    };
   }
 
   if (!conversation.terminee_le) {
-    res.status(409).render("message", {
-      titre: "Le service n'est pas terminé",
-      texte: "On ne donne son avis qu'après un service effectué. " +
-             "Vous pourrez le faire dès qu'il aura été déclaré.",
-      liens: [{ url: "/messages/" + conversation.id, texte: "Ouvrir la discussion" }],
-    });
-    return null;
+    return {
+      conversation,
+      probleme: {
+        code: 409,
+        titre: "Le service n'est pas terminé",
+        texte: "On ne donne son avis qu'après un service effectué. " +
+               "Vous pourrez le faire dès qu'il aura été déclaré.",
+        lien: { url: "/messages/" + conversation.id, texte: "Ouvrir la discussion" },
+      },
+    };
   }
-
-  return conversation;
-}
-
-app.get("/avis/:id", exigerConnexion, interdireALEquipe, (req, res) => {
-  const conversation = chargerServiceANoter(req, res);
-  if (!conversation) return;
-
-  const jeSuisEmployeur = req.utilisateur.id === conversation.employeurId;
-  const deja = requetes.monAvisPour.get(conversation.id, req.utilisateur.id);
 
   // UN SEUL AVIS PAR SERVICE. On ne revient pas dessus : un avis qu'on
   // peut reecrire devient un moyen de pression apres coup.
-  if (deja) {
-    return res.status(409).render("message", {
-      titre: "Vous avez déjà donné votre avis",
-      texte: "Un seul avis par service. Il ne peut pas être modifié : " +
-             "un avis que l'on pourrait réécrire deviendrait un moyen de pression.",
-      liens: [{ url: "/messages/" + conversation.id, texte: "Ouvrir la discussion" }],
-    });
+  if (requetes.monAvisPour.get(conversation.id, utilisateur.id)) {
+    return { conversation, probleme: avisDejaDonne(conversation) };
   }
 
-  res.render("avis", {
-    titre: "Donner mon avis",
+  const jeSuisEmployeur = utilisateur.id === conversation.employeurId;
+  return {
     conversation,
     jeSuisEmployeur,
     nomVise: jeSuisEmployeur ? conversation.nomPrestataire : conversation.nomEmployeur,
-  });
-});
+    viseId: jeSuisEmployeur ? conversation.prestataireId : conversation.employeurId,
+  };
+}
 
-// --- Donner son avis : l'enregistrement ---------------------------
-app.post("/avis/:id", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
-  const conversation = chargerServiceANoter(req, res);
-  if (!conversation) return;
+function donnerAvis(candidatureId, utilisateur, donnees) {
+  const service = serviceANoter(candidatureId, utilisateur);
+  if (service.probleme) return service;
 
-  const jeSuisEmployeur = req.utilisateur.id === conversation.employeurId;
-  const vise = jeSuisEmployeur ? conversation.prestataireId : conversation.employeurId;
+  const { conversation, viseId } = service;
+  const retourFormulaire = { url: "/avis/" + conversation.id, texte: "Retour au formulaire" };
 
-  const note = Math.round(Number(req.body.note));
-
+  const note = Math.round(Number(donnees.note));
   if (!Number.isFinite(note) || note < 1 || note > 5) {
-    return res.status(400).render("message", {
-      titre: "Note manquante",
-      texte: "Choisissez une note de 1 à 5 étoiles. C'est la seule chose obligatoire.",
-      liens: [{ url: "/avis/" + conversation.id, texte: "Retour au formulaire" }],
-    });
+    return {
+      conversation,
+      probleme: {
+        code: 400,
+        titre: "Note manquante",
+        texte: "Choisissez une note de 1 à 5. C'est la seule chose obligatoire.",
+        lien: retourFormulaire,
+      },
+    };
   }
 
-  const commentaire = String(req.body.commentaire || "").trim().slice(0, 1000) || null;
+  const commentaire = String(donnees.commentaire || "").trim();
+  if (commentaire.length > AVIS_COMMENTAIRE_MAX) {
+    return {
+      conversation,
+      probleme: {
+        code: 400,
+        titre: "Commentaire trop long",
+        texte: `Un commentaire ne peut pas dépasser ${AVIS_COMMENTAIRE_MAX} caractères.`,
+        lien: retourFormulaire,
+      },
+    };
+  }
 
   try {
     requetes.creerAvis.run({
       candidature: conversation.id,
-      auteur: req.utilisateur.id,
-      vise,
+      auteur: utilisateur.id,
+      vise: viseId,
       note,
-      commentaire,
-      critere1: noteFacultative(req.body.critere1),
-      critere2: noteFacultative(req.body.critere2),
-      critere3: noteFacultative(req.body.critere3),
-      critere4: noteFacultative(req.body.critere4),
+      commentaire: commentaire || null,
+      critere1: noteFacultative(donnees.critere1),
+      critere2: noteFacultative(donnees.critere2),
+      critere3: noteFacultative(donnees.critere3),
+      critere4: noteFacultative(donnees.critere4),
     });
   } catch (erreur) {
     // La contrainte UNIQUE reste le dernier rempart : deux envois
-    // simultanes passeraient tous deux le controle de l'ecran.
+    // simultanes passeraient tous deux le controle.
     if (String(erreur.message).includes("UNIQUE")) {
-      return res.status(409).render("message", {
-        titre: "Vous avez déjà donné votre avis",
-        texte: "Un seul avis par service.",
-        liens: [{ url: "/messages/" + conversation.id, texte: "Ouvrir la discussion" }],
-      });
+      return { conversation, probleme: avisDejaDonne(conversation) };
     }
     throw erreur;
   }
 
-  res.render("message", {
+  return {
+    conversation,
+    ok: true,
     titre: "Merci pour votre avis",
     texte: "Il est visible par tout le monde, et il ne peut plus être modifié. " +
            "La personne concernée peut le signaler à l'équipe si elle le juge faux.",
-    liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
-  });
-});
+  };
+}
 
 // --- Signaler un avis a l'equipe ----------------------------------
 //
 // SEULE LA PERSONNE VISEE. C'est elle que l'avis designe, et c'est elle
 // qui sait s'il est faux. Personne ne signale l'avis d'un autre.
-app.post("/avis/:id/signaler", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
-  const avis = requetes.avisParId.get(Number(req.params.id));
+function signalerUnAvis(avisId, utilisateur) {
+  const avis = requetes.avisParId.get(avisId);
 
-  if (!avis || avis.vise_id !== req.utilisateur.id) {
-    return res.status(404).render("message", {
-      titre: "Avis introuvable",
-      texte: "Cet avis n'existe pas, ou il ne vous concerne pas.",
-      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
-    });
+  if (!avis || avis.vise_id !== utilisateur.id) {
+    return {
+      probleme: {
+        code: 404,
+        titre: "Avis introuvable",
+        texte: "Cet avis n'existe pas, ou il ne vous concerne pas.",
+        lien: { url: "/mon-profil", texte: "Retour à mon profil" },
+      },
+    };
   }
 
-  requetes.signalerAvis.run({ id: avis.id, vise: req.utilisateur.id });
+  requetes.signalerAvis.run({ id: avis.id, vise: utilisateur.id });
 
-  res.render("message", {
+  return {
+    avis,
+    ok: true,
     titre: "Signalement envoyé",
     texte: "L'équipe PamConnect va lire cet avis. En attendant, il reste visible : " +
            "un avis n'est masqué qu'après examen.",
-    liens: [{ url: "/messages/" + avis.candidature_id, texte: "Retour à la discussion" }],
+  };
+}
+
+function afficherProbleme(res, probleme) {
+  return res.status(probleme.code).render("message", {
+    titre: probleme.titre,
+    texte: probleme.texte,
+    liens: [probleme.lien],
+  });
+}
+
+app.get("/avis/:id", exigerConnexion, interdireALEquipe, (req, res) => {
+  const service = serviceANoter(Number(req.params.id), req.utilisateur);
+  if (service.probleme) return afficherProbleme(res, service.probleme);
+
+  res.render("avis", {
+    titre: "Donner mon avis",
+    conversation: service.conversation,
+    jeSuisEmployeur: service.jeSuisEmployeur,
+    nomVise: service.nomVise,
+    echelle: ECHELLE_NOTES,
+    exempleCommentaire: exempleCommentaireAvis(service.jeSuisEmployeur),
+    commentaireMax: AVIS_COMMENTAIRE_MAX,
+  });
+});
+
+app.post("/avis/:id", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
+  const resultat = donnerAvis(Number(req.params.id), req.utilisateur, req.body);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
+  res.render("message", {
+    titre: resultat.titre,
+    texte: resultat.texte,
+    liens: [{ url: "/messages/" + resultat.conversation.id, texte: "Retour à la discussion" }],
+  });
+});
+
+app.post("/avis/:id/signaler", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
+  const resultat = signalerUnAvis(Number(req.params.id), req.utilisateur);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
+  res.render("message", {
+    titre: resultat.titre,
+    texte: resultat.texte,
+    liens: [{ url: "/messages/" + resultat.avis.candidature_id, texte: "Retour à la discussion" }],
   });
 });
 
@@ -6275,6 +6362,31 @@ app.get("/api/discussions/:id", (req, res) => {
     // Clore le service appartient a celui qui l'a recu, une fois quelqu'un
     // choisi, et une seule fois.
     peutDeclarerService: jeSuisEmployeur && c.statut === "acceptee" && !c.terminee_le,
+    // UN AVIS SUPPOSE UN SERVICE : rien avant qu'il soit termine.
+    avis: c.terminee_le
+      ? {
+          monAvis: discussion.monAvis
+            ? {
+                note: discussion.monAvis.note,
+                commentaire: discussion.monAvis.commentaire || null,
+                publieLe: dateLisible(discussion.monAvis.cree_le),
+                masque: Boolean(discussion.monAvis.masque),
+                motifMasquage: discussion.monAvis.motif_masquage || null,
+              }
+            : null,
+          avisRecu: discussion.avisRecu
+            ? {
+                id: discussion.avisRecu.id,
+                note: discussion.avisRecu.note,
+                commentaire: discussion.avisRecu.commentaire || null,
+                auteur: discussion.avisRecu.nomAuteur,
+                masque: Boolean(discussion.avisRecu.masque),
+                signale: Boolean(discussion.avisRecu.signale),
+                peutSignaler: !discussion.avisRecu.masque && !discussion.avisRecu.signale,
+              }
+            : null,
+        }
+      : null,
     exempleMessage: discussion.exempleMessage,
     // Elle a declare avoir travaille : l'employeur doit le savoir, c'est
     // lui qui detient la cle du paiement.
@@ -6319,6 +6431,52 @@ app.post("/api/candidatures/:id/terminer", (req, res) => {
   if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
 
   res.json({ ok: true });
+});
+
+// --- Donner son avis depuis l'application ---------------------------
+app.get("/api/avis/:id", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const service = serviceANoter(Number(req.params.id), moi);
+  if (service.probleme) return erreurApi(res, service.probleme.code, service.probleme.texte);
+
+  res.json({
+    nomVise: service.nomVise,
+    titreDemande: service.conversation.titreAnnonce,
+    echelle: ECHELLE_NOTES,
+    criteres: criteresAvis(service.jeSuisEmployeur),
+    exempleCommentaire: exempleCommentaireAvis(service.jeSuisEmployeur),
+    commentaireMax: AVIS_COMMENTAIRE_MAX,
+  });
+});
+
+const CHAMPS_AVIS = ["note", "commentaire", "critere1", "critere2", "critere3", "critere4"];
+
+app.post("/api/avis/:id", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const corps = req.body;
+  const formeValide = Boolean(corps) && typeof corps === "object" && !Array.isArray(corps) &&
+    CHAMPS_AVIS.every((champ) => corps[champ] == null ||
+      typeof corps[champ] === "string" || typeof corps[champ] === "number");
+  if (!formeValide) return erreurApi(res, 400, "L'avis envoyé n'a pas la forme attendue.");
+
+  const resultat = donnerAvis(Number(req.params.id), moi, corps);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.status(201).json({ texte: resultat.texte });
+});
+
+app.post("/api/avis/:id/signaler", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const resultat = signalerUnAvis(Number(req.params.id), moi);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.json({ texte: resultat.texte });
 });
 
 app.use((req, res) => {

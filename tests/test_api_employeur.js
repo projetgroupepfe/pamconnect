@@ -566,6 +566,69 @@ setTimeout(async () => {
   const tardif = await ecrireA(cChoisie, M + " trop tard", cookieDe(emp.cookie));
   dire("ecrire dans une discussion archivee : 409", tardif.code === 409, tardif.brut);
 
+  console.log(SAUT + "--- DONNER SON AVIS DEPUIS L'APPLICATION ---");
+  const formulaireAvis = (id, entetes) => json("/api/avis/" + id, undefined, entetes);
+  const noter = (id, corps, entetes) => json("/api/avis/" + id, corps, entetes);
+  const avisEnBase = (auteurId) =>
+    base.prepare("SELECT * FROM avis WHERE candidature_id = ? AND auteur_id = ?").get(cChoisie, auteurId);
+
+  dire("sans session : 401", (await formulaireAvis(cChoisie)).code === 401);
+  dire("pas d'avis avant la fin du service : 409", (await formulaireAvis(cRefusee, cookieDe(emp.cookie))).code === 409);
+  dire("un tiers : 404", (await formulaireAvis(cChoisie, cookieDe(autreEmp.cookie))).code === 404);
+
+  const fa = await formulaireAvis(cChoisie, cookieDe(emp.cookie));
+  const f2 = fa.donnees || {};
+  dire("le formulaire de l'employeur, avec l'echelle et ses criteres",
+       fa.code === 200 && f2.nomVise === "Test verifiee" && f2.echelle.length === 5 &&
+       f2.echelle[0].note === 5 && f2.echelle[0].libelle === "Excellent" &&
+       f2.criteres[0].libelle === "Ponctualité" && f2.commentaireMax === 1000, fa.brut.slice(0, 160));
+  dire("l'exemple garde son apostrophe", f2.exempleCommentaire === "Ce qui s'est bien passé, ce qui pourrait être mieux.");
+  const pageAvisEmp = await (await lire("/avis/" + cChoisie, emp.cookie)).text();
+  dire("la page du site aussi", pageAvisEmp.includes("Ce qui s&#39;est bien passé") && pageAvisEmp.includes('maxlength="1000"') &&
+       pageAvisEmp.includes("<strong>5</strong> sur 5, Excellent"));
+
+  dire("sans note : 400", (await noter(cChoisie, { commentaire: "x" }, cookieDe(emp.cookie))).code === 400);
+  const tropLongAvis = await noter(cChoisie, { note: 5, commentaire: "x".repeat(1001) }, cookieDe(emp.cookie));
+  dire("un commentaire trop long est refuse, pas coupe : 400", tropLongAvis.code === 400 && !avisEnBase(emp.id), tropLongAvis.brut);
+  dire("un objet a la place de la note : 400", (await noter(cChoisie, { note: { faux: true } }, cookieDe(emp.cookie))).code === 400);
+
+  const publieAvis = await noter(cChoisie, { note: 4, commentaire: M + " tres bien", critere1: 5, critere2: "" },
+                                 { Authorization: "Bearer " + jeton });
+  dire("l'employeur publie son avis depuis l'application", publieAvis.code === 201 && Boolean(publieAvis.donnees.texte), publieAvis.brut);
+  const sonAvis = avisEnBase(emp.id);
+  dire("il est enregistre tel quel, la personne visee",
+       sonAvis && sonAvis.note === 4 && sonAvis.critere1 === 5 && sonAvis.critere2 === null && sonAvis.vise_id === verifiee.id,
+       JSON.stringify(sonAvis));
+  dire("un seul avis : 409", (await noter(cChoisie, { note: 1 }, cookieDe(emp.cookie))).code === 409);
+  dire("le formulaire aussi repond 409", (await formulaireAvis(cChoisie, cookieDe(emp.cookie))).code === 409);
+
+  const formElle = await formulaireAvis(cChoisie, cookieDe(verifiee.cookie));
+  dire("le formulaire de la personne a ses criteres a elle",
+       formElle.code === 200 && formElle.donnees.criteres.some((x) => x.libelle === "Paiement déclaré sans retard") &&
+       formElle.donnees.nomVise === "Test emp");
+  await poster("/avis/" + cChoisie, form({ note: "2", commentaire: M + " paiement en retard" }), verifiee.cookie);
+
+  const avisVus = (await discussion(cChoisie, cookieDe(emp.cookie))).donnees.avis;
+  dire("la discussion montre son avis a lui",
+       avisVus && avisVus.monAvis && avisVus.monAvis.note === 4 && avisVus.monAvis.commentaire === M + " tres bien" &&
+       avisVus.monAvis.masque === false, JSON.stringify(avisVus && avisVus.monAvis));
+  dire("et celui qu'il a recu, qu'il peut signaler",
+       avisVus.avisRecu && avisVus.avisRecu.note === 2 && avisVus.avisRecu.auteur === "Test verifiee" &&
+       avisVus.avisRecu.peutSignaler === true, JSON.stringify(avisVus.avisRecu));
+  dire("pas d'avis dans une discussion dont le service n'est pas termine",
+       (await discussion(cRefusee, cookieDe(emp.cookie))).donnees.avis === null);
+
+  dire("on ne signale pas son propre avis : 404",
+       (await json("/api/avis/" + sonAvis.id + "/signaler", {}, cookieDe(emp.cookie))).code === 404);
+  const signalAvis = await json("/api/avis/" + avisVus.avisRecu.id + "/signaler", {}, cookieDe(emp.cookie));
+  dire("il signale l'avis recu depuis l'application",
+       signalAvis.code === 200 && base.prepare("SELECT signale FROM avis WHERE id = ?").get(avisVus.avisRecu.id).signale === 1,
+       signalAvis.brut);
+  const apresSignalAvis = (await discussion(cChoisie, cookieDe(emp.cookie))).donnees.avis.avisRecu;
+  dire("il est dit signale, et ne se signale plus", apresSignalAvis.signale === true && apresSignalAvis.peutSignaler === false);
+  dire("la page du site dit la meme chose",
+       (await (await lire("/messages/" + cChoisie, emp.cookie)).text()).includes("Signalé"));
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");
