@@ -515,4 +515,66 @@ void main() {
       );
     });
   });
+
+  group("la modification d'une demande", () {
+    Map<String, dynamic> modification() => {
+          'metiers': ['metier 1'],
+          'quartiers': ['quartier 1'],
+          'arrondissements': ['arrondissement 1'],
+          'unitesTarif': [
+            {'valeur': 'forfaitaire', 'libelle': 'pour la prestation'},
+          ],
+          'uniteParDefaut': 'forfaitaire',
+          'valeurs': {
+            'titre': 'titre 1',
+            'metier': 'metier 1',
+            'horaire': 'horaire 1',
+            'quartier': 'quartier 1',
+            'arrondissement': 'arrondissement 1',
+            'prix': '8000',
+            'unite_tarif': 'forfaitaire',
+            'duree_estimee': '',
+            'conditions': '',
+          },
+          'avertissement': {'phrase': 'phrase 1', 'conseil': 'conseil 1'},
+        };
+
+    test('les valeurs actuelles et les listes arrivent ensemble', () {
+      final lu = ModificationDemande.depuisJson(modification());
+      expect(lu.valeurs.prix, '8000');
+      expect(lu.formulaire.metiers, ['metier 1']);
+      expect(lu.avertissement!.phrase, 'phrase 1');
+    });
+
+    test("sans reponse, pas d'avertissement", () {
+      final json = modification()..['avertissement'] = null;
+      expect(ModificationDemande.depuisJson(json).avertissement, isNull);
+    });
+  });
+
+  test("l'ecran de mise en avant se lit tel que le serveur l'a calcule", () {
+    final disponible = InfoMiseEnAvant.depuisJson({
+      'titre': 'titre 1',
+      'metier': null,
+      'lieu': null,
+      'finActuelle': null,
+      'disponible': true,
+      'jours': 7,
+      'cout': 'cout 1',
+      'resteApres': 'reste 1',
+      'solde': 'solde 1',
+      'soldeSuffit': false,
+    });
+    expect(disponible.jours, 7);
+    expect(disponible.soldeSuffit, isFalse);
+
+    final indisponible = InfoMiseEnAvant.depuisJson({
+      'titre': 'titre 1',
+      'disponible': false,
+      'solde': 'solde 1',
+      'soldeSuffit': false,
+    });
+    expect(indisponible.cout, isNull);
+    expect(() => InfoMiseEnAvant.depuisJson({'titre': 'titre 1'}), throwsA(isA<FormeInattendue>()));
+  });
 }

@@ -165,6 +165,34 @@ class ApiPamConnect {
     return _interpreter(() => TexteDuServeur.depuisJson(donnees));
   }
 
+  /// Le formulaire de modification, prerempli par le serveur.
+  Future<ModificationDemande> modificationDemande(int demandeId) async {
+    final donnees = await _appeler('/api/demandes/$demandeId/modification');
+    return _interpreter(() => ModificationDemande.depuisJson(donnees));
+  }
+
+  Future<TexteDuServeur> modifierDemande(int demandeId, Map<String, String> champs) async {
+    final donnees = await _appeler('/api/demandes/$demandeId', corps: champs);
+    return _interpreter(() => TexteDuServeur.depuisJson(donnees));
+  }
+
+  Future<InfoMiseEnAvant> infoMiseEnAvant(int demandeId) async {
+    final donnees = await _appeler('/api/demandes/$demandeId/mise-en-avant');
+    return _interpreter(() => InfoMiseEnAvant.depuisJson(donnees));
+  }
+
+  /// Le serveur preleve les jetons et pose la date, ou refuse en disant
+  /// pourquoi.
+  Future<TexteDuServeur> mettreEnAvant(int demandeId) async {
+    final donnees = await _appeler('/api/demandes/$demandeId/mise-en-avant', corps: const {});
+    return _interpreter(() => TexteDuServeur.depuisJson(donnees));
+  }
+
+  Future<TexteDuServeur> retirerDemande(int demandeId) async {
+    final donnees = await _appeler('/api/demandes/$demandeId/retirer', corps: const {});
+    return _interpreter(() => TexteDuServeur.depuisJson(donnees));
+  }
+
   Future<void> _decider(int candidatureId, String decision) async {
     final donnees = await _appeler('/api/candidatures/$candidatureId/$decision', corps: const {});
     _interpreter(() => DecisionPrise.depuisJson(donnees));

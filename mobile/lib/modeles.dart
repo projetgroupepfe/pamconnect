@@ -795,3 +795,117 @@ class TexteDuServeur {
 
   final String texte;
 }
+
+/// Ce qui est ecrit aujourd'hui dans une demande, pour preremplir le
+/// formulaire de modification.
+class ValeursDemande {
+  const ValeursDemande({
+    required this.titre,
+    required this.metier,
+    required this.horaire,
+    required this.quartier,
+    required this.prix,
+    required this.uniteTarif,
+    required this.dureeEstimee,
+    required this.conditions,
+    this.arrondissement,
+  });
+
+  factory ValeursDemande.depuisJson(Map<String, dynamic> json) => ValeursDemande(
+        titre: _lire<String>(json, 'titre'),
+        metier: _lire<String>(json, 'metier'),
+        horaire: _lire<String>(json, 'horaire'),
+        quartier: _lire<String>(json, 'quartier'),
+        prix: _lire<String>(json, 'prix'),
+        uniteTarif: _lire<String>(json, 'unite_tarif'),
+        dureeEstimee: _lire<String>(json, 'duree_estimee'),
+        conditions: _lire<String>(json, 'conditions'),
+        arrondissement: _lireFacultatif<String>(json, 'arrondissement'),
+      );
+
+  final String titre;
+  final String metier;
+  final String horaire;
+  final String quartier;
+  final String prix;
+  final String uniteTarif;
+  final String dureeEstimee;
+  final String conditions;
+  final String? arrondissement;
+}
+
+/// "1 personne a deja repondu..." : formule par le serveur.
+class AvertissementModification {
+  const AvertissementModification({required this.phrase, required this.conseil});
+
+  factory AvertissementModification.depuisJson(Map<String, dynamic> json) => AvertissementModification(
+        phrase: _lire<String>(json, 'phrase'),
+        conseil: _lire<String>(json, 'conseil'),
+      );
+
+  final String phrase;
+  final String conseil;
+}
+
+/// Le formulaire de modification : les listes de la publication, les
+/// valeurs actuelles, et l'avertissement s'il y a lieu.
+class ModificationDemande {
+  const ModificationDemande({required this.formulaire, required this.valeurs, this.avertissement});
+
+  factory ModificationDemande.depuisJson(Map<String, dynamic> json) {
+    final avertissement = _lireFacultatif<Map<String, dynamic>>(json, 'avertissement');
+    return ModificationDemande(
+      formulaire: FormulaireDemande.depuisJson(json),
+      valeurs: ValeursDemande.depuisJson(_lire<Map<String, dynamic>>(json, 'valeurs')),
+      avertissement: avertissement == null ? null : AvertissementModification.depuisJson(avertissement),
+    );
+  }
+
+  final FormulaireDemande formulaire;
+  final ValeursDemande valeurs;
+  final AvertissementModification? avertissement;
+}
+
+/// L'ecran Mettre en avant, deja calcule par le serveur.
+class InfoMiseEnAvant {
+  const InfoMiseEnAvant({
+    required this.titre,
+    required this.disponible,
+    required this.solde,
+    required this.soldeSuffit,
+    this.metier,
+    this.lieu,
+    this.finActuelle,
+    this.jours,
+    this.cout,
+    this.resteApres,
+  });
+
+  factory InfoMiseEnAvant.depuisJson(Map<String, dynamic> json) => InfoMiseEnAvant(
+        titre: _lire<String>(json, 'titre'),
+        disponible: _lire<bool>(json, 'disponible'),
+        solde: _lire<String>(json, 'solde'),
+        soldeSuffit: _lire<bool>(json, 'soldeSuffit'),
+        metier: _lireFacultatif<String>(json, 'metier'),
+        lieu: _lireFacultatif<String>(json, 'lieu'),
+        finActuelle: _lireFacultatif<String>(json, 'finActuelle'),
+        jours: _lireFacultatif<int>(json, 'jours'),
+        cout: _lireFacultatif<String>(json, 'cout'),
+        resteApres: _lireFacultatif<String>(json, 'resteApres'),
+      );
+
+  final String titre;
+  final bool disponible;
+
+  /// "12 jetons (1 200 FCFA)" : ecrit par le serveur.
+  final String solde;
+  final bool soldeSuffit;
+  final String? metier;
+  final String? lieu;
+
+  /// Present si la demande est deja en avant : jusqu'a quand.
+  final String? finActuelle;
+  final int? jours;
+  final String? cout;
+  final String? resteApres;
+}

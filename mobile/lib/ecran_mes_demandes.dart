@@ -4,6 +4,7 @@ import 'api.dart';
 import 'ecran_confirmer_choix.dart';
 import 'ecran_connexion.dart';
 import 'ecran_discussion.dart';
+import 'ecran_mise_en_avant.dart';
 import 'ecran_publier.dart';
 import 'elements.dart';
 import 'modeles.dart';
@@ -13,9 +14,9 @@ import 'theme.dart';
 /// page Mes demandes du site, puisque les deux lisent la meme fonction du
 /// serveur.
 ///
-/// On peut y publier une demande, discuter, choisir ou refuser une
-/// personne. Modifier, mettre en avant ou retirer arrivent ensuite, chacun
-/// avec sa route testee : aucun bouton n'est affiche avant de fonctionner.
+/// On y publie, modifie, met en avant et retire une demande ; on y discute,
+/// choisit ou refuse une personne. Chaque bouton n'apparait que si le
+/// serveur l'autorise.
 class EcranMesDemandes extends StatefulWidget {
   const EcranMesDemandes({super.key, required this.api, required this.moi});
 
@@ -81,13 +82,61 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
     }
   }
 
-  Future<void> _ouvrirPublication() async {
-    final publication = await Navigator.of(context).push<Publication>(
-      MaterialPageRoute(builder: (_) => EcranPublier(api: widget.api)),
+  Future<void> _ouvrirPublication() => _ouvrirFormulaire();
+
+  /// Publier ou modifier : le meme formulaire, qui rend la phrase du serveur.
+  Future<void> _ouvrirFormulaire({int? demandeId}) async {
+    final texte = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => EcranPublier(api: widget.api, demandeId: demandeId)),
     );
-    if (publication == null || !mounted) return;
-    setState(() => _confirmation = publication.texte);
+    if (texte == null || !mounted) return;
+    setState(() => _confirmation = texte);
     await _actualiser();
+  }
+
+  Future<void> _mettreEnAvant(DemandePubliee demande) async {
+    final texte = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => EcranMiseEnAvant(api: widget.api, demandeId: demande.id)),
+    );
+    if (!mounted) return;
+    if (texte != null) setState(() => _confirmation = texte);
+    await _actualiser();
+  }
+
+  /// Retirer ferme la demande pour tout le monde et ne s'annule pas : une
+  /// question le precede, la meme que sur le site.
+  Future<void> _retirer(DemandePubliee demande) async {
+    final confirme = await demanderConfirmation(
+      context,
+      question: 'Voulez-vous vraiment retirer cette demande ?',
+      precision: 'Elle disparaîtra de la liste, personne ne pourra plus y répondre, '
+          'et la somme bloquée vous sera rendue.',
+      action: 'Retirer',
+      danger: true,
+    );
+    if (!confirme || !mounted) return;
+
+    String? confirmation;
+    String? probleme;
+    try {
+      confirmation = (await widget.api.retirerDemande(demande.id)).texte;
+    } on ErreurApi catch (erreur) {
+      if (!mounted) return;
+      if (erreur.sessionPerdue) {
+        revenirALaConnexion(context, widget.api, messageSessionPerdue);
+        return;
+      }
+      probleme = erreur.message;
+    }
+
+    if (!mounted) return;
+    await _charger();
+    if (!mounted) return;
+    setState(() {
+      _confirmation = confirmation;
+      if (probleme != null) _erreur = probleme;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(confirmation ?? probleme ?? '')));
   }
 
   /// L'action principale, comme sur le site : toujours a portee de main.
@@ -250,6 +299,9 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
         ),
       for (final demande in enCours) _CarteDemandePubliee(
             demande: demande,
+            auModifier: (demande) => _ouvrirFormulaire(demandeId: demande.id),
+            auMettreEnAvant: _mettreEnAvant,
+            auRetirer: _retirer,
             auDiscuter: _discuter,
             auChoix: _choisir,
             auRefus: _refuser,
@@ -267,6 +319,9 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
         ),
         for (final demande in terminees) _CarteDemandePubliee(
             demande: demande,
+            auModifier: (demande) => _ouvrirFormulaire(demandeId: demande.id),
+            auMettreEnAvant: _mettreEnAvant,
+            auRetirer: _retirer,
             auDiscuter: _discuter,
             auChoix: _choisir,
             auRefus: _refuser,
@@ -280,6 +335,9 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
 class _CarteDemandePubliee extends StatelessWidget {
   const _CarteDemandePubliee({
     required this.demande,
+    required this.auModifier,
+    required this.auMettreEnAvant,
+    required this.auRetirer,
     required this.auDiscuter,
     required this.auChoix,
     required this.auRefus,
@@ -287,6 +345,9 @@ class _CarteDemandePubliee extends StatelessWidget {
   });
 
   final DemandePubliee demande;
+  final void Function(DemandePubliee) auModifier;
+  final void Function(DemandePubliee) auMettreEnAvant;
+  final void Function(DemandePubliee) auRetirer;
   final void Function(ReponseRecue) auDiscuter;
   final void Function(ReponseRecue) auChoix;
   final void Function(ReponseRecue) auRefus;
@@ -349,6 +410,62 @@ class _CarteDemandePubliee extends StatelessWidget {
                     ],
                   ],
                 ),
+              // Les boutons suivent les decisions du serveur : aucun sur une
+              // demande fermee.
+              if (demande.peutModifier || demande.peutMettreEnAvant || demande.peutRetirer) ...[
+                const SizedBox(height: 12),
+                if (demande.peutModifier)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: OutlinedButton.icon(
+                      onPressed: () => auModifier(demande),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Modifier cette demande'),
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                    ),
+                  ),
+                if (demande.peutMettreEnAvant)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: OutlinedButton.icon(
+                      onPressed: () => auMettreEnAvant(demande),
+                      icon: const Icon(Icons.trending_up),
+                      label: const Text('Mettre en avant'),
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                    ),
+                  ),
+                if (demande.peutRetirer)
+                  OutlinedButton.icon(
+                    onPressed: () => auRetirer(demande),
+                    icon: const Icon(Icons.close),
+                    label: const Text('Retirer cette demande'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Couleurs.rouge,
+                      side: const BorderSide(color: Couleurs.rouge),
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                  ),
+                // DEUX ACTIONS ROUGES SUR LE MEME ECRAN : on dit ce que chacune
+                // fait, comme sur le site.
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text.rich(
+                    const TextSpan(
+                      children: [
+                        TextSpan(text: 'Retirer ferme votre demande', style: TextStyle(fontWeight: FontWeight.w600)),
+                        TextSpan(
+                          text: ' : elle disparaît de la liste, personne ne peut plus y répondre, et la '
+                              'somme bloquée vous est rendue. Pour écarter une seule personne sans fermer '
+                              'votre demande, utilisez ',
+                        ),
+                        TextSpan(text: 'Refuser cette candidature', style: TextStyle(fontWeight: FontWeight.w600)),
+                        TextSpan(text: ' plus bas : les autres pourront encore vous répondre.'),
+                      ],
+                    ),
+                    style: gris,
+                  ),
+                ),
+              ],
               const Divider(height: 32),
               if (demande.reponses.isEmpty)
                 Text("Personne n'a encore répondu.", style: gris)

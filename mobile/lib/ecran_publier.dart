@@ -17,9 +17,13 @@ const _aideArrondissementDepart = "Rempli automatiquement d'après votre quartie
 /// et c'est le serveur qui refuse, avec la phrase que le site affiche aussi.
 /// En cas de succes, il rend la confirmation a l'ecran Mes demandes.
 class EcranPublier extends StatefulWidget {
-  const EcranPublier({super.key, required this.api});
+  const EcranPublier({super.key, required this.api, this.demandeId});
 
   final ApiPamConnect api;
+
+  /// Present pour modifier une demande existante : le meme formulaire,
+  /// prerempli. Absent pour en publier une nouvelle.
+  final int? demandeId;
 
   @override
   State<EcranPublier> createState() => _EcranPublierState();
@@ -27,6 +31,13 @@ class EcranPublier extends StatefulWidget {
 
 class _EcranPublierState extends State<EcranPublier> {
   FormulaireDemande? _formulaire;
+
+  /// En modification : "1 personne a deja repondu...", formule par le serveur.
+  AvertissementModification? _avertissement;
+
+  // En modification : les valeurs de depart des deux champs a suggestions.
+  String _metierDepart = '';
+  String _quartierDepart = '';
 
   /// Le serveur refuse d'ouvrir le formulaire, par exemple a un employeur
   /// dont l'identite n'est pas encore verifiee.
@@ -75,11 +86,20 @@ class _EcranPublierState extends State<EcranPublier> {
 
   Future<void> _charger() async {
     try {
-      final formulaire = await widget.api.formulaireDemande();
+      final demandeId = widget.demandeId;
+      final FormulaireDemande formulaire;
+      ModificationDemande? modification;
+      if (demandeId == null) {
+        formulaire = await widget.api.formulaireDemande();
+      } else {
+        modification = await widget.api.modificationDemande(demandeId);
+        formulaire = modification.formulaire;
+      }
       if (!mounted) return;
       setState(() {
         _formulaire = formulaire;
         _unite = formulaire.uniteParDefaut;
+        if (modification != null) _preremplir(formulaire, modification);
       });
     } on ErreurApi catch (erreur) {
       if (!mounted) return;
@@ -95,6 +115,27 @@ class _EcranPublierState extends State<EcranPublier> {
         }
       });
     }
+  }
+
+  /// Ce qui est ecrit aujourd'hui dans la demande. Une valeur absente des
+  /// listes (un ancien arrondissement mal ecrit, par exemple) n'est pas
+  /// selectionnee : la liste deroulante ne pourrait pas l'afficher.
+  void _preremplir(FormulaireDemande formulaire, ModificationDemande modification) {
+    final valeurs = modification.valeurs;
+    _titre.text = valeurs.titre;
+    _horaire.text = valeurs.horaire;
+    _prix.text = valeurs.prix;
+    _duree.text = valeurs.dureeEstimee;
+    _conditions.text = valeurs.conditions;
+    _metierDepart = valeurs.metier;
+    _quartierDepart = valeurs.quartier;
+    if (formulaire.arrondissements.contains(valeurs.arrondissement)) {
+      _arrondissement = valeurs.arrondissement;
+    }
+    if (formulaire.unitesTarif.any((unite) => unite.valeur == valeurs.uniteTarif)) {
+      _unite = valeurs.uniteTarif;
+    }
+    _avertissement = modification.avertissement;
   }
 
   /// Ce que la liste propose pendant la saisie. Un simple filtre
@@ -149,7 +190,7 @@ class _EcranPublierState extends State<EcranPublier> {
     });
 
     try {
-      final publication = await widget.api.publierDemande({
+      final champs = {
         'titre': _titre.text,
         'metier': _metier?.text ?? '',
         'horaire': _horaire.text,
@@ -159,9 +200,14 @@ class _EcranPublierState extends State<EcranPublier> {
         'unite_tarif': _unite ?? '',
         'duree_estimee': _duree.text,
         'conditions': _conditions.text,
-      });
+      };
+      final demandeId = widget.demandeId;
+      // Dans les deux cas, l'ecran rend la phrase du serveur a Mes demandes.
+      final texte = demandeId == null
+          ? (await widget.api.publierDemande(champs)).texte
+          : (await widget.api.modifierDemande(demandeId, champs)).texte;
       if (!mounted) return;
-      Navigator.of(context).pop(publication);
+      Navigator.of(context).pop(texte);
     } on ErreurApi catch (erreur) {
       if (!mounted) return;
       if (erreur.sessionPerdue) {
@@ -178,7 +224,7 @@ class _EcranPublierState extends State<EcranPublier> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Publier une demande')),
+      appBar: AppBar(title: Text(widget.demandeId == null ? 'Publier une demande' : 'Modifier ma demande')),
       body: SafeArea(child: _corps(context)),
     );
   }
@@ -212,15 +258,39 @@ class _EcranPublierState extends State<EcranPublier> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
-          "Dites ce dont vous avez besoin et quand. Les personnes que l'horaire "
-          'arrange vous répondront.',
-          style: gris,
-        ),
-        const SizedBox(height: 16),
-        // Ce qui arrive a l'argent, annonce AVANT le formulaire, comme sur
-        // le site.
-        const _CarteSomme(),
+        if (widget.demandeId == null) ...[
+          Text(
+            "Dites ce dont vous avez besoin et quand. Les personnes que l'horaire "
+            'arrange vous répondront.',
+            style: gris,
+          ),
+          const SizedBox(height: 16),
+          // Ce qui arrive a l'argent, annonce AVANT le formulaire, comme sur
+          // le site.
+          const _CarteSomme(),
+        ] else ...[
+          Text(
+            "Corrigez ce qui doit l'être. Les personnes qui consultent vos demandes "
+            'verront la nouvelle version.',
+            style: gris,
+          ),
+          if (_avertissement != null) ...[
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_avertissement!.phrase, style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Couleurs.encre)),
+                    const SizedBox(height: 8),
+                    Text(_avertissement!.conseil, style: gris),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
         const SizedBox(height: 16),
         Card(
           child: Padding(
@@ -255,6 +325,7 @@ class _EcranPublierState extends State<EcranPublier> {
         liste: formulaire.metiers,
         libelle: 'Qui cherchez-vous ?',
         exemple: 'ex : Ménage à domicile',
+        valeurDepart: _metierDepart,
         garder: (controleur) => _metier = controleur,
       ),
       espace,
@@ -274,6 +345,7 @@ class _EcranPublierState extends State<EcranPublier> {
         libelle: 'Votre quartier',
         exemple: 'ex : Bastos, Mvan, Biyem-Assi...',
         aide: "Indiquez le quartier, nous trouvons l'arrondissement.",
+        valeurDepart: _quartierDepart,
         garder: (controleur) => _quartier = controleur,
         auChangement: _quartierChange,
       ),
@@ -369,7 +441,7 @@ class _EcranPublierState extends State<EcranPublier> {
                 height: 22,
                 child: CircularProgressIndicator(strokeWidth: 2.5, color: Couleurs.bleuFonce),
               )
-            : const Text('Publier ma demande'),
+            : Text(widget.demandeId == null ? 'Publier ma demande' : 'Enregistrer les modifications'),
       ),
       const SizedBox(height: 8),
       OutlinedButton(
@@ -385,10 +457,12 @@ class _EcranPublierState extends State<EcranPublier> {
     required String libelle,
     required String exemple,
     required void Function(TextEditingController) garder,
+    String valeurDepart = '',
     String? aide,
     void Function(String)? auChangement,
   }) {
     return Autocomplete<String>(
+      initialValue: TextEditingValue(text: valeurDepart),
       optionsBuilder: (saisie) => _suggestions(liste, saisie.text),
       onSelected: (choix) => auChangement?.call(choix),
       fieldViewBuilder: (context, controleur, focus, valider) {
