@@ -306,7 +306,6 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
     final texte = Theme.of(context).textTheme;
     final titre = texte.titleSmall?.copyWith(color: Couleurs.encre, fontWeight: FontWeight.w600);
     final aide = texte.bodyMedium?.copyWith(color: Couleurs.encrePale);
-    const fort = TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre);
     final erreurEnvoi = _erreurEnvoi;
     final detail = _detail;
     final aideDetail = detail?.aide;
@@ -399,27 +398,7 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
         // Le detail se recalcule pendant la saisie, comme sur le site.
         if (detail != null && detail.lignes.isNotEmpty) ...[
           const SizedBox(height: 12),
-          for (final ligne in detail.lignes)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: ligne.total
-                  ? const BoxDecoration(border: Border(top: BorderSide(color: Couleurs.trait)))
-                  : null,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      ligne.libelle,
-                      style: ligne.total ? fort : texte.bodyMedium?.copyWith(color: Couleurs.encreDouce),
-                    ),
-                  ),
-                  Text(
-                    ligne.montant,
-                    style: ligne.retenue ? texte.bodyMedium?.copyWith(color: Couleurs.encreDouce) : fort,
-                  ),
-                ],
-              ),
-            ),
+          DetailMontants(lignes: detail.lignes),
           if (aideDetail != null) Text(aideDetail, style: aide),
         ],
       ],

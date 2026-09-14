@@ -440,3 +440,36 @@ class ChampAvecSuggestions extends StatelessWidget {
     );
   }
 }
+
+/// Des lignes de montants, comme le bloc detail-tarif du site : la
+/// commission en retrait, le total sous un trait.
+class DetailMontants extends StatelessWidget {
+  const DetailMontants({super.key, required this.lignes});
+
+  final List<LigneTarif> lignes;
+
+  @override
+  Widget build(BuildContext context) {
+    final gris = Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encreDouce);
+    const fort = TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final ligne in lignes)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: ligne.total
+                ? const BoxDecoration(border: Border(top: BorderSide(color: Couleurs.trait)))
+                : null,
+            child: Row(
+              children: [
+                Expanded(child: Text(ligne.libelle, style: ligne.total ? fort : gris)),
+                Text(ligne.montant, style: ligne.retenue ? gris : fort),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}

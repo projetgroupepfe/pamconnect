@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'ecran_connexion.dart';
+import 'ecran_mon_compte.dart';
 import 'ecran_modifier_profil.dart';
 import 'elements.dart';
 import 'modeles.dart';
@@ -10,8 +11,8 @@ import 'theme.dart';
 /// Mon profil : qui je suis, et ce que les autres disent de moi. La page du
 /// site, ecrite par le serveur.
 ///
-/// Mon compte et Mes jetons arriveront avec leurs ecrans : un bouton qui ne
-/// mene nulle part n'a rien a faire ici.
+/// Mes jetons arrivera avec son ecran : un bouton qui ne mene nulle part
+/// n'a rien a faire ici.
 class EcranMonProfil extends StatefulWidget {
   const EcranMonProfil({
     super.key,
@@ -130,6 +131,12 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
     await _charger();
     if (!mounted || texte == null) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
+  }
+
+  Future<void> _ouvrirCompte() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => EcranMonCompte(api: widget.api)),
+    );
   }
 
   Future<void> _seDeconnecter() async {
@@ -354,19 +361,7 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
               if (tarif != null) ...[
                 const SizedBox(height: 16),
                 if (phraseTarif != null) Text(phraseTarif, style: gris),
-                for (final ligne in tarif.lignes)
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: ligne.total
-                        ? const BoxDecoration(border: Border(top: BorderSide(color: Couleurs.trait)))
-                        : null,
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(ligne.libelle, style: ligne.total ? fort : gris)),
-                        Text(ligne.montant, style: ligne.retenue ? gris : fort),
-                      ],
-                    ),
-                  ),
+                DetailMontants(lignes: tarif.lignes),
                 if (aideTarif != null) Text(aideTarif, style: aide),
               ],
             ],
@@ -379,6 +374,15 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
         onPressed: _modifier,
         icon: const Icon(Icons.person_outline),
         label: const Text('Modifier mon profil'),
+        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+      ),
+      const SizedBox(height: 8),
+      // Le compte n'est pas dans la barre de menu, comme sur le site : il se
+      // rejoint depuis le profil. L'icone du billet, celle du site.
+      OutlinedButton.icon(
+        onPressed: _ouvrirCompte,
+        icon: const Icon(Icons.payments_outlined),
+        label: const Text('Mon compte'),
         style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
       ),
       const SizedBox(height: 8),

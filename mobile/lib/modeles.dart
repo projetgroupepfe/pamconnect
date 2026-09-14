@@ -1473,3 +1473,74 @@ class AdresseChangee {
   final String texte;
   final String email;
 }
+
+/// Une somme posee par l'employeur, et ce qu'elle est devenue.
+class VersementEnvoye {
+  const VersementEnvoye({
+    required this.titreDemande,
+    required this.etat,
+    required this.libelleEtat,
+    required this.montant,
+    required this.bloqueLe,
+    required this.rappelDeclaration,
+    this.denoue,
+  });
+
+  factory VersementEnvoye.depuisJson(Map<String, dynamic> json) => VersementEnvoye(
+        titreDemande: _lire<String>(json, 'titreDemande'),
+        etat: _lire<String>(json, 'etat'),
+        libelleEtat: _lire<String>(json, 'libelleEtat'),
+        montant: _lire<String>(json, 'montant'),
+        bloqueLe: _lire<String>(json, 'bloqueLe'),
+        rappelDeclaration: _lire<bool>(json, 'rappelDeclaration'),
+        denoue: _lireFacultatif<String>(json, 'denoue'),
+      );
+
+  final String titreDemande;
+
+  /// "bloque", "rembourse" ou "verse" : seulement pour la couleur.
+  final String etat;
+  final String libelleEtat;
+  final String montant;
+  final String bloqueLe;
+  final bool rappelDeclaration;
+
+  /// "Verse le ..." ou "Rendu le ...", absent tant que la somme est bloquee.
+  final String? denoue;
+}
+
+/// Ce que la personne a recu pour un service.
+class VersementRecu {
+  const VersementRecu({required this.titreDemande, required this.chez, required this.lignes, required this.verseLe});
+
+  factory VersementRecu.depuisJson(Map<String, dynamic> json) => VersementRecu(
+        titreDemande: _lire<String>(json, 'titreDemande'),
+        chez: _lire<String>(json, 'chez'),
+        lignes: _lireListe(json, 'lignes', LigneTarif.depuisJson),
+        verseLe: _lire<String>(json, 'verseLe'),
+      );
+
+  final String titreDemande;
+  final String chez;
+  final List<LigneTarif> lignes;
+  final String verseLe;
+}
+
+/// Mon compte (/api/mon-compte).
+class MonCompte {
+  const MonCompte({required this.jeSuisEmployeur, required this.recus, required this.envoyes, this.totalRecu});
+
+  factory MonCompte.depuisJson(Map<String, dynamic> json) => MonCompte(
+        jeSuisEmployeur: _lire<bool>(json, 'jeSuisEmployeur'),
+        recus: _lireListe(json, 'recus', VersementRecu.depuisJson),
+        envoyes: _lireListe(json, 'envoyes', VersementEnvoye.depuisJson),
+        totalRecu: _lireFacultatif<String>(json, 'totalRecu'),
+      );
+
+  final bool jeSuisEmployeur;
+  final List<VersementRecu> recus;
+  final List<VersementEnvoye> envoyes;
+
+  /// Seulement pour la personne qui repond aux demandes.
+  final String? totalRecu;
+}

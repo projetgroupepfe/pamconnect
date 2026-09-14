@@ -744,4 +744,27 @@ void main() {
     expect(lu.email, 'email 2');
     expect(() => AdresseChangee.depuisJson({'texte': 'phrase 1'}), throwsA(isA<FormeInattendue>()));
   });
+
+  test('Mon compte se lit tel que le serveur l ecrit', () {
+    final lu = MonCompte.depuisJson({
+      'jeSuisEmployeur': true,
+      'totalRecu': null,
+      'recus': [],
+      'envoyes': [
+        {
+          'titreDemande': 'titre 1',
+          'etat': 'bloque',
+          'libelleEtat': 'libelle 1',
+          'montant': 'montant 1',
+          'bloqueLe': 'date 1',
+          'denoue': null,
+          'rappelDeclaration': true,
+        },
+      ],
+    });
+    expect(lu.totalRecu, isNull);
+    expect(lu.envoyes.single.denoue, isNull);
+    expect(lu.envoyes.single.rappelDeclaration, isTrue);
+    expect(() => MonCompte.depuisJson({'jeSuisEmployeur': true}), throwsA(isA<FormeInattendue>()));
+  });
 }

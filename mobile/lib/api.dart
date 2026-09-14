@@ -121,6 +121,12 @@ class ApiPamConnect {
   /// Refuser une reponse : la demande reste ouverte.
   Future<void> refuserCandidature(int candidatureId) => _decider(candidatureId, 'refuser');
 
+  /// Mon compte : les sommes, leurs etats et leurs dates, formules par le serveur.
+  Future<MonCompte> monCompte() async {
+    final donnees = await _appeler('/api/mon-compte');
+    return _interpreter(() => MonCompte.depuisJson(donnees));
+  }
+
   /// Mon profil, formule par le serveur.
   Future<MonProfil> monProfil() async {
     final donnees = await _appeler('/api/mon-profil');
