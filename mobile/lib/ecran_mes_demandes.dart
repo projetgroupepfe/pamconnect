@@ -479,7 +479,7 @@ class _CarteReponse extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: () => auDiscuter(reponse),
               icon: const Icon(Icons.chat_bubble_outline),
-              label: const Text('Discuter'),
+              label: Text(reponse.libelleDiscussion),
               style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
             ),
           ),

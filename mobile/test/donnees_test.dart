@@ -40,6 +40,7 @@ Map<String, dynamic> _reponse({
       'peutChoisir': peutChoisir,
       'peutRefuser': true,
       'attendVerification': attendVerification,
+      'libelleDiscussion': 'Discuter',
     };
 
 void main() {
@@ -409,6 +410,8 @@ void main() {
           'serviceTermine': null,
           'peutEcrire': true,
           'exempleMessage': 'exemple 1',
+          'conseilEcriture': 'conseil 1',
+          'peutDeclarerService': false,
           'declarationDeLaPersonne': null,
         };
 
@@ -436,5 +439,34 @@ void main() {
       ((json['messages'] as List).first as Map<String, dynamic>).remove('peutSignaler');
       expect(() => Discussion.depuisJson(json), throwsA(isA<FormeInattendue>()));
     });
+  });
+
+  test('le mot du bouton de discussion vient du serveur', () {
+    final json = _reponse(id: 1, nom: 'nom 1', phrase: 'phrase 1')..['libelleDiscussion'] = 'Relire la discussion';
+    expect(ReponseRecue.depuisJson(json).libelleDiscussion, 'Relire la discussion');
+    expect(() => ReponseRecue.depuisJson(_reponse(id: 1, nom: 'nom 1', phrase: 'phrase 1')..remove('libelleDiscussion')),
+        throwsA(isA<FormeInattendue>()));
+  });
+
+  testWidgets('declarer le service demande confirmation, avec le nom', (tester) async {
+    bool? resultat;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => TextButton(
+            onPressed: () async {
+              resultat = await confirmerDeclarationService(context, 'nom 1');
+            },
+            child: const Text('ouvrir'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('ouvrir'));
+    await tester.pumpAndSettle();
+    expect(find.text("La somme bloquée sera versée à nom 1. Cette déclaration ne s'annule pas."), findsOneWidget);
+    await tester.tap(find.text('Déclarer'));
+    await tester.pumpAndSettle();
+    expect(resultat, isTrue);
   });
 }

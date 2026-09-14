@@ -256,17 +256,21 @@ class Confirmation extends StatelessWidget {
   }
 }
 
-/// "Voulez-vous vraiment refuser ?" : la meme question que sur le site,
-/// avant un geste qui ne s'annule pas. Rend true seulement si la personne
-/// confirme ; fermer la fenetre vaut Annuler.
-Future<bool> confirmerRefus(BuildContext context, String nom) async {
+/// Une question avant un geste qui ne s'annule pas, la meme que sur le
+/// site. Rend true seulement si la personne confirme ; fermer la fenetre
+/// vaut Annuler.
+Future<bool> demanderConfirmation(
+  BuildContext context, {
+  required String question,
+  required String precision,
+  required String action,
+  bool danger = false,
+}) async {
   final reponse = await showDialog<bool>(
     context: context,
     builder: (contexte) => AlertDialog(
-      title: Text('Voulez-vous vraiment refuser la candidature de $nom ?'),
-      content: const Text(
-        "Votre demande reste ouverte : d'autres personnes pourront encore y répondre.",
-      ),
+      title: Text(question),
+      content: Text(precision),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(contexte).pop(false),
@@ -274,11 +278,29 @@ Future<bool> confirmerRefus(BuildContext context, String nom) async {
         ),
         TextButton(
           onPressed: () => Navigator.of(contexte).pop(true),
-          style: TextButton.styleFrom(foregroundColor: Couleurs.rouge),
-          child: const Text('Refuser'),
+          style: danger ? TextButton.styleFrom(foregroundColor: Couleurs.rouge) : null,
+          child: Text(action),
         ),
       ],
     ),
   );
   return reponse == true;
 }
+
+/// "Voulez-vous vraiment refuser ?"
+Future<bool> confirmerRefus(BuildContext context, String nom) => demanderConfirmation(
+      context,
+      question: 'Voulez-vous vraiment refuser la candidature de $nom ?',
+      precision: "Votre demande reste ouverte : d'autres personnes pourront encore y répondre.",
+      action: 'Refuser',
+      danger: true,
+    );
+
+/// Declarer le service effectue verse la somme bloquee : on le confirme
+/// d'abord.
+Future<bool> confirmerDeclarationService(BuildContext context, String nom) => demanderConfirmation(
+      context,
+      question: 'Confirmez-vous que le service a été effectué ?',
+      precision: "La somme bloquée sera versée à $nom. Cette déclaration ne s'annule pas.",
+      action: 'Déclarer',
+    );

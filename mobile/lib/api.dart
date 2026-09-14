@@ -140,6 +140,13 @@ class ApiPamConnect {
     _interpreter(() => ActionFaite.depuisJson(donnees));
   }
 
+  /// Declarer le service effectue : le serveur clot la discussion et verse
+  /// la somme bloquee a la personne qui a travaille.
+  Future<void> declarerServiceEffectue(int candidatureId) async {
+    final donnees = await _appeler('/api/candidatures/$candidatureId/terminer', corps: const {});
+    _interpreter(() => ActionFaite.depuisJson(donnees));
+  }
+
   Future<void> _decider(int candidatureId, String decision) async {
     final donnees = await _appeler('/api/candidatures/$candidatureId/$decision', corps: const {});
     _interpreter(() => DecisionPrise.depuisJson(donnees));

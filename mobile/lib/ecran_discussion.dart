@@ -29,6 +29,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
   final _defilement = ScrollController();
   bool _envoi = false;
   String? _erreurEnvoi;
+  bool _declaration = false;
 
   /// Les messages dont le signalement est en cours d'envoi.
   final Set<int> _signalements = {};
@@ -100,6 +101,33 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
         _envoi = false;
         _erreurEnvoi = erreur.message;
       });
+    }
+  }
+
+  Future<void> _declarerService(Discussion discussion) async {
+    if (_declaration) return;
+    if (!await confirmerDeclarationService(context, discussion.avec)) return;
+    if (!mounted) return;
+    setState(() => _declaration = true);
+
+    String? probleme;
+    try {
+      await widget.api.declarerServiceEffectue(widget.discussionId);
+    } on ErreurApi catch (erreur) {
+      if (!mounted) return;
+      if (erreur.sessionPerdue) {
+        revenirALaConnexion(context, widget.api, messageSessionPerdue);
+        return;
+      }
+      probleme = erreur.message;
+    }
+
+    if (!mounted) return;
+    await _charger(allerEnBas: true);
+    if (!mounted) return;
+    setState(() => _declaration = false);
+    if (probleme != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(probleme)));
     }
   }
 
@@ -321,9 +349,8 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                     alignLabelWithHint: true,
                     hintText: 'ex : ${discussion.exempleMessage}',
                     hintMaxLines: 3,
-                    helperText: 'Parlez du service, du tarif et des horaires. '
-                        "N'indiquez pas votre adresse exacte : elle sera transmise "
-                        'automatiquement après le paiement.',
+                    // Formule par le serveur : la meme phrase que sur le site.
+                    helperText: discussion.conseilEcriture,
                     helperMaxLines: 4,
                   ),
                 ),
@@ -383,6 +410,58 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                 style: aide,
               ),
             ],
+          ),
+        ),
+      ],
+      if (discussion.peutDeclarerService) ...[
+        const SizedBox(height: 16),
+        // Clore le service appartient a celui qui l'a RECU. Ce n'est pas une
+        // formalite : c'est le seul chemin par lequel la somme bloquee arrive
+        // chez la personne qui a travaille.
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    'Le service a-t-il été effectué ?',
+                    style: texte.titleMedium?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(
+                        text: 'Déclarez-le obligatoirement après chaque service.',
+                        style: TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre),
+                      ),
+                      TextSpan(
+                        text: " C'est cette déclaration qui verse la somme bloquée à ${discussion.avec}. "
+                            "Sans elle, elle n'est pas payée, et un désaccord s'ouvre pour rien.",
+                      ),
+                    ],
+                  ),
+                  style: gris,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Cette discussion rejoindra vos services terminés : vous pourrez la relire, '
+                  'mais plus y écrire.',
+                  style: aide,
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _declaration ? null : () => _declarerService(discussion),
+                  icon: const Icon(Icons.task_alt),
+                  label: const Text('Déclarer le service effectué'),
+                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                ),
+              ],
+            ),
           ),
         ),
       ],

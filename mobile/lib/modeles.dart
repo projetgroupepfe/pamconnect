@@ -186,6 +186,7 @@ class ReponseRecue {
     required this.peutChoisir,
     required this.peutRefuser,
     required this.attendVerification,
+    required this.libelleDiscussion,
     this.experience,
     this.disponibilites,
   });
@@ -201,6 +202,7 @@ class ReponseRecue {
         peutChoisir: _lire<bool>(json, 'peutChoisir'),
         peutRefuser: _lire<bool>(json, 'peutRefuser'),
         attendVerification: _lire<bool>(json, 'attendVerification'),
+        libelleDiscussion: _lire<String>(json, 'libelleDiscussion'),
         experience: _lireFacultatif<String>(json, 'experience'),
         disponibilites: _lireFacultatif<String>(json, 'disponibilites'),
       );
@@ -220,6 +222,9 @@ class ReponseRecue {
   final bool peutChoisir;
   final bool peutRefuser;
   final bool attendVerification;
+
+  /// "Discuter", ou "Relire la discussion" une fois le service termine.
+  final String libelleDiscussion;
   final String? experience;
   final String? disponibilites;
 }
@@ -587,6 +592,8 @@ class Discussion {
     required this.messages,
     required this.peutEcrire,
     required this.exempleMessage,
+    required this.conseilEcriture,
+    required this.peutDeclarerService,
     this.metierAutre,
     this.lieu,
     this.conditions,
@@ -607,6 +614,8 @@ class Discussion {
       messages: _lireListe(json, 'messages', MessageDiscussion.depuisJson),
       peutEcrire: _lire<bool>(json, 'peutEcrire'),
       exempleMessage: _lire<String>(json, 'exempleMessage'),
+      conseilEcriture: _lire<String>(json, 'conseilEcriture'),
+      peutDeclarerService: _lire<bool>(json, 'peutDeclarerService'),
       metierAutre: _lireFacultatif<String>(json, 'metierAutre'),
       lieu: _lireFacultatif<String>(json, 'lieu'),
       conditions: _lireFacultatif<String>(json, 'conditions'),
@@ -626,6 +635,12 @@ class Discussion {
   final List<MessageDiscussion> messages;
   final bool peutEcrire;
   final String exempleMessage;
+
+  /// Ce que l'on conseille d'ecrire, formule par le serveur.
+  final String conseilEcriture;
+
+  /// L'employeur, une fois quelqu'un choisi, et une seule fois.
+  final bool peutDeclarerService;
   final String? metierAutre;
   final String? lieu;
   final String? conditions;
