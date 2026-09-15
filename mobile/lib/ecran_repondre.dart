@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'ecran_connexion.dart';
 import 'ecran_mes_jetons.dart';
+import 'ecran_verification.dart';
 import 'elements.dart';
 import 'modeles.dart';
 import 'theme.dart';
@@ -26,6 +27,9 @@ class EcranRepondre extends StatefulWidget {
 class _EcranRepondreState extends State<EcranRepondre> {
   EcranReponse? _ecran;
   String? _refus;
+
+  /// Le refus se regle en faisant verifier son identite.
+  bool _proposeVerification = false;
   bool _envoi = false;
   String? _erreurEnvoi;
 
@@ -42,6 +46,7 @@ class _EcranRepondreState extends State<EcranRepondre> {
       setState(() {
         _ecran = ecran;
         _refus = null;
+        _proposeVerification = false;
       });
     } on ErreurApi catch (erreur) {
       if (!mounted) return;
@@ -49,8 +54,21 @@ class _EcranRepondreState extends State<EcranRepondre> {
         revenirALaConnexion(context, widget.api, messageSessionPerdue);
         return;
       }
-      setState(() => _refus = erreur.message);
+      setState(() {
+        _refus = erreur.message;
+        _proposeVerification = erreur.proposeVerification;
+      });
     }
+  }
+
+  /// Le chemin que le site met sous la phrase du refus. Au retour, l'ecran
+  /// se recharge : le statut a pu changer.
+  Future<void> _faireVerifier() async {
+    await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => EcranVerification(api: widget.api)),
+    );
+    if (!mounted) return;
+    await _charger();
   }
 
   Future<void> _voirJetons() async {
@@ -106,6 +124,14 @@ class _EcranRepondreState extends State<EcranRepondre> {
         children: [
           Avertissement(texte: refus),
           const SizedBox(height: 16),
+          // Le bouton orange de la page du site, sans icone comme lui.
+          if (_proposeVerification) ...[
+            FilledButton(
+              onPressed: _faireVerifier,
+              child: const Text('Faire vérifier mon identité'),
+            ),
+            const SizedBox(height: 8),
+          ],
           OutlinedButton(
             onPressed: () => Navigator.of(context).pop(),
             style: OutlinedButton.styleFrom(minimumSize: hauteurBouton),

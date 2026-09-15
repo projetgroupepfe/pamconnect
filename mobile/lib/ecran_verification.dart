@@ -349,8 +349,8 @@ class _EcranVerificationState extends State<EcranVerification> {
   }
 }
 
-/// Un document a joindre : son nom une fois choisi, et les deux facons de
-/// le fournir.
+/// Un document a joindre, dans l'ordre du champ du site : le titre, les deux
+/// facons de le fournir, la ligne qui dit ce qui est choisi, puis l'aide.
 class _Document extends StatelessWidget {
   const _Document({
     required this.titre,
@@ -378,26 +378,7 @@ class _Document extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(titre, style: texte.titleSmall?.copyWith(color: Couleurs.encre, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text(aide, style: texte.bodyMedium?.copyWith(color: Couleurs.encrePale)),
         const SizedBox(height: 10),
-        if (document != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
-              children: [
-                const Icon(Icons.check_circle_outline, size: 20, color: Couleurs.vert),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    document.nom,
-                    overflow: TextOverflow.ellipsis,
-                    style: texte.bodyMedium?.copyWith(color: Couleurs.encre),
-                  ),
-                ),
-              ],
-            ),
-          ),
         OutlinedButton.icon(
           onPressed: actif ? auPhoto : null,
           style: style,
@@ -411,6 +392,28 @@ class _Document extends StatelessWidget {
           icon: const Icon(Icons.insert_drive_file_outlined),
           label: const Text('Choisir un fichier'),
         ),
+        const SizedBox(height: 10),
+        // La ligne du champ fichier du site : "Aucun fichier sélectionné."
+        // tant que rien n'est choisi, puis le nom du fichier.
+        Row(
+          children: [
+            if (document != null) ...[
+              const Icon(Icons.check_circle_outline, size: 20, color: Couleurs.vert),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: Text(
+                document?.nom ?? 'Aucun fichier sélectionné.',
+                overflow: TextOverflow.ellipsis,
+                style: texte.bodyMedium?.copyWith(
+                  color: document == null ? Couleurs.encreDouce : Couleurs.encre,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(aide, style: texte.bodyMedium?.copyWith(color: Couleurs.encrePale)),
       ],
     );
   }

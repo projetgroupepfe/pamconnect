@@ -54,6 +54,9 @@ ThemeData themePamConnect() {
         side: const BorderSide(color: Couleurs.trait),
       ),
     ),
+    // Les pastilles de la barre, orange comme .pastille sur le site. Sans
+    // cela, Flutter leur donne la couleur des erreurs : un rouge d'alerte.
+    badgeTheme: const BadgeThemeData(backgroundColor: Couleurs.orange, textColor: Couleurs.surface),
     // L'action principale est orange, comme le bouton "Publier une demande"
     // du site.
     filledButtonTheme: FilledButtonThemeData(

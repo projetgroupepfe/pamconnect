@@ -11,10 +11,14 @@ import 'modeles.dart';
 /// Quand le serveur explique un refus, c'est SON message qui s'affiche :
 /// l'application ne reformule pas une decision qu'elle n'a pas prise.
 class ErreurApi implements Exception {
-  const ErreurApi(this.message, {this.code});
+  const ErreurApi(this.message, {this.code, this.proposeVerification = false});
 
   final String message;
   final int? code;
+
+  /// Le refus se regle en faisant verifier son identite : l'ecran propose
+  /// alors le bouton du site, "Faire vérifier mon identité".
+  final bool proposeVerification;
 
   /// 401 : la session ne vaut plus rien, par exemple apres un redemarrage du
   /// serveur, qui garde ses sessions en memoire.
@@ -448,6 +452,7 @@ class ApiPamConnect {
       throw ErreurApi(
         message is String ? message : 'Le serveur a refusé la demande.',
         code: reponse.statusCode,
+        proposeVerification: donnees['verification'] == true,
       );
     }
     return donnees;
