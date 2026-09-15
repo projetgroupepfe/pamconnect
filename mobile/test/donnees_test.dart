@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pamconnect/api.dart';
+import 'package:pamconnect/ecran_connexion.dart';
 import 'package:pamconnect/elements.dart';
 import 'package:pamconnect/modeles.dart';
 
@@ -840,6 +841,23 @@ void main() {
     expect(lu.motifRefus, isNull);
     // Sans lien de suite, l'ecran ne saurait pas ou mener apres la validation.
     expect(() => DossierDeVerification.depuisJson(dossier()), throwsA(isA<FormeInattendue>()));
+  });
+
+  testWidgets("sans adresse retenue, l'ecran de connexion la demande", (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: EcranConnexion()));
+    expect(find.text('Adresse du serveur'), findsOneWidget);
+    expect(find.text("Changer l'adresse du serveur"), findsNothing);
+  });
+
+  testWidgets('une adresse retenue se cache, et le lien la fait revenir', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: EcranConnexion(adresseInitiale: 'http://adresse-1:3000')));
+    expect(find.text('Adresse du serveur'), findsNothing);
+    final lien = find.text("Changer l'adresse du serveur");
+    await tester.ensureVisible(lien);
+    await tester.tap(lien);
+    await tester.pump();
+    expect(find.text('Adresse du serveur'), findsOneWidget);
+    expect(lien, findsNothing);
   });
 
   test('Mon compte se lit tel que le serveur l ecrit', () {

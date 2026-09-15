@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
 import 'ecran_accueil.dart';
@@ -11,6 +12,32 @@ import 'theme.dart';
 /// Ce que lit la personne quand le serveur ne reconnait plus sa session.
 const messageSessionPerdue = "Votre session n'est plus valable, par exemple "
     'après un redémarrage du serveur. Reconnectez-vous.';
+
+const _cleAdresse = 'adresse_serveur';
+
+/// L'adresse du serveur retenue sur le telephone, ou '' la premiere fois.
+///
+/// Elle est demandee une seule fois : la retaper a chaque ouverture ne
+/// servait a rien, et une autre personne qui decouvre l'application n'a pas
+/// a voir ce reglage.
+Future<String> lireAdresseRetenue() async {
+  try {
+    return await SharedPreferencesAsync().getString(_cleAdresse) ?? '';
+  } catch (_) {
+    // Sans memoire lisible, l'adresse est simplement redemandee.
+    return '';
+  }
+}
+
+/// Retenue seulement apres une reponse du serveur : une adresse fausse ne
+/// doit pas se cacher derriere le lien.
+Future<void> _retenirAdresse(String adresse) async {
+  try {
+    await SharedPreferencesAsync().setString(_cleAdresse, adresse);
+  } catch (_) {
+    // Elle sera redemandee a la prochaine ouverture, rien de plus.
+  }
+}
 
 /// Revient a l'ecran de connexion en gardant l'adresse du serveur, et en
 /// disant pourquoi. Partagee par tous les ecrans qui ont besoin d'une
@@ -32,6 +59,9 @@ void revenirALaConnexion(BuildContext context, ApiPamConnect api, [String? messa
 /// L'adresse est demandee ici plutot que fixee a la fabrication : elle change
 /// a chaque fois que l'ordinateur rejoint le partage de connexion, et le jour
 /// de la soutenance il faut pouvoir la corriger sur place.
+///
+/// Une fois retenue, elle se cache derriere "Changer l'adresse du serveur" ;
+/// elle ne revient d'elle-meme que si le serveur est introuvable.
 class EcranConnexion extends StatefulWidget {
   const EcranConnexion({super.key, this.adresseInitiale = '', this.message});
 
@@ -54,6 +84,9 @@ class _EcranConnexionState extends State<EcranConnexion> {
   final _motdepasse = TextEditingController();
   bool _enCours = false;
   late String? _message = widget.message;
+
+  /// Le champ de l'adresse : affiche la premiere fois, cache ensuite.
+  late bool _adresseVisible = widget.adresseInitiale.trim().isEmpty;
 
   /// La phrase du site une fois le compte cree.
   String? _confirmation;
@@ -81,6 +114,8 @@ class _EcranConnexionState extends State<EcranConnexion> {
     final api = ApiPamConnect(_adresse.text);
     try {
       final moi = await api.connexion(_email.text.trim(), _motdepasse.text);
+      // Le serveur a repondu : cette adresse est la bonne, on la retient.
+      await _retenirAdresse(api.racine);
       if (!mounted) return;
 
       // CHAQUE ROLE ARRIVE SUR SA PAGE DE TRAVAIL, comme sur le site : la
@@ -108,6 +143,8 @@ class _EcranConnexionState extends State<EcranConnexion> {
       setState(() {
         _enCours = false;
         _message = erreur.message;
+        // Introuvable a cette adresse : on la montre, pour la corriger.
+        if (erreur.adresseEnCause) _adresseVisible = true;
       });
     }
   }
@@ -115,7 +152,9 @@ class _EcranConnexionState extends State<EcranConnexion> {
   /// Creer un compte et Decouvrir PamConnect ne demandent ici que l'adresse
   /// du serveur : le reste se choisit plus loin.
   bool _adresseValide() {
-    if (_enCours || !_champAdresse.currentState!.validate()) return false;
+    // Cache, le champ n'est pas a l'ecran : l'adresse retenue suffit.
+    final champ = _champAdresse.currentState;
+    if (_enCours || (champ != null && !champ.validate())) return false;
     setState(() {
       _message = null;
       _confirmation = null;
@@ -139,9 +178,13 @@ class _EcranConnexionState extends State<EcranConnexion> {
         ),
       ),
     );
-    if (!mounted || faite == null) return;
+    if (faite == null) return;
+    // Le compte a ete cree : l'adresse est la bonne, on la retient.
+    await _retenirAdresse(ApiPamConnect.normaliserAdresse(_adresse.text));
+    if (!mounted) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
     setState(() {
+      _adresseVisible = false;
       _email.text = faite.email;
       _motdepasse.clear();
       _confirmation = '${faite.titre} ${faite.texte}';
@@ -213,21 +256,23 @@ class _EcranConnexionState extends State<EcranConnexion> {
                     Information(texte: _information!),
                     const SizedBox(height: 16),
                   ],
-                  TextFormField(
-                    key: _champAdresse,
-                    controller: _adresse,
-                    keyboardType: TextInputType.url,
-                    autocorrect: false,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: 'Adresse du serveur',
-                      helperText: "L'adresse affichée par npm start sur l'ordinateur",
+                  if (_adresseVisible) ...[
+                    TextFormField(
+                      key: _champAdresse,
+                      controller: _adresse,
+                      keyboardType: TextInputType.url,
+                      autocorrect: false,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Adresse du serveur',
+                        helperText: "L'adresse affichée par npm start sur l'ordinateur",
+                      ),
+                      validator: (valeur) => (valeur == null || valeur.trim().isEmpty)
+                          ? "Indiquez l'adresse du serveur."
+                          : null,
                     ),
-                    validator: (valeur) => (valeur == null || valeur.trim().isEmpty)
-                        ? "Indiquez l'adresse du serveur."
-                        : null,
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
+                  ],
                   TextFormField(
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
@@ -279,6 +324,15 @@ class _EcranConnexionState extends State<EcranConnexion> {
                     icon: const Icon(Icons.home_outlined),
                     label: const Text('Découvrir PamConnect'),
                   ),
+                  // Le reglage reste a portee, sans s'afficher a chaque personne
+                  // qui ouvre l'application.
+                  if (!_adresseVisible) ...[
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: _enCours ? null : () => setState(() => _adresseVisible = true),
+                      child: const Text("Changer l'adresse du serveur"),
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -11,7 +11,7 @@ import 'modeles.dart';
 /// Quand le serveur explique un refus, c'est SON message qui s'affiche :
 /// l'application ne reformule pas une decision qu'elle n'a pas prise.
 class ErreurApi implements Exception {
-  const ErreurApi(this.message, {this.code, this.proposeVerification = false});
+  const ErreurApi(this.message, {this.code, this.proposeVerification = false, this.adresseEnCause = false});
 
   final String message;
   final int? code;
@@ -19,6 +19,10 @@ class ErreurApi implements Exception {
   /// Le refus se regle en faisant verifier son identite : l'ecran propose
   /// alors le bouton du site, "Faire vérifier mon identité".
   final bool proposeVerification;
+
+  /// Le serveur est introuvable a cette adresse, ou ce n'est pas lui qui
+  /// repond : l'ecran de connexion montre alors l'adresse, pour la corriger.
+  final bool adresseEnCause;
 
   /// 401 : la session ne vaut plus rien, par exemple apres un redemarrage du
   /// serveur, qui garde ses sessions en memoire.
@@ -372,7 +376,7 @@ class ApiPamConnect {
   Future<Map<String, dynamic>> _appeler(String chemin, {Map<String, dynamic>? corps}) async {
     final uri = Uri.tryParse('$racine$chemin');
     if (uri == null || uri.host.isEmpty) {
-      throw const ErreurApi("Cette adresse de serveur n'est pas valide.");
+      throw const ErreurApi("Cette adresse de serveur n'est pas valide.", adresseEnCause: true);
     }
 
     final entetes = {
@@ -387,14 +391,14 @@ class ApiPamConnect {
           : http.post(uri, headers: entetes, body: jsonEncode(corps));
       reponse = await envoi.timeout(const Duration(seconds: 15));
     } on TimeoutException {
-      throw const ErreurApi(_injoignable);
+      throw const ErreurApi(_injoignable, adresseEnCause: true);
     } on SocketException {
-      throw const ErreurApi(_injoignable);
+      throw const ErreurApi(_injoignable, adresseEnCause: true);
     } on http.ClientException {
-      throw const ErreurApi(_injoignable);
+      throw const ErreurApi(_injoignable, adresseEnCause: true);
     } on HandshakeException {
       throw const ErreurApi("Cette adresse attend une connexion sécurisée, "
-          "mais le serveur PamConnect s'ouvre en http://.");
+          "mais le serveur PamConnect s'ouvre en http://.", adresseEnCause: true);
     }
 
     return _lireReponse(reponse);
@@ -406,7 +410,7 @@ class ApiPamConnect {
   Future<Map<String, dynamic>> _envoyerFichiers(String chemin, Map<String, DocumentAEnvoyer> documents) async {
     final uri = Uri.tryParse('$racine$chemin');
     if (uri == null || uri.host.isEmpty) {
-      throw const ErreurApi("Cette adresse de serveur n'est pas valide.");
+      throw const ErreurApi("Cette adresse de serveur n'est pas valide.", adresseEnCause: true);
     }
 
     final requete = http.MultipartRequest('POST', uri);
@@ -421,13 +425,13 @@ class ApiPamConnect {
       final envoye = await requete.send().timeout(const Duration(minutes: 2));
       reponse = await http.Response.fromStream(envoye).timeout(const Duration(minutes: 2));
     } on TimeoutException {
-      throw const ErreurApi(_injoignable);
+      throw const ErreurApi(_injoignable, adresseEnCause: true);
     } on SocketException {
-      throw const ErreurApi(_injoignable);
+      throw const ErreurApi(_injoignable, adresseEnCause: true);
     } on FileSystemException {
       throw const ErreurApi("Un document n'a pas pu être lu sur le téléphone. Choisissez-le de nouveau.");
     } on http.ClientException {
-      throw const ErreurApi(_injoignable);
+      throw const ErreurApi(_injoignable, adresseEnCause: true);
     }
     return _lireReponse(reponse);
   }
@@ -444,6 +448,7 @@ class ApiPamConnect {
       throw ErreurApi(
         'Cette adresse répond, mais pas comme le serveur PamConnect.',
         code: reponse.statusCode,
+        adresseEnCause: true,
       );
     }
 
