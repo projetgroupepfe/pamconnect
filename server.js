@@ -7730,16 +7730,20 @@ app.listen(PORT, () => {
   // Aucune connexion internet n'est necessaire : seule compte la liaison
   // locale entre les deux appareils. C'est ce qui rendra la demonstration
   // possible le jour de la soutenance, meme sans internet dans la salle.
-  const adresses = Object.values(os.networkInterfaces())
-    .flat()
+  //
+  // Le NOM de chaque carte est ecrit a cote de son adresse. VirtualBox et
+  // VMware ajoutent des reseaux qui n'existent que dans l'ordinateur : le
+  // telephone ne joint que celle du Wi-Fi, ou du cable. Sans le nom, il
+  // fallait deviner laquelle taper.
+  const adresses = Object.entries(os.networkInterfaces())
+    .flatMap(([nom, cartes]) => cartes.map((carte) => ({ nom, ...carte })))
     .filter((carte) => carte.family === "IPv4" && !carte.internal)
     // 169.254.x.x : Windows attribue cette plage a une carte reseau qui
     // n'a trouve aucun reseau. L'afficher n'induirait qu'en erreur.
-    .filter((carte) => !carte.address.startsWith("169.254."))
-    .map((carte) => carte.address);
+    .filter((carte) => !carte.address.startsWith("169.254."));
 
   if (adresses.length) {
     console.log("Depuis un téléphone sur le même réseau :");
-    adresses.forEach((ip) => console.log(`   http://${ip}:${PORT}`));
+    adresses.forEach((carte) => console.log(`   http://${carte.address}:${PORT}   (${carte.nom})`));
   }
 });
