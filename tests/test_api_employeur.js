@@ -648,11 +648,20 @@ setTimeout(async () => {
        mod.donnees.valeurs.horaire === "Mercredi 9h" && Array.isArray(mod.donnees.metiers) &&
        mod.donnees.avertissement === null, mod.brut.slice(0, 200));
 
+  const sansReponse = await modifier(idAModifier, Object.assign(complet(M + " a modifier"), { prix: 7500 }),
+                                     cookieDe(emp.cookie));
+  dire("sans reponse, le prix peut encore baisser",
+       sansReponse.code === 200 && ligneDemande(idAModifier).prix === 7500 && sommeBloquee(idAModifier).montant === 7500,
+       sansReponse.brut);
+  await modifier(idAModifier, complet(M + " a modifier"), cookieDe(emp.cookie));
+
   await poster("/candidatures", form({ annonceId: String(idAModifier) }), pre3.cookie);
   const modAvecReponse = (await modification(idAModifier, cookieDe(emp.cookie))).donnees;
   dire("une fois quelqu'un a repondu, l'employeur est prevenu",
        modAvecReponse.avertissement && modAvecReponse.avertissement.phrase.startsWith("1 personne a déjà répondu") &&
-       modAvecReponse.avertissement.conseil.includes("prévenez-la"), JSON.stringify(modAvecReponse.avertissement));
+       modAvecReponse.avertissement.conseil.includes("prévenez-la") &&
+       modAvecReponse.avertissement.conseil.endsWith("Le prix peut augmenter, mais plus baisser."),
+       JSON.stringify(modAvecReponse.avertissement));
   dire("la page du site dit la meme chose",
        (await (await lire("/annonces/" + idAModifier + "/modifier", emp.cookie)).text())
          .includes("1 personne a déjà répondu à cette demande."));
@@ -666,6 +675,15 @@ setTimeout(async () => {
        modOk.brut);
   dire("la somme bloquee suit le nouveau prix", sommeBloquee(idAModifier).montant === 9000,
        JSON.stringify(sommeBloquee(idAModifier)));
+  const baisse = await modifier(idAModifier, Object.assign(complet(M + " modifiee"), { prix: 8500 }), cookieDe(emp.cookie));
+  dire("apres une reponse, le prix ne baisse plus : 409, en disant jusqu'ou",
+       baisse.code === 409 && ligneDemande(idAModifier).prix === 9000 && sommeBloquee(idAModifier).montant === 9000 &&
+       baisse.donnees.erreur === "1 personne a déjà répondu à cette demande : " +
+         "le prix peut augmenter, mais plus descendre sous 9 000 FCFA.", baisse.brut);
+  const baisseWeb = await poster("/annonces/" + idAModifier + "/modifier",
+    form(Object.assign(complet(M + " modifiee"), { prix: "8500" })), emp.cookie);
+  dire("le site la refuse aussi", baisseWeb.code === 409 && ligneDemande(idAModifier).prix === 9000,
+       "code " + baisseWeb.code);
 
   // La faille : une demande pourvue se modifiait encore, et la somme promise avec.
   const modPourvue = await modifier(idAChoisir, Object.assign(complet(M + " a choisir"), { prix: 500 }), cookieDe(emp.cookie));

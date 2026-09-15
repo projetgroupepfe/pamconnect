@@ -25,20 +25,25 @@
         pose a l'interieur d'un exemple chiffre, se lit comme un calcul
         qu'elle peut verifier elle-meme. %>
     <p>
-      PamConnect y retient une commission et vous verse le reste dès que
-      l'employeur a payé.
+      PamConnect y retient une commission et vous verse le reste quand
+      l'employeur a déclaré le service effectué.
     </p>
 
-    <p class="exemple">
-      Par exemple : pour une demande à <strong>10 000 FCFA</strong>, la
-      commission de <strong><%= pourcentageCommission %> %</strong> est de
-      <strong>1 000 FCFA</strong>, et vous recevez
-      <strong>9 000 FCFA</strong>.
-    </p>
+    <%# Un exemple doit se lire comme un exemple : il porte son nom en
+        tete. Ses montants viennent du serveur, ils suivent la commission. %>
+    <div class="exemple">
+      <p class="exemple-titre">Exemple de calcul</p>
+      <p>
+        Pour une demande à <strong><%= exempleTarif.prix %></strong>, la
+        commission de <strong><%= pourcentageCommission %> %</strong> est de
+        <strong><%= exempleTarif.commission %></strong>, et vous recevez
+        <strong><%= exempleTarif.recu %></strong>.
+      </p>
+    </div>
 
     <p class="aide">
       Vous voyez ce calcul avant de répondre à une demande, jamais après.
-      Aucun montant ne change en cours de route.
+      Après votre réponse, le prix ne peut plus baisser.
     </p>
   </div>
 
@@ -51,7 +56,7 @@
         Votre métier, votre quartier et votre tarif. Cela prend deux minutes.
       </p>
       <div class="actions">
-        <a class="bouton" href="/inscription">
+        <a class="bouton" href="/inscription?role=prestataire">
           <%- include("partiels/icone", { nom: "profil" }) %>
           M'inscrire
         </a>

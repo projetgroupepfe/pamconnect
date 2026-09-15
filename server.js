@@ -2980,9 +2980,18 @@ app.use((req, res, next) => {
 // --- Les pages de presentation -------------------------------------
 // Elles ne font qu'afficher une vue : aucune donnee a preparer.
 app.get("/", (req, res) => res.render("accueil", { titre: "Accueil" }));
-app.get("/employeur", (req, res) => res.render("employeur", { titre: "Espace employeur" }));
-app.get("/prestataire", (req, res) => res.render("prestataire", { titre: "Espace prestataire" }));
-app.get("/inscription", (req, res) => res.render("inscription", { titre: "Créer un compte" }));
+// Les titres reprennent ceux des pages : le mot "prestataire" n'a de
+// sens que dans notre code, il ne s'affiche pas, onglet compris.
+app.get("/employeur", (req, res) => res.render("employeur", { titre: "Vous cherchez quelqu'un" }));
+app.get("/prestataire", (req, res) => res.render("prestataire", { titre: "Vous proposez vos services" }));
+// "Proposer mes services" ouvre l'inscription sur ce choix. Avant, la
+// personne arrivait sur "Trouver quelqu'un pour ma maison".
+app.get("/inscription", (req, res) => res.render("inscription", {
+  titre: "Créer un compte",
+  roleChoisi: ROLES_INSCRIPTION.some((r) => r.valeur === req.query.role)
+    ? req.query.role
+    : ROLES_INSCRIPTION[0].valeur,
+}));
 app.get("/connexion", (req, res) => res.render("connexion", { titre: "Se connecter" }));
 
 // Ces pages etaient auparavant des fichiers .html. On redirige les
@@ -3920,7 +3929,8 @@ function avertissementModification(nombre) {
     phrase: `${nombre} personne${plusieurs ? "s ont" : " a"} déjà répondu à cette demande. ` +
             `Elle${plusieurs ? "s se sont décidées" : " s'est décidée"} sur ce qui est écrit aujourd'hui.`,
     conseil: `Si vous changez l'horaire, le lieu ou le prix, prévenez-${plusieurs ? "les" : "la"} ` +
-             "dans la discussion : la plateforme ne le fait pas à votre place.",
+             "dans la discussion : la plateforme ne le fait pas à votre place. " +
+             "Le prix peut augmenter, mais plus baisser.",
   };
 }
 
@@ -3966,6 +3976,25 @@ function modifierDemande(annonceId, utilisateur, donnees) {
   }
 
   const champs = champsAnnonce(donnees);
+
+  // LE PRIX NE BAISSE PLUS APRES UNE REPONSE. Chaque personne qui a
+  // repondu s'est decidee sur ce prix, et y a depense un jeton : le
+  // baisser changerait l'accord apres coup, sans qu'elle en soit prevenue.
+  // Le monter ne fait perdre personne, il reste possible. L'horaire et le
+  // lieu peuvent devoir etre corriges : l'employeur est seulement prevenu.
+  const reponses = requetes.nombreCandidatures.get(annonce.id).n;
+  if (reponses > 0 && (champs.prix || 0) < (annonce.prix || 0)) {
+    return {
+      annonce,
+      probleme: {
+        code: 409,
+        titre: "Le prix ne peut plus baisser",
+        texte: `${reponses} personne${reponses > 1 ? "s ont" : " a"} déjà répondu à cette demande : ` +
+               `le prix peut augmenter, mais plus descendre sous ${formaterMontant(annonce.prix)}.`,
+        lien: { url: `/annonces/${annonce.id}/modifier`, texte: "Retour au formulaire" },
+      },
+    };
+  }
 
   // Le prix a peut-etre change : la somme bloquee doit suivre, sinon les
   // deux chiffres se contredisent. Les deux ensemble, ou aucun.
@@ -6901,6 +6930,17 @@ app.post("/api/inscription", (req, res) => {
   if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
 
   res.status(201).json({ titre: resultat.titre, texte: resultat.texte, email: resultat.email });
+});
+
+// --- Les pages de presentation dans l'application ---------------------
+//
+// Leurs textes sont ceux des pages du site. Seuls les chiffres viennent
+// d'ici, calcules comme pour le site : la commission et l'exemple.
+app.get("/api/presentation", (req, res) => {
+  res.json({
+    pourcentageCommission: app.locals.pourcentageCommission,
+    exempleTarif: exempleDeTarif(),
+  });
 });
 
 // --- Se deconnecter ------------------------------------------------

@@ -13,8 +13,8 @@
         <div class="champ">
           <label for="role">Vous êtes ici pour</label>
           <select id="role" name="role">
-            <option value="employeur">Trouver quelqu'un pour ma maison</option>
-            <option value="prestataire">Proposer mes services</option>
+            <option value="employeur" <%= locals.roleChoisi === "employeur" ? "selected" : "" %>>Trouver quelqu'un pour ma maison</option>
+            <option value="prestataire" <%= locals.roleChoisi === "prestataire" ? "selected" : "" %>>Proposer mes services</option>
           </select>
         </div>
 
@@ -73,13 +73,16 @@
               d'en ajouter un second qui dirait la meme chose. Ce qui lui
               manquait, c'est d'ou vient le montant reellement paye.
               Les montants viennent du serveur : ils suivent la commission. %>
-          <p class="exemple">
-            Ce tarif est indicatif. Le montant réellement reçu dépend de la demande
-            à laquelle vous répondez : pour une demande à
-            <strong><%= exempleTarif.prix %></strong>, la commission est de
-            <strong><%= exempleTarif.commission %></strong> et vous recevez
-            <strong><%= exempleTarif.recu %></strong>.
-          </p>
+          <div class="exemple">
+            <p class="exemple-titre">Exemple de calcul</p>
+            <p>
+              Ce tarif est indicatif. Le montant réellement reçu dépend de la demande
+              à laquelle vous répondez : pour une demande à
+              <strong><%= exempleTarif.prix %></strong>, la commission est de
+              <strong><%= exempleTarif.commission %></strong> et vous recevez
+              <strong><%= exempleTarif.recu %></strong>.
+            </p>
+          </div>
         </div>
 
         <input type="hidden" id="latitude" name="latitude">

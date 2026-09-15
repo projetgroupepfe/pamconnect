@@ -371,6 +371,12 @@ setTimeout(async () => {
        pageInscription.includes('minlength="6"') && pageInscription.includes("6 caractères au minimum.") &&
        pageInscription.includes("<strong>9 000 FCFA</strong>"));
 
+  console.log(SAUT + "--- LES PAGES DE PRESENTATION ---");
+  const presentation = await api("/api/presentation");
+  dire("sans session, la commission et l'exemple, calcules comme pour l'inscription",
+       presentation.code === 200 && presentation.donnees.pourcentageCommission === 10 &&
+       JSON.stringify(presentation.donnees.exempleTarif) === JSON.stringify(fi.exempleTarif), presentation.brut);
+
   console.log(SAUT + "--- LES FORMULAIRES DU SITE MARCHENT TOUJOURS ---");
   // express.json n'est monte que sous /api : une inscription ordinaire
   // doit continuer d'arriver comme avant.

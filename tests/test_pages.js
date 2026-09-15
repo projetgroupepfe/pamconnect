@@ -51,8 +51,8 @@ setTimeout(async () => {
   console.log("\n--- Pages publiques ---");
   for (const [chemin, attendu] of [
     ["/", "PamConnect"],
-    ["/employeur", "Espace employeur"],
-    ["/prestataire", "Espace prestataire"],
+    ["/employeur", "Vous cherchez quelqu'un"],
+    ["/prestataire", "Vous proposez vos services"],
     ["/inscription", "Créer un compte"],
     ["/connexion", "Se connecter"],
     ["/recherche", "Rechercher un prestataire"],
@@ -63,6 +63,32 @@ setTimeout(async () => {
     dire(chemin, p.code === 200 && p.corps.includes(attendu) && !p.corps.includes("ReferenceError"),
          "code " + p.code);
   }
+
+  console.log("\n--- Pages de presentation : ce qu'elles promettent ---");
+  const accueil = (await page("/")).corps;
+  const vousCherchez = (await page("/employeur")).corps;
+  const vousProposez = (await page("/prestataire")).corps;
+  const anciennesPhrases = [/reverse aussitôt/, /reversée aussitôt/, /tarif affiché sur le profil/,
+    /paie le tarif affiché/, /de la plus proche à la plus éloignée/, /dès que\s+l'employeur a payé/,
+    /Aucun montant ne change/];
+  dire("les phrases de l'ancien modele ont disparu des trois pages",
+       [accueil, vousCherchez, vousProposez].every((corps) => anciennesPhrases.every((phrase) => !phrase.test(corps))));
+  dire("la somme est bloquee a la publication et versee a la declaration du service",
+       accueil.includes("bloqué dès la publication") && vousCherchez.includes("bloquée dès la publication") &&
+       /quand\s+l'employeur a déclaré le service effectué/.test(vousProposez));
+  dire("la page dit que le prix ne baisse plus apres une reponse",
+       vousProposez.includes("Après votre réponse, le prix ne peut plus baisser."));
+  dire("l'exemple porte son nom et suit la commission",
+       vousProposez.includes('<p class="exemple-titre">Exemple de calcul</p>') &&
+       vousProposez.includes("<strong>1 000 FCFA</strong>") && vousProposez.includes("<strong>9 000 FCFA</strong>"));
+  dire("le mot prestataire ne s'affiche plus dans le titre",
+       !/<title>[^<]*prestataire/i.test(vousProposez) && !/<title>[^<]*prestataire/i.test(vousCherchez));
+  dire("Proposer mes services ouvre l'inscription sur ce choix",
+       accueil.includes('href="/inscription?role=prestataire"') &&
+       vousProposez.includes('href="/inscription?role=prestataire"') &&
+       (await page("/inscription?role=prestataire")).corps.includes('value="prestataire" selected') &&
+       (await page("/inscription")).corps.includes('value="employeur" selected') &&
+       (await page("/inscription?role=equipe")).corps.includes('value="employeur" selected'));
 
   console.log("\n--- Pages connectees ---");
   for (const [chemin, cookie, attendu, nom] of [
