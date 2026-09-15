@@ -767,4 +767,35 @@ void main() {
     expect(lu.envoyes.single.rappelDeclaration, isTrue);
     expect(() => MonCompte.depuisJson({'jeSuisEmployeur': true}), throwsA(isA<FormeInattendue>()));
   });
+
+  test('Mes jetons se lisent tels que le serveur les ecrit', () {
+    final lu = MesJetons.depuisJson({
+      'jeSuisEmployeur': false,
+      'perdusMaintenant': null,
+      'cout': 'cout 1',
+      'permet': null,
+      'manque': 'manque 1',
+      'soldeTotal': 'solde 1',
+      'offerts': 0,
+      'achetes': 0,
+      'expireLe': null,
+      'soldeVide': true,
+      'verificationAFaire': false,
+      'valeurJeton': null,
+      'demandeEnCours': false,
+      'uneAction': 'action 1',
+      'packs': [
+        {'quantite': 1, 'prix': 'prix 1', 'apres': 1, 'dequoi': null, 'manqueEncore': 2},
+      ],
+      'achats': [],
+      'mouvements': [
+        {'libelle': 'libelle 1', 'date': 'date 1', 'quantite': 'quantite 1', 'retrait': true},
+      ],
+    });
+    expect(lu.valeurJeton, isNull);
+    expect(lu.packs.single.dequoi, isNull);
+    expect(lu.packs.single.manqueEncore, 2);
+    expect(lu.mouvements.single.retrait, isTrue);
+    expect(() => MesJetons.depuisJson({'jeSuisEmployeur': false}), throwsA(isA<FormeInattendue>()));
+  });
 }

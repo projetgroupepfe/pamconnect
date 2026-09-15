@@ -121,6 +121,18 @@ class ApiPamConnect {
   /// Refuser une reponse : la demande reste ouverte.
   Future<void> refuserCandidature(int candidatureId) => _decider(candidatureId, 'refuser');
 
+  /// Mes jetons, formules par le serveur.
+  Future<MesJetons> mesJetons() async {
+    final donnees = await _appeler('/api/mes-jetons');
+    return _interpreter(() => MesJetons.depuisJson(donnees));
+  }
+
+  /// Seule la quantite part : le prix est relu par le serveur.
+  Future<TexteDuServeur> demanderPack(int quantite) async {
+    final donnees = await _appeler('/api/mes-jetons/acheter', corps: {'quantite': quantite});
+    return _interpreter(() => TexteDuServeur.depuisJson(donnees));
+  }
+
   /// Mon compte : les sommes, leurs etats et leurs dates, formules par le serveur.
   Future<MonCompte> monCompte() async {
     final donnees = await _appeler('/api/mon-compte');

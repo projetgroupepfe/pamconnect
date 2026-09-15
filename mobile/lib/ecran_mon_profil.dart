@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'ecran_connexion.dart';
+import 'ecran_mes_jetons.dart';
 import 'ecran_mon_compte.dart';
 import 'ecran_modifier_profil.dart';
 import 'elements.dart';
@@ -11,8 +12,8 @@ import 'theme.dart';
 /// Mon profil : qui je suis, et ce que les autres disent de moi. La page du
 /// site, ecrite par le serveur.
 ///
-/// Mes jetons arrivera avec son ecran : un bouton qui ne mene nulle part
-/// n'a rien a faire ici.
+/// La verification d'identite arrivera avec son ecran : un bouton qui ne
+/// mene nulle part n'a rien a faire ici.
 class EcranMonProfil extends StatefulWidget {
   const EcranMonProfil({
     super.key,
@@ -136,6 +137,12 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
   Future<void> _ouvrirCompte() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(builder: (_) => EcranMonCompte(api: widget.api)),
+    );
+  }
+
+  Future<void> _ouvrirJetons() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => EcranMesJetons(api: widget.api)),
     );
   }
 
@@ -383,6 +390,15 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
         onPressed: _ouvrirCompte,
         icon: const Icon(Icons.payments_outlined),
         label: const Text('Mon compte'),
+        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+      ),
+      const SizedBox(height: 8),
+      // Les jetons ne sont pas de l'argent : ils ont leur page, a cote du
+      // compte et jamais dedans, comme sur le site.
+      OutlinedButton.icon(
+        onPressed: _ouvrirJetons,
+        icon: const Icon(Icons.toll_outlined),
+        label: const Text('Mes jetons'),
         style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
       ),
       const SizedBox(height: 8),

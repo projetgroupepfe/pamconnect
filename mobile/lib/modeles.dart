@@ -1544,3 +1544,142 @@ class MonCompte {
   /// Seulement pour la personne qui repond aux demandes.
   final String? totalRecu;
 }
+
+/// Un pack en vente, avec ce qu'il donnera a cette personne.
+class PackJetons {
+  const PackJetons({required this.quantite, required this.prix, this.apres, this.dequoi, this.manqueEncore});
+
+  factory PackJetons.depuisJson(Map<String, dynamic> json) => PackJetons(
+        quantite: _lire<int>(json, 'quantite'),
+        prix: _lire<String>(json, 'prix'),
+        apres: _lireFacultatif<int>(json, 'apres'),
+        dequoi: _lireFacultatif<String>(json, 'dequoi'),
+        manqueEncore: _lireFacultatif<int>(json, 'manqueEncore'),
+      );
+
+  final int quantite;
+  final String prix;
+
+  /// Le solde apres cet achat, absent si le cout d'une action n'est pas regle.
+  final int? apres;
+
+  /// "repondre a 8 demandes", ou absent s'il manquera encore des jetons.
+  final String? dequoi;
+  final int? manqueEncore;
+}
+
+class AchatJetons {
+  const AchatJetons({
+    required this.quantite,
+    required this.etat,
+    required this.libelleEtat,
+    required this.montant,
+    required this.demandeLe,
+    this.motifRefus,
+  });
+
+  factory AchatJetons.depuisJson(Map<String, dynamic> json) => AchatJetons(
+        quantite: _lire<int>(json, 'quantite'),
+        etat: _lire<String>(json, 'etat'),
+        libelleEtat: _lire<String>(json, 'libelleEtat'),
+        montant: _lire<String>(json, 'montant'),
+        demandeLe: _lire<String>(json, 'demandeLe'),
+        motifRefus: _lireFacultatif<String>(json, 'motifRefus'),
+      );
+
+  final int quantite;
+
+  /// "en attente", "confirme" ou "refuse" : seulement pour la couleur.
+  final String etat;
+  final String libelleEtat;
+  final String montant;
+  final String demandeLe;
+  final String? motifRefus;
+}
+
+class MouvementJetons {
+  const MouvementJetons({required this.libelle, required this.date, required this.quantite, required this.retrait});
+
+  factory MouvementJetons.depuisJson(Map<String, dynamic> json) => MouvementJetons(
+        libelle: _lire<String>(json, 'libelle'),
+        date: _lire<String>(json, 'date'),
+        quantite: _lire<String>(json, 'quantite'),
+        retrait: _lire<bool>(json, 'retrait'),
+      );
+
+  final String libelle;
+  final String date;
+
+  /// "+ 10" ou "− 2", deja ecrit.
+  final String quantite;
+  final bool retrait;
+}
+
+/// Mes jetons (/api/mes-jetons), formule par le serveur.
+class MesJetons {
+  const MesJetons({
+    required this.jeSuisEmployeur,
+    required this.soldeTotal,
+    required this.offerts,
+    required this.achetes,
+    required this.soldeVide,
+    required this.verificationAFaire,
+    required this.demandeEnCours,
+    required this.uneAction,
+    required this.packs,
+    required this.achats,
+    required this.mouvements,
+    this.perdusMaintenant,
+    this.cout,
+    this.permet,
+    this.manque,
+    this.expireLe,
+    this.valeurJeton,
+  });
+
+  factory MesJetons.depuisJson(Map<String, dynamic> json) => MesJetons(
+        jeSuisEmployeur: _lire<bool>(json, 'jeSuisEmployeur'),
+        soldeTotal: _lire<String>(json, 'soldeTotal'),
+        offerts: _lire<int>(json, 'offerts'),
+        achetes: _lire<int>(json, 'achetes'),
+        soldeVide: _lire<bool>(json, 'soldeVide'),
+        verificationAFaire: _lire<bool>(json, 'verificationAFaire'),
+        demandeEnCours: _lire<bool>(json, 'demandeEnCours'),
+        uneAction: _lire<String>(json, 'uneAction'),
+        packs: _lireListe(json, 'packs', PackJetons.depuisJson),
+        achats: _lireListe(json, 'achats', AchatJetons.depuisJson),
+        mouvements: _lireListe(json, 'mouvements', MouvementJetons.depuisJson),
+        perdusMaintenant: _lireFacultatif<int>(json, 'perdusMaintenant'),
+        cout: _lireFacultatif<String>(json, 'cout'),
+        permet: _lireFacultatif<String>(json, 'permet'),
+        manque: _lireFacultatif<String>(json, 'manque'),
+        expireLe: _lireFacultatif<String>(json, 'expireLe'),
+        valeurJeton: _lireFacultatif<String>(json, 'valeurJeton'),
+      );
+
+  final bool jeSuisEmployeur;
+
+  /// "3 jetons (300 FCFA)".
+  final String soldeTotal;
+  final int offerts;
+  final int achetes;
+  final bool soldeVide;
+  final bool verificationAFaire;
+  final bool demandeEnCours;
+
+  /// "repondre a une demande" ou "mettre une demande en avant".
+  final String uneAction;
+  final List<PackJetons> packs;
+  final List<AchatJetons> achats;
+  final List<MouvementJetons> mouvements;
+
+  /// Les jetons offerts qui viennent d'expirer : dit une seule fois.
+  final int? perdusMaintenant;
+  final String? cout;
+  final String? permet;
+  final String? manque;
+  final String? expireLe;
+
+  /// Absente tant que l'equipe n'a pas regle les prix : aucun prix invente.
+  final String? valeurJeton;
+}
