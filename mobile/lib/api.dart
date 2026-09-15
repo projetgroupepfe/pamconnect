@@ -121,6 +121,13 @@ class ApiPamConnect {
   /// Refuser une reponse : la demande reste ouverte.
   Future<void> refuserCandidature(int candidatureId) => _decider(candidatureId, 'refuser');
 
+  /// Les personnes d'un metier, classees par le serveur. Aucune position
+  /// n'est envoyee.
+  Future<ResultatRecherche> rechercher(String metier) async {
+    final donnees = await _appeler('/api/recherche?metier=${Uri.encodeQueryComponent(metier)}');
+    return _interpreter(() => ResultatRecherche.depuisJson(donnees));
+  }
+
   /// Mes jetons, formules par le serveur.
   Future<MesJetons> mesJetons() async {
     final donnees = await _appeler('/api/mes-jetons');

@@ -1683,3 +1683,75 @@ class MesJetons {
   /// Absente tant que l'equipe n'a pas regle les prix : aucun prix invente.
   final String? valeurJeton;
 }
+
+/// Une personne trouvee par la recherche, deja formulee par le serveur.
+class PersonneTrouvee {
+  const PersonneTrouvee({
+    required this.id,
+    required this.nom,
+    required this.verifiee,
+    required this.libelleVerification,
+    required this.note,
+    required this.tarif,
+    this.metier,
+    this.joursDisponibles,
+    this.experience,
+    this.lieu,
+    this.distance,
+  });
+
+  factory PersonneTrouvee.depuisJson(Map<String, dynamic> json) => PersonneTrouvee(
+        id: _lire<int>(json, 'id'),
+        nom: _lire<String>(json, 'nom'),
+        verifiee: _lire<bool>(json, 'verifiee'),
+        libelleVerification: _lire<String>(json, 'libelleVerification'),
+        note: NotePersonne.depuisJson(_lire<Map<String, dynamic>>(json, 'note')),
+        tarif: _lire<String>(json, 'tarif'),
+        metier: _lireFacultatif<String>(json, 'metier'),
+        joursDisponibles: _lireFacultatif<String>(json, 'joursDisponibles'),
+        experience: _lireFacultatif<String>(json, 'experience'),
+        lieu: _lireFacultatif<String>(json, 'lieu'),
+        distance: _lireFacultatif<String>(json, 'distance'),
+      );
+
+  final int id;
+  final String nom;
+  final bool verifiee;
+  final String libelleVerification;
+  final NotePersonne note;
+  final String tarif;
+  final String? metier;
+  final String? joursDisponibles;
+  final String? experience;
+  final String? lieu;
+
+  /// Absente : l'application n'envoie pas de position.
+  final String? distance;
+}
+
+/// La reponse de /api/recherche, dans l'ordre du classement du serveur.
+class ResultatRecherche {
+  const ResultatRecherche({
+    required this.titre,
+    required this.classementExplique,
+    required this.personnes,
+    required this.peutPublier,
+    this.phraseLieu,
+  });
+
+  factory ResultatRecherche.depuisJson(Map<String, dynamic> json) => ResultatRecherche(
+        titre: _lire<String>(json, 'titre'),
+        classementExplique: _lire<bool>(json, 'classementExplique'),
+        personnes: _lireListe(json, 'personnes', PersonneTrouvee.depuisJson),
+        peutPublier: _lire<bool>(json, 'peutPublier'),
+        phraseLieu: _lireFacultatif<String>(json, 'phraseLieu'),
+      );
+
+  final String titre;
+  final bool classementExplique;
+  final List<PersonneTrouvee> personnes;
+  final bool peutPublier;
+
+  /// "Sans votre position, la proximite se mesure a partir de votre quartier..."
+  final String? phraseLieu;
+}

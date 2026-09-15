@@ -5,14 +5,16 @@ import 'ecran_demandes.dart';
 import 'ecran_mes_demandes.dart';
 import 'ecran_messages.dart';
 import 'ecran_mon_profil.dart';
+import 'ecran_rechercher.dart';
 import 'modeles.dart';
 
 /// L'application une fois connecte : une barre de menu en bas, comme le
 /// menu du site.
 ///
-/// CHAQUE ROLE A SES ENTREES, et seulement les siennes : l'employeur a
-/// Mes demandes, la personne qui repond a Les demandes ; Messages et Mon
-/// profil sont communs aux deux. Une entree n'apparait qu'une fois son ecran construit.
+/// CHAQUE ROLE A SES ENTREES, et seulement les siennes, dans l'ordre du site :
+/// l'employeur a Rechercher et Mes demandes, la personne qui repond a Les
+/// demandes ; Messages et Mon profil sont communs aux deux. Une entree
+/// n'apparait qu'une fois son ecran construit.
 class EcranPrincipal extends StatefulWidget {
   const EcranPrincipal({super.key, required this.api, required this.moi});
 
@@ -24,7 +26,18 @@ class EcranPrincipal extends StatefulWidget {
 }
 
 class _EcranPrincipalState extends State<EcranPrincipal> {
-  int _onglet = 0;
+  bool get _employeur => widget.moi.publieDesDemandes;
+
+  // La place de chaque entree dans la barre : Rechercher n'existe que pour
+  // l'employeur, et decale les suivantes.
+  int get _indexRechercher => 0;
+  int get _indexTravail => _employeur ? 1 : 0;
+  int get _indexMessages => _indexTravail + 1;
+  int get _indexProfil => _indexTravail + 2;
+
+  /// L'application s'ouvre sur ce sur quoi chacun travaille : Mes demandes
+  /// pour l'employeur, Les demandes pour la personne qui repond.
+  late int _onglet = _indexTravail;
 
   /// Les messages non lus et les decisions pas encore vues, comptes par le
   /// serveur comme la pastille du menu du site.
@@ -35,7 +48,7 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
   late int _aLire = widget.moi.aLire;
 
   /// Change a chaque retour sur un onglet : son ecran se recharge.
-  final List<int> _rafraichir = [0, 0, 0];
+  late final List<int> _rafraichir = List<int>.filled(_indexProfil + 1, 0);
 
   void _majCompte(int aVoir) {
     if (!mounted || aVoir == _aVoir) return;
@@ -63,23 +76,22 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
   Widget build(BuildContext context) {
     final api = widget.api;
     final moi = widget.moi;
-    final employeur = moi.publieDesDemandes;
-
-    final premier = employeur
-        ? EcranMesDemandes(api: api, moi: moi, rafraichir: _rafraichir[0], auMoi: _majMoi)
-        : EcranDemandes(api: api, moi: moi, rafraichir: _rafraichir[0], auMoi: _majMoi);
+    final employeur = _employeur;
 
     return Scaffold(
       body: IndexedStack(
         index: _onglet,
         children: [
-          premier,
-          EcranMessages(api: api, rafraichir: _rafraichir[1], auCompte: _majCompte),
+          if (employeur) EcranRechercher(api: api, rafraichir: _rafraichir[_indexRechercher]),
+          employeur
+              ? EcranMesDemandes(api: api, moi: moi, rafraichir: _rafraichir[_indexTravail], auMoi: _majMoi)
+              : EcranDemandes(api: api, moi: moi, rafraichir: _rafraichir[_indexTravail], auMoi: _majMoi),
+          EcranMessages(api: api, rafraichir: _rafraichir[_indexMessages], auCompte: _majCompte),
           EcranMonProfil(
             api: api,
-            rafraichir: _rafraichir[2],
+            rafraichir: _rafraichir[_indexProfil],
             auALire: _majALire,
-            auDonnerAvis: () => _choisirOnglet(1),
+            auDonnerAvis: () => _choisirOnglet(_indexMessages),
           ),
         ],
       ),
@@ -87,6 +99,11 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
         selectedIndex: _onglet,
         onDestinationSelected: _choisirOnglet,
         destinations: [
+          if (employeur)
+            const NavigationDestination(
+              icon: Icon(Icons.search),
+              label: 'Rechercher',
+            ),
           employeur
               ? const NavigationDestination(
                   icon: Icon(Icons.description_outlined),

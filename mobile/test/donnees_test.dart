@@ -798,4 +798,30 @@ void main() {
     expect(lu.mouvements.single.retrait, isTrue);
     expect(() => MesJetons.depuisJson({'jeSuisEmployeur': false}), throwsA(isA<FormeInattendue>()));
   });
+
+  test("la recherche garde l'ordre du serveur, sans distance inventee", () {
+    Map<String, dynamic> personne(int id) => {
+          'id': id,
+          'nom': 'nom $id',
+          'metier': null,
+          'verifiee': true,
+          'libelleVerification': 'libelle 1',
+          'note': {'etat': 'nouveau', 'badge': 'badge 1', 'detail': 'detail 1'},
+          'joursDisponibles': null,
+          'experience': null,
+          'lieu': null,
+          'tarif': 'tarif 1',
+          'distance': null,
+        };
+    final lu = ResultatRecherche.depuisJson({
+      'titre': 'titre 1',
+      'phraseLieu': null,
+      'classementExplique': true,
+      'personnes': [personne(2), personne(1)],
+      'peutPublier': true,
+    });
+    expect(lu.personnes.map((p) => p.id), [2, 1]);
+    expect(lu.personnes.first.distance, isNull);
+    expect(() => ResultatRecherche.depuisJson({'titre': 'titre 1'}), throwsA(isA<FormeInattendue>()));
+  });
 }
