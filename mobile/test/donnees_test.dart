@@ -812,6 +812,36 @@ void main() {
     expect(find.textContaining('montant 1', findRichText: true), findsOneWidget);
   });
 
+  test('le dossier de verification se lit tel que le serveur l ecrit', () {
+    Map<String, dynamic> dossier({Object? suite}) => {
+          'statut': 'statut 1',
+          'libelle': 'libelle 2',
+          'attente': {
+            'morceaux': [
+              {'texte': 'morceau 3'},
+              {'texte': 'morceau 4', 'gras': true},
+            ],
+            'aide': 'aide 5',
+          },
+          'motifRefus': null,
+          'verifiee': false,
+          'suite': suite,
+          'chapeau': 'chapeau 6',
+          'delaiHeures': 7,
+          'extensions': ['.ext8'],
+          'tailleMaxMo': 9,
+          'remplaceUnDossier': true,
+        };
+    final lu = DossierDeVerification.depuisJson(dossier(suite: {'url': 'url 10', 'texte': 'texte 11'}));
+    expect(lu.attente?.morceaux.first.gras, isFalse);
+    expect(lu.attente?.morceaux.last.gras, isTrue);
+    expect(lu.suite.texte, 'texte 11');
+    expect(lu.tailleMaxMo, 9);
+    expect(lu.motifRefus, isNull);
+    // Sans lien de suite, l'ecran ne saurait pas ou mener apres la validation.
+    expect(() => DossierDeVerification.depuisJson(dossier()), throwsA(isA<FormeInattendue>()));
+  });
+
   test('Mon compte se lit tel que le serveur l ecrit', () {
     final lu = MonCompte.depuisJson({
       'jeSuisEmployeur': true,

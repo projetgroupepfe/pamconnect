@@ -101,6 +101,7 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
             rafraichir: _rafraichir[_indexProfil],
             auALire: _majALire,
             auDonnerAvis: () => _choisirOnglet(_indexMessages),
+            auVoirTravail: () => _choisirOnglet(_indexTravail),
           ),
         ],
       ),

@@ -30,6 +30,16 @@ class ErreurApi implements Exception {
 const _injoignable = "Le serveur ne répond pas. Vérifiez l'adresse, et que le "
     "téléphone est sur le même réseau que l'ordinateur.";
 
+/// Un document choisi sur le telephone, pret a partir : son nom (avec son
+/// extension, que le serveur verifie), sa taille, et de quoi le lire.
+class DocumentAEnvoyer {
+  const DocumentAEnvoyer({required this.nom, required this.taille, required this.lire});
+
+  final String nom;
+  final int taille;
+  final Stream<List<int>> Function() lire;
+}
+
 /// Le SEUL endroit de l'application qui parle au serveur.
 ///
 /// La session est celle du site : le serveur rend un jeton a la connexion,
@@ -179,6 +189,19 @@ class ApiPamConnect {
   Future<InscriptionFaite> inscrire(Map<String, dynamic> champs) async {
     final donnees = await _appeler('/api/inscription', corps: champs);
     return _interpreter(() => InscriptionFaite.depuisJson(donnees));
+  }
+
+  /// La verification d'identite, ecrite par le serveur.
+  Future<DossierDeVerification> verification() async {
+    final donnees = await _appeler('/api/verification');
+    return _interpreter(() => DossierDeVerification.depuisJson(donnees));
+  }
+
+  /// Les deux documents d'identite ("cni" et "casier"), comme le formulaire
+  /// du site les envoie.
+  Future<TexteDuServeur> envoyerDocuments(Map<String, DocumentAEnvoyer> documents) async {
+    final donnees = await _envoyerFichiers('/api/verification', documents);
+    return _interpreter(() => TexteDuServeur.depuisJson(donnees));
   }
 
   /// Le formulaire Modifier mon profil, rempli par le serveur.
@@ -370,6 +393,42 @@ class ApiPamConnect {
           "mais le serveur PamConnect s'ouvre en http://.");
     }
 
+    return _lireReponse(reponse);
+  }
+
+  /// Des fichiers en multipart, comme un formulaire du site avec
+  /// enctype="multipart/form-data". Le delai est plus long : deux photos
+  /// peuvent peser plusieurs Mo.
+  Future<Map<String, dynamic>> _envoyerFichiers(String chemin, Map<String, DocumentAEnvoyer> documents) async {
+    final uri = Uri.tryParse('$racine$chemin');
+    if (uri == null || uri.host.isEmpty) {
+      throw const ErreurApi("Cette adresse de serveur n'est pas valide.");
+    }
+
+    final requete = http.MultipartRequest('POST', uri);
+    final jeton = _jeton;
+    if (jeton != null) requete.headers['Authorization'] = 'Bearer $jeton';
+    documents.forEach((champ, document) {
+      requete.files.add(http.MultipartFile(champ, document.lire(), document.taille, filename: document.nom));
+    });
+
+    final http.Response reponse;
+    try {
+      final envoye = await requete.send().timeout(const Duration(minutes: 2));
+      reponse = await http.Response.fromStream(envoye).timeout(const Duration(minutes: 2));
+    } on TimeoutException {
+      throw const ErreurApi(_injoignable);
+    } on SocketException {
+      throw const ErreurApi(_injoignable);
+    } on FileSystemException {
+      throw const ErreurApi("Un document n'a pas pu être lu sur le téléphone. Choisissez-le de nouveau.");
+    } on http.ClientException {
+      throw const ErreurApi(_injoignable);
+    }
+    return _lireReponse(reponse);
+  }
+
+  Map<String, dynamic> _lireReponse(http.Response reponse) {
     // Toute reponse de l'API est du JSON, les erreurs comprises. Une page
     // HTML veut dire que l'adresse mene ailleurs.
     final Map<String, dynamic> donnees;

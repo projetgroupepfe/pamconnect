@@ -5,6 +5,7 @@ import 'ecran_connexion.dart';
 import 'ecran_mes_jetons.dart';
 import 'ecran_mon_compte.dart';
 import 'ecran_modifier_profil.dart';
+import 'ecran_verification.dart';
 import 'elements.dart';
 import 'modeles.dart';
 import 'theme.dart';
@@ -12,8 +13,8 @@ import 'theme.dart';
 /// Mon profil : qui je suis, et ce que les autres disent de moi. La page du
 /// site, ecrite par le serveur.
 ///
-/// La verification d'identite arrivera avec son ecran : un bouton qui ne
-/// mene nulle part n'a rien a faire ici.
+/// La verification d'identite s'ouvre d'ici, comme sur le site, pour les
+/// deux cotes.
 class EcranMonProfil extends StatefulWidget {
   const EcranMonProfil({
     super.key,
@@ -21,6 +22,7 @@ class EcranMonProfil extends StatefulWidget {
     this.rafraichir = 0,
     this.auALire,
     this.auDonnerAvis,
+    this.auVoirTravail,
   });
 
   final ApiPamConnect api;
@@ -33,6 +35,9 @@ class EcranMonProfil extends StatefulWidget {
 
   /// Mene a l'onglet Messages, la ou l'on donne ses avis.
   final VoidCallback? auDonnerAvis;
+
+  /// Apres la validation de l'identite : l'onglet ou chacun travaille.
+  final VoidCallback? auVoirTravail;
 
   @override
   State<EcranMonProfil> createState() => _EcranMonProfilState();
@@ -146,6 +151,28 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
     );
   }
 
+  Future<void> _ouvrirVerification() async {
+    final auVoirTravail = widget.auVoirTravail;
+    final texte = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (ecran) => EcranVerification(
+          api: widget.api,
+          auVoirSuite: auVoirTravail == null
+              ? null
+              : () {
+                  Navigator.of(ecran).pop();
+                  auVoirTravail();
+                },
+        ),
+      ),
+    );
+    if (!mounted) return;
+    // Recharge meme sans envoi : le statut a pu changer entre-temps.
+    await _charger();
+    if (!mounted || texte == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
+  }
+
   Future<void> _seDeconnecter() async {
     await widget.api.deconnexion();
     if (!mounted) return;
@@ -206,6 +233,7 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
     final vide = profil.avis.vide;
     final aNoter = profil.servicesANoter;
     final motifRefus = profil.motifRefus;
+    final boutonVerification = profil.boutonVerification;
 
     return [
       if (erreur != null) ...[
@@ -306,7 +334,7 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
               ),
               if (verification != null) ...[
                 const SizedBox(height: 12),
-                _PastilleVerification(verification: verification),
+                PastilleVerification(verification: verification),
                 if (attente != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -457,6 +485,15 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
           padding: const EdgeInsets.only(top: 16),
           child: Text('Motif du refus : $motifRefus', style: aide),
         ),
+      // Le bouton orange du site, avec l'icone de l'envoi.
+      if (boutonVerification != null) ...[
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: _ouvrirVerification,
+          icon: const Icon(Icons.file_upload_outlined),
+          label: Text(boutonVerification),
+        ),
+      ],
     ];
   }
 }
@@ -480,8 +517,8 @@ class _Encadre extends StatelessWidget {
 
 /// L'etat de la verification, avec la couleur des pastilles du site : le
 /// vert reste reserve a ce qui a ete controle.
-class _PastilleVerification extends StatelessWidget {
-  const _PastilleVerification({required this.verification});
+class PastilleVerification extends StatelessWidget {
+  const PastilleVerification({super.key, required this.verification});
 
   final VerificationDuProfil verification;
 
@@ -496,7 +533,7 @@ class _PastilleVerification extends StatelessWidget {
         ),
       'en attente' => Pastille(texte: verification.libelle, fond: Couleurs.ambreFond, couleur: Couleurs.ambre),
       'refuse' => Pastille(texte: verification.libelle, fond: Couleurs.rougeFond, couleur: Couleurs.rouge),
-      _ => Pastille(texte: verification.libelle, fond: Couleurs.trait, couleur: Couleurs.encreDouce),
+      _ => Pastille(texte: verification.libelle, fond: Couleurs.bleuClair, couleur: Couleurs.encreDouce),
     };
   }
 }

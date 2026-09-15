@@ -1341,6 +1341,7 @@ class MonProfil {
     this.tarif,
     this.servicesANoter,
     this.motifRefus,
+    this.boutonVerification,
   });
 
   factory MonProfil.depuisJson(Map<String, dynamic> json) => MonProfil(
@@ -1359,6 +1360,7 @@ class MonProfil {
         tarif: _lireObjet(json, 'tarif', TarifDuProfil.depuisJson),
         servicesANoter: _lireObjet(json, 'servicesANoter', ServicesANoter.depuisJson),
         motifRefus: _lireFacultatif<String>(json, 'motifRefus'),
+        boutonVerification: _lireFacultatif<String>(json, 'boutonVerification'),
       );
 
   final String nom;
@@ -1379,6 +1381,105 @@ class MonProfil {
   /// Seulement pour la personne qui repond aux demandes.
   final TarifDuProfil? tarif;
   final ServicesANoter? servicesANoter;
+  final String? motifRefus;
+
+  /// "Faire vérifier mon identité" ou "Voir mon dossier" ; absent une fois
+  /// l'identite validee.
+  final String? boutonVerification;
+}
+
+/// Un morceau de phrase ecrit par le serveur, en gras ou non.
+class Morceau {
+  const Morceau({required this.texte, this.gras = false});
+
+  factory Morceau.depuisJson(Map<String, dynamic> json) => Morceau(
+        texte: _lire<String>(json, 'texte'),
+        gras: _lireFacultatif<bool>(json, 'gras') ?? false,
+      );
+
+  final String texte;
+  final bool gras;
+}
+
+/// Depuis quand un dossier attend, et combien de temps il reste.
+class AttenteDuDossier {
+  const AttenteDuDossier({required this.morceaux, required this.aide});
+
+  factory AttenteDuDossier.depuisJson(Map<String, dynamic> json) => AttenteDuDossier(
+        morceaux: _lireListe(json, 'morceaux', Morceau.depuisJson),
+        aide: _lire<String>(json, 'aide'),
+      );
+
+  final List<Morceau> morceaux;
+  final String aide;
+}
+
+/// Un lien du site : l'application en garde le texte, et fait l'action
+/// equivalente.
+class LienDuSite {
+  const LienDuSite({required this.url, required this.texte});
+
+  factory LienDuSite.depuisJson(Map<String, dynamic> json) => LienDuSite(
+        url: _lire<String>(json, 'url'),
+        texte: _lire<String>(json, 'texte'),
+      );
+
+  final String url;
+  final String texte;
+}
+
+/// La verification d'identite (/api/verification), ecrite par le serveur.
+class DossierDeVerification {
+  const DossierDeVerification({
+    required this.statut,
+    required this.libelle,
+    required this.verifiee,
+    required this.suite,
+    required this.chapeau,
+    required this.delaiHeures,
+    required this.extensions,
+    required this.tailleMaxMo,
+    required this.remplaceUnDossier,
+    this.attente,
+    this.motifRefus,
+  });
+
+  factory DossierDeVerification.depuisJson(Map<String, dynamic> json) {
+    final suite = _lireObjet(json, 'suite', LienDuSite.depuisJson);
+    if (suite == null) throw const FormeInattendue('suite');
+    return DossierDeVerification(
+      statut: _lire<String>(json, 'statut'),
+      libelle: _lire<String>(json, 'libelle'),
+      verifiee: _lire<bool>(json, 'verifiee'),
+      suite: suite,
+      chapeau: _lire<String>(json, 'chapeau'),
+      delaiHeures: _lire<int>(json, 'delaiHeures'),
+      extensions: _lireTextes(json, 'extensions'),
+      tailleMaxMo: _lire<num>(json, 'tailleMaxMo'),
+      remplaceUnDossier: _lire<bool>(json, 'remplaceUnDossier'),
+      attente: _lireObjet(json, 'attente', AttenteDuDossier.depuisJson),
+      motifRefus: _lireFacultatif<String>(json, 'motifRefus'),
+    );
+  }
+
+  final String statut;
+  final String libelle;
+  final bool verifiee;
+
+  /// Ou aller une fois l'identite validee.
+  final LienDuSite suite;
+
+  /// Pourquoi deux documents : la raison n'est pas la meme des deux cotes.
+  final String chapeau;
+  final int delaiHeures;
+
+  /// ".jpg", ".pdf"... tels que le serveur les accepte.
+  final List<String> extensions;
+  final num tailleMaxMo;
+
+  /// Un dossier est deja en examen : un nouvel envoi le remplace.
+  final bool remplaceUnDossier;
+  final AttenteDuDossier? attente;
   final String? motifRefus;
 }
 
