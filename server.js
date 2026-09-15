@@ -4233,99 +4233,109 @@ function ecranDemandeFermee(annonceId) {
       };
 }
 
-app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, exigerVerification, (req, res) => {
-  if (req.utilisateur.role !== "prestataire") {
-    return res.status(403).render("message", {
+// --- Repondre a une demande, UNE SEULE FOIS pour le site et l'application --
+
+// Qui peut repondre : une personne qui propose ses services, et dont
+// l'identite est verifiee. Le site passe aussi par exigerVerification ; ce
+// controle-ci garde l'application, qui n'a pas ce portier.
+function refusDeRepondre(u) {
+  if (u.role !== "prestataire" || u.est_admin) {
+    return {
+      code: 403,
       titre: "Acces refuse",
-      texte: "Seules les personnes qui proposent leurs services peuvent répondre.",
-      liens: [{ url: "/annonces", texte: "Retour aux demandes" }],
-    });
+      texte: "Seules les personnes qui proposent leurs services peuvent répondre à une demande.",
+      lien: { url: "/annonces", texte: "Retour aux demandes" },
+    };
   }
-
-  const annonce = requetes.annonceParId.get(Number(req.params.annonceId));
-
-  if (!annonce) {
-    return res.status(404).render("message", {
-      titre: "Demande introuvable",
-      texte: "Cette demande n'existe plus.",
-      liens: [{ url: "/annonces", texte: "Retour aux demandes" }],
-    });
+  if (u.statut_verification !== "verifie") {
+    return {
+      code: 403,
+      titre: "Vérification requise",
+      texte: texteVerificationRequise(u.role),
+      lien: { url: "/verification", texte: "Faire vérifier mon identité" },
+    };
   }
+  return null;
+}
+
+const DEMANDE_DISPARUE = {
+  code: 404,
+  titre: "Demande introuvable",
+  texte: "Cette demande n'existe plus.",
+  lien: { url: "/annonces", texte: "Retour aux demandes" },
+};
+
+function problemeDemandeFermee(annonceId) {
+  const ecran = ecranDemandeFermee(annonceId);
+  return { code: 410, titre: ecran.titre, texte: ecran.texte, lien: ecran.liens[0] };
+}
+
+// CE QUE CETTE REPONSE VA COUTER, avant de s'engager. La meme regle que
+// pour la commission : on ne decouvre pas le prix apres.
+function ecranPourRepondre(u, annonceId) {
+  const refus = refusDeRepondre(u);
+  if (refus) return { probleme: refus };
+
+  const annonce = requetes.annonceParId.get(annonceId);
+  if (!annonce) return { probleme: DEMANDE_DISPARUE };
 
   // La demande a ete retiree par son employeur. Elle n'apparait plus dans
   // la liste, mais quelqu'un peut avoir garde l'adresse ouverte.
-  if (annonceFermee(annonce)) {
-    return res.status(410).render("message", ecranDemandeFermee(annonce.id));
-  }
+  if (annonceFermee(annonce)) return { probleme: problemeDemandeFermee(annonce.id) };
 
-  // CE QUE CETTE REPONSE VA COUTER, avant de s'engager. La meme regle
-  // que pour la commission : on ne decouvre pas le prix apres.
-  mettreAJourLesJetons(req.utilisateur);
+  mettreAJourLesJetons(u);
 
-  const cout = parametreNombre("cout_candidature");
-  const solde = soldeJetonsDe(req.utilisateur.id);
-  const envoyees = requetes.candidaturesRecentes.get(req.utilisateur.id).n;
   const limite = parametreNombre("candidatures_par_jour");
+  const envoyees = requetes.candidaturesRecentes.get(u.id).n;
 
-  res.render("repondre", {
-    reputationEmployeur: reputationDe(annonce.employeur_id),
-    titre: "Répondre à cette demande",
+  return {
     annonce,
-    cout,
-    solde: solde.total,
-    restantAujourdhui: limite === null ? null : Math.max(0, limite - envoyees),
+    reputationEmployeur: reputationDe(annonce.employeur_id),
+    cout: parametreNombre("cout_candidature"),
+    solde: soldeJetonsDe(u.id).total,
     limite,
-  });
-});
+    restantAujourdhui: limite === null ? null : Math.max(0, limite - envoyees),
+  };
+}
 
-app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (req, res) => {
-  if (req.utilisateur.role !== "prestataire") {
-    return res.status(403).render("message", {
-      titre: "Acces refuse",
-      texte: "Seules les personnes qui proposent leurs services peuvent répondre à une demande.",
-      liens: [{ url: "/annonces", texte: "Retour aux demandes" }],
-    });
-  }
+function envoyerReponse(u, annonceId) {
+  const refus = refusDeRepondre(u);
+  if (refus) return { probleme: refus };
 
-  const annonce = requetes.annonceParId.get(Number(req.body.annonceId));
-
-  if (!annonce) {
-    return res.status(404).render("message", {
-      titre: "Demande introuvable",
-      texte: "Cette demande n'existe plus.",
-      liens: [{ url: "/annonces", texte: "Retour aux demandes" }],
-    });
-  }
+  const annonce = requetes.annonceParId.get(annonceId);
+  if (!annonce) return { probleme: DEMANDE_DISPARUE };
 
   // Une reponse precedente existe peut-etre. Trois cas, trois suites
-  // differentes - et un seul d'entre eux etait traite jusqu'ici.
+  // differentes.
   //
   // Ce controle passe AVANT celui de la fermeture : accepter quelqu'un
   // ferme la demande, et la personne choisie serait sinon renvoyee vers
   // un ecran qui ne la concerne pas.
-  const deja = requetes.maCandidaturePour.get(annonce.id, req.utilisateur.id);
+  const deja = requetes.maCandidaturePour.get(annonce.id, u.id);
 
   if (deja && deja.statut === "acceptee") {
-    return res.status(409).render("message", {
-      titre: "Vous avez déjà été choisie",
-      texte: "L'employeur vous a retenue pour cette demande.",
-      liens: [{ url: "/messages/" + deja.id, texte: "Ouvrir la discussion" }],
-    });
+    return {
+      probleme: {
+        code: 409,
+        titre: "Vous avez déjà été choisie",
+        texte: "L'employeur vous a retenue pour cette demande.",
+        lien: { url: "/messages/" + deja.id, texte: "Ouvrir la discussion" },
+      },
+    };
   }
 
-  // La demande a ete fermee. Elle n'apparait plus dans la liste, mais
-  // quelqu'un peut avoir garde l'adresse ouverte.
-  if (annonceFermee(annonce)) {
-    return res.status(410).render("message", ecranDemandeFermee(annonce.id));
-  }
+  if (annonceFermee(annonce)) return { probleme: problemeDemandeFermee(annonce.id) };
 
   if (deja && deja.statut === "en attente") {
-    return res.status(409).render("message", {
-      titre: "Candidature déjà envoyée",
-      texte: "Vous avez déjà répondu à cette demande. Elle attend la décision " +
-             "de l'employeur.",
-      liens: [{ url: "/mes-reponses", texte: "Voir mes candidatures" }],
-    });
+    return {
+      probleme: {
+        code: 409,
+        titre: "Candidature déjà envoyée",
+        texte: "Vous avez déjà répondu à cette demande. Elle attend la décision " +
+               "de l'employeur.",
+        lien: { url: "/mes-reponses", texte: "Voir mes candidatures" },
+      },
+    };
   }
 
   // ------------------------------------------------------------------
@@ -4336,39 +4346,44 @@ app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (
 
   // Les jetons offerts arrivent ou expirent ici aussi : quelqu'un peut
   // repondre sans jamais avoir ouvert sa page de jetons.
-  mettreAJourLesJetons(req.utilisateur);
+  mettreAJourLesJetons(u);
 
   // LA LIMITE DU JOUR PASSE AVANT LE SOLDE. Une personne qui a beaucoup
   // de jetons doit lire qu'elle a atteint la limite, pas qu'elle peut
   // payer - sinon la limite ressemble a un probleme d'argent.
   const limite = parametreNombre("candidatures_par_jour");
-  const envoyees = requetes.candidaturesRecentes.get(req.utilisateur.id).n;
+  const envoyees = requetes.candidaturesRecentes.get(u.id).n;
 
   if (limite !== null && envoyees >= limite) {
-    const quand = requetes.prochaineReponsePossible.get(req.utilisateur.id);
+    const quand = requetes.prochaineReponsePossible.get(u.id);
     const heures = heuresAvant(quand && quand.quand);
 
-    return res.status(429).render("message", {
-      titre: "Vous avez atteint la limite du jour",
-      texte: `Vous pouvez envoyer ${limite} réponses par tranche de 24 heures. ` +
-             `Cette limite protège les employeurs : elle évite qu'une même ` +
-             `personne réponde à tout sans avoir regardé.` +
-             (heures ? ` Vous pourrez répondre à nouveau dans ${heures} heure${heures > 1 ? "s" : ""}.` : ""),
-      liens: [{ url: "/annonces", texte: "Revenir aux demandes" }],
-    });
+    return {
+      probleme: {
+        code: 429,
+        titre: "Vous avez atteint la limite du jour",
+        texte: `Vous pouvez envoyer ${limite} réponses par tranche de 24 heures. ` +
+               `Cette limite protège les employeurs : elle évite qu'une même ` +
+               `personne réponde à tout sans avoir regardé.` +
+               (heures ? ` Vous pourrez répondre à nouveau dans ${heures} heure${heures > 1 ? "s" : ""}.` : ""),
+        lien: { url: "/annonces", texte: "Revenir aux demandes" },
+      },
+    };
   }
 
   const cout = parametreNombre("cout_candidature");
-  const solde = soldeJetonsDe(req.utilisateur.id);
-
-  if (cout !== null && solde.total < cout) {
-    return res.status(402).render("message", {
+  const solde = soldeJetonsDe(u.id);
+  const manqueDeJetons = (avecReste) => ({
+    probleme: {
+      code: 402,
       titre: "Il vous manque des jetons",
-      texte: `Répondre à une demande coûte ${jetonsEnClair(cout)}. ` +
-             `Il vous reste ${jetonsEnClair(solde.total)}.`,
-      liens: [{ url: "/mes-jetons", texte: "Voir mes jetons" }],
-    });
-  }
+      texte: `Répondre à une demande coûte ${jetonsEnClair(cout)}.` +
+             (avecReste ? ` Il vous reste ${jetonsEnClair(solde.total)}.` : ""),
+      lien: { url: "/mes-jetons", texte: "Voir mes jetons" },
+    },
+  });
+
+  if (cout !== null && solde.total < cout) return manqueDeJetons(true);
 
   const detail = `Réponse à la demande : ${annonce.titre}`;
 
@@ -4380,7 +4395,7 @@ app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (
     // passee plus haut. Refuser quelqu'un ne ferme pas la demande aux
     // autres : rien ne justifiait de la fermer a elle pour toujours.
     const renvoyer = db.transaction(() => {
-      if (cout && !depenserJetons(req.utilisateur, cout, "candidature", detail, annonce.id)) {
+      if (cout && !depenserJetons(u, cout, "candidature", detail, annonce.id)) {
         return false;
       }
       requetes.rouvrirCandidature.run({ id: deja.id });
@@ -4388,31 +4403,28 @@ app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (
       return true;
     });
 
-    if (!renvoyer()) {
-      return res.status(402).render("message", {
-        titre: "Il vous manque des jetons",
-        texte: `Répondre à une demande coûte ${jetonsEnClair(cout)}.`,
-        liens: [{ url: "/mes-jetons", texte: "Voir mes jetons" }],
-      });
-    }
+    if (!renvoyer()) return manqueDeJetons(false);
 
-    return res.render("message", {
+    return {
+      ok: true,
+      candidatureId: deja.id,
       titre: "Candidature renvoyée",
       texte: "Votre réponse a été renvoyée à cet employeur. Votre discussion " +
              "précédente est conservée." +
              (cout ? ` ${jetonsEnClair(cout)} a été prélevé.` : ""),
       liens: [{ url: "/messages/" + deja.id, texte: "Ouvrir la discussion" }],
-    });
+    };
   }
 
   // LE JETON N'EST PRELEVE QUE SI LA REPONSE PART. La creation et le
   // prelevement sont indivisibles : une reponse enregistree sans jeton
   // preleve serait gratuite, un jeton preleve sans reponse serait un vol.
+  let candidatureId;
   try {
     const envoyer = db.transaction(() => {
-      const creee = requetes.creerCandidature.run(annonce.id, req.utilisateur.id);
+      const creee = requetes.creerCandidature.run(annonce.id, u.id);
 
-      if (cout && !depenserJetons(req.utilisateur, cout, "candidature", detail, annonce.id)) {
+      if (cout && !depenserJetons(u, cout, "candidature", detail, annonce.id)) {
         // La transaction sera annulee par l'exception : la candidature
         // qui vient d'etre creee disparait avec elle.
         throw new Error("SOLDE_INSUFFISANT");
@@ -4421,32 +4433,31 @@ app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (
       return creee;
     });
 
-    envoyer();
+    candidatureId = Number(envoyer().lastInsertRowid);
   } catch (erreur) {
-    if (String(erreur.message) === "SOLDE_INSUFFISANT") {
-      return res.status(402).render("message", {
-        titre: "Il vous manque des jetons",
-        texte: `Répondre à une demande coûte ${jetonsEnClair(cout)}.`,
-        liens: [{ url: "/mes-jetons", texte: "Voir mes jetons" }],
-      });
-    }
+    if (String(erreur.message) === "SOLDE_INSUFFISANT") return manqueDeJetons(false);
 
     // La contrainte UNIQUE reste le dernier rempart : deux envois
     // simultanes passeraient tous deux le controle ci-dessus.
     if (String(erreur.message).includes("UNIQUE")) {
-      return res.status(409).render("message", {
-        titre: "Candidature déjà envoyée",
-        texte: "Vous avez déjà répondu à cette demande.",
-        liens: [{ url: "/mes-reponses", texte: "Voir mes candidatures" }],
-      });
+      return {
+        probleme: {
+          code: 409,
+          titre: "Candidature déjà envoyée",
+          texte: "Vous avez déjà répondu à cette demande.",
+          lien: { url: "/mes-reponses", texte: "Voir mes candidatures" },
+        },
+      };
     }
 
     throw erreur;
   }
 
-  const reste = soldeJetonsDe(req.utilisateur.id).total;
+  const reste = soldeJetonsDe(u.id).total;
 
-  res.render("message", {
+  return {
+    ok: true,
+    candidatureId,
     titre: "Réponse envoyée",
     texte: "Votre réponse a bien été enregistrée." +
            (cout ? ` ${jetonsEnClair(cout)} a été prélevé. Il vous reste ${jetonsEnClair(reste)}.` : ""),
@@ -4454,7 +4465,29 @@ app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (
       { url: "/annonces", texte: "Retour aux demandes" },
       { url: "/mes-jetons", texte: "Voir mes jetons" },
     ],
+  };
+}
+
+app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, exigerVerification, (req, res) => {
+  const ecran = ecranPourRepondre(req.utilisateur, Number(req.params.annonceId));
+  if (ecran.probleme) return afficherProbleme(res, ecran.probleme);
+
+  res.render("repondre", {
+    reputationEmployeur: ecran.reputationEmployeur,
+    titre: "Répondre à cette demande",
+    annonce: ecran.annonce,
+    cout: ecran.cout,
+    solde: ecran.solde,
+    restantAujourdhui: ecran.restantAujourdhui,
+    limite: ecran.limite,
   });
+});
+
+app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (req, res) => {
+  const resultat = envoyerReponse(req.utilisateur, Number(req.body.annonceId));
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
+  res.render("message", { titre: resultat.titre, texte: resultat.texte, liens: resultat.liens });
 });
 
 // --- Accepter ou refuser une candidature ---------------------------
@@ -6741,6 +6774,8 @@ app.get("/api/demandes", (req, res) => {
     prix: a.prix,
     uniteTarif: a.unite_tarif,
     dureeEstimee: a.duree_estimee,
+    // Ce qu'il faut savoir avant de venir : la carte du site le montre.
+    conditions: a.conditions || null,
     // LA MEME MISE EN FORME QUE LES PAGES. prixEnClair est la
     // fonction dont les vues se servent deja : l'application n'a pas a
     // savoir comment on ecrit des francs CFA, et il n'existe qu'une
@@ -7436,6 +7471,74 @@ app.get("/api/recherche", (req, res) => {
     })),
     peutPublier: Boolean(moi.role === "employeur" && !moi.est_admin),
   });
+});
+
+// --- Repondre a une demande depuis l'application ----------------------
+//
+// Les montants et les jetons arrivent deja ecrits : l'application ne
+// recalcule ni la commission, ni le solde apres l'envoi.
+app.get("/api/demandes/:id/reponse", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const ecran = ecranPourRepondre(moi, Number(req.params.id));
+  if (ecran.probleme) return erreurApi(res, ecran.probleme.code, ecran.probleme.texte);
+
+  const { annonce, reputationEmployeur, cout, solde, limite, restantAujourdhui } = ecran;
+  const detail = detaillerTarif(annonce.prix);
+  const pourcentage = Math.round(TAUX_COMMISSION * 100);
+
+  res.json({
+    demande: {
+      id: annonce.id,
+      titre: annonce.titre,
+      metier: annonce.metier || null,
+      horaire: annonce.horaire || "Horaire non précisé",
+      quartier: annonce.quartier || null,
+      arrondissement: annonce.arrondissement || null,
+      conditions: annonce.conditions || null,
+    },
+    employeur: {
+      nom: annonce.nomEmployeur,
+      verifie: annonce.verificationEmployeur === "verifie",
+      note: reputationEmployeur.nombre > 0 ? `${moyenneLisible(reputationEmployeur.moyenne)} sur 5` : null,
+      nombreAvis: reputationEmployeur.nombre,
+    },
+    prix: {
+      annonce: prixEnClair(annonce),
+      dureeEstimee: annonce.duree_estimee || null,
+      // Les lignes du bloc detail-tarif du site, vues par celle qui
+      // travaillera : ce que l'employeur paie, la commission, ce qu'elle
+      // recevra.
+      lignes: detail.brut > 0
+        ? [
+            { libelle: "L'employeur paie", montant: formaterMontant(detail.brut), retenue: false, total: false },
+            { libelle: `Commission PamConnect (${pourcentage} %)`,
+              montant: "− " + formaterMontant(detail.commission), retenue: true, total: false },
+            { libelle: "Vous recevez", montant: formaterMontant(detail.net), retenue: false, total: true },
+          ]
+        : [],
+    },
+    cout: cout
+      ? {
+          envoyer: "− " + jetonsEnClair(cout),
+          reste: jetonsEnClair(Math.max(0, solde - cout)),
+          soldeInsuffisant: solde < cout,
+          solde: jetonsEnClair(solde),
+        }
+      : null,
+    limite: limite ? { parJour: limite, restant: restantAujourdhui } : null,
+  });
+});
+
+app.post("/api/demandes/:id/reponse", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const resultat = envoyerReponse(moi, Number(req.params.id));
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.status(201).json({ texte: resultat.texte, candidatureId: resultat.candidatureId });
 });
 
 // --- La fiche d'une personne depuis l'application -------------------
