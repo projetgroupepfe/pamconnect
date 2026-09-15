@@ -26,6 +26,10 @@ import 'theme.dart';
 //   recherche      Icons.search                  document   Icons.insert_drive_file_outlined
 //   email          Icons.mail_outline            jeton      Icons.toll_outlined
 //   signaler       Icons.flag_outlined           modifier   Icons.edit_outlined
+//   maison         Icons.home_outlined           menage     Icons.auto_awesome_outlined
+//   enfants        Icons.sentiment_satisfied_outlined
+//   gardien        Icons.shield_outlined         jardin     Icons.eco_outlined
+//   cuisine        Icons.restaurant
 
 /// "Vous avez 3 jetons, dont 3 offerts."
 ///
@@ -467,6 +471,82 @@ class ChampAvecSuggestions extends StatelessWidget {
     );
   }
 }
+
+/// Une information, sans erreur : en bleu, comme .badge-info du site. Par
+/// exemple, pourquoi un bouton ramene a la connexion.
+class Information extends StatelessWidget {
+  const Information({super.key, required this.texte});
+
+  final String texte;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Couleurs.bleuClair,
+          borderRadius: BorderRadius.circular(rayon),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.info_outline, color: Couleurs.bleu),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(texte, style: const TextStyle(color: Couleurs.bleu)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Un exemple de calcul, comme le cadre "exemple" du site : fond orange
+/// clair, son nom en tete pour qu'on le lise comme un exemple, et les
+/// montants en orange.
+class CadreExemple extends StatelessWidget {
+  const CadreExemple({super.key, required this.morceaux});
+
+  final List<InlineSpan> morceaux;
+
+  @override
+  Widget build(BuildContext context) {
+    final texte = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Couleurs.orangeClair,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'EXEMPLE DE CALCUL',
+            style: texte.labelMedium?.copyWith(
+              color: Couleurs.orange,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text.rich(
+            TextSpan(children: morceaux),
+            style: texte.bodyMedium?.copyWith(color: Couleurs.encre),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Un montant dans un exemple : en orange et en gras, comme ses strong.
+TextSpan montantExemple(String texte) =>
+    TextSpan(text: texte, style: const TextStyle(color: Couleurs.orange, fontWeight: FontWeight.w700));
 
 /// Des lignes de montants, comme le bloc detail-tarif du site : le meme
 /// cadre au fond clair, les montants en gras et en noir, la commission en

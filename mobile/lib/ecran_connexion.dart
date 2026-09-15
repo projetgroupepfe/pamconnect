@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'ecran_accueil.dart';
 import 'ecran_modifier_profil.dart';
 import 'ecran_principal.dart';
 import 'elements.dart';
@@ -57,6 +58,9 @@ class _EcranConnexionState extends State<EcranConnexion> {
   /// La phrase du site une fois le compte cree.
   String? _confirmation;
 
+  /// Pourquoi un bouton des pages de presentation ramene ici.
+  String? _information;
+
   @override
   void dispose() {
     _adresse.dispose();
@@ -71,6 +75,7 @@ class _EcranConnexionState extends State<EcranConnexion> {
       _enCours = true;
       _message = null;
       _confirmation = null;
+      _information = null;
     });
 
     final api = ApiPamConnect(_adresse.text);
@@ -107,24 +112,64 @@ class _EcranConnexionState extends State<EcranConnexion> {
     }
   }
 
-  /// Creer un compte ne demande ici que l'adresse du serveur : l'email et le
-  /// mot de passe se choisissent dans le formulaire. Une fois le compte cree,
-  /// l'adresse revient remplie, il ne reste que le mot de passe a taper.
-  Future<void> _creerUnCompte() async {
-    if (_enCours || !_champAdresse.currentState!.validate()) return;
+  /// Creer un compte et Decouvrir PamConnect ne demandent ici que l'adresse
+  /// du serveur : le reste se choisit plus loin.
+  bool _adresseValide() {
+    if (_enCours || !_champAdresse.currentState!.validate()) return false;
     setState(() {
       _message = null;
       _confirmation = null;
+      _information = null;
     });
+    return true;
+  }
 
+  Future<void> _creerUnCompte() async {
+    if (_adresseValide()) await _ouvrirInscription();
+  }
+
+  /// Une fois le compte cree, on revient ici, meme depuis l'accueil :
+  /// l'adresse revient remplie, il ne reste que le mot de passe a taper.
+  Future<void> _ouvrirInscription({bool proposerSesServices = false}) async {
     final faite = await Navigator.of(context).push<InscriptionFaite>(
-      MaterialPageRoute(builder: (_) => EcranModifierProfil.inscription(api: ApiPamConnect(_adresse.text))),
+      MaterialPageRoute(
+        builder: (_) => EcranModifierProfil.inscription(
+          api: ApiPamConnect(_adresse.text),
+          proposerSesServices: proposerSesServices,
+        ),
+      ),
     );
     if (!mounted || faite == null) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
     setState(() {
       _email.text = faite.email;
       _motdepasse.clear();
       _confirmation = '${faite.titre} ${faite.texte}';
+    });
+  }
+
+  /// L'accueil du site et ses deux pages, avant tout compte.
+  void _decouvrir() {
+    if (!_adresseValide()) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EcranAccueil(
+          api: ApiPamConnect(_adresse.text),
+          seConnecter: _revenirAvecInformation,
+          proposerSesServices: () => _ouvrirInscription(proposerSesServices: true),
+        ),
+      ),
+    );
+  }
+
+  /// Un bouton des pages de presentation qui, sur le site, ouvre un ecran
+  /// sans compte : ici, il ramene a la connexion en disant pourquoi.
+  void _revenirAvecInformation(String information) {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    setState(() {
+      _message = null;
+      _confirmation = null;
+      _information = information;
     });
   }
 
@@ -162,6 +207,10 @@ class _EcranConnexionState extends State<EcranConnexion> {
                   ],
                   if (_confirmation != null) ...[
                     Confirmation(texte: _confirmation!),
+                    const SizedBox(height: 16),
+                  ],
+                  if (_information != null) ...[
+                    Information(texte: _information!),
                     const SizedBox(height: 16),
                   ],
                   TextFormField(
@@ -221,6 +270,14 @@ class _EcranConnexionState extends State<EcranConnexion> {
                     onPressed: _enCours ? null : _creerUnCompte,
                     style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                     child: const Text('Créer un compte'),
+                  ),
+                  const SizedBox(height: 8),
+                  // L'entree Accueil du site : ce qu'est PamConnect, avant tout compte.
+                  OutlinedButton.icon(
+                    onPressed: _enCours ? null : _decouvrir,
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                    icon: const Icon(Icons.home_outlined),
+                    label: const Text('Découvrir PamConnect'),
                   ),
                 ],
               ),

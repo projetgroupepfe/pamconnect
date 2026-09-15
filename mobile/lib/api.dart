@@ -164,6 +164,12 @@ class ApiPamConnect {
     return _interpreter(() => MonProfil.depuisJson(donnees));
   }
 
+  /// Les chiffres des pages de presentation. Aucune session.
+  Future<Presentation> presentation() async {
+    final donnees = await _appeler('/api/presentation');
+    return _interpreter(() => Presentation.depuisJson(donnees));
+  }
+
   /// Creer un compte. Aucune session : le compte n'existe pas encore.
   Future<FormulaireInscription> formulaireInscription() async {
     final donnees = await _appeler('/api/inscription');

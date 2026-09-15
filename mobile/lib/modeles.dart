@@ -1571,6 +1571,24 @@ class InscriptionFaite {
   final String email;
 }
 
+/// Les chiffres des pages de presentation, calcules par le serveur : la
+/// commission et l'exemple de calcul.
+class Presentation {
+  const Presentation({required this.pourcentageCommission, required this.exempleTarif});
+
+  factory Presentation.depuisJson(Map<String, dynamic> json) {
+    final exemple = _lireObjet(json, 'exempleTarif', ExempleTarif.depuisJson);
+    if (exemple == null) throw const FormeInattendue('exempleTarif');
+    return Presentation(
+      pourcentageCommission: _lire<int>(json, 'pourcentageCommission'),
+      exempleTarif: exemple,
+    );
+  }
+
+  final int pourcentageCommission;
+  final ExempleTarif exempleTarif;
+}
+
 /// La reponse a un changement d'adresse : la phrase et la nouvelle adresse.
 class AdresseChangee {
   const AdresseChangee({required this.texte, required this.email});

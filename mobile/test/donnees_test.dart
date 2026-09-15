@@ -794,6 +794,24 @@ void main() {
         throwsA(isA<FormeInattendue>()));
   });
 
+  test('les pages de presentation lisent la commission et l exemple du serveur', () {
+    final lu = Presentation.depuisJson({
+      'pourcentageCommission': 1,
+      'exempleTarif': {'prix': 'prix 2', 'commission': 'commission 3', 'recu': 'recu 4'},
+    });
+    expect(lu.pourcentageCommission, 1);
+    expect(lu.exempleTarif.commission, 'commission 3');
+    expect(() => Presentation.depuisJson({'pourcentageCommission': 1}), throwsA(isA<FormeInattendue>()));
+  });
+
+  testWidgets('un exemple de calcul porte son nom en tete', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: CadreExemple(morceaux: [montantExemple('montant 1')])),
+    ));
+    expect(find.text('EXEMPLE DE CALCUL'), findsOneWidget);
+    expect(find.textContaining('montant 1', findRichText: true), findsOneWidget);
+  });
+
   test('Mon compte se lit tel que le serveur l ecrit', () {
     final lu = MonCompte.depuisJson({
       'jeSuisEmployeur': true,

@@ -31,14 +31,21 @@ const _nomsDesMois = [
 /// Sur le site, le navigateur peut aussi donner la position. L'application
 /// ne la demande pas : le serveur garde celle qu'il connait.
 class EcranModifierProfil extends StatefulWidget {
-  const EcranModifierProfil({super.key, required this.api}) : pourInscription = false;
+  const EcranModifierProfil({super.key, required this.api})
+      : pourInscription = false,
+        proposerSesServices = false;
 
-  const EcranModifierProfil.inscription({super.key, required this.api}) : pourInscription = true;
+  const EcranModifierProfil.inscription({super.key, required this.api, this.proposerSesServices = false})
+      : pourInscription = true;
 
   final ApiPamConnect api;
 
   /// Creer un compte plutot que modifier le sien.
   final bool pourInscription;
+
+  /// Ouvrir Creer un compte sur le choix de la personne qui repond, comme
+  /// "Proposer mes services" sur le site.
+  final bool proposerSesServices;
 
   @override
   State<EcranModifierProfil> createState() => _EcranModifierProfilState();
@@ -116,8 +123,15 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
       setState(() {
         _formulaire = formulaire;
         _inscription = inscription;
-        // Le premier choix, comme la liste du site a l'ouverture de la page.
-        if (inscription != null) _role ??= inscription.roles.first.valeur;
+        // Le premier choix de la liste, comme sur le site, sauf si l'on vient
+        // de "Proposer mes services".
+        if (inscription != null) {
+          final roles = inscription.roles;
+          _role ??= (widget.proposerSesServices
+                  ? roles.firstWhere((role) => role.pourPersonne, orElse: () => roles.first)
+                  : roles.first)
+              .valeur;
+        }
         _erreurChargement = null;
         _nom.text = formulaire.nom;
         _experience.text = formulaire.experienceAnnees;
@@ -557,7 +571,12 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
         ),
       const SizedBox(height: 8),
       OutlinedButton(
-        onPressed: _envoi ? null : () => Navigator.of(context).pop(),
+        // J'ai deja un compte mene a la connexion, meme depuis l'accueil.
+        onPressed: _envoi
+            ? null
+            : () => inscription == null
+                ? Navigator.of(context).pop()
+                : Navigator.of(context).popUntil((route) => route.isFirst),
         style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         child: Text(inscription == null ? 'Annuler' : "J'ai déjà un compte"),
       ),
@@ -688,9 +707,8 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
   }
 }
 
-/// L'exemple sous le tarif, comme le paragraphe "exemple" de la page
-/// inscription du site : fond orange clair, montants en orange. Les montants
-/// viennent du serveur.
+/// L'exemple sous le tarif, comme le cadre "exemple" de la page inscription
+/// du site. Les montants viennent du serveur.
 class _ExempleDeTarif extends StatelessWidget {
   const _ExempleDeTarif({required this.exemple});
 
@@ -698,30 +716,19 @@ class _ExempleDeTarif extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const montant = TextStyle(color: Couleurs.orange, fontWeight: FontWeight.w700);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Couleurs.orangeClair,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text.rich(
-        TextSpan(
-          children: [
-            const TextSpan(
-              text: 'Ce tarif est indicatif. Le montant réellement reçu dépend de la demande '
-                  'à laquelle vous répondez : pour une demande à ',
-            ),
-            TextSpan(text: exemple.prix, style: montant),
-            const TextSpan(text: ', la commission est de '),
-            TextSpan(text: exemple.commission, style: montant),
-            const TextSpan(text: ' et vous recevez '),
-            TextSpan(text: exemple.recu, style: montant),
-            const TextSpan(text: '.'),
-          ],
+    return CadreExemple(
+      morceaux: [
+        const TextSpan(
+          text: 'Ce tarif est indicatif. Le montant réellement reçu dépend de la demande '
+              'à laquelle vous répondez : pour une demande à ',
         ),
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encre),
-      ),
+        montantExemple(exemple.prix),
+        const TextSpan(text: ', la commission est de '),
+        montantExemple(exemple.commission),
+        const TextSpan(text: ' et vous recevez '),
+        montantExemple(exemple.recu),
+        const TextSpan(text: '.'),
+      ],
     );
   }
 }
