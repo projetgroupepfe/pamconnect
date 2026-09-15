@@ -116,7 +116,6 @@ class _EcranMonCompteState extends State<EcranMonCompte> {
   List<Widget> _versementsRecus(BuildContext context, MonCompte compte) {
     final texte = Theme.of(context).textTheme;
     final aide = texte.bodyMedium?.copyWith(color: Couleurs.encrePale);
-    const fort = TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre);
     final total = compte.totalRecu;
 
     return [
@@ -128,14 +127,8 @@ class _EcranMonCompteState extends State<EcranMonCompte> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (total != null)
-                Row(
-                  children: [
-                    const Expanded(child: Text('Total reçu', style: fort)),
-                    Text(
-                      total,
-                      style: texte.titleMedium?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600),
-                    ),
-                  ],
+                DetailMontants(
+                  lignes: [LigneTarif(libelle: 'Total reçu', montant: total, retenue: false, total: true)],
                 ),
               const SizedBox(height: 8),
               Text.rich(

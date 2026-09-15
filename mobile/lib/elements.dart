@@ -441,35 +441,55 @@ class ChampAvecSuggestions extends StatelessWidget {
   }
 }
 
-/// Des lignes de montants, comme le bloc detail-tarif du site : la
-/// commission en retrait, le total sous un trait.
+/// Des lignes de montants, comme le bloc detail-tarif du site : le meme
+/// cadre au fond clair, les montants en gras et en noir, la commission en
+/// orange, le total sous un trait.
+///
+/// [suite] ajoute d'autres lignes dans le meme cadre, par exemple les deux
+/// parts d'un solde de jetons.
 class DetailMontants extends StatelessWidget {
-  const DetailMontants({super.key, required this.lignes});
+  const DetailMontants({super.key, required this.lignes, this.suite = const []});
 
   final List<LigneTarif> lignes;
+  final List<Widget> suite;
 
   @override
   Widget build(BuildContext context) {
-    final gris = Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encreDouce);
-    const fort = TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre);
+    final texte = Theme.of(context).textTheme;
+    final libelle = texte.bodyMedium?.copyWith(color: Couleurs.encre);
+    final montant = texte.bodyLarge?.copyWith(color: Couleurs.encre, fontWeight: FontWeight.w600);
+    final retenue = texte.bodyMedium?.copyWith(color: Couleurs.orange, fontWeight: FontWeight.w600);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final ligne in lignes)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: ligne.total
-                ? const BoxDecoration(border: Border(top: BorderSide(color: Couleurs.trait)))
-                : null,
-            child: Row(
-              children: [
-                Expanded(child: Text(ligne.libelle, style: ligne.total ? fort : gris)),
-                Text(ligne.montant, style: ligne.retenue ? gris : fort),
-              ],
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+      decoration: BoxDecoration(
+        color: Couleurs.fond,
+        border: Border.all(color: Couleurs.trait),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final ligne in lignes)
+            Container(
+              margin: EdgeInsets.only(top: ligne.total ? 6 : 0),
+              padding: EdgeInsets.only(top: ligne.total ? 10 : 4, bottom: 4),
+              decoration: ligne.total
+                  ? const BoxDecoration(border: Border(top: BorderSide(color: Couleurs.trait)))
+                  : null,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: Text(ligne.libelle, style: libelle)),
+                  const SizedBox(width: 12),
+                  Text(ligne.montant, style: ligne.retenue ? retenue : montant),
+                ],
+              ),
             ),
-          ),
-      ],
+          ...suite,
+        ],
+      ),
     );
   }
 }

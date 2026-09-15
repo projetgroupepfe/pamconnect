@@ -329,7 +329,6 @@ class _CarteSolde extends StatelessWidget {
     final texte = Theme.of(context).textTheme;
     final aide = texte.bodyMedium?.copyWith(color: Couleurs.encrePale);
     final petit = texte.bodySmall?.copyWith(color: Couleurs.encrePale);
-    const fort = TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre);
     final expireLe = jetons.expireLe;
 
     return Card(
@@ -338,29 +337,29 @@ class _CarteSolde extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                const Expanded(child: Text('Votre solde', style: fort)),
-                Flexible(
-                  child: Text(
-                    jetons.soldeTotal,
-                    textAlign: TextAlign.end,
-                    style: texte.titleSmall?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600),
+            // Le meme cadre que sur le site : le solde en gras et en noir, les
+            // deux parts en dessous.
+            DetailMontants(
+              lignes: [LigneTarif(libelle: 'Votre solde', montant: jetons.soldeTotal, retenue: false, total: true)],
+              suite: [
+                if (jetons.offerts > 0)
+                  _LigneSolde(
+                    libelle: 'Jetons offerts',
+                    precision: expireLe == null
+                        ? 'Offerts à la vérification de votre compte'
+                        : 'Offerts à la vérification de votre compte, à utiliser avant le $expireLe',
+                    nombre: jetons.offerts,
+                    style: petit,
                   ),
-                ),
+                if (jetons.achetes > 0)
+                  _LigneSolde(
+                    libelle: 'Jetons achetés',
+                    precision: 'Sans date limite',
+                    nombre: jetons.achetes,
+                    style: petit,
+                  ),
               ],
             ),
-            if (jetons.offerts > 0)
-              _LigneSolde(
-                libelle: 'Jetons offerts',
-                precision: expireLe == null
-                    ? 'Offerts à la vérification de votre compte'
-                    : 'Offerts à la vérification de votre compte, à utiliser avant le $expireLe',
-                nombre: jetons.offerts,
-                style: petit,
-              ),
-            if (jetons.achetes > 0)
-              _LigneSolde(libelle: 'Jetons achetés', precision: 'Sans date limite', nombre: jetons.achetes, style: petit),
             if (jetons.soldeVide) ...[
               const SizedBox(height: 12),
               // Une personne non verifiee n'a rien a acheter tout de suite :
@@ -396,9 +395,9 @@ class _LigneSolde extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gris = Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encreDouce);
+    final encre = Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encre);
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.only(top: 6, bottom: 2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -406,13 +405,13 @@ class _LigneSolde extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(libelle, style: gris),
+                Text(libelle, style: encre),
                 Text(precision, style: style),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          Text('$nombre', style: gris),
+          Text('$nombre', style: encre),
         ],
       ),
     );
