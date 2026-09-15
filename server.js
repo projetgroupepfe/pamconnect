@@ -6975,12 +6975,14 @@ function prixDeLaDiscussion(conversation, jeSuisEmployeur) {
   const detail = detaillerTarif(conversation.prixAnnonce);
   return {
     lignes: [
+      // retenue et total : la commission en orange, le montant recu en vert,
+      // comme le bloc detail-tarif du site.
       { libelle: jeSuisEmployeur ? "Vous payez" : "L'employeur paie",
-        montant: formaterMontant(detail.brut), fort: true },
+        montant: formaterMontant(detail.brut), fort: true, retenue: false, total: false },
       { libelle: `Commission PamConnect (${Math.round(TAUX_COMMISSION * 100)} %)`,
-        montant: "− " + formaterMontant(detail.commission), fort: false },
+        montant: "− " + formaterMontant(detail.commission), fort: false, retenue: true, total: false },
       { libelle: jeSuisEmployeur ? `${conversation.nomPrestataire} reçoit` : "Vous recevez",
-        montant: formaterMontant(detail.net), fort: true },
+        montant: formaterMontant(detail.net), fort: true, retenue: false, total: true },
     ],
     phrase: jeSuisEmployeur
       ? "C'est le prix que vous avez annoncé dans votre demande."

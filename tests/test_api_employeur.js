@@ -470,7 +470,8 @@ setTimeout(async () => {
   dire("la phrase de statut de l'employeur", de.phraseStatut === "Vous avez accepté cette candidature", de.phraseStatut);
   dire("le prix vu par l'employeur",
        de.prix && de.prix.lignes.length === 3 && de.prix.lignes[0].libelle === "Vous payez" &&
-       de.prix.lignes[2].libelle === "Test verifiee reçoit" && de.prix.lignes[2].montant === "7 200 FCFA",
+       de.prix.lignes[2].libelle === "Test verifiee reçoit" && de.prix.lignes[2].montant === "7 200 FCFA" &&
+       de.prix.lignes[1].retenue === true && de.prix.lignes[2].total === true,
        JSON.stringify(de.prix));
   dire("aucune coordonnee ne sort", !vueEmp.brut.includes("@example.com") && !vueEmp.brut.includes("motdepasse"));
   dire("le conseil ne parle plus du prix a negocier, et l'adresse va a la personne choisie",
