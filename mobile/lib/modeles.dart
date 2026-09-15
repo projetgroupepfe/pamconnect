@@ -1498,6 +1498,79 @@ class FormulaireProfil {
   final int motDePasseMin;
 }
 
+/// Une raison de creer un compte, dans la liste fermee du serveur.
+class RoleInscription {
+  const RoleInscription({required this.valeur, required this.libelle, required this.pourPersonne});
+
+  factory RoleInscription.depuisJson(Map<String, dynamic> json) => RoleInscription(
+        valeur: _lire<String>(json, 'valeur'),
+        libelle: _lire<String>(json, 'libelle'),
+        pourPersonne: _lire<bool>(json, 'pourPersonne'),
+      );
+
+  final String valeur;
+  final String libelle;
+
+  /// Ce choix declare un metier, un tarif et des disponibilites : leurs
+  /// champs s'affichent, comme sur le site.
+  final bool pourPersonne;
+}
+
+/// Les montants de l'exemple sous le tarif, calcules par le serveur avec
+/// la commission.
+class ExempleTarif {
+  const ExempleTarif({required this.prix, required this.commission, required this.recu});
+
+  factory ExempleTarif.depuisJson(Map<String, dynamic> json) => ExempleTarif(
+        prix: _lire<String>(json, 'prix'),
+        commission: _lire<String>(json, 'commission'),
+        recu: _lire<String>(json, 'recu'),
+      );
+
+  final String prix;
+  final String commission;
+  final String recu;
+}
+
+/// Creer un compte : le formulaire de Modifier mon profil, vide, avec le
+/// choix du role et l'exemple sous le tarif.
+class FormulaireInscription {
+  const FormulaireInscription({required this.profil, required this.roles, required this.exempleTarif});
+
+  factory FormulaireInscription.depuisJson(Map<String, dynamic> json) {
+    final roles = _lireListe(json, 'roles', RoleInscription.depuisJson);
+    // Sans choix, le formulaire n'aurait rien a proposer.
+    if (roles.isEmpty) throw const FormeInattendue('roles');
+    final exemple = _lireObjet(json, 'exempleTarif', ExempleTarif.depuisJson);
+    if (exemple == null) throw const FormeInattendue('exempleTarif');
+    return FormulaireInscription(
+      profil: FormulaireProfil.depuisJson(json),
+      roles: roles,
+      exempleTarif: exemple,
+    );
+  }
+
+  final FormulaireProfil profil;
+  final List<RoleInscription> roles;
+  final ExempleTarif exempleTarif;
+}
+
+/// Le compte est cree : la phrase du site, et l'adresse a saisir pour se
+/// connecter.
+class InscriptionFaite {
+  const InscriptionFaite({required this.titre, required this.texte, required this.email});
+
+  factory InscriptionFaite.depuisJson(Map<String, dynamic> json) => InscriptionFaite(
+        titre: _lire<String>(json, 'titre'),
+        texte: _lire<String>(json, 'texte'),
+        email: _lire<String>(json, 'email'),
+      );
+
+  final String titre;
+  final String texte;
+  final String email;
+}
+
 /// La reponse a un changement d'adresse : la phrase et la nouvelle adresse.
 class AdresseChangee {
   const AdresseChangee({required this.texte, required this.email});

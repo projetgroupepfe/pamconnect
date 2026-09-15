@@ -22,12 +22,23 @@ const _nomsDesMois = [
 /// refuse, avec la phrase du site. En cas de succes, l'ecran rend cette
 /// phrase a Mon profil.
 ///
+/// CREER UN COMPTE reprend ce formulaire, vide, comme la page inscription
+/// du site reprend ses morceaux : le choix du role, l'adresse et le mot de
+/// passe s'ajoutent en haut, et les champs de la personne qui repond
+/// n'apparaissent que pour ce choix. En cas de succes, l'ecran rend
+/// l'adresse a la connexion.
+///
 /// Sur le site, le navigateur peut aussi donner la position. L'application
 /// ne la demande pas : le serveur garde celle qu'il connait.
 class EcranModifierProfil extends StatefulWidget {
-  const EcranModifierProfil({super.key, required this.api});
+  const EcranModifierProfil({super.key, required this.api}) : pourInscription = false;
+
+  const EcranModifierProfil.inscription({super.key, required this.api}) : pourInscription = true;
 
   final ApiPamConnect api;
+
+  /// Creer un compte plutot que modifier le sien.
+  final bool pourInscription;
 
   @override
   State<EcranModifierProfil> createState() => _EcranModifierProfilState();
@@ -36,6 +47,12 @@ class EcranModifierProfil extends StatefulWidget {
 class _EcranModifierProfilState extends State<EcranModifierProfil> {
   FormulaireProfil? _formulaire;
   String? _erreurChargement;
+
+  // Creer un compte seulement : le choix du role, l'adresse et le mot de passe.
+  FormulaireInscription? _inscription;
+  String? _role;
+  final _email = TextEditingController();
+  final _motdepasse = TextEditingController();
 
   final _nom = TextEditingController();
   final _experience = TextEditingController();
@@ -77,7 +94,7 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
   void dispose() {
     _attenteQuartier?.cancel();
     _attenteTarif?.cancel();
-    for (final controleur in [_nom, _experience, _tarif]) {
+    for (final controleur in [_nom, _experience, _tarif, _email, _motdepasse]) {
       controleur.dispose();
     }
     super.dispose();
@@ -85,10 +102,22 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
 
   Future<void> _charger() async {
     try {
-      final formulaire = await widget.api.formulaireProfil();
+      final FormulaireInscription? inscription;
+      final FormulaireProfil formulaire;
+      if (widget.pourInscription) {
+        final lu = await widget.api.formulaireInscription();
+        inscription = lu;
+        formulaire = lu.profil;
+      } else {
+        inscription = null;
+        formulaire = await widget.api.formulaireProfil();
+      }
       if (!mounted) return;
       setState(() {
         _formulaire = formulaire;
+        _inscription = inscription;
+        // Le premier choix, comme la liste du site a l'ouverture de la page.
+        if (inscription != null) _role ??= inscription.roles.first.valeur;
         _erreurChargement = null;
         _nom.text = formulaire.nom;
         _experience.text = formulaire.experienceAnnees;
@@ -109,7 +138,7 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
       if (formulaire.pourPersonne) await _chercherDetail(formulaire.tarif);
     } on ErreurApi catch (erreur) {
       if (!mounted) return;
-      if (erreur.sessionPerdue) {
+      if (erreur.sessionPerdue && !widget.pourInscription) {
         revenirALaConnexion(context, widget.api, messageSessionPerdue);
         return;
       }
@@ -187,6 +216,29 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
     _attenteTarif = Timer(const Duration(milliseconds: 400), () => _chercherDetail(texte));
   }
 
+  /// Comme sur le site, quitter le choix de la personne qui repond vide le
+  /// metier et le tarif.
+  void _roleChange(String? choix) {
+    setState(() {
+      _role = choix;
+      final formulaire = _formulaire;
+      if (formulaire != null && !_champsDeLaPersonne(formulaire)) {
+        _attenteTarif?.cancel();
+        _rechercheTarif++;
+        _tarif.clear();
+        _detail = null;
+      }
+    });
+  }
+
+  /// Les champs de la personne qui repond : ceux de son compte, ou ceux du
+  /// role choisi pour en creer un.
+  bool _champsDeLaPersonne(FormulaireProfil formulaire) {
+    final inscription = _inscription;
+    if (inscription == null) return formulaire.pourPersonne;
+    return inscription.roles.any((role) => role.valeur == _role && role.pourPersonne);
+  }
+
   /// La commission n'est pas calculee ici : le serveur rend le detail.
   Future<void> _chercherDetail(String montant) async {
     final numero = ++_rechercheTarif;
@@ -207,9 +259,10 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
   Future<void> _enregistrer() async {
     final formulaire = _formulaire;
     if (_envoi || formulaire == null) return;
+    final personne = _champsDeLaPersonne(formulaire);
 
     final date = _dateAEnvoyer();
-    if (formulaire.pourPersonne && date == null) {
+    if (personne && date == null) {
       setState(() => _erreurEnvoi =
           "Choisissez le jour, le mois et l'année de naissance, ou laissez les trois vides.");
       return;
@@ -222,10 +275,15 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
 
     try {
       final champs = <String, dynamic>{
+        if (widget.pourInscription) ...{
+          'role': _role ?? '',
+          'email': _email.text,
+          'motdepasse': _motdepasse.text,
+        },
         'nom': _nom.text,
         'quartier': _quartier?.text ?? '',
         'arrondissement': _arrondissement ?? '',
-        if (formulaire.pourPersonne) ...{
+        if (personne) ...{
           'metier': _metier?.text ?? '',
           'tarif': _tarif.text,
           'date_naissance': date,
@@ -237,12 +295,18 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
           ],
         },
       };
+      if (widget.pourInscription) {
+        final faite = await widget.api.inscrire(champs);
+        if (!mounted) return;
+        Navigator.of(context).pop(faite);
+        return;
+      }
       final texte = (await widget.api.enregistrerProfil(champs)).texte;
       if (!mounted) return;
       Navigator.of(context).pop(texte);
     } on ErreurApi catch (erreur) {
       if (!mounted) return;
-      if (erreur.sessionPerdue) {
+      if (erreur.sessionPerdue && !widget.pourInscription) {
         revenirALaConnexion(context, widget.api, messageSessionPerdue);
         return;
       }
@@ -256,7 +320,7 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Modifier mon profil')),
+      appBar: AppBar(title: Text(widget.pourInscription ? 'Créer un compte' : 'Modifier mon profil')),
       body: SafeArea(child: _corps(context)),
     );
   }
@@ -280,6 +344,15 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // La phrase sous le titre de la page du site.
+        if (widget.pourInscription) ...[
+          Text(
+            "C'est gratuit. Si vous proposez vos services, vous devrez ensuite "
+            'faire vérifier votre identité pour être visible.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encreDouce),
+          ),
+          const SizedBox(height: 16),
+        ],
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -291,12 +364,14 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
         ),
         // L'adresse et le mot de passe sont les deux cles du compte : chacune
         // a sa section, et chacune exige le mot de passe actuel.
-        const SizedBox(height: 8),
-        const TitreSection('Changer mon adresse email'),
-        _CarteEmail(api: widget.api, emailActuel: formulaire.email),
-        const SizedBox(height: 8),
-        const TitreSection('Changer mon mot de passe'),
-        _CarteMotDePasse(api: widget.api, minimum: formulaire.motDePasseMin),
+        if (!widget.pourInscription) ...[
+          const SizedBox(height: 8),
+          const TitreSection('Changer mon adresse email'),
+          _CarteEmail(api: widget.api, emailActuel: formulaire.email),
+          const SizedBox(height: 8),
+          const TitreSection('Changer mon mot de passe'),
+          _CarteMotDePasse(api: widget.api, minimum: formulaire.motDePasseMin),
+        ],
       ],
     );
   }
@@ -308,16 +383,61 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
     final aide = texte.bodyMedium?.copyWith(color: Couleurs.encrePale);
     final erreurEnvoi = _erreurEnvoi;
     final detail = _detail;
-    final aideDetail = detail?.aide;
+    // Sur la page inscription du site, l'aide est l'exemple, sous le cadre.
+    final aideDetail = widget.pourInscription ? null : detail?.aide;
+    final inscription = _inscription;
+    final personne = _champsDeLaPersonne(formulaire);
 
     return [
+      if (inscription != null) ...[
+        InputDecorator(
+          decoration: const InputDecoration(labelText: 'Vous êtes ici pour'),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _role,
+              isExpanded: true,
+              isDense: true,
+              items: [
+                for (final role in inscription.roles)
+                  DropdownMenuItem<String>(value: role.valeur, child: Text(role.libelle)),
+              ],
+              onChanged: _envoi ? null : _roleChange,
+            ),
+          ),
+        ),
+        espace,
+      ],
       TextField(
         controller: _nom,
         textCapitalization: TextCapitalization.words,
         textInputAction: TextInputAction.next,
-        decoration: const InputDecoration(labelText: 'Votre nom'),
+        decoration: InputDecoration(labelText: inscription != null ? 'Votre nom complet' : 'Votre nom'),
       ),
       espace,
+      if (inscription != null) ...[
+        TextField(
+          controller: _email,
+          keyboardType: TextInputType.emailAddress,
+          autocorrect: false,
+          autofillHints: const [AutofillHints.email],
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(labelText: 'Votre adresse email'),
+        ),
+        espace,
+        TextField(
+          controller: _motdepasse,
+          obscureText: true,
+          autocorrect: false,
+          enableSuggestions: false,
+          autofillHints: const [AutofillHints.newPassword],
+          textInputAction: TextInputAction.next,
+          decoration: InputDecoration(
+            labelText: 'Votre mot de passe',
+            helperText: '${formulaire.motDePasseMin} caractères au minimum.',
+          ),
+        ),
+        espace,
+      ],
       ChampAvecSuggestions(
         liste: formulaire.quartiers,
         libelle: 'Votre quartier',
@@ -348,7 +468,7 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
           ),
         ),
       ),
-      if (formulaire.pourPersonne) ...[
+      if (personne) ...[
         espace,
         ChampAvecSuggestions(
           liste: formulaire.metiers,
@@ -401,29 +521,45 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
           DetailMontants(lignes: detail.lignes),
           if (aideDetail != null) Text(aideDetail, style: aide),
         ],
+        if (inscription != null) ...[
+          const SizedBox(height: 12),
+          _ExempleDeTarif(exemple: inscription.exempleTarif),
+        ],
       ],
       const SizedBox(height: 24),
       if (erreurEnvoi != null) ...[
         Avertissement(texte: erreurEnvoi),
         espace,
       ],
-      // La coche, comme le bouton du site.
-      FilledButton.icon(
-        onPressed: _envoi ? null : _enregistrer,
-        icon: _envoi
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.5, color: Couleurs.bleuFonce),
-              )
-            : const Icon(Icons.check),
-        label: const Text('Enregistrer'),
-      ),
+      // La coche, comme le bouton du site. Creer mon compte n'en a pas.
+      if (inscription == null)
+        FilledButton.icon(
+          onPressed: _envoi ? null : _enregistrer,
+          icon: _envoi
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Couleurs.bleuFonce),
+                )
+              : const Icon(Icons.check),
+          label: const Text('Enregistrer'),
+        )
+      else
+        FilledButton(
+          onPressed: _envoi ? null : _enregistrer,
+          child: _envoi
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Couleurs.bleuFonce),
+                )
+              : const Text('Créer mon compte'),
+        ),
       const SizedBox(height: 8),
       OutlinedButton(
         onPressed: _envoi ? null : () => Navigator.of(context).pop(),
         style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-        child: const Text('Annuler'),
+        child: Text(inscription == null ? 'Annuler' : "J'ai déjà un compte"),
       ),
     ];
   }
@@ -548,6 +684,44 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
             ],
           ),
       ],
+    );
+  }
+}
+
+/// L'exemple sous le tarif, comme le paragraphe "exemple" de la page
+/// inscription du site : fond orange clair, montants en orange. Les montants
+/// viennent du serveur.
+class _ExempleDeTarif extends StatelessWidget {
+  const _ExempleDeTarif({required this.exemple});
+
+  final ExempleTarif exemple;
+
+  @override
+  Widget build(BuildContext context) {
+    const montant = TextStyle(color: Couleurs.orange, fontWeight: FontWeight.w700);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Couleurs.orangeClair,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            const TextSpan(
+              text: 'Ce tarif est indicatif. Le montant réellement reçu dépend de la demande '
+                  'à laquelle vous répondez : pour une demande à ',
+            ),
+            TextSpan(text: exemple.prix, style: montant),
+            const TextSpan(text: ', la commission est de '),
+            TextSpan(text: exemple.commission, style: montant),
+            const TextSpan(text: ' et vous recevez '),
+            TextSpan(text: exemple.recu, style: montant),
+            const TextSpan(text: '.'),
+          ],
+        ),
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encre),
+      ),
     );
   }
 }

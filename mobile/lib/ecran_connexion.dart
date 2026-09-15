@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'ecran_modifier_profil.dart';
 import 'ecran_principal.dart';
 import 'elements.dart';
+import 'modeles.dart';
 import 'theme.dart';
 
 /// Ce que lit la personne quand le serveur ne reconnait plus sa session.
@@ -45,11 +47,15 @@ class EcranConnexion extends StatefulWidget {
 
 class _EcranConnexionState extends State<EcranConnexion> {
   final _formulaire = GlobalKey<FormState>();
+  final _champAdresse = GlobalKey<FormFieldState<String>>();
   late final _adresse = TextEditingController(text: widget.adresseInitiale);
   final _email = TextEditingController();
   final _motdepasse = TextEditingController();
   bool _enCours = false;
   late String? _message = widget.message;
+
+  /// La phrase du site une fois le compte cree.
+  String? _confirmation;
 
   @override
   void dispose() {
@@ -64,6 +70,7 @@ class _EcranConnexionState extends State<EcranConnexion> {
     setState(() {
       _enCours = true;
       _message = null;
+      _confirmation = null;
     });
 
     final api = ApiPamConnect(_adresse.text);
@@ -100,6 +107,27 @@ class _EcranConnexionState extends State<EcranConnexion> {
     }
   }
 
+  /// Creer un compte ne demande ici que l'adresse du serveur : l'email et le
+  /// mot de passe se choisissent dans le formulaire. Une fois le compte cree,
+  /// l'adresse revient remplie, il ne reste que le mot de passe a taper.
+  Future<void> _creerUnCompte() async {
+    if (_enCours || !_champAdresse.currentState!.validate()) return;
+    setState(() {
+      _message = null;
+      _confirmation = null;
+    });
+
+    final faite = await Navigator.of(context).push<InscriptionFaite>(
+      MaterialPageRoute(builder: (_) => EcranModifierProfil.inscription(api: ApiPamConnect(_adresse.text))),
+    );
+    if (!mounted || faite == null) return;
+    setState(() {
+      _email.text = faite.email;
+      _motdepasse.clear();
+      _confirmation = '${faite.titre} ${faite.texte}';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final texte = Theme.of(context).textTheme;
@@ -132,7 +160,12 @@ class _EcranConnexionState extends State<EcranConnexion> {
                     Avertissement(texte: _message!),
                     const SizedBox(height: 16),
                   ],
+                  if (_confirmation != null) ...[
+                    Confirmation(texte: _confirmation!),
+                    const SizedBox(height: 16),
+                  ],
                   TextFormField(
+                    key: _champAdresse,
                     controller: _adresse,
                     keyboardType: TextInputType.url,
                     autocorrect: false,
@@ -181,6 +214,13 @@ class _EcranConnexionState extends State<EcranConnexion> {
                             ),
                           )
                         : const Text('Se connecter'),
+                  ),
+                  const SizedBox(height: 8),
+                  // Le second bouton de la page Se connecter du site.
+                  OutlinedButton(
+                    onPressed: _enCours ? null : _creerUnCompte,
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                    child: const Text('Créer un compte'),
                   ),
                 ],
               ),

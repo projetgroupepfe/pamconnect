@@ -11,6 +11,7 @@ abstract final class Couleurs {
   static const bleuClair = Color(0xFFE8F0F7);
   static const orange = Color(0xFFC25E14);
   static const orangeFonce = Color(0xFF9E4B0E);
+  static const orangeClair = Color(0xFFFDF0E3);
   static const encre = Color(0xFF1A2430);
   static const encreDouce = Color(0xFF4E5D6C);
   static const encrePale = Color(0xFF67757F);

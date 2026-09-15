@@ -164,6 +164,17 @@ class ApiPamConnect {
     return _interpreter(() => MonProfil.depuisJson(donnees));
   }
 
+  /// Creer un compte. Aucune session : le compte n'existe pas encore.
+  Future<FormulaireInscription> formulaireInscription() async {
+    final donnees = await _appeler('/api/inscription');
+    return _interpreter(() => FormulaireInscription.depuisJson(donnees));
+  }
+
+  Future<InscriptionFaite> inscrire(Map<String, dynamic> champs) async {
+    final donnees = await _appeler('/api/inscription', corps: champs);
+    return _interpreter(() => InscriptionFaite.depuisJson(donnees));
+  }
+
   /// Le formulaire Modifier mon profil, rempli par le serveur.
   Future<FormulaireProfil> formulaireProfil() async {
     final donnees = await _appeler('/api/mon-profil/modification');

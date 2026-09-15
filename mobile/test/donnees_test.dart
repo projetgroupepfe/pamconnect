@@ -745,6 +745,55 @@ void main() {
     expect(() => AdresseChangee.depuisJson({'texte': 'phrase 1'}), throwsA(isA<FormeInattendue>()));
   });
 
+  test('Creer un compte lit les choix et l exemple du serveur', () {
+    Map<String, dynamic> formulaire({required List<dynamic> roles, Object? exemple}) => {
+          'nom': '',
+          'quartier': '',
+          'arrondissement': null,
+          'quartiers': ['quartier 1'],
+          'arrondissements': ['arrondissement 1'],
+          'pourPersonne': true,
+          'metier': '',
+          'metiers': ['metier 1'],
+          'dateNaissance': null,
+          'anneesNaissance': {'de': 1, 'a': 2},
+          'experienceAnnees': '',
+          'experienceMax': 3,
+          'moments': ['moment 1'],
+          'jours': [
+            {
+              'libelle': 'jour 1',
+              'creneaux': [
+                {'valeur': 'valeur 1', 'libelle': 'moment 1', 'coche': false},
+              ],
+            },
+          ],
+          'tarif': '',
+          'email': '',
+          'motDePasseMin': 4,
+          'roles': roles,
+          'exempleTarif': exemple,
+        };
+    const role = {'valeur': 'valeur 1', 'libelle': 'libelle 2', 'pourPersonne': false};
+    const exemple = {'prix': 'prix 1', 'commission': 'commission 2', 'recu': 'recu 3'};
+
+    final lu = FormulaireInscription.depuisJson(formulaire(roles: [role], exemple: exemple));
+    expect(lu.roles.single.pourPersonne, isFalse);
+    expect(lu.exempleTarif.recu, 'recu 3');
+    expect(lu.profil.motDePasseMin, 4);
+    // Sans choix ou sans exemple, le formulaire serait incomplet.
+    expect(() => FormulaireInscription.depuisJson(formulaire(roles: [], exemple: exemple)),
+        throwsA(isA<FormeInattendue>()));
+    expect(() => FormulaireInscription.depuisJson(formulaire(roles: [role])), throwsA(isA<FormeInattendue>()));
+  });
+
+  test('un compte cree rend la phrase et l adresse a saisir', () {
+    final lu = InscriptionFaite.depuisJson({'titre': 'titre 1', 'texte': 'texte 2', 'email': 'email 3'});
+    expect(lu.email, 'email 3');
+    expect(() => InscriptionFaite.depuisJson({'titre': 'titre 1', 'texte': 'texte 2'}),
+        throwsA(isA<FormeInattendue>()));
+  });
+
   test('Mon compte se lit tel que le serveur l ecrit', () {
     final lu = MonCompte.depuisJson({
       'jeSuisEmployeur': true,
