@@ -30,7 +30,9 @@
 
         <div class="champ">
           <label for="motdepasse">Votre mot de passe</label>
-          <input type="password" id="motdepasse" name="motdepasse" autocomplete="new-password" required>
+          <input type="password" id="motdepasse" name="motdepasse" autocomplete="new-password"
+                 minlength="<%= motDePasseMin %>" required>
+          <span class="aide"><%= motDePasseMin %> caractères au minimum.</span>
         </div>
 
         <%- include("partiels/champ-lieu", {
@@ -69,13 +71,14 @@
 
           <%# Ce paragraphe existait deja : on le complete plutot que
               d'en ajouter un second qui dirait la meme chose. Ce qui lui
-              manquait, c'est d'ou vient le montant reellement paye. %>
+              manquait, c'est d'ou vient le montant reellement paye.
+              Les montants viennent du serveur : ils suivent la commission. %>
           <p class="exemple">
             Ce tarif est indicatif. Le montant réellement reçu dépend de la demande
             à laquelle vous répondez : pour une demande à
-            <strong>10 000 FCFA</strong>, la commission est de
-            <strong>1 000 FCFA</strong> et vous recevez
-            <strong>9 000 FCFA</strong>.
+            <strong><%= exempleTarif.prix %></strong>, la commission est de
+            <strong><%= exempleTarif.commission %></strong> et vous recevez
+            <strong><%= exempleTarif.recu %></strong>.
           </p>
         </div>
 

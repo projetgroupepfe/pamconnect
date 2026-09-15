@@ -2982,7 +2982,7 @@ app.use((req, res, next) => {
 app.get("/", (req, res) => res.render("accueil", { titre: "Accueil" }));
 app.get("/employeur", (req, res) => res.render("employeur", { titre: "Espace employeur" }));
 app.get("/prestataire", (req, res) => res.render("prestataire", { titre: "Espace prestataire" }));
-app.get("/inscription", (req, res) => res.render("inscription", { titre: "Creer un compte" }));
+app.get("/inscription", (req, res) => res.render("inscription", { titre: "Créer un compte" }));
 app.get("/connexion", (req, res) => res.render("connexion", { titre: "Se connecter" }));
 
 // Ces pages etaient auparavant des fichiers .html. On redirige les
@@ -3006,57 +3006,145 @@ app.post("/deconnexion", (req, res) => {
   res.redirect("/");
 });
 
-// --- Inscription ---------------------------------------------------
-app.post("/inscription", lireFormulaire, (req, res) => {
-  const donnees = req.body;
-  const email = (donnees.email || "").trim().toLowerCase();
+// --- Creer un compte, UNE SEULE FOIS pour le site et l'application ---
 
-  if (requetes.utilisateurParEmail.get(email)) {
-    return res.status(409).render("message", {
-      titre: "Email deja utilise",
-      texte: `Un compte existe deja avec l'adresse ${donnees.email}.`,
+// Les deux raisons de venir, dans l'ordre du formulaire du site. Seule la
+// seconde declare un metier, un tarif et des disponibilites.
+const ROLES_INSCRIPTION = [
+  { valeur: "employeur", libelle: "Trouver quelqu'un pour ma maison", pourPersonne: false },
+  { valeur: "prestataire", libelle: "Proposer mes services", pourPersonne: true },
+];
+
+// L'exemple sous le tarif. Ecrits a la main dans la page, ses montants
+// auraient menti le jour ou la commission changerait.
+function exempleDeTarif() {
+  const detail = detaillerTarif(10000);
+  return {
+    prix: formaterMontant(detail.brut),
+    commission: formaterMontant(detail.commission),
+    recu: formaterMontant(detail.net),
+  };
+}
+app.locals.exempleTarif = exempleDeTarif();
+
+// Un controle volontairement minimal : une adresse doit contenir un @
+// et un point apres. Trop strict, on refuserait des adresses valides.
+// Le meme a l'inscription et au changement d'adresse.
+function adresseEmailValide(email) {
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+}
+
+// Le formulaire vide : les listes de Modifier mon profil, le choix du
+// role et l'exemple. Les champs de la personne qui repond sont prepares :
+// ils s'affichent des que ce role est choisi, comme sur le site.
+function formulaireInscription() {
+  return {
+    ...formulaireMonProfil({ role: "prestataire", nom: "", email: "" }),
+    roles: ROLES_INSCRIPTION,
+    exempleTarif: exempleDeTarif(),
+  };
+}
+
+function inscrire(donnees) {
+  const retour = { url: "/inscription", texte: "Retour au formulaire" };
+  const refus = (code, titre, texte) => ({ probleme: { code, titre, texte, lien: retour } });
+
+  // Le role vient d'une liste fermee. Une valeur inconnue faisait
+  // echouer la base : la personne voyait une erreur du serveur.
+  const role = ROLES_INSCRIPTION.find((r) => r.valeur === donnees.role);
+  if (!role) {
+    return refus(400, "Choix obligatoire",
+      "Indiquez si vous cherchez quelqu'un pour votre maison ou si vous proposez vos services.");
+  }
+
+  const nom = String(donnees.nom || "").trim();
+  if (!nom) return refus(400, "Nom obligatoire", "Indiquez votre nom complet.");
+
+  const email = String(donnees.email || "").trim().toLowerCase();
+  if (!adresseEmailValide(email)) {
+    return refus(400, "Adresse invalide", "Vérifiez l'adresse saisie : il manque un @ ou le nom du site.");
+  }
+
+  const dejaUtilisee = {
+    probleme: {
+      code: 409,
+      titre: "Adresse déjà utilisée",
+      texte: `Un compte existe déjà avec l'adresse ${email}.`,
       liens: [
         { url: "/connexion", texte: "Se connecter" },
-        { url: "/inscription", texte: "Reessayer" },
+        { url: "/inscription", texte: "Réessayer" },
       ],
-    });
+    },
+  };
+  if (requetes.utilisateurParEmail.get(email)) return dejaUtilisee;
+
+  // La meme longueur que pour changer de mot de passe. Avant, seul le
+  // changement l'exigeait : un compte pouvait naitre avec "1".
+  const motdepasse = String(donnees.motdepasse || "");
+  if (motdepasse.length < MOT_DE_PASSE_MIN) {
+    return refus(400, "Mot de passe trop court",
+      `Choisissez un mot de passe d'au moins ${MOT_DE_PASSE_MIN} caractères.`);
   }
 
   // Sans metier, la personne n'apparait dans aucune recherche.
   // Sans tarif, la plateforme ne peut ni faire payer, ni reverser.
-  if (donnees.role === "prestataire") {
+  const personne = role.pourPersonne;
+  if (personne) {
     const probleme = verifierProfilPrestataire(donnees);
-    if (probleme) {
-      return res.status(400).render("message", Object.assign({}, probleme, {
-        liens: [{ url: "/inscription", texte: "Retour au formulaire" }],
-      }));
-    }
+    if (probleme) return refus(400, probleme.titre, probleme.texte);
   }
 
   // Le quartier commande : l'arrondissement en est deduit (voir resoudreLieu).
   const lieu = resoudreLieu(donnees);
+  const experience = String(donnees.experience_annees ?? "").trim();
+  const coordonnee = (valeur) => {
+    const nombre = Number(valeur);
+    return valeur && Number.isFinite(nombre) ? nombre : null;
+  };
 
-  requetes.creerUtilisateur.run({
-    role: donnees.role,
-    nom: donnees.nom,
-    email,
-    motdepasse: hacherMotDePasse(donnees.motdepasse),
-    arrondissement: lieu.arrondissement,
-    quartier: lieu.quartier,
-    metier: resoudreMetier(donnees.metier),
-    tarif: donnees.tarif ? Number(donnees.tarif) : null,
-    date_naissance: donnees.date_naissance || null,
-    experience_annees: donnees.experience_annees ? Math.round(Number(donnees.experience_annees)) : null,
-    disponibilites: resoudreDisponibilites(donnees),
-    latitude: donnees.latitude ? Number(donnees.latitude) : null,
-    longitude: donnees.longitude ? Number(donnees.longitude) : null,
-  });
+  try {
+    requetes.creerUtilisateur.run({
+      role: role.valeur,
+      nom,
+      email,
+      motdepasse: hacherMotDePasse(motdepasse),
+      arrondissement: lieu.arrondissement,
+      quartier: lieu.quartier,
+      // Un employeur n'a ni metier, ni tarif, ni age, ni disponibilites a
+      // declarer. Le site cache ces champs sans tous les vider : une case
+      // cochee avant de changer de choix partait quand meme.
+      metier: personne ? resoudreMetier(donnees.metier) : null,
+      tarif: personne ? Math.round(Number(donnees.tarif)) : null,
+      date_naissance: personne ? (donnees.date_naissance || null) : null,
+      experience_annees: personne && experience ? Number(experience) : null,
+      disponibilites: personne ? resoudreDisponibilites(donnees) : null,
+      latitude: coordonnee(donnees.latitude),
+      longitude: coordonnee(donnees.longitude),
+    });
+  } catch (erreur) {
+    // La contrainte UNIQUE de la base est le dernier rempart, au cas ou
+    // deux inscriptions viseraient la meme adresse au meme instant.
+    if (String(erreur.message).includes("UNIQUE")) return dejaUtilisee;
+    throw erreur;
+  }
 
   console.log("Nouvel utilisateur enregistré :", email);
 
-  res.render("message", {
-    titre: `Merci ${donnees.nom} !`,
+  return {
+    ok: true,
+    email,
+    titre: `Merci ${nom} !`,
     texte: "Votre compte est créé. Vous pouvez maintenant vous connecter.",
+  };
+}
+
+app.post("/inscription", lireFormulaire, (req, res) => {
+  const resultat = inscrire(req.body);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
+  res.render("message", {
+    titre: resultat.titre,
+    texte: resultat.texte,
     liens: [{ url: "/connexion", texte: "Se connecter" }],
   });
 });
@@ -3556,9 +3644,7 @@ function changerMonEmail(moi, saisie) {
     };
   }
 
-  // Un controle volontairement minimal : une adresse doit contenir un @
-  // et un point apres. Trop strict, on refuserait des adresses valides.
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(nouvelEmail)) {
+  if (!adresseEmailValide(nouvelEmail)) {
     return {
       probleme: {
         code: 400,
@@ -5769,7 +5855,8 @@ function afficherProbleme(res, probleme) {
   return res.status(probleme.code).render("message", {
     titre: probleme.titre,
     texte: probleme.texte,
-    liens: [probleme.lien],
+    // Un refus peut proposer deux chemins : Se connecter ou Reessayer.
+    liens: probleme.liens || [probleme.lien],
   });
 }
 
@@ -6794,6 +6881,28 @@ app.post("/api/connexion", (req, res) => {
   res.json({ jeton: token, moi: moiPourApi(utilisateur) });
 });
 
+// --- Creer un compte depuis l'application ----------------------------
+//
+// Sans session, forcement : le compte n'existe pas encore. La fonction
+// est celle du site, les refus disent la meme chose.
+app.get("/api/inscription", (req, res) => {
+  res.json(formulaireInscription());
+});
+
+app.post("/api/inscription", (req, res) => {
+  if (!formeDeProfilValide(req.body) || !formeDeCleValide(req.body, ["role", "email", "motdepasse"])) {
+    return erreurApi(res, 400, "L'inscription envoyée n'a pas la forme attendue.");
+  }
+
+  // La position vient du navigateur, sur le site. L'application ne la
+  // demande pas.
+  const { latitude, longitude, ...donnees } = req.body;
+  const resultat = inscrire(donnees);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.status(201).json({ titre: resultat.titre, texte: resultat.texte, email: resultat.email });
+});
+
 // --- Se deconnecter ------------------------------------------------
 app.post("/api/deconnexion", (req, res) => {
   // Cookie OU en-tete : la session est effacee quel que soit son
@@ -6945,9 +7054,10 @@ app.get("/api/formulaire-demande", (req, res) => {
 // Le site fait ce calcul dans le navigateur pour l'afficher avant
 // l'envoi ; l'application le demande ici plutot que de recopier la
 // regle, synonymes compris.
+//
+// Sans session : Creer un compte s'en sert aussi. Rien de prive n'en
+// sort, la liste des quartiers est deja dans chaque formulaire du site.
 app.get("/api/quartier", (req, res) => {
-  if (!utilisateurConnecte(req)) return erreurApi(res, 401, "Personne n'est connecté.");
-
   const connu = trouverQuartier(String(req.query.nom || ""));
   res.json(connu
     ? { connu: true, quartier: connu.nom, arrondissement: connu.arrondissement }
@@ -7429,9 +7539,10 @@ app.post("/api/mon-profil", (req, res) => {
 // Le detail d'un tarif pendant la saisie. Le site le calcule dans le
 // navigateur ; l'application le demande ici plutot que de recopier la
 // commission.
+//
+// Sans session, lui aussi : ce n'est qu'un calcul, et Creer un compte
+// l'affiche avant que le compte existe.
 app.get("/api/detail-tarif", (req, res) => {
-  if (!utilisateurConnecte(req)) return erreurApi(res, 401, "Personne n'est connecté.");
-
   res.json(tarifSurMonProfil(req.query.montant));
 });
 

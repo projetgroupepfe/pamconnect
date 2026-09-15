@@ -218,7 +218,7 @@ setTimeout(async () => {
        f.uniteParDefaut === "forfaitaire");
 
   console.log(SAUT + "--- L'ARRONDISSEMENT D'UN QUARTIER ---");
-  dire("sans session : 401", (await json("/api/quartier?nom=x")).code === 401);
+  dire("sans session aussi : Creer un compte s'en sert", (await json("/api/quartier?nom=x")).code === 200);
   const trouve = await json("/api/quartier?nom=" + encodeURIComponent(unQuartier.nom.toLowerCase()), undefined, cookieDe(emp.cookie));
   dire("un quartier connu, meme ecrit en minuscules",
        trouve.donnees && trouve.donnees.connu === true && trouve.donnees.quartier === unQuartier.nom &&
@@ -972,9 +972,9 @@ setTimeout(async () => {
 
   const detailTarif = await json("/api/detail-tarif?montant=15000", undefined, cookieDe(verifiee.cookie));
   const detailVide = await json("/api/detail-tarif?montant=abc", undefined, cookieDe(verifiee.cookie));
-  dire("le detail du tarif pendant la saisie, calcule par le serveur",
+  dire("le detail du tarif pendant la saisie, calcule par le serveur, meme sans session",
        detailTarif.code === 200 && detailTarif.donnees.lignes[2].montant === "13 500 FCFA" &&
-       detailVide.donnees.lignes.length === 0 && (await json("/api/detail-tarif?montant=15000")).code === 401,
+       detailVide.donnees.lignes.length === 0 && (await json("/api/detail-tarif?montant=15000")).code === 200,
        detailTarif.brut);
 
   console.log(SAUT + "--- UNE ADRESSE D'API INCONNUE ---");

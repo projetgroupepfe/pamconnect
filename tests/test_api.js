@@ -273,6 +273,104 @@ setTimeout(async () => {
   dire("l'application se deconnecte par l'en-tete", sortieApp.code === 200, "code " + sortieApp.code);
   dire("et son jeton ne vaut plus rien", (await avecJeton("/api/moi", null, jeton)).code === 401);
 
+  console.log(SAUT + "--- CREER UN COMPTE DEPUIS L'APPLICATION ---");
+  const ouverture = await api("/api/inscription");
+  const fi = ouverture.donnees || {};
+  dire("le formulaire s'ouvre sans session, avec les deux choix du site dans leur ordre",
+       ouverture.code === 200 && Array.isArray(fi.roles) &&
+       fi.roles.map((r) => r.valeur).join() === "employeur,prestataire" &&
+       fi.roles[0].libelle === "Trouver quelqu'un pour ma maison" && fi.roles[0].pourPersonne === false &&
+       fi.roles[1].libelle === "Proposer mes services" && fi.roles[1].pourPersonne === true,
+       ouverture.brut.slice(0, 200));
+  dire("il est vide, avec les listes et le minimum du mot de passe",
+       fi.nom === "" && fi.email === "" && fi.motDePasseMin === 6 && fi.quartiers.length > 0 &&
+       fi.metiers.length > 0 && fi.jours.length === 7);
+  dire("l'exemple sous le tarif suit la commission",
+       Boolean(fi.exempleTarif) && fi.exempleTarif.prix === "10 000 FCFA" &&
+       fi.exempleTarif.commission === "1 000 FCFA" && fi.exempleTarif.recu === "9 000 FCFA");
+
+  const adresse = (s) => M + "-insc-" + s + "@example.com";
+  const ligneDe = (mail) => base.prepare("SELECT * FROM utilisateurs WHERE email = ?").get(mail);
+  const deuxCreneaux = [fi.jours[0].creneaux[0].valeur, fi.jours[5].creneaux[2].valeur];
+
+  // Des champs de la personne qui repond, envoyes par erreur : un employeur
+  // ne doit rien en garder.
+  const parApp = await api("/api/inscription", {
+    role: "employeur", nom: "  Test insc emp  ", email: " " + adresse("emp").toUpperCase() + " ",
+    motdepasse: "motdepasse123", quartier: "Bastos", metier: "menagere", tarif: "15000",
+    date_naissance: "1995-06-15", experience_annees: "4", disponibilites: deuxCreneaux,
+  });
+  const ligneEmp = ligneDe(adresse("emp"));
+  dire("un employeur s'inscrit : 201, la phrase du site, l'adresse en minuscules",
+       parApp.code === 201 && parApp.donnees.email === adresse("emp") &&
+       parApp.donnees.titre === "Merci Test insc emp !" &&
+       parApp.donnees.texte === "Votre compte est créé. Vous pouvez maintenant vous connecter.", parApp.brut);
+  dire("son nom est nettoye, et rien de la personne qui repond n'est garde",
+       Boolean(ligneEmp) && ligneEmp.nom === "Test insc emp" && ligneEmp.role === "employeur" &&
+       ligneEmp.metier === null && ligneEmp.tarif === null && ligneEmp.date_naissance === null &&
+       ligneEmp.experience_annees === null && ligneEmp.disponibilites === null);
+  dire("il se connecte aussitot",
+       (await api("/api/connexion", { email: adresse("emp"), motdepasse: "motdepasse123" })).code === 200);
+
+  const personneApp = await api("/api/inscription", {
+    role: "prestataire", nom: "Test insc pre", email: adresse("pre"), motdepasse: "motdepasse123",
+    quartier: "Bastos", metier: "menagere", tarif: 15000, date_naissance: "1995-06-15",
+    experience_annees: "4", disponibilites: deuxCreneaux,
+  });
+  const lignePre = ligneDe(adresse("pre"));
+  dire("une personne qui repond s'inscrit avec son metier, son tarif, son age et ses moments",
+       personneApp.code === 201 && Boolean(lignePre) && lignePre.role === "prestataire" &&
+       Boolean(lignePre.metier) && lignePre.tarif === 15000 && lignePre.date_naissance === "1995-06-15" &&
+       lignePre.experience_annees === 4 &&
+       deuxCreneaux.every((c) => String(lignePre.disponibilites).split("|").includes(c)), personneApp.brut);
+
+  const essai = (s, extra) => api("/api/inscription", Object.assign(
+    { role: "employeur", nom: "Test insc " + s, email: adresse(s), motdepasse: "motdepasse123" }, extra));
+  const erreur = (r) => (r.donnees && r.donnees.erreur) || "";
+  const sansRole = await essai("role", { role: "equipe" });
+  const sansNom = await essai("nom", { nom: "   " });
+  const sansArobase = await essai("mail", { email: M + "-insc-mail.example.com" });
+  const court = await essai("court", { motdepasse: "12345" });
+  const doublon = await essai("emp", { motdepasse: "x" });
+  const sansMetier = await essai("metier", { role: "prestataire", tarif: "15000" });
+  const pasDuTexte = await essai("objet", { nom: { texte: "x" } });
+  dire("un role hors de la liste est refuse", sansRole.code === 400 && erreur(sansRole).startsWith("Indiquez si"));
+  dire("un nom fait d'espaces est refuse", sansNom.code === 400 && erreur(sansNom) === "Indiquez votre nom complet.");
+  dire("une adresse sans @ est refusee", sansArobase.code === 400 && erreur(sansArobase).includes("@"));
+  dire("un mot de passe de 5 caracteres est refuse, en disant le minimum",
+       court.code === 400 && erreur(court) === "Choisissez un mot de passe d'au moins 6 caractères.");
+  dire("une adresse deja inscrite : 409, en la nommant",
+       doublon.code === 409 && erreur(doublon).includes(adresse("emp")));
+  dire("une personne sans metier : la regle du site", sansMetier.code === 400 && erreur(sansMetier).includes("métier"));
+  dire("un champ qui n'est pas du texte : 400", pasDuTexte.code === 400);
+  dire("aucun de ces refus n'a cree de compte",
+       ["role", "nom", "court", "metier", "objet"].every((s) => !ligneDe(adresse(s))) &&
+       !ligneDe(M + "-insc-mail.example.com"));
+
+  const surLeSite = async (s, extra) => {
+    const r = await fetch(RACINE + "/inscription", {
+      method: "POST", redirect: "manual",
+      body: form(Object.assign({ role: "employeur", nom: "Test insc " + s, email: adresse(s),
+                                 motdepasse: "motdepasse123" }, extra)),
+    });
+    return { code: r.status, corps: await r.text() };
+  };
+  const siteCourt = await surLeSite("sitecourt", { motdepasse: "12345" });
+  dire("le site refuse le meme mot de passe, avec la meme phrase",
+       siteCourt.code === 400 && siteCourt.corps.includes("au moins 6 caractères") && !ligneDe(adresse("sitecourt")));
+  const siteDoublon = await surLeSite("emp");
+  dire("le site propose Se connecter ou Réessayer pour une adresse deja inscrite",
+       siteDoublon.code === 409 && siteDoublon.corps.includes("Réessayer"));
+  await surLeSite("siteemp", { date_naissance: "1995-06-15", experience_annees: "4", disponibilites: deuxCreneaux[0] });
+  const ligneSiteEmp = ligneDe(adresse("siteemp"));
+  dire("sur le site aussi, un employeur ne garde ni age, ni experience, ni disponibilites",
+       Boolean(ligneSiteEmp) && ligneSiteEmp.date_naissance === null &&
+       ligneSiteEmp.experience_annees === null && ligneSiteEmp.disponibilites === null);
+  const pageInscription = await (await fetch(RACINE + "/inscription")).text();
+  dire("la page du site annonce le minimum, et son exemple est calcule",
+       pageInscription.includes('minlength="6"') && pageInscription.includes("6 caractères au minimum.") &&
+       pageInscription.includes("<strong>9 000 FCFA</strong>"));
+
   console.log(SAUT + "--- LES FORMULAIRES DU SITE MARCHENT TOUJOURS ---");
   // express.json n'est monte que sous /api : une inscription ordinaire
   // doit continuer d'arriver comme avant.
