@@ -322,6 +322,16 @@ Future<bool> confirmerDeclarationService(BuildContext context, String nom) => de
       action: 'Déclarer',
     );
 
+/// "Confirmez-vous avoir effectue ce service ?", du cote de la personne qui a
+/// travaille. La meme question que sur le site.
+Future<bool> confirmerAvoirTravaille(BuildContext context, String employeur) => demanderConfirmation(
+      context,
+      question: 'Confirmez-vous avoir effectué ce service ?',
+      precision: 'Votre déclaration sera enregistrée avec sa date. Elle ne vous paie pas : '
+          "c'est $employeur qui déclenche le versement en le confirmant.",
+      action: 'Déclarer',
+    );
+
 /// Un avis recu, comme le site l'affiche : la note, son auteur, le
 /// commentaire et les criteres.
 ///

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'ecran_demandes.dart';
 import 'ecran_mes_demandes.dart';
+import 'ecran_mes_reponses.dart';
 import 'ecran_messages.dart';
 import 'ecran_mon_profil.dart';
 import 'ecran_rechercher.dart';
@@ -13,7 +14,7 @@ import 'modeles.dart';
 ///
 /// CHAQUE ROLE A SES ENTREES, et seulement les siennes, dans l'ordre du site :
 /// l'employeur a Rechercher et Mes demandes, la personne qui repond a Les
-/// demandes ; Messages et Mon profil sont communs aux deux. Une entree
+/// demandes et Mes reponses ; Messages et Mon profil sont communs aux deux. Une entree
 /// n'apparait qu'une fois son ecran construit.
 class EcranPrincipal extends StatefulWidget {
   const EcranPrincipal({super.key, required this.api, required this.moi});
@@ -28,12 +29,14 @@ class EcranPrincipal extends StatefulWidget {
 class _EcranPrincipalState extends State<EcranPrincipal> {
   bool get _employeur => widget.moi.publieDesDemandes;
 
-  // La place de chaque entree dans la barre : Rechercher n'existe que pour
-  // l'employeur, et decale les suivantes.
+  // La place de chaque entree dans la barre. Employeur : Rechercher, Mes
+  // demandes, Messages, Mon profil. Personne qui repond : Demandes, Mes
+  // reponses, Messages, Mon profil.
   int get _indexRechercher => 0;
   int get _indexTravail => _employeur ? 1 : 0;
-  int get _indexMessages => _indexTravail + 1;
-  int get _indexProfil => _indexTravail + 2;
+  int get _indexMesReponses => 1;
+  int get _indexMessages => 2;
+  int get _indexProfil => 3;
 
   /// L'application s'ouvre sur ce sur quoi chacun travaille : Mes demandes
   /// pour l'employeur, Les demandes pour la personne qui repond.
@@ -86,6 +89,12 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
           employeur
               ? EcranMesDemandes(api: api, moi: moi, rafraichir: _rafraichir[_indexTravail], auMoi: _majMoi)
               : EcranDemandes(api: api, moi: moi, rafraichir: _rafraichir[_indexTravail], auMoi: _majMoi),
+          if (!employeur)
+            EcranMesReponses(
+              api: api,
+              rafraichir: _rafraichir[_indexMesReponses],
+              auVoirDemandes: () => _choisirOnglet(_indexTravail),
+            ),
           EcranMessages(api: api, rafraichir: _rafraichir[_indexMessages], auCompte: _majCompte),
           EcranMonProfil(
             api: api,
@@ -115,6 +124,12 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
                   selectedIcon: Icon(Icons.insert_drive_file),
                   label: 'Demandes',
                 ),
+          // L'icone du site pour Mes reponses : l'envoi.
+          if (!employeur)
+            const NavigationDestination(
+              icon: Icon(Icons.file_upload_outlined),
+              label: 'Mes réponses',
+            ),
           NavigationDestination(
             icon: Badge(
               isLabelVisible: _aVoir > 0,

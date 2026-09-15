@@ -652,6 +652,7 @@ class Discussion {
     this.conditions,
     this.serviceTermine,
     this.declarationDeLaPersonne,
+    this.maDeclaration,
     this.avis,
   });
 
@@ -676,6 +677,7 @@ class Discussion {
       conditions: _lireFacultatif<String>(json, 'conditions'),
       serviceTermine: termine == null ? null : DateDeclaree.depuisJson(termine, 'par'),
       declarationDeLaPersonne: declaration == null ? null : DateDeclaree.depuisJson(declaration, 'nom'),
+      maDeclaration: _lireObjet(json, 'maDeclaration', MaDeclaration.depuisJson),
       avis: avis == null ? null : AvisDuService.depuisJson(avis),
     );
   }
@@ -706,6 +708,10 @@ class Discussion {
 
   /// Present pour l'employeur quand la personne dit avoir travaille.
   final DateDeclaree? declarationDeLaPersonne;
+
+  /// Pour la personne choisie : dire qu'elle a effectue le service, ou
+  /// relire qu'elle l'a deja dit.
+  final MaDeclaration? maDeclaration;
 
   /// Present une fois le service termine : les avis donnes et recus.
   final AvisDuService? avis;
@@ -1916,4 +1922,47 @@ class ReponseEnvoyee {
 
   final String texte;
   final int candidatureId;
+}
+
+/// "J'ai effectue ce service", du cote de la personne choisie.
+class MaDeclaration {
+  const MaDeclaration({required this.dejaFaite, required this.employeur, this.le});
+
+  factory MaDeclaration.depuisJson(Map<String, dynamic> json) => MaDeclaration(
+        dejaFaite: _lire<bool>(json, 'dejaFaite'),
+        employeur: _lire<String>(json, 'employeur'),
+        le: _lireFacultatif<String>(json, 'le'),
+      );
+
+  final bool dejaFaite;
+  final String employeur;
+
+  /// La date de sa declaration, une fois faite.
+  final String? le;
+}
+
+/// Une reponse envoyee, et ou elle en est.
+class MaReponse {
+  const MaReponse({required this.id, required this.titreDemande, required this.phrase});
+
+  factory MaReponse.depuisJson(Map<String, dynamic> json) => MaReponse(
+        id: _lire<int>(json, 'id'),
+        titreDemande: _lire<String>(json, 'titreDemande'),
+        phrase: _lire<String>(json, 'phrase'),
+      );
+
+  /// L'identifiant de la candidature, qui ouvre aussi la discussion.
+  final int id;
+  final String titreDemande;
+  final String phrase;
+}
+
+/// Mes reponses (/api/mes-reponses).
+class MesReponses {
+  const MesReponses({required this.reponses});
+
+  factory MesReponses.depuisJson(Map<String, dynamic> json) =>
+      MesReponses(reponses: _lireListe(json, 'reponses', MaReponse.depuisJson));
+
+  final List<MaReponse> reponses;
 }

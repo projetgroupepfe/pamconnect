@@ -32,6 +32,9 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
   bool _envoi = false;
   String? _erreurEnvoi;
   bool _declaration = false;
+
+  /// Sa declaration "J'ai effectue ce service" est en cours d'envoi.
+  bool _declarationPersonne = false;
   bool _signalementAvis = false;
 
   /// Les messages dont le signalement est en cours d'envoi.
@@ -132,6 +135,33 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
     if (probleme != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(probleme)));
     }
+  }
+
+  /// "J'ai effectue ce service", du cote de la personne qui a travaille : une
+  /// trace datee, que l'employeur et l'equipe voient. Elle ne verse rien.
+  Future<void> _direAvoirTravaille(MaDeclaration declaration) async {
+    if (_declarationPersonne) return;
+    if (!await confirmerAvoirTravaille(context, declaration.employeur)) return;
+    if (!mounted) return;
+    setState(() => _declarationPersonne = true);
+
+    String message;
+    try {
+      message = (await widget.api.declarerAvoirTravaille(widget.discussionId)).texte;
+    } on ErreurApi catch (erreur) {
+      if (!mounted) return;
+      if (erreur.sessionPerdue) {
+        revenirALaConnexion(context, widget.api, messageSessionPerdue);
+        return;
+      }
+      message = erreur.message;
+    }
+
+    if (!mounted) return;
+    await _charger(allerEnBas: true);
+    if (!mounted) return;
+    setState(() => _declarationPersonne = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _donnerAvis() async {
@@ -407,6 +437,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
     final metierAutre = discussion.metierAutre;
     final serviceTermine = discussion.serviceTermine;
     final declaration = discussion.declarationDeLaPersonne;
+    final maDeclaration = discussion.maDeclaration;
     final avis = discussion.avis;
     final erreurEnvoi = _erreurEnvoi;
 
@@ -653,6 +684,65 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                   label: const Text('Déclarer le service effectué'),
                   style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                 ),
+              ],
+            ),
+          ),
+        ),
+      ],
+      // ELLE AUSSI PEUT LE DIRE. Sa declaration ne libere aucun argent : elle
+      // pose une trace datee, que l'employeur et l'equipe voient.
+      if (maDeclaration != null) ...[
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  maDeclaration.dejaFaite
+                      ? 'Vous avez déclaré avoir effectué ce service'
+                      : 'Avez-vous effectué ce service ?',
+                  style: texte.titleMedium?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                if (maDeclaration.dejaFaite) ...[
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        if (maDeclaration.le != null) ...[
+                          const TextSpan(text: 'Le '),
+                          TextSpan(text: maDeclaration.le, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          const TextSpan(text: '. '),
+                        ],
+                        TextSpan(
+                          text: '${maDeclaration.employeur} doit le confirmer de son côté pour que la somme '
+                              'vous soit versée.',
+                        ),
+                      ],
+                    ),
+                    style: gris,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "S'il ne le fait pas, signalez le problème à l'équipe : elle verra votre déclaration et sa date.",
+                    style: aide,
+                  ),
+                ] else ...[
+                  Text(
+                    "Le dire ne vous paie pas tout de suite : c'est ${maDeclaration.employeur} qui déclenche le "
+                    'versement en le confirmant. Mais votre déclaration est enregistrée avec sa date, et '
+                    "l'équipe la verra s'il ne confirme rien.",
+                    style: gris,
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _declarationPersonne ? null : () => _direAvoirTravaille(maDeclaration),
+                    icon: const Icon(Icons.check),
+                    label: const Text("J'ai effectué ce service"),
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                  ),
+                ],
               ],
             ),
           ),

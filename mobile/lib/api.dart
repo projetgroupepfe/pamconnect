@@ -245,6 +245,18 @@ class ApiPamConnect {
 
   /// Declarer le service effectue : le serveur clot la discussion et verse
   /// la somme bloquee a la personne qui a travaille.
+  /// Les reponses de la personne, et ou elles en sont.
+  Future<MesReponses> mesReponses() async {
+    final donnees = await _appeler('/api/mes-reponses');
+    return _interpreter(() => MesReponses.depuisJson(donnees));
+  }
+
+  /// "J'ai effectue ce service" : une trace datee, qui ne verse rien.
+  Future<TexteDuServeur> declarerAvoirTravaille(int candidatureId) async {
+    final donnees = await _appeler('/api/candidatures/$candidatureId/jai-effectue', corps: const {});
+    return _interpreter(() => TexteDuServeur.depuisJson(donnees));
+  }
+
   Future<void> declarerServiceEffectue(int candidatureId) async {
     final donnees = await _appeler('/api/candidatures/$candidatureId/terminer', corps: const {});
     _interpreter(() => ActionFaite.depuisJson(donnees));

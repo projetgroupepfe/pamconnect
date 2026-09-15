@@ -846,4 +846,22 @@ void main() {
     expect(lu.employeur.note, isNull);
     expect(() => EcranReponse.depuisJson({'demande': null}), throwsA(isA<FormeInattendue>()));
   });
+
+  test('Mes reponses se lisent telles que le serveur les ecrit', () {
+    final lu = MesReponses.depuisJson({
+      'reponses': [
+        {'id': 4, 'titreDemande': 'titre 1', 'phrase': 'phrase 1'},
+      ],
+    });
+    expect(lu.reponses.single.id, 4);
+    expect(lu.reponses.single.phrase, 'phrase 1');
+    expect(() => MesReponses.depuisJson({'reponses': [{'id': 4}]}), throwsA(isA<FormeInattendue>()));
+  });
+
+  test("la declaration de la personne choisie garde sa date quand elle existe", () {
+    final faite = MaDeclaration.depuisJson({'dejaFaite': true, 'employeur': 'nom 1', 'le': 'date 1'});
+    final aFaire = MaDeclaration.depuisJson({'dejaFaite': false, 'employeur': 'nom 1', 'le': null});
+    expect(faite.le, 'date 1');
+    expect(aFaire.le, isNull);
+  });
 }
