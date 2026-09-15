@@ -186,6 +186,53 @@ setTimeout(async () => {
        siteRetiree.code === 410 && siteDoublon.code === 409 && siteDoublon.corps.includes("Candidature déjà envoyée"),
        "codes " + siteRetiree.code + " " + siteDoublon.code);
 
+  console.log(SAUT + "--- MES REPONSES ---");
+  const mesReponsesApi = (entetes) => json("/api/mes-reponses", undefined, entetes);
+  dire("sans session : 401", (await mesReponsesApi()).code === 401);
+  dire("un employeur : 403", (await mesReponsesApi(cookieDe(emp.cookie))).code === 403);
+  const reponses = await mesReponsesApi(parJeton);
+  const maReponse = reponses.donnees && reponses.donnees.reponses.find((r) => r.id === candidature.id);
+  dire("sa reponse y figure, avec la phrase du site",
+       reponses.code === 200 && Boolean(maReponse) && maReponse.titreDemande === M + " ouverte" &&
+       maReponse.phrase === "Votre candidature est en attente", reponses.brut.slice(0, 300));
+  const pageReponses = await (await lire("/mes-reponses", elle.cookie)).text();
+  dire("la page du site dit la meme chose",
+       pageReponses.includes(M + " ouverte") && pageReponses.includes(maReponse.phrase));
+
+  console.log(SAUT + "--- J'AI EFFECTUE CE SERVICE ---");
+  const jaiEffectue = (id, entetes) => json("/api/candidatures/" + id + "/jai-effectue", {}, entetes);
+  const declareeLe = (id) => base.prepare("SELECT declaree_par_elle_le AS le FROM candidatures WHERE id = ?").get(id).le;
+  dire("sans session : 401", (await jaiEffectue(candidature.id)).code === 401);
+  dire("avant d'etre choisie : 409, rien d'enregistre",
+       (await jaiEffectue(candidature.id, parJeton)).code === 409 && declareeLe(candidature.id) === null);
+  // Le choix a sa propre serie : on le pose directement.
+  base.prepare("UPDATE candidatures SET statut = 'acceptee' WHERE id = ?").run(candidature.id);
+  dire("l'employeur n'a pas ce bouton : 403", (await jaiEffectue(candidature.id, cookieDe(emp.cookie))).code === 403);
+  dire("une autre personne : 404", (await jaiEffectue(candidature.id, cookieDe(fauchee.cookie))).code === 404);
+  const avantDeclaration = (await json("/api/discussions/" + candidature.id, undefined, parJeton)).donnees;
+  dire("choisie, la discussion lui propose de le dire",
+       Boolean(avantDeclaration.maDeclaration) && avantDeclaration.maDeclaration.dejaFaite === false &&
+       avantDeclaration.maDeclaration.employeur === "Test emp" && avantDeclaration.peutDeclarerService === false,
+       JSON.stringify(avantDeclaration.maDeclaration));
+  const pageAvantDeclaration = await (await lire("/messages/" + candidature.id, elle.cookie)).text();
+  dire("la page du site pose la question avant de declarer",
+       pageAvantDeclaration.includes('data-question="Confirmez-vous avoir effectué ce service ?"'));
+  const declaration = await jaiEffectue(candidature.id, parJeton);
+  dire("sa declaration est enregistree avec sa date, et ne clot rien",
+       declaration.code === 200 && declareeLe(candidature.id) !== null && declaration.donnees.texte.includes("Test emp") &&
+       base.prepare("SELECT terminee_le FROM candidatures WHERE id = ?").get(candidature.id).terminee_le === null,
+       declaration.brut);
+  dire("une seconde fois : 409", (await jaiEffectue(candidature.id, parJeton)).code === 409);
+  const apresDeclaration = (await json("/api/discussions/" + candidature.id, undefined, parJeton)).donnees;
+  const vueDeLEmployeur = (await json("/api/discussions/" + candidature.id, undefined, cookieDe(emp.cookie))).donnees;
+  dire("elle relit sa declaration, et l'employeur l'apprend",
+       apresDeclaration.maDeclaration.dejaFaite === true && apresDeclaration.maDeclaration.le === declareeLe(candidature.id) &&
+       vueDeLEmployeur.maDeclaration === null && Boolean(vueDeLEmployeur.declarationDeLaPersonne) &&
+       vueDeLEmployeur.declarationDeLaPersonne.nom === "Test elle");
+  const pageApresDeclaration = await (await lire("/messages/" + candidature.id, elle.cookie)).text();
+  dire("la page du site dit la meme chose",
+       pageApresDeclaration.includes("Vous avez déclaré avoir effectué ce service"));
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");

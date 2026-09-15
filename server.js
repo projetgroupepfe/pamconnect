@@ -3362,6 +3362,16 @@ app.get("/mes-demandes", exigerConnexion, interdireALEquipe, (req, res) => {
 // Le meme besoin des deux cotes : savoir ce qui est parti et ce que
 // c'est devenu. Ne le donner qu'a l'employeur aurait laisse la
 // moitie de la plateforme chercher ses reponses au fond du profil.
+// Les reponses de la personne, et ou elles en sont : ECRIT UNE SEULE FOIS
+// pour le site et l'application.
+function mesReponses(u) {
+  return requetes.candidaturesDePrestataire.all(u.id).map((c) => ({
+    id: c.id,
+    titreDemande: c.titreAnnonce,
+    phrase: phraseCandidature(c.statut, false, c),
+  }));
+}
+
 app.get("/mes-reponses", exigerConnexion, interdireALEquipe, (req, res) => {
   if (req.utilisateur.role !== "prestataire") {
     return res.status(403).render("message", {
@@ -3375,7 +3385,7 @@ app.get("/mes-reponses", exigerConnexion, interdireALEquipe, (req, res) => {
   res.render("mes-reponses", {
     titre: "Mes reponses",
     utilisateur: req.utilisateur,
-    mesCandidatures: requetes.candidaturesDePrestataire.all(req.utilisateur.id),
+    reponses: mesReponses(req.utilisateur),
   });
 });
 
@@ -5247,40 +5257,92 @@ app.post("/verification", exigerConnexion, interdireALEquipe, (req, res) => {
 //
 // Ce qu'elle change : l'employeur voit qu'elle attend sa confirmation,
 // et l'equipe lit un desaccord date au lieu d'une somme qui traine.
-app.post("/candidatures/:id/jai-effectue", exigerConnexion, lireFormulaire, (req, res) => {
-  const conversation = conversationDe(Number(req.params.id), req.utilisateur);
+function declarerAvoirTravaille(candidatureId, u) {
+  const conversation = conversationDe(candidatureId, u);
 
   if (!conversation) {
-    return res.status(404).render("message", {
-      titre: "Discussion introuvable",
-      texte: "Cette discussion n'existe pas, ou elle ne vous concerne pas.",
-      liens: [{ url: "/messages", texte: "Mes messages" }],
-    });
+    return {
+      probleme: {
+        code: 404,
+        titre: "Discussion introuvable",
+        texte: "Cette discussion n'existe pas, ou elle ne vous concerne pas.",
+        lien: { url: "/messages", texte: "Mes messages" },
+      },
+    };
   }
+
+  const retour = { url: "/messages/" + conversation.id, texte: "Retour à la discussion" };
 
   // L'employeur a son propre bouton, qui lui verse la somme. Celui-ci
   // n'est pas le sien.
-  if (req.utilisateur.id !== conversation.prestataireId) {
-    return res.status(403).render("message", {
-      titre: "Ce bouton n'est pas le vôtre",
-      texte: "Déclarer que vous avez effectué le service appartient à la personne " +
-             "qui a travaillé. De votre côté, déclarez le service effectué : " +
-             "c'est ce qui la paie.",
-      liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
-    });
+  if (u.id !== conversation.prestataireId) {
+    return {
+      conversation,
+      probleme: {
+        code: 403,
+        titre: "Ce bouton n'est pas le vôtre",
+        texte: "Déclarer que vous avez effectué le service appartient à la personne " +
+               "qui a travaillé. De votre côté, déclarez le service effectué : " +
+               "c'est ce qui la paie.",
+        lien: retour,
+      },
+    };
   }
 
   if (conversation.statut !== "acceptee") {
-    return res.status(409).render("message", {
-      titre: "Aucun service à déclarer",
-      texte: "Vous ne pouvez déclarer un service que si l'employeur vous a choisie.",
-      liens: [{ url: "/messages/" + conversation.id, texte: "Retour à la discussion" }],
-    });
+    return {
+      conversation,
+      probleme: {
+        code: 409,
+        titre: "Aucun service à déclarer",
+        texte: "Vous ne pouvez déclarer un service que si l'employeur vous a choisie.",
+        lien: retour,
+      },
+    };
+  }
+
+  // UNE SEULE FOIS, et jamais apres l'employeur. La requete ne changeait
+  // deja rien dans ces deux cas ; la personne l'apprend desormais au lieu
+  // d'etre renvoyee sans un mot.
+  if (conversation.terminee_le) {
+    return {
+      conversation,
+      probleme: {
+        code: 409,
+        titre: "Service déjà terminé",
+        texte: `${conversation.nomEmployeur} a déjà déclaré ce service effectué.`,
+        lien: retour,
+      },
+    };
+  }
+
+  if (conversation.declaree_par_elle_le) {
+    return {
+      conversation,
+      probleme: {
+        code: 409,
+        titre: "Service déjà déclaré",
+        texte: `Vous avez déjà déclaré ce service le ${conversation.declaree_par_elle_le}.`,
+        lien: retour,
+      },
+    };
   }
 
   requetes.declarerParElle.run({ id: conversation.id });
 
-  res.redirect("/messages/" + conversation.id);
+  return {
+    conversation,
+    ok: true,
+    texte: `Votre déclaration est enregistrée. ${conversation.nomEmployeur} doit la confirmer ` +
+           "de son côté pour que la somme vous soit versée.",
+  };
+}
+
+app.post("/candidatures/:id/jai-effectue", exigerConnexion, lireFormulaire, (req, res) => {
+  const resultat = declarerAvoirTravaille(Number(req.params.id), req.utilisateur);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
+  res.redirect("/messages/" + resultat.conversation.id);
 });
 
 // L'employeur declare le service effectue. C'est lui qui l'a recu :
@@ -7124,6 +7186,11 @@ app.get("/api/discussions/:id", (req, res) => {
     declarationDeLaPersonne: jeSuisEmployeur && c.declaree_par_elle_le && !c.terminee_le
       ? { nom: c.nomPrestataire, le: c.declaree_par_elle_le }
       : null,
+    // ELLE AUSSI PEUT LE DIRE, une fois choisie. Sa declaration ne libere
+    // aucun argent : elle pose une trace datee.
+    maDeclaration: !jeSuisEmployeur && c.statut === "acceptee" && !c.terminee_le
+      ? { dejaFaite: Boolean(c.declaree_par_elle_le), le: c.declaree_par_elle_le || null, employeur: c.nomEmployeur }
+      : null,
   });
 });
 
@@ -7539,6 +7606,28 @@ app.post("/api/demandes/:id/reponse", (req, res) => {
   if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
 
   res.status(201).json({ texte: resultat.texte, candidatureId: resultat.candidatureId });
+});
+
+// --- Mes reponses depuis l'application ---------------------------------
+app.get("/api/mes-reponses", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+  if (moi.est_admin || moi.role !== "prestataire") {
+    return erreurApi(res, 403, "Cette page est celle des personnes qui répondent aux demandes.");
+  }
+
+  res.json({ reponses: mesReponses(moi) });
+});
+
+// --- J'ai effectue ce service, depuis l'application --------------------
+app.post("/api/candidatures/:id/jai-effectue", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const resultat = declarerAvoirTravaille(Number(req.params.id), moi);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.json({ texte: resultat.texte });
 });
 
 // --- La fiche d'une personne depuis l'application -------------------

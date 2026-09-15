@@ -11,7 +11,7 @@
 
   <%# ---- Cote prestataire : les candidatures envoyees ---- %>
   <% if (utilisateur.role === "prestataire") { %>
-    <% if (mesCandidatures.length === 0) { %>
+    <% if (reponses.length === 0) { %>
       <div class="vide">
         <p>Vous n'avez répondu à aucune demande.</p>
         <div class="actions">
@@ -23,17 +23,18 @@
       </div>
     <% } else { %>
       <div class="grille">
-        <% mesCandidatures.forEach(function (candidature) { %>
+        <%# Les phrases viennent de mesReponses : l'application lit les memes. %>
+        <% reponses.forEach(function (reponse) { %>
           <div class="carte">
-            <h3><%= candidature.titreAnnonce %></h3>
+            <h3><%= reponse.titreDemande %></h3>
             <ul class="infos">
               <li>
                 <%- include("partiels/icone", { nom: "disponibilite" }) %>
-                <span><strong><%= phraseCandidature(candidature.statut, false, candidature) %></strong></span>
+                <span><strong><%= reponse.phrase %></strong></span>
               </li>
             </ul>
             <div class="actions">
-              <a class="bouton bouton-secondaire" href="/messages/<%= candidature.id %>">
+              <a class="bouton bouton-secondaire" href="/messages/<%= reponse.id %>">
                 <%- include("partiels/icone", { nom: "message" }) %>
                 Discuter
               </a>
