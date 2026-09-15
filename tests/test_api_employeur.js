@@ -1065,6 +1065,60 @@ setTimeout(async () => {
        pageComptePre.includes(cp.totalRecu) && pageComptePre.includes(cp.recus[0].lignes[2].montant) &&
        pageComptePre.includes("Versé le " + cp.recus[0].verseLe));
 
+  console.log(SAUT + "--- MES JETONS ---");
+  const mesJetonsApi = (entetes) => json("/api/mes-jetons", undefined, entetes);
+  const demanderPack = (corps, entetes) => json("/api/mes-jetons/acheter", corps, entetes);
+  const achatsEnAttente = (id) => base.prepare(
+    "SELECT COUNT(*) n FROM jetons_achats WHERE utilisateur_id = ? AND etat = 'en attente'").get(id).n;
+  const montantLisible = (n) => n.toLocaleString("fr-FR").replace(/[\u202f\u00a0]/g, " ") + " FCFA";
+  dire("sans session : 401", (await mesJetonsApi()).code === 401 && (await demanderPack({ quantite: 1 })).code === 401);
+  dire("un compte d'equipe : 403", (await mesJetonsApi(cookieDe(equipe.cookie))).code === 403);
+
+  const jetonsEmp = await mesJetonsApi({ Authorization: "Bearer " + jeton });
+  const je = jetonsEmp.donnees || {};
+  const pageJetonsEmp = await (await lire("/mes-jetons", emp.cookie)).text();
+  dire("l'employeur lit son solde et ce qu'il permet, comme sur le site",
+       jetonsEmp.code === 200 && je.jeSuisEmployeur === true && je.uneAction === "mettre une demande en avant" &&
+       pageJetonsEmp.includes(je.soldeTotal) &&
+       (je.cout === null || pageJetonsEmp.includes(je.cout)) &&
+       (je.permet === null || pageJetonsEmp.includes(je.permet)) &&
+       (je.manque === null || pageJetonsEmp.includes(je.manque)) &&
+       je.mouvements.length === base.prepare("SELECT COUNT(*) n FROM jetons_mouvements WHERE utilisateur_id = ?").get(emp.id).n,
+       jetonsEmp.brut.slice(0, 300));
+  dire("chaque pack montre le meme prix que la page",
+       je.packs.every((pack) => pageJetonsEmp.includes(">" + pack.quantite + " jetons<") && pageJetonsEmp.includes(pack.prix)));
+
+  const packInexistant = await demanderPack({ quantite: 987654 }, cookieDe(emp.cookie));
+  dire("un pack qui n'existe pas : 400", packInexistant.code === 400 && achatsEnAttente(emp.id) === 0, packInexistant.brut);
+  dire("une quantite qui n'est ni un nombre ni un texte : 400",
+       (await demanderPack({ quantite: { faux: true } }, cookieDe(emp.cookie))).code === 400);
+
+  if (je.packs.length === 0) {
+    dire("aucun pack en vente : la page le dit aussi", pageJetonsEmp.includes("Aucun pack n&#39;est en vente") ||
+         pageJetonsEmp.includes("Aucun pack n'est en vente"));
+  } else {
+    const pack = je.packs[0];
+    const demandePack = await demanderPack({ quantite: pack.quantite, prix: 1, montant: 1 },
+                                           { Authorization: "Bearer " + jeton });
+    const enregistre = base.prepare(
+      "SELECT quantite, montant_fcfa FROM jetons_achats WHERE utilisateur_id = ? ORDER BY id DESC LIMIT 1").get(emp.id);
+    dire("la demande part de l'application, au prix du serveur et non a celui envoye",
+         demandePack.code === 201 && enregistre.quantite === pack.quantite &&
+         montantLisible(enregistre.montant_fcfa) === pack.prix, demandePack.brut);
+    dire("une seconde demande : 409",
+         (await demanderPack({ quantite: pack.quantite }, cookieDe(emp.cookie))).code === 409 && achatsEnAttente(emp.id) === 1);
+    const apresDemande = (await mesJetonsApi(cookieDe(emp.cookie))).donnees;
+    dire("le solde ne bouge pas avant l'equipe, et la demande attend",
+         apresDemande.soldeTotal === je.soldeTotal && apresDemande.demandeEnCours === true &&
+         apresDemande.achats[0].libelleEtat === "En attente de confirmation");
+    dire("la page du site pose la question avant d'envoyer",
+         pageJetonsEmp.includes('data-question="Demander ' + pack.quantite + " jetons pour " + pack.prix + ' ?"'));
+  }
+
+  const jetonsPre = (await mesJetonsApi(cookieDe(verifiee.cookie))).donnees;
+  dire("la personne qui repond lit la phrase de son role",
+       jetonsPre.jeSuisEmployeur === false && jetonsPre.uneAction === "répondre à une demande");
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");

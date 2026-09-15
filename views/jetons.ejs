@@ -2,11 +2,13 @@
 
   <h1>Mes jetons</h1>
 
-  <% if (perdusMaintenant) { %>
+  <%# Les decisions et les phrases de cette page viennent de mesJetons,
+      dans server.js : l'application lit exactement les memes. %>
+  <% if (jetons.perdusMaintenant) { %>
     <div class="carte">
       <p><span class="badge badge-non-soumis">Jetons offerts expirés</span></p>
       <p>
-        Vos <%= perdusMaintenant %> jetons offerts ne sont plus utilisables :
+        Vos <%= jetons.perdusMaintenant %> jetons offerts ne sont plus utilisables :
         le délai est passé.
       </p>
       <p class="aide">
@@ -25,26 +27,23 @@
     <h3>À quoi servent les jetons</h3>
 
     <p>
-      <% if (jeSuisEmployeur) { %>
+      <% if (jetons.jeSuisEmployeur) { %>
         <strong>Mettre une demande en avant</strong>, pour qu'elle soit vue
-        avant les autres<% if (coutAction) { %>, coûte
-        <strong><%= jetonsEnClair(coutAction) %></strong><% } %>.
+        avant les autres<% if (jetons.cout) { %>, coûte
+        <strong><%= jetons.cout %></strong><% } %>.
       <% } else { %>
-        <strong>Répondre à une demande</strong><% if (coutAction) { %> coûte
-        <strong><%= jetonsEnClair(coutAction) %></strong><% } %>.
+        <strong>Répondre à une demande</strong><% if (jetons.cout) { %> coûte
+        <strong><%= jetons.cout %></strong><% } %>.
       <% } %>
-      <% if (coutAction && solde.total > 0) { %>
-        <% const possible = Math.floor(solde.total / coutAction); %>
-        <% if (possible > 0) { %>
-          Votre solde vous permet de
-          <strong><%= actionsPossibles(jeSuisEmployeur, possible) %></strong>.
-        <% } else { %>
-          Il vous manque <strong><%= jetonsEnClair(coutAction - solde.total) %></strong>.
-        <% } %>
+      <% if (jetons.permet) { %>
+        Votre solde vous permet de
+        <strong><%= jetons.permet %></strong>.
+      <% } else if (jetons.manque) { %>
+        Il vous manque <strong><%= jetons.manque %></strong>.
       <% } %>
     </p>
 
-    <% if (jeSuisEmployeur) { %>
+    <% if (jetons.jeSuisEmployeur) { %>
       <p class="aide">
         Elle se lance depuis <a href="/mes-demandes">vos demandes</a>, sur celle
         que vous voulez faire passer devant.
@@ -67,36 +66,36 @@
     <div class="detail-tarif">
       <div class="ligne-tarif total">
         <span>Votre solde</span>
-        <strong><%= jetonsEnClair(solde.total) %></strong>
+        <strong><%= jetons.soldeTotal %></strong>
       </div>
 
-      <% if (solde.offerts > 0) { %>
+      <% if (jetons.offerts > 0) { %>
         <div class="ligne-tarif">
           <%# D'OU ILS VIENNENT ET JUSQU'A QUAND, en une ligne. Un pave
               entier disait la meme chose juste au-dessus de celle-ci. %>
           <span>
             Jetons offerts
             <br><small class="discret">
-              Offerts à la vérification de votre compte<% if (expireLe) { %>, à utiliser avant le <%= expireLe %><% } %>
+              Offerts à la vérification de votre compte<% if (jetons.expireLe) { %>, à utiliser avant le <%= jetons.expireLe %><% } %>
             </small>
           </span>
-          <span><%= solde.offerts %></span>
+          <span><%= jetons.offerts %></span>
         </div>
       <% } %>
 
-      <% if (solde.achetes > 0) { %>
+      <% if (jetons.achetes > 0) { %>
         <div class="ligne-tarif">
           <span>Jetons achetés<br><small class="discret">Sans date limite</small></span>
-          <span><%= solde.achetes %></span>
+          <span><%= jetons.achetes %></span>
         </div>
       <% } %>
     </div>
 
-    <% if (solde.total === 0) { %>
+    <% if (jetons.soldeVide) { %>
       <%# UNE PERSONNE NON VERIFIEE N'A RIEN A ACHETER TOUT DE SUITE :
           des jetons l'attendent, et le dire vaut mieux que de la laisser
           payer ce qu'on allait lui offrir. %>
-      <% if (moi.statut_verification !== "verifie") { %>
+      <% if (jetons.verificationAFaire) { %>
         <p class="aide">
           Vous n'avez pas encore de jetons. Des jetons vous seront
           <strong>offerts</strong> dès que votre identité aura été vérifiée.
@@ -117,7 +116,7 @@
 
   <h2>Acheter des jetons</h2>
 
-  <% if (valeurJeton === null || packs.length === 0) { %>
+  <% if (jetons.valeurJeton === null || jetons.packs.length === 0) { %>
 
     <%# Aucun prix invente : si le reglage manque, on le dit. %>
     <div class="vide">
@@ -128,10 +127,10 @@
   <% } else { %>
 
     <p class="chapeau">
-      Un jeton vaut <strong><%= formaterMontant(valeurJeton) %></strong>.
+      Un jeton vaut <strong><%= jetons.valeurJeton %></strong>.
     </p>
 
-    <% if (demandeEnCours) { %>
+    <% if (jetons.demandeEnCours) { %>
       <div class="carte">
         <p>
           <span class="badge badge-en-attente">Demande en cours</span>
@@ -143,43 +142,44 @@
       </div>
     <% } else { %>
       <div class="grille">
-        <% packs.forEach(function (pack) { %>
+        <% jetons.packs.forEach(function (pack) { %>
           <div class="carte">
             <h3><%= pack.quantite %> jetons</h3>
             <div class="detail-tarif">
               <div class="ligne-tarif total">
                 <span>Prix</span>
-                <strong><%= formaterMontant(pack.prix) %></strong>
+                <strong><%= pack.prix %></strong>
               </div>
             </div>
 
             <%# CE QUE CE PACK DONNERA A CETTE PERSONNE, son solde actuel
                 compris. Le meme pack de 5 vaut cinq reponses pour une
                 aide-menagere, et pas grand-chose pour un employeur dont
-                l'action coute 20 - il a le droit de le savoir avant. %>
-            <% if (coutAction) { %>
-              <% const apres = solde.total + pack.quantite; %>
-              <% const combien = Math.floor(apres / coutAction); %>
-              <%# LE TOTAL, ET PAS SEULEMENT CE QUE LE PACK APPORTE. Sans
-                  lui, "de quoi mettre 2 demandes en avant" sous un pack
-                  de 20 jetons se lit comme si le pack en valait deux -
-                  et le prix semble divise par deux. %>
-              <% if (combien > 0) { %>
-                <p class="aide">
-                  Après cet achat : <strong><%= apres %> jetons</strong>,
-                  de quoi <%= actionsPossibles(jeSuisEmployeur, combien) %>.
-                </p>
-              <% } else { %>
-                <% const manque = coutAction - apres; %>
-                <p class="aide">
-                  Après cet achat : <strong><%= apres %> jetons</strong>. Il vous en
-                  manquera encore <strong><%= manque %></strong>
-                  pour <%= uneAction(jeSuisEmployeur) %>.
-                </p>
-              <% } %>
+                l'action coute 20 - il a le droit de le savoir avant.
+
+                LE TOTAL, ET PAS SEULEMENT CE QUE LE PACK APPORTE. Sans
+                lui, "de quoi mettre 2 demandes en avant" sous un pack
+                de 20 jetons se lit comme si le pack en valait deux -
+                et le prix semble divise par deux. %>
+            <% if (pack.dequoi) { %>
+              <p class="aide">
+                Après cet achat : <strong><%= pack.apres %> jetons</strong>,
+                de quoi <%= pack.dequoi %>.
+              </p>
+            <% } else if (pack.manqueEncore) { %>
+              <p class="aide">
+                Après cet achat : <strong><%= pack.apres %> jetons</strong>. Il vous en
+                manquera encore <strong><%= pack.manqueEncore %></strong>
+                pour <%= jetons.uneAction %>.
+              </p>
             <% } %>
 
-            <form action="/mes-jetons/acheter" method="POST">
+            <%# UNE QUESTION AVANT D'ENVOYER. Une demande envoyee ne
+                s'annule pas depuis le compte, et l'equipe attendra un
+                paiement : un appui par erreur ne doit pas suffire. %>
+            <form action="/mes-jetons/acheter" method="POST"
+                  data-question="Demander <%= pack.quantite %> jetons pour <%= pack.prix %> ?"
+                  data-precision="L'équipe ajoutera les jetons à votre solde une fois le paiement reçu. Une demande envoyée ne s'annule pas depuis votre compte.">
               <input type="hidden" name="quantite" value="<%= pack.quantite %>">
               <button type="submit" class="bouton">
                 <%- include("partiels/icone", { nom: "jeton" }) %>
@@ -212,34 +212,28 @@
 
   <h2>Vos demandes d'achat</h2>
 
-  <% if (achats.length === 0) { %>
+  <% if (jetons.achats.length === 0) { %>
     <p class="vide">Aucune demande pour le moment.</p>
   <% } else { %>
     <div class="grille">
-      <% achats.forEach(function (achat) { %>
+      <% jetons.achats.forEach(function (achat) { %>
         <div class="carte">
           <h3><%= achat.quantite %> jetons</h3>
           <p>
-            <% if (achat.etat === "en attente") { %>
-              <span class="badge badge-en-attente">En attente de confirmation</span>
-            <% } else if (achat.etat === "confirme") { %>
-              <span class="badge badge-verifie">Jetons ajoutés</span>
-            <% } else { %>
-              <span class="badge badge-refuse">Refusée</span>
-            <% } %>
+            <span class="badge <%= { "en attente": "badge-en-attente", confirme: "badge-verifie" }[achat.etat] || "badge-refuse" %>"><%= achat.libelleEtat %></span>
           </p>
           <ul class="infos">
             <li>
               <%- include("partiels/icone", { nom: "remuneration" }) %>
-              <span><%= formaterMontant(achat.montant) %></span>
+              <span><%= achat.montant %></span>
             </li>
             <li>
               <%- include("partiels/icone", { nom: "calendrier" }) %>
-              <span>Demandé le <%= dateLisible(achat.cree_le) %></span>
+              <span>Demandé le <%= achat.demandeLe %></span>
             </li>
           </ul>
-          <% if (achat.etat === "refuse" && achat.motif_refus) { %>
-            <p class="aide">Motif : <%= achat.motif_refus %></p>
+          <% if (achat.motifRefus) { %>
+            <p class="aide">Motif : <%= achat.motifRefus %></p>
           <% } %>
         </div>
       <% }); %>
@@ -250,23 +244,21 @@
 
   <%# L'HISTORIQUE COMPLET. Une plateforme qui prend un jeton doit
       pouvoir dire quand, et pour quoi. %>
-  <% if (mouvements.length === 0) { %>
+  <% if (jetons.mouvements.length === 0) { %>
     <p class="vide">Aucun mouvement pour le moment.</p>
   <% } else { %>
     <div class="carte">
       <div class="detail-tarif">
-        <% mouvements.forEach(function (m) { %>
+        <% jetons.mouvements.forEach(function (m) { %>
           <div class="ligne-tarif">
             <span>
-              <%= m.detail || motifJetonsLisible(m.motif) %>
-              <br><small class="discret">
-                <%= dateLisible(m.cree_le) %><%= m.nature === "offert" ? ", jetons offerts" : "" %>
-              </small>
+              <%= m.libelle %>
+              <br><small class="discret"><%= m.date %></small>
             </span>
-            <% if (m.quantite < 0) { %>
-              <span class="retenue">− <%= Math.abs(m.quantite) %></span>
+            <% if (m.retrait) { %>
+              <span class="retenue"><%= m.quantite %></span>
             <% } else { %>
-              <strong>+ <%= m.quantite %></strong>
+              <strong><%= m.quantite %></strong>
             <% } %>
           </div>
         <% }); %>

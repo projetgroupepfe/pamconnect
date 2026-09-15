@@ -5845,86 +5845,157 @@ app.get("/mon-compte", exigerConnexion, interdireALEquipe, (req, res) => {
 // repondre a une demande de l'autre - et cette phrase-la depend du role.
 //
 // Un membre de l'equipe n'en a pas : il ne publie ni ne repond.
-app.get("/mes-jetons", exigerConnexion, interdireALEquipe, (req, res) => {
+//
+// Tout ce que la page decide est ecrit ICI, UNE SEULE FOIS : le site et
+// l'application lisent les memes phrases et les memes nombres.
+function mesJetons(u) {
   // Les jetons offerts arrivent ici, et les perimes partent ici. Ne rien
   // faire tant que personne ne regarde couterait une tache de fond, pour
   // un resultat qu'on ne verrait qu'en ouvrant cette page.
-  const mouvement = mettreAJourLesJetons(req.utilisateur);
+  const mouvement = mettreAJourLesJetons(u);
 
-  const solde = soldeJetonsDe(req.utilisateur.id);
-  const expiration = requetes.expirationJetonsOfferts.get(req.utilisateur.id);
+  const jeSuisEmployeur = u.role === "employeur";
+  const solde = soldeJetonsDe(u.id);
+  const expiration = requetes.expirationJetonsOfferts.get(u.id);
+  const valeurJeton = valeurDuJeton();
 
-  res.render("jetons", {
-    titre: "Mes jetons",
-    jeSuisEmployeur: req.utilisateur.role === "employeur",
-    solde,
+  // Ce que coute UNE action pour cette personne-la. La page s'en sert
+  // pour dire ce que son solde permet - au lieu d'afficher un nombre
+  // de jetons dont personne ne sait ce qu'il vaut.
+  const coutAction = coutDeLAction(u.role);
+  const possible = coutAction ? Math.floor(solde.total / coutAction) : 0;
 
+  return {
+    jeSuisEmployeur,
+
+    // La perte est un evenement : on la dit une fois.
+    perdusMaintenant: mouvement.perdus || null,
+
+    cout: coutAction ? jetonsEnClair(coutAction) : null,
+    permet: coutAction && solde.total > 0 && possible > 0
+      ? actionsPossibles(jeSuisEmployeur, possible) : null,
+    manque: coutAction && solde.total > 0 && possible === 0
+      ? jetonsEnClair(coutAction - solde.total) : null,
+
+    // LE SOLDE, EN DEUX PARTS. Les melanger cacherait ce qui va expirer.
+    soldeTotal: jetonsEnClair(solde.total),
+    offerts: solde.offerts,
+    achetes: solde.achetes,
     // La date n'est annoncee que s'il reste vraiment des jetons offerts.
     expireLe: solde.offerts > 0 && expiration && expiration.quand
-      ? dateLisible(expiration.quand)
-      : null,
+      ? dateLisible(expiration.quand) : null,
+    soldeVide: solde.total === 0,
+    // Une personne non verifiee n'a rien a acheter tout de suite : des
+    // jetons l'attendent.
+    verificationAFaire: u.statut_verification !== "verifie",
 
-    packs: packsEnVente(),
-    valeurJeton: valeurDuJeton(),
+    valeurJeton: valeurJeton === null ? null : formaterMontant(valeurJeton),
+    demandeEnCours: Boolean(requetes.achatJetonsEnAttentePour.get(u.id)),
+    uneAction: uneAction(jeSuisEmployeur),
 
-    // Ce que coute UNE action pour cette personne-la. La page s'en sert
-    // pour dire ce que son solde permet - au lieu d'afficher un nombre
-    // de jetons dont personne ne sait ce qu'il vaut.
-    coutAction: coutDeLAction(req.utilisateur.role),
+    // CE QUE CHAQUE PACK DONNERA A CETTE PERSONNE, son solde actuel
+    // compris : le total apres achat, et ce qu'il permet.
+    packs: packsEnVente().map((pack) => {
+      const apres = solde.total + pack.quantite;
+      const combien = coutAction ? Math.floor(apres / coutAction) : 0;
+      return {
+        quantite: pack.quantite,
+        prix: formaterMontant(pack.prix),
+        apres: coutAction ? apres : null,
+        dequoi: coutAction && combien > 0 ? actionsPossibles(jeSuisEmployeur, combien) : null,
+        manqueEncore: coutAction && combien === 0 ? coutAction - apres : null,
+      };
+    }),
 
-    mouvements: requetes.mesMouvementsJetons.all(req.utilisateur.id),
-    achats: requetes.mesAchatsJetons.all(req.utilisateur.id),
-    demandeEnCours: Boolean(requetes.achatJetonsEnAttentePour.get(req.utilisateur.id)),
+    achats: requetes.mesAchatsJetons.all(u.id).map((achat) => ({
+      quantite: achat.quantite,
+      etat: achat.etat,
+      libelleEtat: achat.etat === "en attente" ? "En attente de confirmation"
+        : achat.etat === "confirme" ? "Jetons ajoutés"
+        : "Refusée",
+      montant: formaterMontant(achat.montant),
+      demandeLe: dateLisible(achat.cree_le),
+      motifRefus: achat.etat === "refuse" && achat.motif_refus ? achat.motif_refus : null,
+    })),
 
-    // Les jetons offerts sont annonces a partir du SOLDE, pas de ce qui
-    // vient de se passer : ils sont credites par l'equipe, la personne
-    // ne les voit donc pas arriver.
-    //
-    // La perte, elle, est bien un evenement : on la dit une fois.
-    perdusMaintenant: mouvement.perdus,
-  });
+    // L'HISTORIQUE COMPLET. Une plateforme qui prend un jeton doit
+    // pouvoir dire quand, et pour quoi.
+    mouvements: requetes.mesMouvementsJetons.all(u.id).map((m) => ({
+      libelle: m.detail || motifJetonsLisible(m.motif),
+      date: dateLisible(m.cree_le) + (m.nature === "offert" ? ", jetons offerts" : ""),
+      quantite: m.quantite < 0 ? `− ${Math.abs(m.quantite)}` : `+ ${m.quantite}`,
+      retrait: m.quantite < 0,
+    })),
+  };
+}
+
+app.get("/mes-jetons", exigerConnexion, interdireALEquipe, (req, res) => {
+  res.render("jetons", { titre: "Mes jetons", jetons: mesJetons(req.utilisateur) });
 });
 
 // --- Demander un pack de jetons ------------------------------------
-app.post("/mes-jetons/acheter", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
+//
+// UNE DEMANDE, PAS UN PAIEMENT. Rien n'est encaisse ici : la demande est
+// enregistree au prix du serveur, et l'equipe credite les jetons a la
+// main une fois le paiement constate.
+function demanderUnPack(u, quantiteSaisie) {
+  const retour = { url: "/mes-jetons", texte: "Retour à mes jetons" };
+
   // LE PRIX NE VIENT JAMAIS DU FORMULAIRE. On ne retient que la
   // quantite demandee, et on relit le prix dans les packs du serveur.
   // Sinon n'importe qui pourrait renvoyer la page en ecrivant 60 jetons
   // pour 1 FCFA.
-  const quantite = Math.round(Number(req.body.quantite) || 0);
+  const quantite = Math.round(Number(quantiteSaisie) || 0);
   const pack = packsEnVente().find((p) => p.quantite === quantite);
 
   if (!pack) {
-    return res.status(400).render("message", {
-      titre: "Ce pack n'existe pas",
-      texte: "Ce pack n'est plus en vente. Choisissez-en un dans la liste.",
-      liens: [{ url: "/mes-jetons", texte: "Retour à mes jetons" }],
-    });
+    return {
+      probleme: {
+        code: 400,
+        titre: "Ce pack n'existe pas",
+        texte: "Ce pack n'est plus en vente. Choisissez-en un dans la liste.",
+        lien: retour,
+      },
+    };
   }
 
   // UNE SEULE DEMANDE A LA FOIS. Deux demandes identiques en attente
   // sont presque toujours un double clic, et l'equipe ne saurait pas
   // laquelle confirmer.
-  if (requetes.achatJetonsEnAttentePour.get(req.utilisateur.id)) {
-    return res.status(409).render("message", {
-      titre: "Une demande est déjà en cours",
-      texte: "Votre demande précédente attend la confirmation de l'équipe. " +
-             "Vous pourrez en envoyer une autre une fois celle-ci traitée.",
-      liens: [{ url: "/mes-jetons", texte: "Retour à mes jetons" }],
-    });
+  if (requetes.achatJetonsEnAttentePour.get(u.id)) {
+    return {
+      probleme: {
+        code: 409,
+        titre: "Une demande est déjà en cours",
+        texte: "Votre demande précédente attend la confirmation de l'équipe. " +
+               "Vous pourrez en envoyer une autre une fois celle-ci traitée.",
+        lien: retour,
+      },
+    };
   }
 
   requetes.creerAchatJetons.run({
-    personne: req.utilisateur.id,
+    personne: u.id,
     quantite: pack.quantite,
     montant: pack.prix,
   });
 
-  res.render("message", {
+  return {
+    ok: true,
     titre: "Demande enregistrée",
     texte: `Votre demande de ${pack.quantite} jetons pour ` +
            `${formaterMontant(pack.prix)} est enregistrée. Vos jetons seront ` +
            `ajoutés à votre solde dès que l'équipe aura confirmé le paiement.`,
+  };
+}
+
+app.post("/mes-jetons/acheter", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
+  const resultat = demanderUnPack(req.utilisateur, req.body.quantite);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
+  res.render("message", {
+    titre: resultat.titre,
+    texte: resultat.texte,
     liens: [{ url: "/mes-jetons", texte: "Voir mes jetons" }],
   });
 });
@@ -7259,6 +7330,33 @@ app.get("/api/mon-compte", (req, res) => {
   if (refusEquipeApi(res, moi)) return;
 
   res.json(monCompte(moi));
+});
+
+// --- Mes jetons depuis l'application ---------------------------------
+//
+// La demande d'achat part de l'application comme du site : au prix du
+// serveur, sans aucun numero ni code de paiement. Un prix envoye avec la
+// demande est ignore.
+app.get("/api/mes-jetons", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  res.json(mesJetons(moi));
+});
+
+app.post("/api/mes-jetons/acheter", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  const quantite = req.body && req.body.quantite;
+  if (quantite != null && typeof quantite !== "number" && typeof quantite !== "string") {
+    return erreurApi(res, 400, "La demande envoyée n'a pas la forme attendue.");
+  }
+
+  const resultat = demanderUnPack(moi, quantite);
+  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+  res.status(201).json({ texte: resultat.texte });
 });
 
 // --- La fiche d'une personne depuis l'application -------------------
