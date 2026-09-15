@@ -8,6 +8,9 @@
 // scénario du tout. Tant que cette série passe, ce qui est écrit dans la
 // fiche est vrai.
 //
+// La personne qui repond joue ses ecrans SUR LE TELEPHONE : la serie
+// verifie aussi que l'API de l'application dit la meme chose que le site.
+//
 // Elle utilise des comptes jetables : les comptes de la démonstration
 // (meena, asta) ne doivent surtout pas être consommés ici.
 const fs = require("fs");
@@ -54,6 +57,17 @@ async function creerCompte(suffixe, role, extra) {
 const fichier = (nom, octets, type) =>
   new File([new Uint8Array(octets)], nom, { type });
 
+// Les appels de l'application : du JSON, avec la meme session.
+async function json(chemin, cookie) {
+  const r = await fetch(RACINE + chemin, {
+    headers: Object.assign({ "Content-Type": "application/json" }, cookie ? { Cookie: cookie } : {}),
+  });
+  const brut = await r.text();
+  let donnees = null;
+  try { donnees = JSON.parse(brut); } catch (e) { donnees = null; }
+  return { code: r.status, donnees: donnees || {}, brut };
+}
+
 setTimeout(async () => {
   // L'employeur de la demonstration est prepare a l'avance : c'est ce
   // que la fiche conseille, pour ne jouer en direct que la verification
@@ -96,6 +110,15 @@ setTimeout(async () => {
   dire("et on lui propose de faire verifier son identite",
        texteRefus.includes("Faire vérifier mon identité"));
 
+  // SUR LE TELEPHONE, la meme porte fermee, la meme phrase, le meme chemin.
+  const refusApp = await json("/api/demandes/" + annonce.id + "/reponse", pre.cookie);
+  dire("sur le telephone aussi : la meme raison, et la verification proposee",
+       refusApp.code === 403 && String(refusApp.donnees.erreur).includes("il a le droit de savoir qui vient") &&
+       refusApp.donnees.verification === true, refusApp.brut);
+  const refusEmployeur = await json("/api/demandes/" + annonce.id + "/reponse", emp.cookie);
+  dire("un employeur est refuse sans qu'on lui propose la verification",
+       refusEmployeur.code === 403 && refusEmployeur.donnees.verification === undefined, refusEmployeur.brut);
+
   // La regle est sur le serveur, pas dans la page.
   dire("envoyer la requete a la main ne change rien",
        (await poster("/candidatures", form({ annonceId: String(annonce.id) }), pre.cookie)).code === 403);
@@ -114,6 +137,10 @@ setTimeout(async () => {
          .get(pre.id).statut_verification === "en attente");
   dire("son profil dit depuis quand elle attend",
        (await (await lire("/mon-profil", pre.cookie)).text()).includes("Réponse attendue"));
+  const dossierApp = await json("/api/verification", pre.cookie);
+  dire("sur le telephone, le dossier attend, sous 24 heures",
+       dossierApp.code === 200 && dossierApp.brut.includes("Réponse attendue") && dossierApp.brut.includes("24"),
+       dossierApp.brut.slice(0, 200));
 
   console.log("\n--- ECRAN 3 : L'EQUIPE VERIFIE, ET LES JETONS ARRIVENT ---");
   const espaceEquipe = await (await lire("/admin", eq.cookie)).text();
@@ -147,6 +174,12 @@ setTimeout(async () => {
   dire("sa page dit d ou ils viennent", pageJetons.includes("Offerts à la vérification"));
   dire("et jusqu a quand ils durent", pageJetons.includes("à utiliser avant le"));
   dire("et ce qu'ils lui permettent", pageJetons.includes("répondre à 3 demandes"));
+  const jetonsApp = await json("/api/mes-jetons", pre.cookie);
+  // La phrase autour des chiffres est ecrite par chaque ecran ; les
+  // chiffres, eux, viennent du serveur.
+  dire("sur le telephone, les 3 jetons offerts, leur date limite et ce qu'ils permettent",
+       jetonsApp.code === 200 && jetonsApp.donnees.offerts === 3 && Boolean(jetonsApp.donnees.expireLe) &&
+       jetonsApp.donnees.permet === "répondre à 3 demandes", jetonsApp.brut.slice(0, 200));
 
   console.log("\n--- ECRAN 4 : ELLE REPOND, ET VOIT CE QU'ELLE TOUCHERA ---");
   const ecranReponse = await (await lire("/candidatures/nouvelle/" + annonce.id, pre.cookie)).text();
@@ -165,6 +198,10 @@ setTimeout(async () => {
   dire("le cout de la reponse est annonce avant", ecranReponse.includes("Envoyer cette réponse"));
   dire("en jetons et en francs", ecranReponse.includes("1 jeton (100 FCFA)"));
   dire("ce qu'il lui restera aussi", ecranReponse.includes("Il vous restera"));
+  const reponseApp = await json("/api/demandes/" + annonce.id + "/reponse", pre.cookie);
+  dire("sur le telephone, l'ecran s'ouvre avec les memes montants et le meme cout",
+       reponseApp.code === 200 && ["20 000", "2 000", "18 000", "1 jeton (100 FCFA)"]
+         .every((morceau) => reponseApp.brut.includes(morceau)), reponseApp.brut.slice(0, 300));
 
   const reponse = await poster("/candidatures", form({ annonceId: String(annonce.id) }), pre.cookie);
   const cand = base.prepare("SELECT id FROM candidatures WHERE annonce_id = ?").get(annonce.id);
@@ -196,6 +233,9 @@ setTimeout(async () => {
        (await (await lire("/annonces", pre.cookie)).text()).includes('class="pastille"'));
   dire("et sa candidature dit qu'elle est acceptee",
        (await (await lire("/mes-reponses", pre.cookie)).text()).includes("Votre candidature a été acceptée"));
+  dire("sur le telephone, la pastille de Messages et Mes reponses le disent aussi",
+       (await json("/api/moi", pre.cookie)).donnees.moi.aVoir >= 1 &&
+       (await json("/api/mes-reponses", pre.cookie)).brut.includes("Votre candidature a été acceptée"));
 
   console.log("\n--- ECRAN 6 : L'ARGENT ---");
   const compteEmp = await (await lire("/mon-compte", emp.cookie)).text();
@@ -209,6 +249,9 @@ setTimeout(async () => {
   dire("avec le detail de la commission", comptePre.includes("2 000"));
   dire("la discussion rejoint les services termines",
        (await (await lire("/messages", pre.cookie)).text()).includes("Services terminés"));
+  const compteApp = await json("/api/mon-compte", pre.cookie);
+  dire("sur le telephone, Mon compte montre les 18 000 FCFA recus",
+       compteApp.code === 200 && compteApp.brut.includes("18 000"), compteApp.brut.slice(0, 200));
 
   const versementsEquipe = await (await lire("/admin/versements", eq.cookie)).text();
   const attendent = versementsEquipe.slice(0, versementsEquipe.indexOf("Sommes dénouées"));

@@ -6925,6 +6925,16 @@ function erreurApi(res, code, message) {
   return res.status(code).json({ erreur: message });
 }
 
+// Un refus qui se regle en faisant verifier son identite le dit a
+// l'application : elle propose alors le bouton que le site met sous la
+// phrase, "Faire vérifier mon identité". Sans lui, la personne lisait
+// pourquoi la porte est fermee, sans le chemin pour l'ouvrir.
+function erreurApiDuProbleme(res, probleme) {
+  const corps = { erreur: probleme.texte };
+  if (probleme.lien && probleme.lien.url === "/verification") corps.verification = true;
+  return res.status(probleme.code).json(corps);
+}
+
 // Ce que l'application a le droit de savoir sur la personne connectee.
 // On choisit les champs UN PAR UN : renvoyer la ligne entiere ferait
 // sortir l'empreinte du mot de passe.
@@ -7797,7 +7807,7 @@ app.get("/api/demandes/:id/reponse", (req, res) => {
   if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
 
   const ecran = ecranPourRepondre(moi, Number(req.params.id));
-  if (ecran.probleme) return erreurApi(res, ecran.probleme.code, ecran.probleme.texte);
+  if (ecran.probleme) return erreurApiDuProbleme(res, ecran.probleme);
 
   const { annonce, reputationEmployeur, cout, solde, limite, restantAujourdhui } = ecran;
   const detail = detaillerTarif(annonce.prix);
@@ -7851,7 +7861,7 @@ app.post("/api/demandes/:id/reponse", (req, res) => {
   if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
 
   const resultat = envoyerReponse(moi, Number(req.params.id));
-  if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+  if (resultat.probleme) return erreurApiDuProbleme(res, resultat.probleme);
 
   res.status(201).json({ texte: resultat.texte, candidatureId: resultat.candidatureId });
 });
