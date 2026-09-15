@@ -76,6 +76,18 @@ class ApiPamConnect {
     return _interpreter(() => Moi.depuisReponse(donnees));
   }
 
+  /// L'ecran Repondre a cette demande : le prix, ce qu'elle recevra, et ce
+  /// que la reponse coute, ecrits par le serveur.
+  Future<EcranReponse> ecranReponse(int demandeId) async {
+    final donnees = await _appeler('/api/demandes/$demandeId/reponse');
+    return _interpreter(() => EcranReponse.depuisJson(donnees));
+  }
+
+  Future<ReponseEnvoyee> repondre(int demandeId) async {
+    final donnees = await _appeler('/api/demandes/$demandeId/reponse', corps: const {});
+    return _interpreter(() => ReponseEnvoyee.depuisJson(donnees));
+  }
+
   Future<ListeDemandes> demandes() async {
     final donnees = await _appeler('/api/demandes');
     return _interpreter(() => ListeDemandes.depuisJson(donnees));

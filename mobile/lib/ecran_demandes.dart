@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'ecran_connexion.dart';
+import 'ecran_repondre.dart';
 import 'elements.dart';
 import 'modeles.dart';
 import 'theme.dart';
 
-/// Les demandes ouvertes, dans l'ordre que le serveur a decide : celles du
-/// metier de la personne d'abord, les autres ensuite.
+/// Les demandes ouvertes, comme la page Demandes disponibles du site, dans
+/// l'ordre que le serveur a decide : celles du metier de la personne
+/// d'abord, les autres ensuite.
 class EcranDemandes extends StatefulWidget {
   const EcranDemandes({super.key, required this.api, required this.moi, this.rafraichir = 0, this.auMoi});
 
@@ -82,6 +84,17 @@ class _EcranDemandesState extends State<EcranDemandes> {
     }
   }
 
+  Future<void> _repondre(Demande demande) async {
+    final texte = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => EcranRepondre(api: widget.api, demandeId: demande.id)),
+    );
+    if (!mounted) return;
+    // Le solde de jetons a pu changer : l'en-tete se recharge aussi.
+    await _actualiser();
+    if (!mounted || texte == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
+  }
+
   Future<void> _seDeconnecter() async {
     await widget.api.deconnexion();
     if (!mounted) return;
@@ -92,7 +105,7 @@ class _EcranDemandesState extends State<EcranDemandes> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Les demandes'),
+        title: const Text('Demandes disponibles'),
         actions: [
           IconButton(
             tooltip: 'Actualiser',
@@ -119,16 +132,19 @@ class _EcranDemandesState extends State<EcranDemandes> {
 
   List<Widget> _contenu(BuildContext context) {
     final liste = _liste;
-    // UN TITRE SERT A DISTINGUER, PAS A ETIQUETER : il n'apparait que si les
-    // deux listes existent. Seul au-dessus d'une liste unique, il n'apprendrait
-    // rien. C'est la regle deja appliquee sur le site.
-    final deuxListes = liste != null && liste.pourMoi.isNotEmpty && liste.autres.isNotEmpty;
+    final erreur = _erreur;
+    final texte = Theme.of(context).textTheme;
+    final gris = texte.bodyLarge?.copyWith(color: Couleurs.encreDouce);
+    final aide = texte.bodyMedium?.copyWith(color: Couleurs.encrePale);
+    final monMetier = liste?.monMetier;
 
     return [
       EnTetePersonne(moi: _moi),
+      const SizedBox(height: 12),
+      Text('Les demandes publiées par les employeurs de Yaoundé.', style: gris),
       const SizedBox(height: 16),
-      if (_erreur != null) ...[
-        Avertissement(texte: _erreur!),
+      if (erreur != null) ...[
+        Avertissement(texte: erreur),
         const SizedBox(height: 16),
       ],
       if (liste == null && _enCours)
@@ -139,33 +155,55 @@ class _EcranDemandesState extends State<EcranDemandes> {
       if (liste != null && liste.vide)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 32),
-          child: Text(
-            'Aucune demande ouverte pour le moment.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Couleurs.encreDouce),
-          ),
+          child: Text('Aucune demande pour le moment.', textAlign: TextAlign.center, style: gris),
         ),
-      if (liste != null) ...[
-        if (deuxListes) const TitreSection('Pour votre métier'),
-        for (final demande in liste.pourMoi) _CarteDemande(demande: demande),
-        if (deuxListes) const TitreSection('Les autres demandes'),
-        for (final demande in liste.autres) _CarteDemande(demande: demande),
+      if (liste != null && !liste.vide) ...[
+        // Les demandes de son metier passent devant, sans masquer les autres :
+        // rien n'empeche une aide-menagere de garder des enfants.
+        if (monMetier != null) ...[
+          TitreSection('Pour vous : $monMetier'),
+          if (liste.pourMoi.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text('Aucune demande de $monMetier pour le moment.', style: gris),
+            ),
+          for (final demande in liste.pourMoi) _CarteDemande(demande: demande, auRepondre: _repondre),
+          if (liste.autres.isNotEmpty) ...[
+            const TitreSection('Les autres demandes'),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                "Elles ne correspondent pas à ce que vous avez indiqué, mais rien ne vous empêche d'y répondre.",
+                style: aide,
+              ),
+            ),
+          ],
+        ],
+        for (final demande in liste.autres) _CarteDemande(demande: demande, auRepondre: _repondre),
       ],
     ];
   }
 }
 
+/// Une demande, comme la carte du site : le titre, le badge s'il a ete
+/// paye, puis le metier, l'horaire, le prix, ce qu'il faut savoir et le lieu.
 class _CarteDemande extends StatelessWidget {
-  const _CarteDemande({required this.demande});
+  const _CarteDemande({required this.demande, required this.auRepondre});
 
   final Demande demande;
+  final void Function(Demande) auRepondre;
 
   @override
   Widget build(BuildContext context) {
     final texte = Theme.of(context).textTheme;
-    final lieu = demande.lieu;
-    final horaire = demande.horaire;
+    final aide = texte.bodyMedium?.copyWith(color: Couleurs.encrePale);
+    const fort = TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre);
+    final metier = demande.metier;
     final prix = demande.prixLisible;
+    final duree = demande.dureeEstimee;
+    final conditions = demande.conditions;
+    final quartier = demande.quartier;
+    final arrondissement = demande.arrondissement;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -173,31 +211,48 @@ class _CarteDemande extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (demande.misEnAvant) ...[
-                const Pastille(texte: 'Mise en avant'),
-                const SizedBox(height: 8),
-              ],
               Text(
                 demande.titre,
-                style: texte.titleMedium?.copyWith(
-                  color: Couleurs.encre,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: texte.titleMedium?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
               ),
-              if (prix != null) ...[
+              // LE BADGE EST OBLIGATOIRE, pas decoratif : une demande qui passe
+              // devant parce que son auteur a paye doit le dire.
+              if (demande.misEnAvant) ...[
                 const SizedBox(height: 6),
-                Text(
-                  prix,
-                  style: texte.bodyLarge?.copyWith(
-                    color: Couleurs.orangeFonce,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                const Align(alignment: Alignment.centerLeft, child: Pastille(texte: 'Mise en avant')),
               ],
-              if (lieu != null) LigneDetail(icone: Icons.place_outlined, texte: lieu),
-              if (horaire != null) LigneDetail(icone: Icons.schedule, texte: horaire),
+              if (metier != null) LigneRiche(icone: Icons.work_outline, morceaux: [TextSpan(text: metier, style: fort)]),
+              LigneRiche(
+                icone: Icons.calendar_today_outlined,
+                morceaux: [TextSpan(text: demande.horaire ?? 'Horaire non précisé', style: fort)],
+              ),
+              if (prix != null)
+                LigneRiche(
+                  icone: Icons.payments_outlined,
+                  morceaux: [
+                    TextSpan(text: prix, style: fort),
+                    if (duree != null) TextSpan(text: '  $duree', style: aide),
+                  ],
+                ),
+              if (conditions != null) LigneRiche(icone: Icons.info_outline, morceaux: [TextSpan(text: conditions)]),
+              if (quartier != null || arrondissement != null)
+                LigneRiche(
+                  icone: Icons.place_outlined,
+                  morceaux: [
+                    if (quartier != null) TextSpan(text: quartier, style: fort),
+                    if (quartier != null && arrondissement != null) const TextSpan(text: ', '),
+                    if (arrondissement != null) TextSpan(text: arrondissement),
+                  ],
+                ),
+              const SizedBox(height: 12),
+              // La coche, comme le bouton du site.
+              FilledButton.icon(
+                onPressed: () => auRepondre(demande),
+                icon: const Icon(Icons.check),
+                label: const Text('Je suis disponible'),
+              ),
             ],
           ),
         ),

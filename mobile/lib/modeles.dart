@@ -123,6 +123,9 @@ class Demande {
     this.arrondissement,
     this.horaire,
     this.prixLisible,
+    this.metier,
+    this.dureeEstimee,
+    this.conditions,
   });
 
   factory Demande.depuisJson(Map<String, dynamic> json) => Demande(
@@ -133,6 +136,9 @@ class Demande {
         arrondissement: _lireFacultatif<String>(json, 'arrondissement'),
         horaire: _lireFacultatif<String>(json, 'horaire'),
         prixLisible: _lireFacultatif<String>(json, 'prixLisible'),
+        metier: _lireFacultatif<String>(json, 'metier'),
+        dureeEstimee: _lireFacultatif<String>(json, 'dureeEstimee'),
+        conditions: _lireFacultatif<String>(json, 'conditions'),
       );
 
   final int id;
@@ -142,6 +148,11 @@ class Demande {
   final String? arrondissement;
   final String? horaire;
   final String? prixLisible;
+  final String? metier;
+  final String? dureeEstimee;
+
+  /// Ce qu'il faut savoir avant de venir, comme sur la carte du site.
+  final String? conditions;
 
   /// "Manguier, Yaounde 1" : seulement ce qui est connu. Une demande sans
   /// quartier n'en recoit pas un invente a sa place.
@@ -156,12 +167,16 @@ class Demande {
 
 /// La reponse de /api/demandes, dans l'ordre decide par le serveur.
 class ListeDemandes {
-  const ListeDemandes({required this.pourMoi, required this.autres});
+  const ListeDemandes({required this.pourMoi, required this.autres, this.monMetier});
 
   factory ListeDemandes.depuisJson(Map<String, dynamic> json) => ListeDemandes(
         pourMoi: _lireListe(json, 'pourMoi', Demande.depuisJson),
         autres: _lireListe(json, 'autres', Demande.depuisJson),
+        monMetier: _lireFacultatif<String>(json, 'monMetier'),
       );
+
+  /// Le metier de la personne, pour le titre "Pour vous : ...".
+  final String? monMetier;
 
   /// Les demandes du metier de la personne.
   final List<Demande> pourMoi;
@@ -1770,4 +1785,135 @@ class ResultatRecherche {
 
   /// "Sans votre position, la proximite se mesure a partir de votre quartier..."
   final String? phraseLieu;
+}
+
+/// La demande telle que l'ecran de reponse la montre.
+class DemandeARepondre {
+  const DemandeARepondre({
+    required this.id,
+    required this.titre,
+    required this.horaire,
+    this.metier,
+    this.quartier,
+    this.arrondissement,
+    this.conditions,
+  });
+
+  factory DemandeARepondre.depuisJson(Map<String, dynamic> json) => DemandeARepondre(
+        id: _lire<int>(json, 'id'),
+        titre: _lire<String>(json, 'titre'),
+        horaire: _lire<String>(json, 'horaire'),
+        metier: _lireFacultatif<String>(json, 'metier'),
+        quartier: _lireFacultatif<String>(json, 'quartier'),
+        arrondissement: _lireFacultatif<String>(json, 'arrondissement'),
+        conditions: _lireFacultatif<String>(json, 'conditions'),
+      );
+
+  final int id;
+  final String titre;
+  final String horaire;
+  final String? metier;
+  final String? quartier;
+  final String? arrondissement;
+  final String? conditions;
+}
+
+/// Chez qui la personne va : son nom, sa verification, sa reputation.
+class EmployeurDeLaDemande {
+  const EmployeurDeLaDemande({required this.nom, required this.verifie, required this.nombreAvis, this.note});
+
+  factory EmployeurDeLaDemande.depuisJson(Map<String, dynamic> json) => EmployeurDeLaDemande(
+        nom: _lire<String>(json, 'nom'),
+        verifie: _lire<bool>(json, 'verifie'),
+        nombreAvis: _lire<int>(json, 'nombreAvis'),
+        note: _lireFacultatif<String>(json, 'note'),
+      );
+
+  final String nom;
+  final bool verifie;
+  final int nombreAvis;
+
+  /// Absente tant que personne n'a note cet employeur.
+  final String? note;
+}
+
+class PrixARepondre {
+  const PrixARepondre({required this.lignes, this.annonce, this.dureeEstimee});
+
+  factory PrixARepondre.depuisJson(Map<String, dynamic> json) => PrixARepondre(
+        lignes: _lireListe(json, 'lignes', LigneTarif.depuisJson),
+        annonce: _lireFacultatif<String>(json, 'annonce'),
+        dureeEstimee: _lireFacultatif<String>(json, 'dureeEstimee'),
+      );
+
+  /// Ce que l'employeur paie, la commission, ce qu'elle recevra.
+  final List<LigneTarif> lignes;
+  final String? annonce;
+  final String? dureeEstimee;
+}
+
+class CoutDeLaReponse {
+  const CoutDeLaReponse({
+    required this.envoyer,
+    required this.reste,
+    required this.soldeInsuffisant,
+    required this.solde,
+  });
+
+  factory CoutDeLaReponse.depuisJson(Map<String, dynamic> json) => CoutDeLaReponse(
+        envoyer: _lire<String>(json, 'envoyer'),
+        reste: _lire<String>(json, 'reste'),
+        soldeInsuffisant: _lire<bool>(json, 'soldeInsuffisant'),
+        solde: _lire<String>(json, 'solde'),
+      );
+
+  final String envoyer;
+  final String reste;
+  final bool soldeInsuffisant;
+  final String solde;
+}
+
+class LimiteDuJour {
+  const LimiteDuJour({required this.parJour, required this.restant});
+
+  factory LimiteDuJour.depuisJson(Map<String, dynamic> json) => LimiteDuJour(
+        parJour: _lire<int>(json, 'parJour'),
+        restant: _lire<int>(json, 'restant'),
+      );
+
+  final int parJour;
+  final int restant;
+}
+
+/// L'ecran Repondre a cette demande (/api/demandes/:id/reponse).
+class EcranReponse {
+  const EcranReponse({required this.demande, required this.employeur, required this.prix, this.cout, this.limite});
+
+  factory EcranReponse.depuisJson(Map<String, dynamic> json) => EcranReponse(
+        demande: DemandeARepondre.depuisJson(_lire<Map<String, dynamic>>(json, 'demande')),
+        employeur: EmployeurDeLaDemande.depuisJson(_lire<Map<String, dynamic>>(json, 'employeur')),
+        prix: PrixARepondre.depuisJson(_lire<Map<String, dynamic>>(json, 'prix')),
+        cout: _lireObjet(json, 'cout', CoutDeLaReponse.depuisJson),
+        limite: _lireObjet(json, 'limite', LimiteDuJour.depuisJson),
+      );
+
+  final DemandeARepondre demande;
+  final EmployeurDeLaDemande employeur;
+  final PrixARepondre prix;
+
+  /// Absent si l'equipe n'a pas regle le cout d'une reponse.
+  final CoutDeLaReponse? cout;
+  final LimiteDuJour? limite;
+}
+
+class ReponseEnvoyee {
+  const ReponseEnvoyee({required this.texte, required this.candidatureId});
+
+  factory ReponseEnvoyee.depuisJson(Map<String, dynamic> json) => ReponseEnvoyee(
+        texte: _lire<String>(json, 'texte'),
+        candidatureId: _lire<int>(json, 'candidatureId'),
+      );
+
+  final String texte;
+  final int candidatureId;
 }

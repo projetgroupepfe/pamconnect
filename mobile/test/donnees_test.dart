@@ -824,4 +824,26 @@ void main() {
     expect(lu.personnes.first.distance, isNull);
     expect(() => ResultatRecherche.depuisJson({'titre': 'titre 1'}), throwsA(isA<FormeInattendue>()));
   });
+
+  test("l'ecran de reponse se lit tel que le serveur l'ecrit", () {
+    final lu = EcranReponse.depuisJson({
+      'demande': {
+        'id': 1,
+        'titre': 'titre 1',
+        'metier': null,
+        'horaire': 'horaire 1',
+        'quartier': null,
+        'arrondissement': null,
+        'conditions': null,
+      },
+      'employeur': {'nom': 'nom 1', 'verifie': false, 'note': null, 'nombreAvis': 0},
+      'prix': {'annonce': null, 'dureeEstimee': null, 'lignes': []},
+      'cout': {'envoyer': 'envoyer 1', 'reste': 'reste 1', 'soldeInsuffisant': true, 'solde': 'solde 1'},
+      'limite': null,
+    });
+    expect(lu.cout?.soldeInsuffisant, isTrue);
+    expect(lu.limite, isNull);
+    expect(lu.employeur.note, isNull);
+    expect(() => EcranReponse.depuisJson({'demande': null}), throwsA(isA<FormeInattendue>()));
+  });
 }

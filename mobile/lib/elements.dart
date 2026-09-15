@@ -513,3 +513,32 @@ class DetailMontants extends StatelessWidget {
     );
   }
 }
+
+/// Une ligne d'information avec son icone, dont une partie peut etre en gras :
+/// les listes <ul class="infos"> du site.
+class LigneRiche extends StatelessWidget {
+  const LigneRiche({super.key, required this.icone, required this.morceaux});
+
+  final IconData icone;
+  final List<InlineSpan> morceaux;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icone, size: 18, color: Couleurs.encreDouce),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text.rich(
+              TextSpan(children: morceaux),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encreDouce),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
