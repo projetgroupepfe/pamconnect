@@ -231,7 +231,7 @@ class _EcranRechercherState extends State<EcranRechercher> {
                 children: [
                   Text(
                     "Vous avez trouvé quelqu'un ?",
-                    style: texte.titleSmall?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600),
+                    style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -299,7 +299,7 @@ class _CartePersonne extends StatelessWidget {
                       children: [
                         Text(
                           personne.nom,
-                          style: texte.titleSmall?.copyWith(color: Couleurs.encre, fontWeight: FontWeight.w600),
+                          style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
                         ),
                         if (metier != null) Text(metier, style: gris),
                       ],
@@ -328,10 +328,10 @@ class _CartePersonne extends StatelessWidget {
                 ],
               ),
               if (jours != null) LigneDetail(icone: Icons.calendar_today_outlined, texte: 'Disponible', enGras: jours),
-              if (experience != null) LigneDetail(icone: Icons.work_history_outlined, texte: experience),
+              if (experience != null) LigneDetail(icone: Icons.work_outline, texte: experience),
               if (lieu != null) LigneDetail(icone: Icons.place_outlined, texte: lieu),
               LigneDetail(icone: Icons.payments_outlined, texte: 'Tarif demandé :', enGras: personne.tarif),
-              if (distance != null) LigneDetail(icone: Icons.near_me_outlined, texte: distance),
+              if (distance != null) LigneDetail(icone: Icons.schedule, texte: distance),
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: () => auVoirProfil(personne),

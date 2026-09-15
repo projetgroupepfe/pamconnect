@@ -109,7 +109,7 @@ class _EcranProblemeState extends State<EcranProbleme> {
           style: texte.bodyLarge?.copyWith(color: Couleurs.encreDouce),
         ),
         const SizedBox(height: 8),
-        LigneDetail(icone: Icons.description_outlined, texte: 'Discussion :', enGras: formulaire.titreDemande),
+        LigneDetail(icone: Icons.insert_drive_file_outlined, texte: 'Discussion :', enGras: formulaire.titreDemande),
         // La personne qui ecrit doit savoir QUI l'equipe pourra sanctionner.
         LigneDetail(icone: Icons.person_outline, texte: 'Personne concernée :', enGras: formulaire.autre),
         const SizedBox(height: 16),
@@ -121,7 +121,7 @@ class _EcranProblemeState extends State<EcranProbleme> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text('Vous avez déjà signalé cette discussion',
-                      style: texte.titleSmall?.copyWith(color: Couleurs.encre, fontWeight: FontWeight.w600)),
+                      style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Text(
                     "L'équipe ne l'a pas encore examinée. Elle traite les signalements dans l'ordre d'arrivée.",
@@ -166,7 +166,7 @@ class _EcranProblemeState extends State<EcranProbleme> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Ce qui se passe ensuite',
-                    style: texte.titleSmall?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600)),
+                    style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 Text(formulaire.consequences, style: gris),
                 const SizedBox(height: 8),
@@ -187,7 +187,7 @@ class _EcranProblemeState extends State<EcranProbleme> {
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2.5, color: Couleurs.bleuFonce),
                   )
-                : const Icon(Icons.send),
+                : const Icon(Icons.file_upload_outlined),
             label: const Text("Envoyer à l'équipe"),
           ),
           const SizedBox(height: 8),

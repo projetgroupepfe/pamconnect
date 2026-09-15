@@ -10,6 +10,23 @@ import 'package:flutter/material.dart';
 import 'modeles.dart';
 import 'theme.dart';
 
+// LES ICONES DU SITE ET LEUR EQUIVALENT ANDROID. Le dessin differe, le
+// symbole est le meme : un bouton porte ici l'equivalent de l'icone qu'il
+// porte sur le site (views/partiels/icone.ejs). Toutes sont rangees dans
+// l'application : aucune ne vient d'internet.
+//
+//   lieu           Icons.place_outlined          profil     Icons.person_outline
+//   verifie        Icons.verified_user_outlined  equipe     Icons.group_outlined
+//   disponibilite  Icons.schedule                envoi      Icons.file_upload_outlined
+//   calendrier     Icons.calendar_today_outlined ajouter    Icons.add
+//   message        Icons.chat_bubble_outline     valider    Icons.check
+//   avis           Icons.star_border             refuser    Icons.close
+//   experience     Icons.work_outline            info       Icons.info_outline
+//   remuneration   Icons.payments_outlined       suivant    Icons.chevron_right
+//   recherche      Icons.search                  document   Icons.insert_drive_file_outlined
+//   email          Icons.mail_outline            jeton      Icons.toll_outlined
+//   signaler       Icons.flag_outlined           modifier   Icons.edit_outlined
+
 /// "Vous avez 3 jetons, dont 3 offerts."
 ///
 /// Les jetons offerts sont nommes parce qu'ils perissent, contrairement aux
@@ -107,7 +124,7 @@ class TitreSection extends StatelessWidget {
         child: Text(
           texte,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Couleurs.bleuFonce,
+                color: Couleurs.bleu,
                 fontWeight: FontWeight.w600,
               ),
         ),

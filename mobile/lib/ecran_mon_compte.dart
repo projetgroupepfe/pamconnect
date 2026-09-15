@@ -179,7 +179,7 @@ class _CarteCirculation extends StatelessWidget {
         children: [
           Text(
             "Comment l'argent circule sur PamConnect",
-            style: texte.titleSmall?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600),
+            style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           Text.rich(
@@ -250,7 +250,7 @@ class _CarteVersementEnvoye extends StatelessWidget {
             children: [
               Text(
                 versement.titreDemande,
-                style: texte.titleSmall?.copyWith(color: Couleurs.encre, fontWeight: FontWeight.w600),
+                style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               pastille,
@@ -315,7 +315,7 @@ class _CarteVersementRecu extends StatelessWidget {
             children: [
               Text(
                 versement.titreDemande,
-                style: texte.titleSmall?.copyWith(color: Couleurs.encre, fontWeight: FontWeight.w600),
+                style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
               ),
               Text('Chez ${versement.chez}', style: texte.bodyMedium?.copyWith(color: Couleurs.encreDouce)),
               const SizedBox(height: 8),

@@ -119,7 +119,7 @@ class _EcranMiseEnAvantState extends State<EcranMiseEnAvant> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(info.titre, style: texte.titleMedium?.copyWith(color: Couleurs.encre, fontWeight: FontWeight.w600)),
+                Text(info.titre, style: texte.titleMedium?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600)),
                 if (metier != null) LigneDetail(icone: Icons.work_outline, texte: metier),
                 if (lieu != null) LigneDetail(icone: Icons.place_outlined, texte: lieu),
               ],
@@ -174,7 +174,7 @@ class _EcranMiseEnAvantState extends State<EcranMiseEnAvant> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   LigneDetail(
-                    icone: Icons.arrow_upward,
+                    icone: Icons.chevron_right,
                     texte: 'Votre demande passe',
                     enGras: metier == null ? 'devant les autres demandes' : 'devant les autres demandes de $metier',
                     apresGras: ' dans la liste.',
@@ -266,15 +266,17 @@ class _EcranMiseEnAvantState extends State<EcranMiseEnAvant> {
             Avertissement(texte: erreurEnvoi),
             const SizedBox(height: 16),
           ],
-          FilledButton(
+          // La coche, comme le bouton du site.
+          FilledButton.icon(
             onPressed: _envoi || !info.soldeSuffit ? null : _confirmer,
-            child: _envoi
+            icon: _envoi
                 ? const SizedBox(
                     width: 22,
                     height: 22,
                     child: CircularProgressIndicator(strokeWidth: 2.5, color: Couleurs.bleuFonce),
                   )
-                : const Text('Confirmer la mise en avant'),
+                : const Icon(Icons.check),
+            label: const Text('Confirmer la mise en avant'),
           ),
           const SizedBox(height: 8),
           OutlinedButton(

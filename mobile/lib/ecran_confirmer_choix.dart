@@ -180,7 +180,7 @@ class _EcranConfirmerChoixState extends State<EcranConfirmerChoix> {
                     ),
                     Text(ecran.note.detail, style: gris),
                     if (experience != null)
-                      Pastille(texte: experience, icone: Icons.work_history_outlined),
+                      Pastille(texte: experience, icone: Icons.work_outline),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -219,7 +219,7 @@ class _EcranConfirmerChoixState extends State<EcranConfirmerChoix> {
                   enGras: ecran.horaire,
                 ),
                 if (duree != null)
-                  LigneDetail(icone: Icons.timer_outlined, texte: 'Durée estimée :', enGras: duree),
+                  LigneDetail(icone: Icons.schedule, texte: 'Durée estimée :', enGras: duree),
                 // Le lieu general, jamais l'adresse exacte.
                 if (lieu != null) LigneDetail(icone: Icons.place_outlined, texte: 'Lieu :', enGras: lieu),
                 if (conditions != null) LigneDetail(icone: Icons.info_outline, texte: conditions),
@@ -289,7 +289,7 @@ class _EcranConfirmerChoixState extends State<EcranConfirmerChoix> {
                   ),
                 ),
                 const _LigneEnsuite(
-                  icone: Icons.description_outlined,
+                  icone: Icons.insert_drive_file_outlined,
                   debut: 'Votre demande sera ',
                   gras: 'retirée de la liste',
                   fin: " : quelqu'un a été choisi.",
@@ -313,15 +313,17 @@ class _EcranConfirmerChoixState extends State<EcranConfirmerChoix> {
           Avertissement(texte: erreurEnvoi),
           const SizedBox(height: 16),
         ],
-        FilledButton(
+        // La coche, comme le bouton du site.
+        FilledButton.icon(
           onPressed: _envoi ? null : _confirmer,
-          child: _envoi
+          icon: _envoi
               ? const SizedBox(
                   width: 22,
                   height: 22,
                   child: CircularProgressIndicator(strokeWidth: 2.5, color: Couleurs.bleuFonce),
                 )
-              : Text('Confirmer et choisir ${ecran.nom}', textAlign: TextAlign.center),
+              : const Icon(Icons.check),
+          label: Text('Confirmer et choisir ${ecran.nom}', textAlign: TextAlign.center),
         ),
         const SizedBox(height: 8),
         OutlinedButton(

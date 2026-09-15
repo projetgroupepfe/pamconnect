@@ -106,13 +106,13 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
             ),
           employeur
               ? const NavigationDestination(
-                  icon: Icon(Icons.description_outlined),
-                  selectedIcon: Icon(Icons.description),
+                  icon: Icon(Icons.insert_drive_file_outlined),
+                  selectedIcon: Icon(Icons.insert_drive_file),
                   label: 'Mes demandes',
                 )
               : const NavigationDestination(
-                  icon: Icon(Icons.list_alt_outlined),
-                  selectedIcon: Icon(Icons.list_alt),
+                  icon: Icon(Icons.insert_drive_file_outlined),
+                  selectedIcon: Icon(Icons.insert_drive_file),
                   label: 'Demandes',
                 ),
           NavigationDestination(

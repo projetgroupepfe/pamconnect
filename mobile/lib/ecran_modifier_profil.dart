@@ -407,15 +407,17 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
         Avertissement(texte: erreurEnvoi),
         espace,
       ],
-      FilledButton(
+      // La coche, comme le bouton du site.
+      FilledButton.icon(
         onPressed: _envoi ? null : _enregistrer,
-        child: _envoi
+        icon: _envoi
             ? const SizedBox(
                 width: 22,
                 height: 22,
                 child: CircularProgressIndicator(strokeWidth: 2.5, color: Couleurs.bleuFonce),
               )
-            : const Text('Enregistrer'),
+            : const Icon(Icons.check),
+        label: const Text('Enregistrer'),
       ),
       const SizedBox(height: 8),
       OutlinedButton(

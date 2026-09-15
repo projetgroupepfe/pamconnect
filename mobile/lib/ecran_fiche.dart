@@ -101,7 +101,7 @@ class _EcranFicheState extends State<EcranFiche> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(fiche.nom, style: texte.titleLarge?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600)),
+                          Text(fiche.nom, style: texte.titleLarge?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600)),
                           if (metier != null) Text(metier, style: gris),
                         ],
                       ),
@@ -209,7 +209,7 @@ class _EcranFicheState extends State<EcranFiche> {
             children: [
               Text(
                 'Ce que nous vérifions, et ce que nous ne vérifions pas',
-                style: texte.titleSmall?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600),
+                style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Text.rich(
@@ -244,7 +244,7 @@ class _EcranFicheState extends State<EcranFiche> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Travailler avec cette personne', style: texte.titleSmall?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600)),
+                  Text('Travailler avec cette personne', style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Text(
                     'Publiez votre demande avec le service, l\'horaire et le prix. Cette personne pourra y répondre, '

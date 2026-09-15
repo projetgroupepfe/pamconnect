@@ -218,7 +218,7 @@ class _CarteDiscussion extends StatelessWidget {
                       children: [
                         Text(
                           discussion.avec,
-                          style: texte.titleSmall?.copyWith(color: Couleurs.encre, fontWeight: FontWeight.w600),
+                          style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
                         ),
                         Text(discussion.titreDemande, style: gris),
                       ],
@@ -233,7 +233,7 @@ class _CarteDiscussion extends StatelessWidget {
                   marque: discussion.nouveau ? 'Nouveau' : null,
                 ),
                 // Ce qui attend d'etre lu passe avant le compte total.
-                if (phraseNonLus != null) _LigneForte(icone: Icons.mark_chat_unread_outlined, texte: phraseNonLus),
+                if (phraseNonLus != null) _LigneForte(icone: Icons.info_outline, texte: phraseNonLus),
                 LigneDetail(
                   icone: Icons.chat_bubble_outline,
                   texte: discussion.phraseMessages,
@@ -247,7 +247,7 @@ class _CarteDiscussion extends StatelessWidget {
                   style: OutlinedButton.styleFrom(minimumSize: hauteurBouton),
                 ),
               ] else ...[
-                LigneDetail(icone: Icons.task_alt, texte: 'Service effectué le', enGras: termineeLe),
+                LigneDetail(icone: Icons.check, texte: 'Service effectué le', enGras: termineeLe),
                 if (discussion.avisAttendu)
                   const _LigneForte(icone: Icons.star_border, texte: 'Votre avis est attendu'),
                 LigneDetail(icone: Icons.chat_bubble_outline, texte: discussion.phraseMessages),
@@ -263,7 +263,7 @@ class _CarteDiscussion extends StatelessWidget {
                 ],
                 OutlinedButton.icon(
                   onPressed: () => auOuvrir(discussion),
-                  icon: const Icon(Icons.description_outlined),
+                  icon: const Icon(Icons.insert_drive_file_outlined),
                   label: const Text('Relire la discussion'),
                   style: OutlinedButton.styleFrom(minimumSize: hauteurBouton),
                 ),

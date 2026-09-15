@@ -220,7 +220,7 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
           children: [
             Text(
               "L'équipe PamConnect vous écrit",
-              style: texte.titleSmall?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600),
+              style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 4),
             Text('Le ${message.le}', style: aide),
@@ -296,7 +296,7 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
                       children: [
                         Text(
                           profil.nom,
-                          style: texte.titleLarge?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600),
+                          style: texte.titleLarge?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
                         ),
                         Text(profil.fonction, style: gris),
                       ],
@@ -376,10 +376,10 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
         ),
       ),
       const SizedBox(height: 12),
-      // L'icone du site pour ce bouton : le profil.
+      // Le crayon, comme sur le site.
       OutlinedButton.icon(
         onPressed: _modifier,
-        icon: const Icon(Icons.person_outline),
+        icon: const Icon(Icons.edit_outlined),
         label: const Text('Modifier mon profil'),
         style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
       ),

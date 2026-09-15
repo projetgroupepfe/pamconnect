@@ -424,15 +424,18 @@ class _EcranPublierState extends State<EcranPublier> {
         Avertissement(texte: erreurEnvoi),
         espace,
       ],
-      FilledButton(
+      // Comme sur le site : "Enregistrer les modifications" porte la coche,
+      // "Publier ma demande" n'a pas d'icone.
+      FilledButton.icon(
         onPressed: _envoi ? null : _publier,
-        child: _envoi
+        icon: _envoi
             ? const SizedBox(
                 width: 22,
                 height: 22,
                 child: CircularProgressIndicator(strokeWidth: 2.5, color: Couleurs.bleuFonce),
               )
-            : Text(widget.demandeId == null ? 'Publier ma demande' : 'Enregistrer les modifications'),
+            : (widget.demandeId == null ? null : const Icon(Icons.check)),
+        label: Text(widget.demandeId == null ? 'Publier ma demande' : 'Enregistrer les modifications'),
       ),
       const SizedBox(height: 8),
       OutlinedButton(

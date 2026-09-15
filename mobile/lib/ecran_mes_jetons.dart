@@ -247,7 +247,7 @@ class _CarteUsage extends StatelessWidget {
         children: [
           Text(
             'À quoi servent les jetons',
-            style: texte.titleSmall?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600),
+            style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           Text.rich(
@@ -445,7 +445,7 @@ class _CartePack extends StatelessWidget {
             children: [
               Text(
                 '${pack.quantite} jetons',
-                style: texte.titleSmall?.copyWith(color: Couleurs.encre, fontWeight: FontWeight.w600),
+                style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
               ),
               DetailMontants(
                 lignes: [LigneTarif(libelle: 'Prix', montant: pack.prix, retenue: false, total: true)],
@@ -505,7 +505,7 @@ class _CartePaiement extends StatelessWidget {
         children: [
           Text(
             'Comment se passe le paiement',
-            style: texte.titleSmall?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600),
+            style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           Text(
@@ -563,7 +563,7 @@ class _CarteAchat extends StatelessWidget {
             children: [
               Text(
                 '${achat.quantite} jetons',
-                style: texte.titleSmall?.copyWith(color: Couleurs.encre, fontWeight: FontWeight.w600),
+                style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               pastille,

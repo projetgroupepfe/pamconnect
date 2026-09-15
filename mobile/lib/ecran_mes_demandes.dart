@@ -399,7 +399,7 @@ class _CarteDemandePubliee extends StatelessWidget {
               Text(
                 demande.titre,
                 style: texte.titleMedium?.copyWith(
-                  color: Couleurs.encre,
+                  color: Couleurs.bleu,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -453,7 +453,7 @@ class _CarteDemandePubliee extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: OutlinedButton.icon(
                       onPressed: () => auMettreEnAvant(demande),
-                      icon: const Icon(Icons.trending_up),
+                      icon: const Icon(Icons.toll_outlined),
                       label: const Text('Mettre en avant'),
                       style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                     ),
@@ -588,7 +588,7 @@ class _CarteReponse extends StatelessWidget {
                     Text(
                       reponse.nom,
                       style: texte.titleSmall?.copyWith(
-                        color: Couleurs.encre,
+                        color: Couleurs.bleu,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -613,7 +613,7 @@ class _CarteReponse extends StatelessWidget {
             ],
           ),
           if (prix != null) LigneDetail(icone: Icons.payments_outlined, texte: prix),
-          if (experience != null) LigneDetail(icone: Icons.work_history_outlined, texte: experience),
+          if (experience != null) LigneDetail(icone: Icons.work_outline, texte: experience),
           if (disponibilites != null)
             LigneDetail(icone: Icons.calendar_today_outlined, texte: 'Disponible', enGras: disponibilites),
           // Sa fiche, avant de decider : sa note et ses avis y sont en entier.

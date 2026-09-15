@@ -425,7 +425,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
             children: [
               Text(
                 discussion.titreDemande,
-                style: texte.titleMedium?.copyWith(color: Couleurs.encre, fontWeight: FontWeight.w600),
+                style: texte.titleMedium?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
               ),
               LigneDetail(
                 icone: Icons.person_outline,
@@ -500,7 +500,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                 header: true,
                 child: Text(
                   'Service terminé',
-                  style: texte.titleMedium?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600),
+                  style: texte.titleMedium?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(height: 8),
@@ -560,7 +560,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2.5, color: Couleurs.bleuFonce),
                         )
-                      : const Icon(Icons.send),
+                      : const Icon(Icons.file_upload_outlined),
                   label: const Text('Envoyer'),
                 ),
               ],
@@ -582,7 +582,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
             children: [
               Text(
                 '${declaration.nom} indique avoir effectué le service',
-                style: texte.titleMedium?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600),
+                style: texte.titleMedium?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Text.rich(
@@ -621,7 +621,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                   header: true,
                   child: Text(
                     'Le service a-t-il été effectué ?',
-                    style: texte.titleMedium?.copyWith(color: Couleurs.bleuFonce, fontWeight: FontWeight.w600),
+                    style: texte.titleMedium?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -649,7 +649,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: _declaration ? null : () => _declarerService(discussion),
-                  icon: const Icon(Icons.task_alt),
+                  icon: const Icon(Icons.check),
                   label: const Text('Déclarer le service effectué'),
                   style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                 ),
