@@ -32,14 +32,12 @@
       "3 personnes pour menage" renseigne. "10 personnes au total"
       compte les inscrits : ce n'est pas ce que l'employeur cherche a
       savoir, et un petit nombre decourage au lieu d'informer. %>
-  <% if (locals.metierRecherche) { %>
-    <h2>
-      <%= prestataires.length %>
-      personne<%= prestataires.length > 1 ? "s" : "" %>
-      pour « <%= metierRecherche %> »
-    </h2>
-  <% } else { %>
-    <h2>Les personnes disponibles</h2>
+  <h2><%= titreResultats %></h2>
+  <%# Sans position, la proximite se mesure a partir du quartier de
+      l'employeur : on le lui dit. La phrase vient de rechercherPersonnes,
+      que l'application lit aussi. %>
+  <% if (phraseLieu) { %>
+    <p class="aide"><%= phraseLieu %></p>
   <% } %>
 
   <%# ON DIT CE QUI COMPTE, sans donner de note. Un classement qu'on
@@ -93,7 +91,7 @@
           </div>
 
           <p>
-            <% if (prestataire.statut_verification === "verifie") { %>
+            <% if (prestataire.verifiee) { %>
               <span class="badge badge-verifie">
                 <%- include("partiels/icone", { nom: "verifie" }) %>
                 Identité vérifiée
@@ -120,21 +118,20 @@
           <ul class="infos">
             <%# Ce qu'un employeur regarde avant tout : quand la personne
                 peut venir, et depuis combien de temps elle exerce. %>
-            <% const creneaux = disponibilitesLisibles(prestataire.disponibilites); %>
-            <% if (creneaux.length > 0) { %>
+            <% if (prestataire.joursDisponibles) { %>
               <li>
                 <%- include("partiels/icone", { nom: "calendrier" }) %>
                 <span>
                   Disponible
-                  <strong><%= creneaux.map(function (c) { return c.jour; }).join(", ") %></strong>
+                  <strong><%= prestataire.joursDisponibles %></strong>
                 </span>
               </li>
             <% } %>
 
-            <% if (libelleExperience(prestataire.experience_annees)) { %>
+            <% if (prestataire.experience) { %>
               <li>
                 <%- include("partiels/icone", { nom: "experience" }) %>
-                <span><%= libelleExperience(prestataire.experience_annees) %></span>
+                <span><%= prestataire.experience %></span>
               </li>
             <% } %>
 
@@ -142,17 +139,19 @@
                 personnelle, et elle n'aide pas a choisir. Elle n'apparait
                 que sur la fiche, et seulement apres une embauche. %>
 
-            <li>
-              <%- include("partiels/icone", { nom: "lieu" }) %>
-              <span><%= prestataire.arrondissement %><%= prestataire.quartier ? ", " + prestataire.quartier : "" %></span>
-            </li>
+            <% if (prestataire.lieu) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "lieu" }) %>
+                <span><%= prestataire.lieu %></span>
+              </li>
+            <% } %>
             <li>
               <%- include("partiels/icone", { nom: "remuneration" }) %>
-              <span><strong><%= formaterTarif(prestataire.tarif) %></strong> à payer</span>
+              <span>Tarif demandé : <strong><%= prestataire.tarif %></strong></span>
             </li>
             <li>
               <%- include("partiels/icone", { nom: "disponibilite" }) %>
-              <span><%= prestataire.distanceTexte %></span>
+              <span><%= prestataire.distance || "Distance inconnue" %></span>
             </li>
           </ul>
 

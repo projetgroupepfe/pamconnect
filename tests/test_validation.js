@@ -105,7 +105,7 @@ setTimeout(async () => {
 
   const rech = await requete("/recherche?metier=metiertest");
   v("la recherche trouve ce prestataire", rech.corps.includes("Tarif Test"));
-  v("l'employeur voit le montant a payer", rech.corps.includes("10 000 FCFA") && rech.corps.includes("payer"));
+  v("l'employeur voit le tarif demande, pas un montant a payer", rech.corps.includes("10 000 FCFA") && rech.corps.includes("Tarif demandé"));
   v("l'employeur ne voit PAS la commission", !rech.corps.includes("Commission"));
 
   console.log("\n--- NETTOYAGE ---");

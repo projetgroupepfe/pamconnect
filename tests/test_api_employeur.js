@@ -1119,6 +1119,43 @@ setTimeout(async () => {
   dire("la personne qui repond lit la phrase de son role",
        jetonsPre.jeSuisEmployeur === false && jetonsPre.uneAction === "répondre à une demande");
 
+  console.log(SAUT + "--- RECHERCHER ---");
+  const rechercher = (metier, entetes) =>
+    json("/api/recherche?metier=" + encodeURIComponent(metier), undefined, entetes);
+  const rangDe = (liste, id) => liste.findIndex((p) => p.id === id);
+  dire("sans session : 401", (await rechercher("")).code === 401);
+
+  // Deux personnes identiques, sauf le quartier. "Loin" est inscrite la
+  // premiere : sans la proximite, elle passerait devant.
+  const quartierLointain = base.prepare(
+    "SELECT nom FROM quartiers WHERE arrondissement != ? ORDER BY nom LIMIT 1").get(arrondissementBastos).nom;
+  const personneLoin = await creerCompte("loin", "prestataire", { metier: "menagere", tarif: "15000", quartier: quartierLointain });
+  const personneProche = await creerCompte("proche", "prestataire", { metier: "menagere", tarif: "15000" });
+
+  const rech = await rechercher(metierEnBase, { Authorization: "Bearer " + jeton });
+  const rechDonnees = rech.donnees || {};
+  dire("l'employeur trouve les personnes du metier, sans distance ni score",
+       rech.code === 200 && rechDonnees.titre.includes("pour « " + metierEnBase + " »") && rechDonnees.peutPublier === true &&
+       rechDonnees.personnes.some((p) => p.id === verifiee.id && p.tarif === "15 000 FCFA" && p.verifiee === true) &&
+       rechDonnees.personnes.every((p) => p.distance === null && p.classement === undefined),
+       rech.brut.slice(0, 300));
+  dire("sans position, c'est son quartier qui compte",
+       String(rechDonnees.phraseLieu).includes("Bastos") && rangDe(rechDonnees.personnes, personneLoin.id) >= 0 &&
+       rangDe(rechDonnees.personnes, personneProche.id) < rangDe(rechDonnees.personnes, personneLoin.id),
+       JSON.stringify({ phrase: rechDonnees.phraseLieu, proche: rangDe(rechDonnees.personnes, personneProche.id),
+                        loin: rangDe(rechDonnees.personnes, personneLoin.id) }));
+  const pageRecherche = await (await lire("/recherche?metier=" + encodeURIComponent(metierEnBase), emp.cookie)).text();
+  dire("la page du site dit la meme chose, dans le meme ordre",
+       pageRecherche.includes(rechDonnees.phraseLieu) && pageRecherche.includes(rechDonnees.titre) &&
+       pageRecherche.includes("Tarif demandé : <strong>15 000 FCFA</strong>") &&
+       pageRecherche.indexOf("Test proche") < pageRecherche.indexOf("Test loin"));
+  const pageVisiteur = await (await lire("/recherche?metier=" + encodeURIComponent(metierEnBase))).text();
+  dire("un visiteur n'a pas de quartier : aucune phrase, l'ordre d'inscription reste",
+       !pageVisiteur.includes("Sans votre position") &&
+       pageVisiteur.indexOf("Test loin") < pageVisiteur.indexOf("Test proche"));
+  const motInconnu = await rechercher("zzzz-" + M, cookieDe(emp.cookie));
+  dire("un mot sans resultat : une liste vide", motInconnu.code === 200 && motInconnu.donnees.personnes.length === 0);
+
   console.log(SAUT + "--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");

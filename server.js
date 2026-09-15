@@ -4985,19 +4985,18 @@ app.get("/personnes/:id", (req, res) => {
 });
 
 // --- Recherche de prestataires -------------------------------------
-app.get("/recherche", (req, res) => {
-  // req.query contient deja les parametres de l'adresse :
-  // /recherche?metier=menage&latitude=3.8  ->  { metier: "menage", latitude: "3.8" }
-  const motCherche = String(req.query.metier || "").trim();
-
+// --- Rechercher, UNE SEULE FOIS pour le site et l'application ---------
+function rechercherPersonnes(criteres, moi) {
   // "menage", "menagere", "MENAGE" et "technicienne de surface" designent
   // des metiers de notre liste : on les ramene au nom officiel avant de
   // chercher. Sans cela, une recherche de "menage" ratait les profils
   // enregistres sous "Menage a domicile" - l'accent suffisait a les
   // rendre invisibles.
+  const motCherche = String(criteres.metier || "").trim();
   const metierOfficiel = trouverMetier(motCherche);
-  const latEmployeur = parseFloat(req.query.latitude);
-  const lonEmployeur = parseFloat(req.query.longitude);
+  const latEmployeur = parseFloat(criteres.latitude);
+  const lonEmployeur = parseFloat(criteres.longitude);
+  const positionConnue = !isNaN(latEmployeur) && !isNaN(lonEmployeur);
 
   // C'est la base qui filtre par metier, pas JavaScript.
   let prestataires;
@@ -5012,7 +5011,7 @@ app.get("/recherche", (req, res) => {
     prestataires = requetes.tousLesPrestataires.all();
   }
 
-  if (!isNaN(latEmployeur) && !isNaN(lonEmployeur)) {
+  if (positionConnue) {
     prestataires = prestataires
       .filter((p) => p.latitude && p.longitude)
       .map((p) => ({
@@ -5024,8 +5023,6 @@ app.get("/recherche", (req, res) => {
   // LE CLASSEMENT. Ce qui vient avant a FILTRE - le metier, la position
   // connue. Ce qui suit ORDONNE, et sur autre chose que les etoiles.
   //
-  // La moyenne generale est lue une fois : elle sert de point de depart
-  // a ceux qui n'ont pas encore d'avis.
   // LA MOYENNE DE LA PLATEFORME NE SERT QUE QUAND ELLE VEUT DIRE
   // QUELQUE CHOSE. Avec un seul avis, elle vaut la note de cet avis-la
   // et tire tout le monde vers elle : ce n'est pas une information,
@@ -5035,43 +5032,91 @@ app.get("/recherche", (req, res) => {
     ? general.moyenne
     : NOTE_DE_DEPART;
 
-  const lieuCherche = {
-    quartier: trouverQuartier(String(req.query.quartier || "")),
-    arrondissement: String(req.query.arrondissement || "").trim() || null,
-  };
+  // SANS POSITION, LE QUARTIER. Le formulaire ne demande pas de quartier :
+  // pour un employeur connecte, c'est celui de son profil qui compte.
+  // Avant, la proximite par quartier ne servait jamais : rien n'envoyait
+  // de quartier, et le quartier cherche etait compare, objet entier, au
+  // nom du quartier de chaque personne.
+  const employeur = moi && moi.role === "employeur" && !moi.est_admin ? moi : null;
+  const quartierDemande = trouverQuartier(String(criteres.quartier || ""));
+  const arrondissementDemande = String(criteres.arrondissement || "").trim() || null;
+  let lieuCherche = { quartier: null, arrondissement: null };
+  let lieuDuProfil = false;
+
+  if (quartierDemande) {
+    lieuCherche = { quartier: quartierDemande.nom, arrondissement: quartierDemande.arrondissement };
+  } else if (arrondissementDemande) {
+    lieuCherche = { quartier: null, arrondissement: arrondissementDemande };
+  } else if (employeur && (employeur.quartier || employeur.arrondissement)) {
+    const connu = trouverQuartier(String(employeur.quartier || ""));
+    lieuCherche = connu
+      ? { quartier: connu.nom, arrondissement: connu.arrondissement }
+      : { quartier: employeur.quartier || null, arrondissement: employeur.arrondissement || null };
+    lieuDuProfil = true;
+  }
 
   const resultats = prestataires
     .map((p) => {
       const chiffres = requetes.reputationEtExperience.get({ personne: p.id });
       const score = scoreDe(p, chiffres, moyenneGenerale);
       const proximite = pointsDeProximite(p, lieuCherche, p.distance);
+      const moyenne = chiffres.nbAvis > 0
+        ? Math.round((chiffres.sommeNotes / chiffres.nbAvis) * 10) / 10
+        : null;
 
       return {
-        ...p,
-        distanceTexte: p.distance !== undefined
-          ? `${p.distance.toFixed(1)} km`
-          : "Distance inconnue",
+        id: p.id,
+        nom: p.nom,
+        metier: p.metier,
+        verifiee: p.statut_verification === "verifie",
 
-        // Ce que la vue affiche : la moyenne reelle, le nombre d'avis,
-        // et le badge des personnes qui commencent. Jamais le score -
-        // un nombre affiche se compare, se discute, et finit par se
-        // chercher.
+        // Ce que les ecrans affichent : la moyenne reelle, le nombre d'avis,
+        // et le badge des personnes qui commencent. Jamais le score - un
+        // nombre affiche se compare, se discute, et finit par se chercher.
         nbAvis: chiffres.nbAvis,
-        moyenne: chiffres.nbAvis > 0
-          ? Math.round((chiffres.sommeNotes / chiffres.nbAvis) * 10) / 10
-          : null,
+        moyenne,
         services: chiffres.services,
         nouvelle: estNouvelle(chiffres),
+        note: notePersonne({ nbAvis: chiffres.nbAvis, moyenne, services: chiffres.services }),
+
+        joursDisponibles: disponibilitesLisibles(p.disponibilites).map((c) => c.jour).join(", ") || null,
+        experience: libelleExperience(p.experience_annees),
+        lieu: [p.arrondissement, p.quartier].filter(Boolean).join(", ") || null,
+        tarif: formaterTarif(p.tarif),
+        distance: p.distance !== undefined ? `${p.distance.toFixed(1)} km` : null,
 
         classement: score.total + proximite,
       };
     })
     .sort((a, b) => b.classement - a.classement);
 
+  const nombre = resultats.length;
+  const lieuLisible = lieuCherche.quartier
+    ? `votre quartier, ${lieuCherche.quartier}`
+    : `votre arrondissement, ${lieuCherche.arrondissement}`;
+
+  return {
+    metierRecherche: motCherche,
+    // LE NOMBRE REPOND A UNE QUESTION, ou il ne sert a rien.
+    titre: motCherche
+      ? `${nombre} personne${nombre > 1 ? "s" : ""} pour « ${motCherche} »`
+      : "Les personnes disponibles",
+    phraseLieu: lieuDuProfil && !positionConnue
+      ? `Sans votre position, la proximité se mesure à partir de ${lieuLisible}.`
+      : null,
+    personnes: resultats,
+  };
+}
+
+app.get("/recherche", (req, res) => {
+  const recherche = rechercherPersonnes(req.query, res.locals.moi);
+
   res.render("recherche", {
     titre: "Rechercher un prestataire",
-    prestataires: resultats,
-    metierRecherche: (req.query.metier || "").trim(),
+    prestataires: recherche.personnes,
+    metierRecherche: recherche.metierRecherche,
+    titreResultats: recherche.titre,
+    phraseLieu: recherche.phraseLieu,
   });
 });
 
@@ -7357,6 +7402,38 @@ app.post("/api/mes-jetons/acheter", (req, res) => {
   if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
 
   res.status(201).json({ texte: resultat.texte });
+});
+
+// --- Rechercher depuis l'application ----------------------------------
+//
+// L'application ne demande pas la position : la proximite se mesure a
+// partir du quartier de l'employeur. Le score ne sort jamais.
+app.get("/api/recherche", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
+
+  const metier = typeof req.query.metier === "string" ? req.query.metier : "";
+  const recherche = rechercherPersonnes({ metier }, moi);
+
+  res.json({
+    titre: recherche.titre,
+    phraseLieu: recherche.phraseLieu,
+    classementExplique: recherche.personnes.length > 1,
+    personnes: recherche.personnes.map((p) => ({
+      id: p.id,
+      nom: p.nom,
+      metier: p.metier || null,
+      verifiee: p.verifiee,
+      libelleVerification: p.verifiee ? "Identité vérifiée" : "Identité non vérifiée",
+      note: p.note,
+      joursDisponibles: p.joursDisponibles,
+      experience: p.experience,
+      lieu: p.lieu,
+      tarif: p.tarif,
+      distance: p.distance,
+    })),
+    peutPublier: Boolean(moi.role === "employeur" && !moi.est_admin),
+  });
 });
 
 // --- La fiche d'une personne depuis l'application -------------------
