@@ -1,79 +1,52 @@
 <%- include("partiels/tete") %>
 
+  <%# Tout ce qui depend du compte vient de ecranDeVerification :
+      l'application lit exactement la meme chose. %>
   <div class="colonne">
     <h1>Vérification d'identité</h1>
 
     <p>
-      <span class="badge badge-<%= utilisateur.statut_verification.replace(/ /g, "-") %>">
-        <%= libelleVerification(utilisateur.statut_verification) %>
+      <span class="badge badge-<%= verification.statut.replace(/ /g, "-") %>">
+        <%= verification.libelle %>
       </span>
     </p>
 
     <%# Un dossier envoye n'est pas un dossier oublie. Tant que la
         personne ne sait pas combien de temps elle attend, chaque heure
         ressemble a un abandon. %>
-    <% if (utilisateur.statut_verification === "en attente") { %>
-      <% const attente = attenteVerification(utilisateur.documents_envoyes_le); %>
+    <% if (verification.attente) { %>
       <div class="carte confiance">
         <h3>Votre dossier est entre les mains de l'équipe</h3>
-        <% if (attente === null) { %>
-          <p>
-            Notre équipe l'examine sous <strong><%= delaiVerificationHeures %> heures</strong>.
-          </p>
-          <p class="aide">La date d'envoi de ce dossier n'a pas été enregistrée.</p>
-        <% } else if (attente.depasse) { %>
-          <p>
-            Envoyé <strong><%= attenteLisible(utilisateur.documents_envoyes_le) %></strong>.
-            Le délai de <%= delaiVerificationHeures %> heures est dépassé.
-          </p>
-          <p class="aide">
-            Votre dossier n'a pas été perdu : il reste en tête de la liste
-            de l'équipe.
-          </p>
-        <% } else { %>
-          <p>
-            Envoyé <strong><%= attenteLisible(utilisateur.documents_envoyes_le) %></strong>.
-            Réponse attendue d'ici <strong><%= attente.restantes %> heure<%= attente.restantes > 1 ? "s" : "" %></strong>.
-          </p>
-          <p class="aide">Vous n'avez rien d'autre à faire.</p>
-        <% } %>
+        <p><% verification.attente.morceaux.forEach(function (m) { %><% if (m.gras) { %><strong><%= m.texte %></strong><% } else { %><%= m.texte %><% } %><% }); %></p>
+        <p class="aide"><%= verification.attente.aide %></p>
       </div>
     <% } %>
 
-    <% if (utilisateur.statut_verification === "refuse" && utilisateur.motif_refus) { %>
+    <% if (verification.motifRefus) { %>
       <div class="carte">
         <h3>Motif du refus</h3>
-        <p class="discret"><%= utilisateur.motif_refus %></p>
+        <p class="discret"><%= verification.motifRefus %></p>
       </div>
     <% } %>
 
-    <% if (utilisateur.statut_verification === "verifie") { %>
+    <% if (verification.verifiee) { %>
 
       <div class="carte">
         <p>Votre identité a été validée par notre équipe. Vous n'avez rien d'autre à faire.</p>
         <p class="discret">Vos documents ont été supprimés de nos serveurs après la validation.</p>
-        <p class="actions"><a class="bouton" href="/annonces">Voir les demandes</a></p>
+        <p class="actions"><a class="bouton" href="<%= verification.suite.url %>"><%= verification.suite.texte %></a></p>
       </div>
 
     <% } else { %>
 
-      <p class="chapeau">
-        <% if (utilisateur.role === "employeur") { %>
-          Les personnes qui vous répondront se déplaceront chez vous, seules,
-          souvent tôt le matin. Elles ont le droit de savoir qui vous êtes :
-          deux documents sont demandés.
-        <% } else { %>
-          Les employeurs confient l'accès à leur domicile. Pour que votre profil
-          inspire confiance, deux documents sont demandés.
-        <% } %>
-      </p>
+      <p class="chapeau"><%= verification.chapeau %></p>
 
       <%# Le delai est annonce AVANT l'envoi, et il est le meme des deux
           cotes. Une personne qui sait combien de temps elle attend ne
           renvoie pas ses documents trois fois en croyant a une panne. %>
       <p class="aide">
         Notre équipe examine votre dossier sous
-        <strong><%= delaiVerificationHeures %> heures</strong>.
+        <strong><%= verification.delaiHeures %> heures</strong>.
       </p>
 
       <div class="carte confiance">
@@ -93,14 +66,14 @@
 
           <div class="champ">
             <label for="cni">Pièce d'identité</label>
-            <input type="file" id="cni" name="cni" accept=".jpg,.jpeg,.png,.pdf" required>
+            <input type="file" id="cni" name="cni" accept="<%= verification.extensions.join(",") %>" required>
             <span class="aide">Carte nationale d'identité ou passeport.</span>
           </div>
 
           <div class="champ">
             <label for="casier">Extrait de casier judiciaire</label>
-            <input type="file" id="casier" name="casier" accept=".jpg,.jpeg,.png,.pdf" required>
-            <span class="aide">Formats acceptés : <%= extensions %>. <%= tailleMaxMo %> Mo maximum par document.</span>
+            <input type="file" id="casier" name="casier" accept="<%= verification.extensions.join(",") %>" required>
+            <span class="aide">Formats acceptés : <%= verification.extensions.join(", ") %>. <%= verification.tailleMaxMo %> Mo maximum par document.</span>
           </div>
 
           <div class="actions">
@@ -110,7 +83,7 @@
         </form>
       </div>
 
-      <% if (utilisateur.statut_verification === "en attente") { %>
+      <% if (verification.remplaceUnDossier) { %>
         <p class="aide">Un dossier est déjà en cours d'examen. Un nouvel envoi remplacera le précédent.</p>
       <% } %>
 

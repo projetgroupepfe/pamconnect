@@ -3339,8 +3339,11 @@ function monProfil(u) {
                  "messages que vous dites ce que vous pensez d'eux.",
         }
       : null,
-    motifRefus: personne && statut === "refuse" && u.motif_refus ? u.motif_refus : null,
-    boutonVerification: personne && statut !== "verifie"
+    // LES DEUX COTES passent par la verification : l'employeur aussi doit
+    // trouver le bouton sur son profil, et y lire pourquoi on l'a refusee.
+    // Il n'arrivait a la page qu'en essayant de publier.
+    motifRefus: !equipe && statut === "refuse" && u.motif_refus ? u.motif_refus : null,
+    boutonVerification: !equipe && statut !== "verifie"
       ? (statut === "non soumis" ? "Faire vérifier mon identité" : "Voir mon dossier")
       : null,
   };
@@ -5286,13 +5289,125 @@ app.get("/recherche", (req, res) => {
 // aller dans un seul sens.
 //
 // Seul un compte d'equipe en est dispense : il ne rencontre personne.
-app.get("/verification", exigerConnexion, interdireALEquipe, (req, res) => {
+// CE QUE L'ECRAN MONTRE, ecrit UNE SEULE FOIS pour la page du site et
+// l'application.
+//
+// L'attente d'un dossier, avec ses mots en gras : depuis quand, et combien
+// de temps il reste. Sans date d'envoi enregistree, on ne l'invente pas.
+function attenteDuDossier(u) {
+  if (u.statut_verification !== "en attente") return null;
+  const delai = `${DELAI_VERIFICATION_HEURES} heures`;
+  const attente = attenteVerification(u.documents_envoyes_le);
 
+  if (attente === null) {
+    return {
+      morceaux: [{ texte: "Notre équipe l'examine sous " }, { texte: delai, gras: true }, { texte: "." }],
+      aide: "La date d'envoi de ce dossier n'a pas été enregistrée.",
+    };
+  }
+
+  const envoye = { texte: attenteLisible(u.documents_envoyes_le), gras: true };
+  if (attente.depasse) {
+    return {
+      morceaux: [{ texte: "Envoyé " }, envoye, { texte: `. Le délai de ${delai} est dépassé.` }],
+      aide: "Votre dossier n'a pas été perdu : il reste en tête de la liste de l'équipe.",
+    };
+  }
+
+  return {
+    morceaux: [
+      { texte: "Envoyé " }, envoye, { texte: ". Réponse attendue d'ici " },
+      { texte: `${attente.restantes} heure${attente.restantes > 1 ? "s" : ""}`, gras: true },
+      { texte: "." },
+    ],
+    aide: "Vous n'avez rien d'autre à faire.",
+  };
+}
+
+function ecranDeVerification(u) {
+  const statut = u.statut_verification;
+  const employeur = u.role === "employeur";
+
+  return {
+    statut,
+    libelle: libelleVerification(statut),
+    attente: attenteDuDossier(u),
+    motifRefus: statut === "refuse" && u.motif_refus ? u.motif_refus : null,
+    verifiee: statut === "verifie",
+    // Apres la validation, chacun retourne a son travail. Un employeur ne
+    // repond pas aux demandes : on l'envoyait pourtant sur leur tableau.
+    suite: employeur
+      ? { url: "/mes-demandes", texte: "Voir mes demandes" }
+      : { url: "/annonces", texte: "Voir les demandes" },
+    // Pourquoi deux documents : la raison n'est pas la meme des deux cotes.
+    chapeau: employeur
+      ? "Les personnes qui vous répondront se déplaceront chez vous, seules, souvent tôt " +
+        "le matin. Elles ont le droit de savoir qui vous êtes : deux documents sont demandés."
+      : "Les employeurs confient l'accès à leur domicile. Pour que votre profil inspire " +
+        "confiance, deux documents sont demandés.",
+    delaiHeures: DELAI_VERIFICATION_HEURES,
+    extensions: EXTENSIONS_AUTORISEES,
+    tailleMaxMo: TAILLE_MAX_OCTETS / 1024 / 1024,
+    // Un nouvel envoi remplace le dossier en cours d'examen : on le dit.
+    remplaceUnDossier: statut === "en attente",
+  };
+}
+
+const DOSSIER_DEJA_VALIDE = {
+  code: 409,
+  titre: "Déjà vérifié",
+  texte: "Votre identité a déjà été validée, il n'y a rien à renvoyer.",
+  lien: { url: "/mon-profil", texte: "Retour à mon profil" },
+};
+
+// CE QUE L'ENVOI A RECU, relu UNE SEULE FOIS pour le site et
+// l'application. Un envoi refuse ne laisse aucun fichier sur le disque.
+function recevoirUnDossier(u, recus, erreur) {
+  const cni = recus && recus.cni ? recus.cni[0] : null;
+  const casier = recus && recus.casier ? recus.casier[0] : null;
+
+  function refus(titre, texte) {
+    if (cni) supprimerDocument(cni.filename);
+    if (casier) supprimerDocument(casier.filename);
+    return { probleme: { code: 400, titre, texte, lien: { url: "/verification", texte: "Réessayer" } } };
+  }
+
+  if (erreur) {
+    if (erreur.code === "LIMIT_FILE_SIZE") {
+      return refus("Fichier trop volumineux",
+        `Chaque document doit peser moins de ${TAILLE_MAX_OCTETS / 1024 / 1024} Mo.`);
+    }
+    if (erreur.message === "TYPE_NON_AUTORISE") {
+      return refus("Format non accepté", `Formats acceptés : ${EXTENSIONS_AUTORISEES.join(", ")}.`);
+    }
+    return refus("Envoi impossible", "Le fichier n'a pas pu être reçu. Réessayez.");
+  }
+
+  if (!cni || !casier) {
+    return refus("Deux documents sont nécessaires",
+      "Il faut envoyer la pièce d'identité ET l'extrait de casier judiciaire.");
+  }
+
+  // Un envoi precedent est remplace : on efface les anciens fichiers.
+  supprimerDocument(u.cni_fichier);
+  supprimerDocument(u.casier_fichier);
+
+  requetes.enregistrerDocuments.run({ cni: cni.filename, casier: casier.filename, id: u.id });
+
+  return {
+    ok: true,
+    titre: "Documents envoyés",
+    texte: "Votre dossier est arrivé. Notre équipe l'examine sous " +
+           DELAI_VERIFICATION_HEURES + " heures. Vous n'avez rien d'autre à " +
+           "faire : le résultat apparaîtra sur votre profil.",
+  };
+}
+
+app.get("/verification", exigerConnexion, interdireALEquipe, (req, res) => {
   res.render("verification", {
     titre: "Vérification d'identité",
     utilisateur: req.utilisateur,
-    tailleMaxMo: TAILLE_MAX_OCTETS / 1024 / 1024,
-    extensions: EXTENSIONS_AUTORISEES.join(", "),
+    verification: ecranDeVerification(req.utilisateur),
   });
 });
 
@@ -5300,65 +5415,19 @@ app.get("/verification", exigerConnexion, interdireALEquipe, (req, res) => {
 // Les deux cotes deposent les memes documents : la protection ne va pas
 // dans un seul sens.
 app.post("/verification", exigerConnexion, interdireALEquipe, (req, res) => {
-
   if (req.utilisateur.statut_verification === "verifie") {
-    return res.status(409).render("message", {
-      titre: "Deja verifie",
-      texte: "Votre identité a déjà été validée, il n'y a rien à renvoyer.",
-      liens: [{ url: "/mon-profil", texte: "Retour a mon profil" }],
-    });
+    return afficherProbleme(res, DOSSIER_DEJA_VALIDE);
   }
 
   // On appelle multer nous-memes pour pouvoir afficher un message clair
   // au lieu de laisser une erreur brute remonter jusqu'a l'utilisateur.
   recevoirDocuments(req, res, (erreur) => {
-    const recus = req.files || {};
-    const cni = recus.cni ? recus.cni[0] : null;
-    const casier = recus.casier ? recus.casier[0] : null;
-
-    function refuser(titre, texte) {
-      // Un envoi refuse ne doit laisser aucun fichier sur le disque.
-      if (cni) supprimerDocument(cni.filename);
-      if (casier) supprimerDocument(casier.filename);
-      return res.status(400).render("message", {
-        titre,
-        texte,
-        liens: [{ url: "/verification", texte: "Reessayer" }],
-      });
-    }
-
-    if (erreur) {
-      if (erreur.code === "LIMIT_FILE_SIZE") {
-        return refuser("Fichier trop volumineux",
-          `Chaque document doit peser moins de ${TAILLE_MAX_OCTETS / 1024 / 1024} Mo.`);
-      }
-      if (erreur.message === "TYPE_NON_AUTORISE") {
-        return refuser("Format non accepte",
-          `Formats acceptes : ${EXTENSIONS_AUTORISEES.join(", ")}.`);
-      }
-      return refuser("Envoi impossible", "Le fichier n'a pas pu etre recu. Reessaie.");
-    }
-
-    if (!cni || !casier) {
-      return refuser("Deux documents sont necessaires",
-        "Il faut envoyer la piece d'identite ET l'extrait de casier judiciaire.");
-    }
-
-    // Un envoi precedent est remplace : on efface les anciens fichiers.
-    supprimerDocument(req.utilisateur.cni_fichier);
-    supprimerDocument(req.utilisateur.casier_fichier);
-
-    requetes.enregistrerDocuments.run({
-      cni: cni.filename,
-      casier: casier.filename,
-      id: req.utilisateur.id,
-    });
+    const resultat = recevoirUnDossier(req.utilisateur, req.files, erreur);
+    if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
 
     res.render("message", {
-      titre: "Documents envoyés",
-      texte: "Votre dossier est arrivé. Notre équipe l'examine sous " +
-             DELAI_VERIFICATION_HEURES + " heures. Vous n'avez rien d'autre à " +
-             "faire : le résultat apparaîtra sur votre profil.",
+      titre: resultat.titre,
+      texte: resultat.texte,
       liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
     });
   });
@@ -7549,6 +7618,34 @@ app.post("/api/mon-profil/avertissement/lu", (req, res) => {
 
   requetes.marquerAvertissementLu.run(moi.id);
   res.json({ ok: true });
+});
+
+// --- La verification d'identite depuis l'application ------------------
+//
+// Les documents arrivent en multipart, comme depuis le formulaire du site :
+// multer les recoit, et la meme fonction les relit.
+//
+// LIMITE CONNUE : comme le reste de l'API, ils voyagent sans chiffrement
+// tant que le serveur s'ouvre en http://. Un vrai deploiement passerait en
+// https.
+app.get("/api/verification", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  res.json(ecranDeVerification(moi));
+});
+
+app.post("/api/verification", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+  if (moi.statut_verification === "verifie") return erreurApi(res, 409, DOSSIER_DEJA_VALIDE.texte);
+
+  recevoirDocuments(req, res, (erreur) => {
+    const resultat = recevoirUnDossier(moi, req.files, erreur);
+    if (resultat.probleme) return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+
+    res.json({ texte: resultat.texte });
+  });
 });
 
 // --- Modifier mon profil depuis l'application -----------------------

@@ -181,9 +181,11 @@ setTimeout(async () => {
   // Une date inconnue - un dossier depose avant l'existence de cette
   // colonne - ne doit pas produire une date inventee.
   remettreEnAttente("NULL");
+  // La phrase vient maintenant du serveur : EJS ecrit son apostrophe
+  // &#39; dans la page, que le navigateur affiche comme une apostrophe.
   const pageSansDate = await (await lire("/verification", cookie)).text();
   dire("une date inconnue est annoncee comme telle",
-       pageSansDate.includes("n'a pas été enregistrée"));
+       pageSansDate.replace(/&#39;/g, "'").includes("n'a pas été enregistrée"));
   dire("et le delai reste annonce", pageSansDate.includes("24 heures"));
 
   console.log("\n--- CE QUE L'EQUIPE VOIT ---");
@@ -218,11 +220,95 @@ setTimeout(async () => {
   const carteDepassee = carteDe(await (await lire("/admin", cEq)).text());
   dire("un dossier en retard est signale a l'equipe", carteDepassee.includes("Délai dépassé"));
 
+  console.log("\n--- LA VERIFICATION DEPUIS L'APPLICATION ---");
+  const jetonDe = async (adresse) => (await (await fetch(RACINE + "/api/connexion", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: adresse, motdepasse: mdp }),
+  })).json()).jeton;
+  const parJeton = (jeton) => ({ Authorization: "Bearer " + jeton });
+  const ecranApi = async (entetes) => {
+    const r = await fetch(RACINE + "/api/verification", { headers: entetes || {} });
+    return { code: r.status, donnees: await r.json().catch(() => null) };
+  };
+  const envoyerApi = async (envoi, entetes) => {
+    const r = await fetch(RACINE + "/api/verification", { method: "POST", body: envoi, headers: entetes || {} });
+    return { code: r.status, donnees: await r.json().catch(() => null) };
+  };
+  const deuxDocuments = (cniNom, casierNom) => {
+    const envoi = new FormData();
+    envoi.append("cni", fichier(cniNom, 2000, "image/jpeg"));
+    envoi.append("casier", fichier(casierNom, 3000, "application/pdf"));
+    return envoi;
+  };
+  const jetonPre = await jetonDe(mail);
+  const jetonEmp = await jetonDe(mailEmp);
+  const employeurTest = () => base.prepare("SELECT * FROM utilisateurs WHERE email = ?").get(mailEmp);
+
+  dire("sans session : 401", (await ecranApi()).code === 401);
+  dire("un compte d'equipe : 403", (await ecranApi({ Cookie: cEq })).code === 403);
+
+  remettreEnAttente("datetime('now', '-2 hours')");
+  const ecranPre = (await ecranApi(parJeton(jetonPre))).donnees;
+  const pageSite = await (await lire("/verification", cookie)).text();
+  dire("en attente : la meme phrase et les memes mots en gras que la page du site",
+       ecranPre.statut === "en attente" && ecranPre.libelle === "Vérification en cours" &&
+       ecranPre.attente.morceaux.map((m) => m.texte).join("") === "Envoyé il y a 2 heures. Réponse attendue d'ici 22 heures." &&
+       ecranPre.attente.morceaux.filter((m) => m.gras).map((m) => m.texte).join("|") === "il y a 2 heures|22 heures" &&
+       pageSite.includes("<strong>il y a 2 heures</strong>") && pageSite.includes("<strong>22 heures</strong>") &&
+       ecranPre.remplaceUnDossier === true, JSON.stringify(ecranPre.attente));
+  dire("les formats et la taille viennent du serveur",
+       JSON.stringify(ecranPre.extensions) === JSON.stringify([".jpg", ".jpeg", ".png", ".pdf"]) &&
+       ecranPre.tailleMaxMo === 5 && pageSite.includes('accept=".jpg,.jpeg,.png,.pdf"'));
+
+  const ecranEmp = (await ecranApi(parJeton(jetonEmp))).donnees;
+  dire("chacun lit sa raison de donner ses documents",
+       ecranEmp.chapeau.startsWith("Les personnes qui vous répondront") &&
+       ecranPre.chapeau.startsWith("Les employeurs confient") && ecranEmp.attente === null);
+
+  const profilEmp = await (await fetch(RACINE + "/api/mon-profil", { headers: parJeton(jetonEmp) })).json();
+  const pageProfilEmp = await (await lire("/mon-profil", cEmp)).text();
+  dire("un employeur trouve aussi le bouton sur son profil, site et application",
+       profilEmp.boutonVerification === "Faire vérifier mon identité" &&
+       pageProfilEmp.includes("Faire vérifier mon identité"), JSON.stringify(profilEmp.boutonVerification));
+
+  const fichiersAvantApi = fs.readdirSync(DOCS).length;
+  const seulApi = new FormData();
+  seulApi.append("cni", fichier("cni.jpg", 1000, "image/jpeg"));
+  const refusApi = await envoyerApi(seulApi, parJeton(jetonEmp));
+  dire("un seul document : 400, avec la phrase du site, sans fichier laisse",
+       refusApi.code === 400 &&
+       refusApi.donnees.erreur === "Il faut envoyer la pièce d'identité ET l'extrait de casier judiciaire." &&
+       fs.readdirSync(DOCS).length === fichiersAvantApi, JSON.stringify(refusApi.donnees));
+
+  const accepteApi = await envoyerApi(deuxDocuments("photo-cni.jpg", "casier.pdf"), parJeton(jetonEmp));
+  dire("les deux documents par le jeton de l'application : le dossier part en examen",
+       accepteApi.code === 200 && accepteApi.donnees.texte.startsWith("Votre dossier est arrivé.") &&
+       employeurTest().statut_verification === "en attente" &&
+       fs.existsSync(path.join(DOCS, employeurTest().cni_fichier)) &&
+       fs.existsSync(path.join(DOCS, employeurTest().casier_fichier)), JSON.stringify(accepteApi.donnees));
+
+  const ancienPre = moi();
+  const remplace = await envoyerApi(deuxDocuments("nouvelle-cni.jpg", "nouveau-casier.pdf"), parJeton(jetonPre));
+  dire("un nouvel envoi remplace le dossier en examen et efface les anciens fichiers",
+       remplace.code === 200 && moi().cni_fichier !== ancienPre.cni_fichier &&
+       !fs.existsSync(path.join(DOCS, ancienPre.cni_fichier)) &&
+       fs.existsSync(path.join(DOCS, moi().cni_fichier)), JSON.stringify(remplace.donnees));
+
+  base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' WHERE email = ?").run(mailEmp);
+  dire("deja verifie : 409",
+       (await envoyerApi(deuxDocuments("cni.jpg", "casier.pdf"), parJeton(jetonEmp))).code === 409);
+  const ecranValide = (await ecranApi(parJeton(jetonEmp))).donnees;
+  const pageValide = await (await lire("/verification", cEmp)).text();
+  dire("une fois valide, l'employeur est renvoye vers ses demandes, sur le site aussi",
+       ecranValide.verifiee === true && ecranValide.suite.url === "/mes-demandes" &&
+       pageValide.includes('href="/mes-demandes">Voir mes demandes'));
+
   console.log("\n--- NETTOYAGE ---");
-  const u = moi();
-  [u.cni_fichier, u.casier_fichier].forEach((f) => {
-    if (f && fs.existsSync(path.join(DOCS, f))) fs.unlinkSync(path.join(DOCS, f));
-  });
+  base.prepare("SELECT cni_fichier, casier_fichier FROM utilisateurs WHERE email LIKE ?").all("%" + M + "%")
+    .flatMap((compte) => [compte.cni_fichier, compte.casier_fichier])
+    .forEach((f) => {
+      if (f && fs.existsSync(path.join(DOCS, f))) fs.unlinkSync(path.join(DOCS, f));
+    });
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes et leurs documents supprimes");
 
