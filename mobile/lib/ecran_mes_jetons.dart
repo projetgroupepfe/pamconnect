@@ -395,7 +395,7 @@ class _LigneSolde extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final encre = Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encre);
+    final encre = Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encreDouce);
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2),
       child: Row(

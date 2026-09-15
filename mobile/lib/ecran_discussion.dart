@@ -464,8 +464,8 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final ligne in discussion.prix.lignes) _LignePrix(ligne: ligne),
-              if (discussion.prix.lignes.isNotEmpty) const SizedBox(height: 8),
+              if (discussion.prix.lignes.isNotEmpty)
+                DetailMontants(lignes: [for (final ligne in discussion.prix.lignes) ligne.enLigneTarif()]),
               Text(discussion.prix.phrase, style: aide),
             ],
           ),
@@ -686,31 +686,6 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
         ),
       ),
     ];
-  }
-}
-
-class _LignePrix extends StatelessWidget {
-  const _LignePrix({required this.ligne});
-
-  final LignePrix ligne;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: ligne.fort ? Couleurs.encre : Couleurs.encreDouce,
-          fontWeight: ligne.fort ? FontWeight.w600 : FontWeight.normal,
-        );
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: Text(ligne.libelle, style: style)),
-          const SizedBox(width: 12),
-          Text(ligne.montant, style: style),
-        ],
-      ),
-    );
   }
 }
 

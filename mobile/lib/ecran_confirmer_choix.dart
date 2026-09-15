@@ -238,13 +238,18 @@ class _EcranConfirmerChoixState extends State<EcranConfirmerChoix> {
                 // Les montants arrivent calcules par le serveur : la
                 // commission n'est jamais recalculee ici.
                 if (paiement != null) ...[
-                  _LignePaiement(libelle: 'Vous payez', montant: paiement.vousPayez, fort: true),
-                  _LignePaiement(
-                    libelle: 'Commission PamConnect (${paiement.pourcentageCommission} %)',
-                    montant: '− ${paiement.commission}',
+                  DetailMontants(
+                    lignes: [
+                      LigneTarif(libelle: 'Vous payez', montant: paiement.vousPayez, retenue: false, total: false),
+                      LigneTarif(
+                        libelle: 'Commission PamConnect (${paiement.pourcentageCommission} %)',
+                        montant: '− ${paiement.commission}',
+                        retenue: true,
+                        total: false,
+                      ),
+                      LigneTarif(libelle: '${ecran.nom} reçoit', montant: paiement.recoit, retenue: false, total: true),
+                    ],
                   ),
-                  const Divider(height: 20),
-                  _LignePaiement(libelle: '${ecran.nom} reçoit', montant: paiement.recoit, fort: true),
                 ] else ...[
                   Text("${ecran.nom} n'a pas encore indiqué de tarif."),
                   Text('Demandez-lui son montant dans la discussion.', style: aide),
@@ -325,34 +330,6 @@ class _EcranConfirmerChoixState extends State<EcranConfirmerChoix> {
           child: const Text('Annuler'),
         ),
       ],
-    );
-  }
-}
-
-/// Une ligne du detail du paiement : le libelle a gauche, le montant a droite.
-class _LignePaiement extends StatelessWidget {
-  const _LignePaiement({required this.libelle, required this.montant, this.fort = false});
-
-  final String libelle;
-  final String montant;
-  final bool fort;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: fort ? Couleurs.encre : Couleurs.encreDouce,
-          fontWeight: fort ? FontWeight.w600 : FontWeight.normal,
-        );
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: Text(libelle, style: style)),
-          const SizedBox(width: 12),
-          Text(montant, style: style),
-        ],
-      ),
     );
   }
 }

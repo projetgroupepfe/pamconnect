@@ -527,17 +527,33 @@ class ActionFaite {
 
 /// Une ligne du prix, formulee par le serveur pour la personne qui lit.
 class LignePrix {
-  const LignePrix({required this.libelle, required this.montant, required this.fort});
+  const LignePrix({
+    required this.libelle,
+    required this.montant,
+    required this.fort,
+    this.retenue = false,
+    this.total = false,
+  });
 
   factory LignePrix.depuisJson(Map<String, dynamic> json) => LignePrix(
         libelle: _lire<String>(json, 'libelle'),
         montant: _lire<String>(json, 'montant'),
         fort: _lire<bool>(json, 'fort'),
+        retenue: _lireFacultatif<bool>(json, 'retenue') ?? false,
+        total: _lireFacultatif<bool>(json, 'total') ?? false,
       );
 
   final String libelle;
   final String montant;
   final bool fort;
+
+  /// La commission : en orange, comme sur le site.
+  final bool retenue;
+
+  /// Le montant recu : en vert, sous un trait.
+  final bool total;
+
+  LigneTarif enLigneTarif() => LigneTarif(libelle: libelle, montant: montant, retenue: retenue, total: total);
 }
 
 /// Le prix de la demande vu depuis la discussion.

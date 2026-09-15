@@ -456,8 +456,11 @@ class DetailMontants extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final texte = Theme.of(context).textTheme;
-    final libelle = texte.bodyMedium?.copyWith(color: Couleurs.encre);
+    // Les couleurs de .ligne-tarif dans public/style.css : le libelle en gris, le
+    // montant en noir, la commission en orange, et le total en vert, plus grand.
+    final libelle = texte.bodyMedium?.copyWith(color: Couleurs.encreDouce);
     final montant = texte.bodyLarge?.copyWith(color: Couleurs.encre, fontWeight: FontWeight.w600);
+    final montantTotal = texte.titleMedium?.copyWith(color: Couleurs.vert, fontWeight: FontWeight.w600, fontSize: 19);
     final retenue = texte.bodyMedium?.copyWith(color: Couleurs.orange, fontWeight: FontWeight.w600);
 
     return Container(
@@ -483,7 +486,7 @@ class DetailMontants extends StatelessWidget {
                 children: [
                   Expanded(child: Text(ligne.libelle, style: libelle)),
                   const SizedBox(width: 12),
-                  Text(ligne.montant, style: ligne.retenue ? retenue : montant),
+                  Text(ligne.montant, style: ligne.retenue ? retenue : (ligne.total ? montantTotal : montant)),
                 ],
               ),
             ),

@@ -219,9 +219,17 @@ class _EcranMiseEnAvantState extends State<EcranMiseEnAvant> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _LigneCout(libelle: 'Mise en avant, ${info.jours} jours', montant: '− ${info.cout}'),
-                  const Divider(height: 20),
-                  _LigneCout(libelle: 'Il vous restera', montant: info.resteApres ?? '', fort: true),
+                  DetailMontants(
+                    lignes: [
+                      LigneTarif(
+                        libelle: 'Mise en avant, ${info.jours} jours',
+                        montant: '− ${info.cout}',
+                        retenue: true,
+                        total: false,
+                      ),
+                      LigneTarif(libelle: 'Il vous restera', montant: info.resteApres ?? '', retenue: false, total: true),
+                    ],
+                  ),
                   const SizedBox(height: 12),
                   if (!info.soldeSuffit)
                     Text.rich(
@@ -280,26 +288,3 @@ class _EcranMiseEnAvantState extends State<EcranMiseEnAvant> {
   }
 }
 
-class _LigneCout extends StatelessWidget {
-  const _LigneCout({required this.libelle, required this.montant, this.fort = false});
-
-  final String libelle;
-  final String montant;
-  final bool fort;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: fort ? Couleurs.encre : Couleurs.encreDouce,
-          fontWeight: fort ? FontWeight.w600 : FontWeight.normal,
-        );
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: Text(libelle, style: style)),
-        const SizedBox(width: 12),
-        Text(montant, style: style),
-      ],
-    );
-  }
-}
