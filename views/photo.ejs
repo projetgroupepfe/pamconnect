@@ -1,0 +1,38 @@
+<%- include("partiels/tete") %>
+
+  <%#
+    Ajouter ou changer sa photo, une fois l'identite verifiee. La piece
+    d'identite est renvoyee : elle a ete supprimee apres la verification,
+    et c'est elle qui permet a l'equipe de comparer le visage.
+  %>
+  <div class="colonne">
+    <h1><%= titre %></h1>
+    <p class="chapeau"><%= photo.texte %></p>
+
+    <div class="carte">
+      <%# enctype est indispensable : sans lui le navigateur enverrait le NOM
+          du fichier, pas son contenu. %>
+      <form action="/mon-profil/photo" method="POST" enctype="multipart/form-data">
+        <div class="champ">
+          <label for="photo">Ma photo</label>
+          <input type="file" id="photo" name="photo" accept="<%= photo.extensionsPhoto.join(",") %>" required>
+        </div>
+
+        <div class="champ">
+          <label for="cni">Ma pièce d'identité</label>
+          <input type="file" id="cni" name="cni" accept="<%= photo.extensions.join(",") %>" required>
+          <span class="aide">Formats acceptés : <%= photo.extensions.join(", ") %>. <%= photo.tailleMaxMo %> Mo maximum par document.</span>
+        </div>
+
+        <div class="actions">
+          <button type="submit">
+            <%- include("partiels/icone", { nom: "envoi" }) %>
+            Envoyer
+          </button>
+          <a class="bouton bouton-secondaire" href="/mon-profil">Retour à mon profil</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<%- include("partiels/pied") %>

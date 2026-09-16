@@ -82,6 +82,13 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
   -- photo_fichier         : la photo acceptee.
   photo_envoyee_fichier TEXT,
   photo_fichier   TEXT,
+
+  -- Changer de photo, une fois verifie : la piece d'identite a ete
+  -- supprimee apres la verification, elle est donc renvoyee avec la
+  -- nouvelle photo, puis supprimee a la decision de l'equipe.
+  photo_piece_fichier TEXT,
+  photo_envoyee_le    TEXT,
+  photo_motif_refus   TEXT,
   -- Quand les documents ont ete envoyes. Sans cette date, le delai de
   -- 24 h annonce aux deux cotes ne serait qu'une phrase : rien ne
   -- permettrait de dire si l'equipe le tient.

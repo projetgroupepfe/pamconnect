@@ -318,6 +318,15 @@ Future<bool> confirmerRefus(BuildContext context, String nom) => demanderConfirm
       danger: true,
     );
 
+/// Retirer sa photo : la meme question que sur le site.
+Future<bool> confirmerRetraitPhoto(BuildContext context) => demanderConfirmation(
+      context,
+      question: 'Retirer votre photo ?',
+      precision: 'Elle ne sera plus visible.',
+      action: 'Retirer',
+      danger: true,
+    );
+
 /// Declarer le service effectue verse la somme bloquee : on le confirme
 /// d'abord.
 Future<bool> confirmerDeclarationService(BuildContext context, String nom) => demanderConfirmation(

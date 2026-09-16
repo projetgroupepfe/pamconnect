@@ -224,6 +224,23 @@ class ApiPamConnect {
     return _interpreter(() => TexteDuServeur.depuisJson(donnees));
   }
 
+  /// L'ecran Ajouter ma photo. Refuse (403) tant que l'identite n'est pas
+  /// verifiee.
+  Future<EcranDeMaPhoto> ecranMaPhoto() async {
+    final donnees = await _appeler('/api/mon-profil/photo');
+    return _interpreter(() => EcranDeMaPhoto.depuisJson(donnees));
+  }
+
+  /// La photo du visage et la piece d'identite ("photo" et "cni").
+  Future<TexteDuServeur> envoyerMaPhoto(Map<String, DocumentAEnvoyer> documents) async {
+    final donnees = await _envoyerFichiers('/api/mon-profil/photo', documents);
+    return _interpreter(() => TexteDuServeur.depuisJson(donnees));
+  }
+
+  Future<void> retirerMaPhoto() async {
+    await _appeler('/api/mon-profil/photo/retirer', corps: const {});
+  }
+
   /// Le formulaire Modifier mon profil, rempli par le serveur.
   Future<FormulaireProfil> formulaireProfil() async {
     final donnees = await _appeler('/api/mon-profil/modification');

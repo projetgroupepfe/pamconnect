@@ -120,6 +120,52 @@
 
   <% } %>
 
+  <%# LES CHANGEMENTS DE PHOTO d'une personne deja verifiee. La piece
+      d'identite est renvoyee avec la photo : elle a ete supprimee apres la
+      verification, et c'est elle qui permet de comparer. %>
+  <h2>Photos à contrôler</h2>
+  <% if (photosAControler.length === 0) { %>
+    <p class="vide">Aucune photo à contrôler.</p>
+  <% } else { %>
+    <% photosAControler.forEach(function (demande) { %>
+      <div class="carte">
+        <h3><%= demande.nom %></h3>
+        <p class="discret">
+          <strong><%= demande.role === "employeur" ? "Employeur" : demande.metier %></strong><br>
+          <%= demande.email %>
+        </p>
+        <p class="actions">
+          <a class="bouton bouton-secondaire" target="_blank" rel="noopener"
+             href="/admin/photo/<%= demande.id %>/photo">Ouvrir la photo du visage</a>
+          <a class="bouton bouton-secondaire" target="_blank" rel="noopener"
+             href="/admin/photo/<%= demande.id %>/piece">Ouvrir la pièce d'identité</a>
+        </p>
+        <p class="aide">Comparez le visage de la photo à celui de la pièce d'identité avant de valider.</p>
+
+        <div class="candidature">
+          <div class="actions">
+            <form action="/admin/photos" method="POST" class="en-ligne">
+              <input type="hidden" name="utilisateurId" value="<%= demande.id %>">
+              <input type="hidden" name="decision" value="accepter">
+              <button type="submit">Accepter la photo</button>
+            </form>
+          </div>
+
+          <form action="/admin/photos" method="POST">
+            <input type="hidden" name="utilisateurId" value="<%= demande.id %>">
+            <input type="hidden" name="decision" value="refuser">
+            <div class="champ" style="margin-top:1rem">
+              <label for="motif-photo-<%= demande.id %>">Motif du refus (lu par la personne)</label>
+              <input type="text" id="motif-photo-<%= demande.id %>" name="motif"
+                     placeholder="ex : le visage n'est pas visible">
+            </div>
+            <button type="submit" class="bouton-danger">Refuser</button>
+          </form>
+        </div>
+      </div>
+    <% }); %>
+  <% } %>
+
   <div class="carte confiance">
     <h3>Rappel</h3>
     <p>

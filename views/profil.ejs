@@ -51,7 +51,12 @@
 
   <div class="carte">
     <div class="fiche-tete">
-      <div class="portrait"><%= utilisateur.nom.charAt(0) %></div>
+      <%# Sa propre photo, une fois acceptee. Sinon l'initiale. %>
+      <% if (profil.photo && profil.photo.adresse) { %>
+        <img class="portrait" src="<%= profil.photo.adresse %>" alt="Ma photo" width="56" height="56">
+      <% } else { %>
+        <div class="portrait"><%= utilisateur.nom.charAt(0) %></div>
+      <% } %>
       <div>
         <h3><%= utilisateur.nom %></h3>
         <div class="metier">
@@ -214,6 +219,31 @@
       </div>
     <% } %>
   </div>
+
+  <%# ---- Ma photo : une fois l'identite verifiee ---- %>
+  <% if (profil.photo) { %>
+    <div class="carte">
+      <h3>Ma photo</h3>
+      <p><%= profil.photo.texte %></p>
+      <% if (profil.photo.bouton || profil.photo.peutRetirer) { %>
+        <div class="actions">
+          <% if (profil.photo.bouton) { %>
+            <a class="bouton" href="/mon-profil/photo">
+              <%- include("partiels/icone", { nom: "envoi" }) %>
+              <%= profil.photo.bouton %>
+            </a>
+          <% } %>
+          <% if (profil.photo.peutRetirer) { %>
+            <form action="/mon-profil/photo/retirer" method="POST"
+                  data-question="Retirer votre photo ?"
+                  data-precision="Elle ne sera plus visible.">
+              <button type="submit" class="bouton-secondaire">Retirer ma photo</button>
+            </form>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+  <% } %>
 
   <%# ---- Cote equipe : le compte ne sert qu'a verifier des dossiers ---- %>
   <% if (utilisateur.est_admin) { %>

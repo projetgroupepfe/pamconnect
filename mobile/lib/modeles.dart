@@ -1382,6 +1382,7 @@ class MonProfil {
     this.servicesANoter,
     this.motifRefus,
     this.boutonVerification,
+    this.photo,
   });
 
   factory MonProfil.depuisJson(Map<String, dynamic> json) => MonProfil(
@@ -1401,6 +1402,7 @@ class MonProfil {
         servicesANoter: _lireObjet(json, 'servicesANoter', ServicesANoter.depuisJson),
         motifRefus: _lireFacultatif<String>(json, 'motifRefus'),
         boutonVerification: _lireFacultatif<String>(json, 'boutonVerification'),
+        photo: _lireObjet(json, 'photo', PhotoDuProfil.depuisJson),
       );
 
   final String nom;
@@ -1426,6 +1428,65 @@ class MonProfil {
   /// "Faire vérifier mon identité" ou "Voir mon dossier" ; absent une fois
   /// l'identite validee.
   final String? boutonVerification;
+
+  /// La carte Ma photo, une fois l'identite verifiee.
+  final PhotoDuProfil? photo;
+}
+
+/// Ma photo, sur Mon profil : son etat, et ce que la carte dit, formules
+/// par le serveur.
+class PhotoDuProfil {
+  const PhotoDuProfil({
+    required this.etat,
+    required this.texte,
+    required this.peutRetirer,
+    this.adresse,
+    this.bouton,
+  });
+
+  factory PhotoDuProfil.depuisJson(Map<String, dynamic> json) => PhotoDuProfil(
+        etat: _lire<String>(json, 'etat'),
+        texte: _lire<String>(json, 'texte'),
+        peutRetirer: _lire<bool>(json, 'peutRetirer'),
+        adresse: _lireFacultatif<String>(json, 'adresse'),
+        bouton: _lireFacultatif<String>(json, 'bouton'),
+      );
+
+  /// "aucune", "attente", "acceptee" ou "refusee".
+  final String etat;
+  final String texte;
+  final bool peutRetirer;
+
+  /// L'adresse de la photo acceptee, pour l'afficher.
+  final String? adresse;
+
+  /// "Ajouter ma photo", "Changer ma photo" ou "Envoyer une autre photo".
+  final String? bouton;
+}
+
+/// L'ecran Ajouter ma photo, ecrit par le serveur.
+class EcranDeMaPhoto {
+  const EcranDeMaPhoto({
+    required this.titre,
+    required this.texte,
+    required this.extensions,
+    required this.extensionsPhoto,
+    required this.tailleMaxMo,
+  });
+
+  factory EcranDeMaPhoto.depuisJson(Map<String, dynamic> json) => EcranDeMaPhoto(
+        titre: _lire<String>(json, 'titre'),
+        texte: _lire<String>(json, 'texte'),
+        extensions: _lireTextes(json, 'extensions'),
+        extensionsPhoto: _lireTextes(json, 'extensionsPhoto'),
+        tailleMaxMo: _lire<num>(json, 'tailleMaxMo'),
+      );
+
+  final String titre;
+  final String texte;
+  final List<String> extensions;
+  final List<String> extensionsPhoto;
+  final num tailleMaxMo;
 }
 
 /// Un morceau de phrase ecrit par le serveur, en gras ou non.

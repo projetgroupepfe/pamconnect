@@ -140,6 +140,9 @@ ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
 ajouterColonneSiAbsente("annonces", "mise_en_avant_jusqu_au", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "photo_envoyee_fichier", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "photo_fichier", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "photo_piece_fichier", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "photo_envoyee_le", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "photo_motif_refus", "TEXT");
 ajouterColonneSiAbsente("annonces", "personne_invitee_id",
   "INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL");
 
@@ -332,6 +335,54 @@ const requetes = {
   photoDe: db.prepare(`
     SELECT id, photo_fichier, suspendu FROM utilisateurs
     WHERE id = ? AND photo_fichier IS NOT NULL
+  `),
+
+  // --- Ajouter ou changer sa photo, une fois verifie ---
+  enregistrerDemandePhoto: db.prepare(`
+    UPDATE utilisateurs
+    SET photo_envoyee_fichier = @photo,
+        photo_piece_fichier = @piece,
+        photo_envoyee_le = datetime('now'),
+        photo_motif_refus = NULL
+    WHERE id = @id AND statut_verification = 'verifie'
+  `),
+
+  retirerPhoto: db.prepare(`
+    UPDATE utilisateurs SET photo_fichier = NULL WHERE id = ?
+  `),
+
+  // La plus ancienne d'abord, comme les dossiers.
+  photosAControler: db.prepare(`
+    SELECT id, nom, email, role, metier, photo_envoyee_le
+    FROM utilisateurs
+    WHERE statut_verification = 'verifie'
+      AND photo_envoyee_fichier IS NOT NULL AND photo_piece_fichier IS NOT NULL
+    ORDER BY photo_envoyee_le, id
+  `),
+
+  demandePhotoParId: db.prepare(`
+    SELECT * FROM utilisateurs
+    WHERE id = ? AND statut_verification = 'verifie'
+      AND photo_envoyee_fichier IS NOT NULL AND photo_piece_fichier IS NOT NULL
+  `),
+
+  accepterPhoto: db.prepare(`
+    UPDATE utilisateurs
+    SET photo_fichier = photo_envoyee_fichier,
+        photo_envoyee_fichier = NULL,
+        photo_piece_fichier = NULL,
+        photo_envoyee_le = NULL,
+        photo_motif_refus = NULL
+    WHERE id = ?
+  `),
+
+  refuserPhoto: db.prepare(`
+    UPDATE utilisateurs
+    SET photo_envoyee_fichier = NULL,
+        photo_piece_fichier = NULL,
+        photo_envoyee_le = NULL,
+        photo_motif_refus = ?
+    WHERE id = ?
   `),
 
   // Un service convenu entre deux personnes, dans un sens ou dans l'autre :
@@ -3397,6 +3448,9 @@ function monProfil(u) {
     // trouver le bouton sur son profil, et y lire pourquoi on l'a refusee.
     // Il n'arrivait a la page qu'en essayant de publier.
     motifRefus: !equipe && statut === "refuse" && u.motif_refus ? u.motif_refus : null,
+    // MA PHOTO, une fois l'identite verifiee : l'equipe la compare a une
+    // piece d'identite, il faut donc qu'elle en ait deja controle une.
+    photo: equipe || statut !== "verifie" ? null : etatDeMaPhoto(u),
     boutonVerification: !equipe && statut !== "verifie"
       ? (statut === "non soumis" ? "Faire vérifier mon identité" : "Voir mon dossier")
       : null,
@@ -5604,6 +5658,134 @@ app.post("/verification", exigerConnexion, interdireALEquipe, (req, res) => {
   });
 });
 
+// --- Ma photo : l'ajouter, la changer, la retirer --------------------
+//
+// ECRIT UNE SEULE FOIS pour la page du site et l'application.
+function etatDeMaPhoto(u) {
+  const enAttente = Boolean(u.photo_envoyee_fichier && u.photo_piece_fichier);
+  const motif = !enAttente && u.photo_motif_refus ? u.photo_motif_refus : null;
+  const acceptee = Boolean(u.photo_fichier);
+
+  if (enAttente) {
+    return { etat: "attente", adresse: adressePhoto(u), texte: "Votre photo est en cours de contrôle par l'équipe.",
+             bouton: null, peutRetirer: false };
+  }
+  if (motif) {
+    const fin = /[.!?]$/.test(motif) ? "" : ".";
+    return { etat: "refusee", adresse: adressePhoto(u), texte: `Votre photo n'a pas été acceptée : ${motif}${fin}`,
+             bouton: "Envoyer une autre photo", peutRetirer: acceptee };
+  }
+  if (acceptee) {
+    return { etat: "acceptee", adresse: adressePhoto(u),
+             texte: "Visible seulement par la personne avec qui vous travaillez, une fois le choix fait.",
+             bouton: "Changer ma photo", peutRetirer: true };
+  }
+  return { etat: "aucune", adresse: null,
+           texte: "Ajoutez une photo de votre visage : la personne avec qui vous travaillerez pourra vous reconnaître le jour du service.",
+           bouton: "Ajouter ma photo", peutRetirer: false };
+}
+
+const PHOTO_SANS_VERIFICATION = {
+  code: 403,
+  titre: "Vérification requise",
+  texte: "Faites d'abord vérifier votre identité : l'équipe compare la photo à votre pièce d'identité.",
+  lien: { url: "/verification", texte: "Faire vérifier mon identité" },
+};
+
+function ecranDeMaPhoto(u) {
+  if (u.statut_verification !== "verifie") return { probleme: PHOTO_SANS_VERIFICATION };
+  return {
+    titre: u.photo_fichier ? "Changer ma photo" : "Ajouter ma photo",
+    texte: "Envoyez une photo de votre visage et votre pièce d'identité. L'équipe vérifie que " +
+           "c'est bien vous, puis supprime la pièce d'identité : seule la photo est gardée.",
+    extensions: EXTENSIONS_AUTORISEES,
+    extensionsPhoto: EXTENSIONS_PHOTO,
+    tailleMaxMo: TAILLE_MAX_OCTETS / 1024 / 1024,
+  };
+}
+
+// CE QUE L'ENVOI A RECU. Comme pour le dossier, un envoi refuse ne laisse
+// aucun fichier sur le disque.
+function recevoirUnePhoto(u, recus, erreur) {
+  const photo = recus && recus.photo ? recus.photo[0] : null;
+  const piece = recus && recus.cni ? recus.cni[0] : null;
+  const inutile = recus && recus.casier ? recus.casier[0] : null;
+  if (inutile) supprimerDocument(inutile.filename);
+
+  function refus(titre, texte, code) {
+    if (photo) supprimerDocument(photo.filename);
+    if (piece) supprimerDocument(piece.filename);
+    return { probleme: { code: code || 400, titre, texte, lien: { url: "/mon-profil/photo", texte: "Réessayer" } } };
+  }
+
+  if (u.statut_verification !== "verifie") {
+    const refuse = refus(PHOTO_SANS_VERIFICATION.titre, PHOTO_SANS_VERIFICATION.texte, 403);
+    refuse.probleme.lien = PHOTO_SANS_VERIFICATION.lien;
+    return refuse;
+  }
+
+  if (erreur) {
+    if (erreur.code === "LIMIT_FILE_SIZE") {
+      return refus("Fichier trop volumineux",
+        `Chaque document doit peser moins de ${TAILLE_MAX_OCTETS / 1024 / 1024} Mo.`);
+    }
+    if (erreur.message === "PHOTO_NON_IMAGE") {
+      return refus("Format non accepté", "La photo de votre visage doit être au format JPEG ou PNG.");
+    }
+    if (erreur.message === "TYPE_NON_AUTORISE") {
+      return refus("Format non accepté", `Formats acceptés : ${EXTENSIONS_AUTORISEES.join(", ")}.`);
+    }
+    return refus("Envoi impossible", "Le fichier n'a pas pu être reçu. Réessayez.");
+  }
+
+  if (!photo || !piece) {
+    return refus("Deux envois sont nécessaires",
+      "Il faut envoyer une photo de votre visage ET votre pièce d'identité.");
+  }
+  if (!estUneImage(photo.filename)) {
+    return refus("Format non accepté", "La photo de votre visage doit être au format JPEG ou PNG.");
+  }
+
+  // Une demande precedente est remplacee. La photo deja acceptee reste
+  // visible jusqu'a la decision sur la nouvelle.
+  supprimerDocument(u.photo_envoyee_fichier);
+  supprimerDocument(u.photo_piece_fichier);
+  requetes.enregistrerDemandePhoto.run({ photo: photo.filename, piece: piece.filename, id: u.id });
+
+  return { ok: true, titre: "Photo envoyée", texte: "Votre photo est en cours de contrôle par l'équipe." };
+}
+
+// Retirer sa photo : elle disparait du disque, et de la discussion.
+function retirerMaPhoto(u) {
+  if (!u.photo_fichier) return;
+  supprimerDocument(u.photo_fichier);
+  requetes.retirerPhoto.run(u.id);
+}
+
+app.get("/mon-profil/photo", exigerConnexion, interdireALEquipe, (req, res) => {
+  const ecran = ecranDeMaPhoto(req.utilisateur);
+  if (ecran.probleme) return afficherProbleme(res, ecran.probleme);
+  res.render("photo", { titre: ecran.titre, photo: ecran });
+});
+
+app.post("/mon-profil/photo", exigerConnexion, interdireALEquipe, (req, res) => {
+  recevoirDocuments(req, res, (erreur) => {
+    const resultat = recevoirUnePhoto(req.utilisateur, req.files, erreur);
+    if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
+    res.render("message", {
+      titre: resultat.titre,
+      texte: resultat.texte,
+      liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+    });
+  });
+});
+
+app.post("/mon-profil/photo/retirer", exigerConnexion, interdireALEquipe, (req, res) => {
+  retirerMaPhoto(req.utilisateur);
+  res.redirect("/mon-profil");
+});
+
 // LA PERSONNE QUI A TRAVAILLE DECLARE L'AVOIR FAIT.
 //
 // Sa declaration ne libere AUCUN argent : seule celle de l'employeur le
@@ -6862,6 +7044,7 @@ app.get("/admin", exigerAdmin, (req, res) => {
   res.render("admin", {
     titre: "Espace équipe",
     dossiers: requetes.dossiersEnAttente.all(),
+    photosAControler: requetes.photosAControler.all(),
     statistiques: requetes.statistiquesVerification.all(),
     signalementsOuverts: requetes.nombreSignalementsOuverts.get().n,
     problemesOuverts: requetes.nombreProblemesOuverts.get().n,
@@ -7025,6 +7208,53 @@ app.get("/admin/document/:id/:type", exigerAdmin, (req, res) => {
   // deviner, par exemple, qu'un fichier serait une page a executer.
   res.set("X-Content-Type-Options", "nosniff");
   res.sendFile(path.join(DOSSIER_DOCUMENTS, nomFichier));
+});
+
+// --- Espace equipe : les photos a controler --------------------------
+// La photo et la piece d'identite renvoyee avec elle. Comme les documents
+// d'un dossier, elles ne s'atteignent que par ici.
+app.get("/admin/photo/:id/:type", exigerAdmin, (req, res) => {
+  const demande = requetes.demandePhotoParId.get(Number(req.params.id));
+  const nomFichier = !demande ? null
+    : req.params.type === "photo" ? demande.photo_envoyee_fichier
+    : req.params.type === "piece" ? demande.photo_piece_fichier : null;
+
+  if (!nomFichier || !/^[0-9a-f]{32}\.[a-z0-9]+$/.test(nomFichier)) {
+    return res.status(404).render("message", {
+      titre: "Document introuvable",
+      texte: "Ce document n'est plus disponible.",
+      liens: [{ url: "/admin", texte: "Retour à l'espace équipe" }],
+    });
+  }
+
+  res.set("X-Content-Type-Options", "nosniff");
+  res.sendFile(path.join(DOSSIER_DOCUMENTS, nomFichier));
+});
+
+// Accepter remplace l'ancienne photo ; refuser garde l'ancienne. Dans les
+// deux cas, la piece d'identite est supprimee.
+app.post("/admin/photos", exigerAdmin, lireFormulaire, (req, res) => {
+  const demande = requetes.demandePhotoParId.get(Number(req.body.utilisateurId));
+
+  if (!demande) {
+    return res.status(404).render("message", {
+      titre: "Photo introuvable",
+      texte: "Cette photo n'existe pas ou a déjà été contrôlée.",
+      liens: [{ url: "/admin", texte: "Retour à l'espace équipe" }],
+    });
+  }
+
+  if (req.body.decision === "accepter") {
+    requetes.accepterPhoto.run(demande.id);
+    if (demande.photo_fichier) supprimerDocument(demande.photo_fichier);
+  } else {
+    const motif = String(req.body.motif || "").trim() || "Photo non conforme.";
+    requetes.refuserPhoto.run(motif, demande.id);
+    supprimerDocument(demande.photo_envoyee_fichier);
+  }
+  supprimerDocument(demande.photo_piece_fichier);
+
+  res.redirect("/admin");
 });
 
 // --- Espace equipe : valider ou refuser ----------------------------
@@ -7847,6 +8077,35 @@ app.post("/api/verification", (req, res) => {
 
     res.json({ texte: resultat.texte });
   });
+});
+
+// --- Ma photo depuis l'application ------------------------------------
+app.get("/api/mon-profil/photo", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  const ecran = ecranDeMaPhoto(moi);
+  if (ecran.probleme) return erreurApiDuProbleme(res, ecran.probleme);
+  res.json(ecran);
+});
+
+app.post("/api/mon-profil/photo", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  recevoirDocuments(req, res, (erreur) => {
+    const resultat = recevoirUnePhoto(moi, req.files, erreur);
+    if (resultat.probleme) return erreurApiDuProbleme(res, resultat.probleme);
+    res.json({ texte: resultat.texte });
+  });
+});
+
+app.post("/api/mon-profil/photo/retirer", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  if (refusEquipeApi(res, moi)) return;
+
+  retirerMaPhoto(moi);
+  res.json({ ok: true });
 });
 
 // --- Modifier mon profil depuis l'application -----------------------

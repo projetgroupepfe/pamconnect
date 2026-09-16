@@ -655,6 +655,29 @@ void main() {
     expect(Moi.depuisJson(_moi('employeur')..['aVoir'] = 3).aVoir, 3);
   });
 
+  test('Ma photo se lit telle que le serveur la decrit', () {
+    final carte = PhotoDuProfil.depuisJson({
+      'etat': 'acceptee',
+      'texte': 'texte 1',
+      'peutRetirer': true,
+      'adresse': 'adresse 2',
+      'bouton': 'bouton 3',
+    });
+    expect(carte.peutRetirer, isTrue);
+    expect(carte.adresse, 'adresse 2');
+    final sans = PhotoDuProfil.depuisJson({'etat': 'attente', 'texte': 'texte 4', 'peutRetirer': false});
+    expect(sans.bouton, isNull);
+    final ecran = EcranDeMaPhoto.depuisJson({
+      'titre': 'titre 5',
+      'texte': 'texte 6',
+      'extensions': ['.ext7'],
+      'extensionsPhoto': ['.ext8'],
+      'tailleMaxMo': 9,
+    });
+    expect(ecran.extensionsPhoto, ['.ext8']);
+    expect(() => EcranDeMaPhoto.depuisJson({'titre': 'titre 5'}), throwsA(isA<FormeInattendue>()));
+  });
+
   test("la fiche d'une personne se lit telle que le serveur l'ecrit", () {
     final lu = FichePersonne.depuisJson({
       'id': 6,

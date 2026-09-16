@@ -35,7 +35,7 @@ class EcranVerification extends StatefulWidget {
   State<EcranVerification> createState() => _EcranVerificationState();
 }
 
-class _EcranVerificationState extends State<EcranVerification> {
+class _EcranVerificationState extends State<EcranVerification> with _ChoixDeDocuments<EcranVerification> {
   DossierDeVerification? _dossier;
   String? _erreurChargement;
 
@@ -69,6 +69,10 @@ class _EcranVerificationState extends State<EcranVerification> {
     }
   }
 
+  @override
+  void _erreurDeChoix(String message) => setState(() => _erreurEnvoi = message);
+
+  @override
   void _garder(String champ, DocumentAEnvoyer document) {
     setState(() {
       if (champ == 'cni') {
@@ -80,50 +84,6 @@ class _EcranVerificationState extends State<EcranVerification> {
       }
       _erreurEnvoi = null;
     });
-  }
-
-  Future<void> _prendrePhoto(String champ) async {
-    try {
-      final photo = await ImagePicker().pickImage(
-        source: ImageSource.camera,
-        // La photo du visage se prend en se regardant ; un document, avec
-        // l'appareil de derriere.
-        preferredCameraDevice: champ == 'photo' ? CameraDevice.front : CameraDevice.rear,
-        maxWidth: _cotePhotoMax,
-        maxHeight: _cotePhotoMax,
-        imageQuality: _qualitePhoto,
-      );
-      if (photo == null) return;
-      final document = DocumentAEnvoyer(nom: photo.name, taille: await photo.length(), lire: photo.openRead);
-      if (mounted) _garder(champ, document);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _erreurEnvoi = "L'appareil photo n'a pas pu s'ouvrir. Choisissez plutôt un fichier.");
-    }
-  }
-
-  Future<void> _choisirFichier(String champ, List<String> extensions) async {
-    try {
-      final choisis = await FilePicker.pickFiles(
-        type: FileType.custom,
-        // Le serveur ecrit ".pdf", le selecteur attend "pdf".
-        allowedExtensions: [for (final extension in extensions) extension.replaceFirst('.', '')],
-      );
-      if (choisis.isEmpty) return;
-      final fichier = choisis.first;
-      final taille = await fichier.length();
-      final DocumentAEnvoyer document;
-      if (taille == null) {
-        final octets = await fichier.readAsBytes();
-        document = DocumentAEnvoyer(nom: fichier.name, taille: octets.length, lire: () => Stream.value(octets));
-      } else {
-        document = DocumentAEnvoyer(nom: fichier.name, taille: taille, lire: fichier.readAsByteStream);
-      }
-      if (mounted) _garder(champ, document);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _erreurEnvoi = "Ce fichier n'a pas pu être lu. Choisissez-en un autre.");
-    }
   }
 
   /// Le serveur decide : un document manquant, un format ou une taille
@@ -375,15 +335,17 @@ class _EcranVerificationState extends State<EcranVerification> {
 class _Document extends StatelessWidget {
   const _Document({
     required this.titre,
-    required this.aide,
     required this.document,
+    this.aide,
     required this.actif,
     required this.auPhoto,
     required this.auFichier,
   });
 
   final String titre;
-  final String aide;
+
+  /// Absente quand le champ du site n'en a pas.
+  final String? aide;
   final DocumentAEnvoyer? document;
   final bool actif;
   final VoidCallback auPhoto;
@@ -393,6 +355,7 @@ class _Document extends StatelessWidget {
   Widget build(BuildContext context) {
     final texte = Theme.of(context).textTheme;
     final document = this.document;
+    final aide = this.aide;
     final style = OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48));
 
     return Column(
@@ -433,8 +396,10 @@ class _Document extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        Text(aide, style: texte.bodyMedium?.copyWith(color: Couleurs.encrePale)),
+        if (aide != null) ...[
+          const SizedBox(height: 6),
+          Text(aide, style: texte.bodyMedium?.copyWith(color: Couleurs.encrePale)),
+        ],
       ],
     );
   }
@@ -452,6 +417,224 @@ class _Cadre extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Couleurs.bleuClair, borderRadius: BorderRadius.circular(rayon)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+    );
+  }
+}
+
+/// Prendre une photo ou choisir un fichier : les memes gestes pour la
+/// verification et pour la photo du profil.
+mixin _ChoixDeDocuments<T extends StatefulWidget> on State<T> {
+  void _garder(String champ, DocumentAEnvoyer document);
+  void _erreurDeChoix(String message);
+
+  Future<void> _prendrePhoto(String champ) async {
+    try {
+      final photo = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        // La photo du visage se prend en se regardant ; un document, avec
+        // l'appareil de derriere.
+        preferredCameraDevice: champ == 'photo' ? CameraDevice.front : CameraDevice.rear,
+        maxWidth: _cotePhotoMax,
+        maxHeight: _cotePhotoMax,
+        imageQuality: _qualitePhoto,
+      );
+      if (photo == null) return;
+      final document = DocumentAEnvoyer(nom: photo.name, taille: await photo.length(), lire: photo.openRead);
+      if (mounted) _garder(champ, document);
+    } catch (_) {
+      if (!mounted) return;
+      _erreurDeChoix("L'appareil photo n'a pas pu s'ouvrir. Choisissez plutôt un fichier.");
+    }
+  }
+
+  Future<void> _choisirFichier(String champ, List<String> extensions) async {
+    try {
+      final choisis = await FilePicker.pickFiles(
+        type: FileType.custom,
+        // Le serveur ecrit ".pdf", le selecteur attend "pdf".
+        allowedExtensions: [for (final extension in extensions) extension.replaceFirst('.', '')],
+      );
+      if (choisis.isEmpty) return;
+      final fichier = choisis.first;
+      final taille = await fichier.length();
+      final DocumentAEnvoyer document;
+      if (taille == null) {
+        final octets = await fichier.readAsBytes();
+        document = DocumentAEnvoyer(nom: fichier.name, taille: octets.length, lire: () => Stream.value(octets));
+      } else {
+        document = DocumentAEnvoyer(nom: fichier.name, taille: taille, lire: fichier.readAsByteStream);
+      }
+      if (mounted) _garder(champ, document);
+    } catch (_) {
+      if (!mounted) return;
+      _erreurDeChoix("Ce fichier n'a pas pu être lu. Choisissez-en un autre.");
+    }
+  }
+}
+
+/// Ajouter ou changer sa photo, une fois l'identite verifiee : la photo du
+/// visage et la piece d'identite, que l'equipe compare. La page du site.
+class EcranMaPhoto extends StatefulWidget {
+  const EcranMaPhoto({super.key, required this.api});
+
+  final ApiPamConnect api;
+
+  @override
+  State<EcranMaPhoto> createState() => _EcranMaPhotoState();
+}
+
+class _EcranMaPhotoState extends State<EcranMaPhoto> with _ChoixDeDocuments<EcranMaPhoto> {
+  EcranDeMaPhoto? _ecran;
+  String? _erreurChargement;
+
+  DocumentAEnvoyer? _photo;
+  DocumentAEnvoyer? _piece;
+  String? _erreurEnvoi;
+  bool _envoi = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _charger();
+  }
+
+  Future<void> _charger() async {
+    try {
+      final ecran = await widget.api.ecranMaPhoto();
+      if (!mounted) return;
+      setState(() {
+        _ecran = ecran;
+        _erreurChargement = null;
+      });
+    } on ErreurApi catch (erreur) {
+      if (!mounted) return;
+      if (erreur.sessionPerdue) {
+        revenirALaConnexion(context, widget.api, messageSessionPerdue);
+        return;
+      }
+      setState(() => _erreurChargement = erreur.message);
+    }
+  }
+
+  @override
+  void _erreurDeChoix(String message) => setState(() => _erreurEnvoi = message);
+
+  @override
+  void _garder(String champ, DocumentAEnvoyer document) {
+    setState(() {
+      if (champ == 'photo') {
+        _photo = document;
+      } else {
+        _piece = document;
+      }
+      _erreurEnvoi = null;
+    });
+  }
+
+  /// Le serveur decide : une piece manquante ou un format refuse reviennent
+  /// avec la phrase du site.
+  Future<void> _envoyer() async {
+    if (_envoi) return;
+    final photo = _photo;
+    final piece = _piece;
+    setState(() {
+      _envoi = true;
+      _erreurEnvoi = null;
+    });
+
+    try {
+      final texte = (await widget.api.envoyerMaPhoto({
+        'photo': ?photo,
+        'cni': ?piece,
+      }))
+          .texte;
+      if (!mounted) return;
+      Navigator.of(context).pop(texte);
+    } on ErreurApi catch (erreur) {
+      if (!mounted) return;
+      if (erreur.sessionPerdue) {
+        revenirALaConnexion(context, widget.api, messageSessionPerdue);
+        return;
+      }
+      setState(() {
+        _envoi = false;
+        _erreurEnvoi = erreur.message;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(_ecran?.titre ?? 'Ma photo')),
+      body: SafeArea(child: _corps(context)),
+    );
+  }
+
+  Widget _corps(BuildContext context) {
+    final erreurChargement = _erreurChargement;
+    final ecran = _ecran;
+    final erreurEnvoi = _erreurEnvoi;
+
+    if (erreurChargement != null) {
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [Avertissement(texte: erreurChargement)],
+      );
+    }
+    if (ecran == null) return const Center(child: CircularProgressIndicator());
+
+    final texte = Theme.of(context).textTheme;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(ecran.texte, style: texte.bodyLarge?.copyWith(color: Couleurs.encreDouce)),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _Document(
+                  titre: 'Ma photo',
+                  document: _photo,
+                  actif: !_envoi,
+                  auPhoto: () => _prendrePhoto('photo'),
+                  auFichier: () => _choisirFichier('photo', ecran.extensionsPhoto),
+                ),
+                const SizedBox(height: 24),
+                _Document(
+                  titre: "Ma pièce d'identité",
+                  aide: 'Formats acceptés : ${ecran.extensions.join(', ')}. '
+                      '${ecran.tailleMaxMo} Mo maximum par document.',
+                  document: _piece,
+                  actif: !_envoi,
+                  auPhoto: () => _prendrePhoto('cni'),
+                  auFichier: () => _choisirFichier('cni', ecran.extensions),
+                ),
+                const SizedBox(height: 24),
+                if (erreurEnvoi != null) ...[
+                  Avertissement(texte: erreurEnvoi),
+                  const SizedBox(height: 16),
+                ],
+                // L'icone de l'envoi, comme le bouton du site.
+                FilledButton.icon(
+                  onPressed: _envoi ? null : _envoyer,
+                  icon: _envoi
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Couleurs.bleuFonce),
+                        )
+                      : const Icon(Icons.file_upload_outlined),
+                  label: const Text('Envoyer'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

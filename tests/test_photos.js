@@ -68,6 +68,26 @@ function poserPhoto(personne) {
   return nom;
 }
 
+// Un envoi de l'ecran Ajouter ma photo : la photo et la piece d'identite.
+function envoiPhoto(options) {
+  const envoi = new FormData();
+  const o = options || {};
+  if (o.photo !== false) {
+    const contenu = new Uint8Array(o.octets || 1500);
+    if (!o.deguisee) contenu.set([0xff, 0xd8, 0xff, 0xe0]);
+    envoi.append("photo", new File([contenu], o.nomPhoto || "visage.jpg", { type: "image/jpeg" }));
+  }
+  if (o.piece !== false) {
+    envoi.append("cni", new File([new Uint8Array(900)], "piece.pdf", { type: "application/pdf" }));
+  }
+  return envoi;
+}
+
+const ligne = (personne) => base.prepare("SELECT * FROM utilisateurs WHERE id = ?").get(personne.id);
+const surLeDisque = (nom) => Boolean(nom) && fs.existsSync(path.join(DOCS, nom));
+// EJS ecrit &#39; pour une apostrophe venue du serveur : on la decode.
+const uneLigne = (texte) => texte.replace(/\s+/g, " ").replace(/&#39;/g, "'");
+
 const crediter = (id, n) => base.prepare(`
   INSERT INTO jetons_mouvements (utilisateur_id, quantite, nature, motif, detail)
   VALUES (?, ?, 'achete', 'achat', 'Credit de test')
@@ -170,9 +190,136 @@ setTimeout(async () => {
        !(await lire("/messages/" + candElle, cookieDe(emp.cookie))).texte.includes("/photos/"));
   base.prepare("UPDATE utilisateurs SET photo_fichier = ? WHERE id = ?").run(photoElle, elle.id);
 
+  console.log(SAUT + "--- MA PHOTO : SEULEMENT UNE FOIS VERIFIEE ---");
+  const pasVerifiee = await creerCompte("pasverifiee", "prestataire", { metier: "menagere", tarif: "15000" });
+  base.prepare("UPDATE utilisateurs SET statut_verification = 'non soumis' WHERE id = ?").run(pasVerifiee.id);
+  const fichiersAvant = fs.readdirSync(DOCS).length;
+  dire("la page lui est fermee", (await lire("/mon-profil/photo", cookieDe(pasVerifiee.cookie))).code === 403);
+  const envoiRefuse = await poster("/mon-profil/photo", envoiPhoto(), pasVerifiee.cookie);
+  dire("l'envoi aussi, sans fichier laisse",
+       envoiRefuse.code === 403 && fs.readdirSync(DOCS).length === fichiersAvant, "code " + envoiRefuse.code);
+  const profilPasVerifiee = await lire("/mon-profil", cookieDe(pasVerifiee.cookie));
+  dire("et son profil ne montre pas la carte", !profilPasVerifiee.texte.includes("Ma photo"));
+
+  console.log(SAUT + "--- MA PHOTO : L'AJOUTER ---");
+  const profilSans = uneLigne((await lire("/mon-profil", cookieDe(inconnue.cookie))).texte);
+  dire("sans photo, la carte invite a en ajouter une",
+       profilSans.includes("Ajoutez une photo de votre visage : la personne avec qui vous travaillerez pourra vous reconnaître le jour du service.") &&
+       profilSans.includes("Ajouter ma photo") && !profilSans.includes("Retirer ma photo"));
+  const pageAjout = uneLigne((await lire("/mon-profil/photo", cookieDe(inconnue.cookie))).texte);
+  dire("la page dit ce qui est envoye et ce qui est garde",
+       pageAjout.includes("<h1>Ajouter ma photo</h1>") &&
+       pageAjout.includes("L'équipe vérifie que c'est bien vous, puis supprime la pièce d'identité : seule la photo est gardée.") &&
+       pageAjout.includes("Ma photo") && pageAjout.includes("Ma pièce d'identité"));
+
+  const avantRefus = fs.readdirSync(DOCS).length;
+  const sansPiece = await poster("/mon-profil/photo", envoiPhoto({ piece: false }), inconnue.cookie);
+  dire("sans piece d'identite : refuse", sansPiece.code === 400 && sansPiece.texte.includes("Deux envois sont nécessaires"));
+  const enPdf = await poster("/mon-profil/photo", envoiPhoto({ nomPhoto: "visage.pdf" }), inconnue.cookie);
+  dire("une photo en PDF : refusee", enPdf.code === 400 && enPdf.texte.includes("au format JPEG ou PNG"));
+  const deguisee = await poster("/mon-profil/photo", envoiPhoto({ deguisee: true }), inconnue.cookie);
+  dire("un faux JPEG : refuse", deguisee.code === 400 && deguisee.texte.includes("au format JPEG ou PNG"));
+  dire("aucun fichier laisse par ces refus", fs.readdirSync(DOCS).length === avantRefus);
+
+  const ajout = await poster("/mon-profil/photo", envoiPhoto(), inconnue.cookie);
+  dire("la photo et la piece partent", ajout.code === 200 && ajout.texte.includes("Photo envoyée"), "code " + ajout.code);
+  const enAttente = ligne(inconnue);
+  dire("elles attendent sur le disque", surLeDisque(enAttente.photo_envoyee_fichier) && surLeDisque(enAttente.photo_piece_fichier));
+  dire("le profil dit que la photo est controlee",
+       uneLigne((await lire("/mon-profil", cookieDe(inconnue.cookie))).texte).includes("Votre photo est en cours de contrôle par l'équipe."));
+  dire("et elle n'est encore visible par personne", (await photo(inconnue, cookieDe(inconnue.cookie))).code === 404);
+
+  console.log(SAUT + "--- L'EQUIPE CONTROLE ---");
+  const espace = uneLigne((await lire("/admin", cookieDe(eq.cookie))).texte);
+  dire("la photo attend dans l'espace equipe",
+       espace.includes("Photos à contrôler") && espace.includes(inconnue.nom) &&
+       espace.includes('href="/admin/photo/' + inconnue.id + '/photo"') &&
+       espace.includes('href="/admin/photo/' + inconnue.id + '/piece"'));
+  const ouverte = await lire("/admin/photo/" + inconnue.id + "/photo", cookieDe(eq.cookie));
+  dire("l'equipe ouvre la photo", ouverte.code === 200 && ouverte.entetes.get("x-content-type-options") === "nosniff");
+  dire("et la piece", (await lire("/admin/photo/" + inconnue.id + "/piece", cookieDe(eq.cookie))).code === 200);
+  dire("personne d'autre", (await lire("/admin/photo/" + inconnue.id + "/piece", cookieDe(inconnue.cookie))).code === 403);
+
+  await poster("/admin/photos", form({ utilisateurId: String(inconnue.id), decision: "refuser",
+    motif: "le visage n'est pas visible" }), eq.cookie);
+  const apresRefus = ligne(inconnue);
+  dire("refusee : la photo et la piece sont supprimees",
+       apresRefus.photo_envoyee_fichier === null && apresRefus.photo_piece_fichier === null &&
+       !surLeDisque(enAttente.photo_envoyee_fichier) && !surLeDisque(enAttente.photo_piece_fichier));
+  const profilRefus = uneLigne((await lire("/mon-profil", cookieDe(inconnue.cookie))).texte);
+  dire("la personne lit le motif",
+       profilRefus.includes("Votre photo n&#39;a pas été acceptée : le visage n&#39;est pas visible.") ||
+       profilRefus.includes("Votre photo n'a pas été acceptée : le visage n'est pas visible."));
+  dire("et peut en envoyer une autre", profilRefus.includes("Envoyer une autre photo"));
+
+  await poster("/mon-profil/photo", envoiPhoto(), inconnue.cookie);
+  const deuxieme = ligne(inconnue);
+  await poster("/admin/photos", form({ utilisateurId: String(inconnue.id), decision: "accepter" }), eq.cookie);
+  const acceptee = ligne(inconnue);
+  dire("acceptee : elle devient sa photo, la piece est supprimee",
+       acceptee.photo_fichier === deuxieme.photo_envoyee_fichier && surLeDisque(acceptee.photo_fichier) &&
+       !surLeDisque(deuxieme.photo_piece_fichier) && acceptee.photo_piece_fichier === null &&
+       acceptee.photo_motif_refus === null);
+  const profilAcceptee = uneLigne((await lire("/mon-profil", cookieDe(inconnue.cookie))).texte);
+  dire("le profil la montre, avec qui peut la voir",
+       profilAcceptee.includes('src="/photos/' + inconnue.id + "?v=") &&
+       profilAcceptee.includes("Visible seulement par la personne avec qui vous travaillez, une fois le choix fait.") &&
+       profilAcceptee.includes("Changer ma photo") && profilAcceptee.includes("Retirer ma photo") &&
+       profilAcceptee.includes('data-question="Retirer votre photo ?"'));
+  dire("l'espace equipe n'a plus rien a controler pour elle",
+       !uneLigne((await lire("/admin", cookieDe(eq.cookie))).texte).includes('/admin/photo/' + inconnue.id + '/'));
+  dire("une decision deja prise : 404",
+       (await poster("/admin/photos", form({ utilisateurId: String(inconnue.id), decision: "accepter" }), eq.cookie)).code === 404);
+
+  console.log(SAUT + "--- CHANGER DE PHOTO, PUIS LA RETIRER ---");
+  const ancienne = ligne(elle).photo_fichier;
+  await poster("/mon-profil/photo", envoiPhoto(), elle.cookie);
+  dire("pendant le controle, l'ancienne photo reste visible pour l'employeur",
+       ligne(elle).photo_fichier === ancienne && (await photo(elle, cookieDe(emp.cookie))).code === 200);
+  dire("la page s'appelle Changer ma photo",
+       (await lire("/mon-profil/photo", cookieDe(elle.cookie))).texte.includes("<h1>Changer ma photo</h1>"));
+  await poster("/admin/photos", form({ utilisateurId: String(elle.id), decision: "accepter" }), eq.cookie);
+  const nouvelle = ligne(elle).photo_fichier;
+  dire("acceptee, la nouvelle remplace l'ancienne, effacee du disque",
+       nouvelle !== ancienne && surLeDisque(nouvelle) && !surLeDisque(ancienne));
+  dire("la discussion donne la nouvelle adresse",
+       (await discussionApi(candElle, emp.cookie)).photoAutre === "/photos/" + elle.id + "?v=" + nouvelle.slice(0, 8));
+
+  const retrait = await poster("/mon-profil/photo/retirer", new URLSearchParams(), elle.cookie);
+  dire("elle retire sa photo", retrait.code === 302 && ligne(elle).photo_fichier === null && !surLeDisque(nouvelle));
+  dire("l'employeur ne la voit plus", (await photo(elle, cookieDe(emp.cookie))).code === 404 &&
+       (await discussionApi(candElle, emp.cookie)).photoAutre === null);
+  dire("et sa carte l'invite de nouveau a en ajouter une",
+       (await lire("/mon-profil", cookieDe(elle.cookie))).texte.includes("Ajouter ma photo"));
+
+  console.log(SAUT + "--- MA PHOTO DEPUIS L'APPLICATION ---");
+  const coElle = await fetch(RACINE + "/api/connexion", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: elle.mail, motdepasse: "motdepasse123" }) });
+  const jetonElle = { Authorization: "Bearer " + (await coElle.json()).jeton };
+  const profilApi = JSON.parse((await lire("/api/mon-profil", jetonElle)).texte);
+  dire("le profil de l'application porte la meme carte",
+       profilApi.photo && profilApi.photo.etat === "aucune" && profilApi.photo.bouton === "Ajouter ma photo" &&
+       profilApi.photo.texte === "Ajoutez une photo de votre visage : la personne avec qui vous travaillerez pourra vous reconnaître le jour du service.");
+  const ecranApi = JSON.parse((await lire("/api/mon-profil/photo", jetonElle)).texte);
+  dire("l'ecran d'envoi aussi", ecranApi.titre === "Ajouter ma photo" &&
+       JSON.stringify(ecranApi.extensionsPhoto) === JSON.stringify([".jpg", ".jpeg", ".png"]));
+  const envoiApi = await fetch(RACINE + "/api/mon-profil/photo", { method: "POST", body: envoiPhoto(), headers: jetonElle });
+  const envoiApiJson = await envoiApi.json();
+  dire("l'application envoie la photo et la piece",
+       envoiApi.status === 200 && envoiApiJson.texte === "Votre photo est en cours de contrôle par l'équipe.", JSON.stringify(envoiApiJson));
+  const refusApi = await fetch(RACINE + "/api/mon-profil/photo", { method: "POST", body: envoiPhoto({ piece: false }), headers: jetonElle });
+  dire("et recoit le meme refus en JSON",
+       refusApi.status === 400 && (await refusApi.json()).erreur === "Il faut envoyer une photo de votre visage ET votre pièce d'identité.");
+  const jetonPasVerifiee = { Authorization: "Bearer " + (await (await fetch(RACINE + "/api/connexion", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: pasVerifiee.mail, motdepasse: "motdepasse123" }) })).json()).jeton };
+  const fermeApi = await fetch(RACINE + "/api/mon-profil/photo", { headers: jetonPasVerifiee });
+  dire("une personne non verifiee : 403, avec le chemin de la verification",
+       fermeApi.status === 403 && (await fermeApi.json()).verification === true);
+
   console.log(SAUT + "--- NETTOYAGE ---");
-  base.prepare("SELECT photo_fichier, photo_envoyee_fichier FROM utilisateurs WHERE email LIKE ?").all("%" + M + "%")
-    .flatMap((u) => [u.photo_fichier, u.photo_envoyee_fichier])
+  base.prepare("SELECT photo_fichier, photo_envoyee_fichier, photo_piece_fichier FROM utilisateurs WHERE email LIKE ?").all("%" + M + "%")
+    .flatMap((u) => [u.photo_fichier, u.photo_envoyee_fichier, u.photo_piece_fichier])
     .forEach((f) => { if (f && fs.existsSync(path.join(DOCS, f))) fs.unlinkSync(path.join(DOCS, f)); });
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes, et leurs photos");

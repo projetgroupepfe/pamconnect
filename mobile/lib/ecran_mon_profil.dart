@@ -173,6 +173,22 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
   }
 
+  Future<void> _ouvrirMaPhoto() async {
+    final texte = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => EcranMaPhoto(api: widget.api)),
+    );
+    if (!mounted) return;
+    await _charger();
+    if (!mounted || texte == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
+  }
+
+  /// Une question d'abord, comme sur le site ; puis le profil se recharge.
+  Future<void> _retirerMaPhoto() async {
+    if (_action || !await confirmerRetraitPhoto(context)) return;
+    await _marquerLu(widget.api.retirerMaPhoto);
+  }
+
   Future<void> _seDeconnecter() async {
     await widget.api.deconnexion();
     if (!mounted) return;
@@ -234,6 +250,9 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
     final aNoter = profil.servicesANoter;
     final motifRefus = profil.motifRefus;
     final boutonVerification = profil.boutonVerification;
+    final photo = profil.photo;
+    final adressePhoto = photo?.adresse;
+    final boutonPhoto = photo?.bouton;
 
     return [
       if (erreur != null) ...[
@@ -311,11 +330,14 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
             children: [
               Row(
                 children: [
+                  // Sa propre photo, une fois acceptee. Sinon l'initiale.
                   CircleAvatar(
                     radius: 26,
                     backgroundColor: Couleurs.bleuClair,
                     foregroundColor: Couleurs.bleuFonce,
-                    child: Text(profil.nom.isEmpty ? '' : profil.nom.characters.first),
+                    backgroundImage: adressePhoto == null ? null : widget.api.imageProtegee(adressePhoto),
+                    onBackgroundImageError: adressePhoto == null ? null : (_, _) {},
+                    child: adressePhoto == null ? Text(profil.nom.isEmpty ? '' : profil.nom.characters.first) : null,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -492,6 +514,39 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
           onPressed: _ouvrirVerification,
           icon: const Icon(Icons.file_upload_outlined),
           label: Text(boutonVerification),
+        ),
+      ],
+      // Ma photo, une fois l'identite verifiee, comme la carte du site.
+      if (photo != null) ...[
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Ma photo', style: texte.titleMedium?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Text(photo.texte, style: gris),
+                if (boutonPhoto != null) ...[
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: _action ? null : _ouvrirMaPhoto,
+                    icon: const Icon(Icons.file_upload_outlined),
+                    label: Text(boutonPhoto),
+                  ),
+                ],
+                if (photo.peutRetirer) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: _action ? null : _retirerMaPhoto,
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                    child: const Text('Retirer ma photo'),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ],
     ];
