@@ -46,9 +46,10 @@ class _EcranFicheState extends State<EcranFiche> {
     }
   }
 
-  Future<void> _publier() async {
+  /// [pour] : la demande est proposee a cette personne.
+  Future<void> _publier({int? pour}) async {
     final texte = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => EcranPublier(api: widget.api)),
+      MaterialPageRoute(builder: (_) => EcranPublier(api: widget.api, pourPersonneId: pour)),
     );
     if (!mounted || texte == null) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
@@ -237,17 +238,29 @@ class _EcranFicheState extends State<EcranFiche> {
                 children: [
                   Text('Travailler avec cette personne', style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
-                  Text(
-                    "Publiez votre demande avec le service, l'horaire et le prix : cette personne "
-                    'pourra y répondre.',
-                    style: gris,
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: _publier,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Publier une demande'),
-                  ),
+                  // On ne propose une demande qu'a une personne verifiee :
+                  // les autres ne peuvent pas y repondre.
+                  if (fiche.peutProposer) ...[
+                    Text('Publiez une demande pour cette personne : elle la verra en premier.', style: gris),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: () => _publier(pour: fiche.id),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Publier une demande pour cette personne'),
+                    ),
+                  ] else ...[
+                    Text(
+                      "Publiez votre demande avec le service, l'horaire et le prix : cette personne "
+                      'pourra y répondre.',
+                      style: gris,
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: _publier,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Publier une demande'),
+                    ),
+                  ],
                 ],
               ),
             ),

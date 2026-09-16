@@ -167,9 +167,10 @@ class Demande {
 
 /// La reponse de /api/demandes, dans l'ordre decide par le serveur.
 class ListeDemandes {
-  const ListeDemandes({required this.pourMoi, required this.autres, this.monMetier});
+  const ListeDemandes({required this.proposees, required this.pourMoi, required this.autres, this.monMetier});
 
   factory ListeDemandes.depuisJson(Map<String, dynamic> json) => ListeDemandes(
+        proposees: _lireListe(json, 'proposees', Demande.depuisJson),
         pourMoi: _lireListe(json, 'pourMoi', Demande.depuisJson),
         autres: _lireListe(json, 'autres', Demande.depuisJson),
         monMetier: _lireFacultatif<String>(json, 'monMetier'),
@@ -178,13 +179,17 @@ class ListeDemandes {
   /// Le metier de la personne, pour le titre "Pour vous : ...".
   final String? monMetier;
 
+  /// Les demandes qu'un employeur a publiees pour cette personne : elles
+  /// passent avant tout le reste.
+  final List<Demande> proposees;
+
   /// Les demandes du metier de la personne.
   final List<Demande> pourMoi;
 
   /// Toutes les autres, qui restent visibles.
   final List<Demande> autres;
 
-  bool get vide => pourMoi.isEmpty && autres.isEmpty;
+  bool get vide => proposees.isEmpty && pourMoi.isEmpty && autres.isEmpty;
 }
 
 /// La note d'une personne, deja formulee par le serveur (notePersonne) :
@@ -277,6 +282,7 @@ class DemandePubliee {
     this.prixLisible,
     this.dureeEstimee,
     this.lieu,
+    this.proposeeA,
     this.phraseFermeture,
     this.enAvantJusquAu,
   });
@@ -295,6 +301,7 @@ class DemandePubliee {
         prixLisible: _lireFacultatif<String>(json, 'prixLisible'),
         dureeEstimee: _lireFacultatif<String>(json, 'dureeEstimee'),
         lieu: _lireFacultatif<String>(json, 'lieu'),
+        proposeeA: _lireFacultatif<String>(json, 'proposeeA'),
         phraseFermeture: _lireFacultatif<String>(json, 'phraseFermeture'),
         enAvantJusquAu: _lireFacultatif<String>(json, 'enAvantJusquAu'),
       );
@@ -312,6 +319,9 @@ class DemandePubliee {
   final String? prixLisible;
   final String? dureeEstimee;
   final String? lieu;
+
+  /// Le nom de la personne a qui la demande a ete proposee.
+  final String? proposeeA;
 
   /// "Vous avez choisi quelqu'un." ou "Vous avez retire cette demande."
   final String? phraseFermeture;
@@ -365,6 +375,7 @@ class FormulaireDemande {
     required this.arrondissements,
     required this.unitesTarif,
     required this.uniteParDefaut,
+    this.invitee,
   });
 
   factory FormulaireDemande.depuisJson(Map<String, dynamic> json) {
@@ -374,6 +385,7 @@ class FormulaireDemande {
       arrondissements: _lireTextes(json, 'arrondissements'),
       unitesTarif: _lireListe(json, 'unitesTarif', UniteTarif.depuisJson),
       uniteParDefaut: _lire<String>(json, 'uniteParDefaut'),
+      invitee: _lireObjet(json, 'invitee', PersonneInvitee.depuisJson),
     );
     // La liste deroulante doit pouvoir montrer le choix par defaut : un
     // choix absent de la liste la ferait planter.
@@ -388,6 +400,25 @@ class FormulaireDemande {
   final List<String> arrondissements;
   final List<UniteTarif> unitesTarif;
   final String uniteParDefaut;
+
+  /// La personne a qui la demande est proposee. Absente pour une demande
+  /// publiee pour tout le monde.
+  final PersonneInvitee? invitee;
+}
+
+/// La personne a qui un employeur propose sa demande, depuis sa fiche.
+class PersonneInvitee {
+  const PersonneInvitee({required this.id, required this.nom, this.metier});
+
+  factory PersonneInvitee.depuisJson(Map<String, dynamic> json) => PersonneInvitee(
+        id: _lire<int>(json, 'id'),
+        nom: _lire<String>(json, 'nom'),
+        metier: _lireFacultatif<String>(json, 'metier'),
+      );
+
+  final int id;
+  final String nom;
+  final String? metier;
 }
 
 /// La reponse de /api/quartier : l'arrondissement que le serveur retiendra.
@@ -1149,6 +1180,7 @@ class FichePersonne {
     required this.tarif,
     required this.avis,
     required this.peutPublier,
+    required this.peutProposer,
     this.metier,
     this.trancheAge,
     this.lieu,
@@ -1165,6 +1197,7 @@ class FichePersonne {
         tarif: _lire<String>(json, 'tarif'),
         avis: AvisDeLaFiche.depuisJson(_lire<Map<String, dynamic>>(json, 'avis')),
         peutPublier: _lire<bool>(json, 'peutPublier'),
+        peutProposer: _lire<bool>(json, 'peutProposer'),
         metier: _lireFacultatif<String>(json, 'metier'),
         trancheAge: _lireFacultatif<String>(json, 'trancheAge'),
         lieu: _lireFacultatif<String>(json, 'lieu'),
@@ -1180,6 +1213,10 @@ class FichePersonne {
   final String tarif;
   final AvisDeLaFiche avis;
   final bool peutPublier;
+
+  /// Publier une demande POUR cette personne : seulement si elle est
+  /// verifiee.
+  final bool peutProposer;
   final String? metier;
 
   /// Seulement pour l'employeur qui l'a deja embauchee.
@@ -2085,12 +2122,20 @@ class LimiteDuJour {
 
 /// L'ecran Repondre a cette demande (/api/demandes/:id/reponse).
 class EcranReponse {
-  const EcranReponse({required this.demande, required this.employeur, required this.prix, this.cout, this.limite});
+  const EcranReponse({
+    required this.demande,
+    required this.employeur,
+    required this.prix,
+    required this.proposee,
+    this.cout,
+    this.limite,
+  });
 
   factory EcranReponse.depuisJson(Map<String, dynamic> json) => EcranReponse(
         demande: DemandeARepondre.depuisJson(_lire<Map<String, dynamic>>(json, 'demande')),
         employeur: EmployeurDeLaDemande.depuisJson(_lire<Map<String, dynamic>>(json, 'employeur')),
         prix: PrixARepondre.depuisJson(_lire<Map<String, dynamic>>(json, 'prix')),
+        proposee: _lire<bool>(json, 'proposee'),
         cout: _lireObjet(json, 'cout', CoutDeLaReponse.depuisJson),
         limite: _lireObjet(json, 'limite', LimiteDuJour.depuisJson),
       );
@@ -2098,6 +2143,10 @@ class EcranReponse {
   final DemandeARepondre demande;
   final EmployeurDeLaDemande employeur;
   final PrixARepondre prix;
+
+  /// La demande a ete publiee pour cette personne : pas de jeton, pas de
+  /// limite du jour.
+  final bool proposee;
 
   /// Absent si l'equipe n'a pas regle le cout d'une reponse.
   final CoutDeLaReponse? cout;

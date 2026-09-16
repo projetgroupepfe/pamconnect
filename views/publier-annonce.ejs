@@ -7,6 +7,19 @@
       arrange vous répondront.
     </p>
 
+    <%# PROPOSEE A UNE PERSONNE, depuis sa fiche. Ce qu'elle change est dit
+        avant le formulaire : cette personne la voit en premier, et la
+        demande reste ouverte aux autres. %>
+    <% if (locals.invitee) { %>
+      <div class="carte">
+        <h3>Proposée à <%= invitee.nom %></h3>
+        <p>
+          Cette personne verra votre demande en premier. D'autres pourront
+          aussi y répondre.
+        </p>
+      </div>
+    <% } %>
+
     <%# Ce qui arrive a l'argent, annonce AVANT le formulaire. Une
         personne qui repond se deplace chez un inconnu : elle doit savoir
         que la somme existe. L'employeur, lui, doit savoir qu'il devra la
@@ -33,8 +46,11 @@
 
     <div class="carte">
       <form action="/annonces" method="POST">
+        <% if (locals.invitee) { %>
+          <input type="hidden" name="pour" value="<%= invitee.id %>">
+        <% } %>
 
-        <%- include("partiels/champs-annonce", { annonce: null }) %>
+        <%- include("partiels/champs-annonce", { annonce: locals.annonce || null }) %>
 
         <div class="actions">
           <button type="submit">Publier ma demande</button>

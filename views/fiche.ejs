@@ -96,18 +96,33 @@
 
     <%# LA MEME IMPASSE, sur la fiche. Il regarde la personne qu'il
         veut et n'a qu'un bouton de retour. %>
+    <%# On ne propose une demande qu'a une personne verifiee : les autres
+        ne peuvent pas y repondre. %>
+    <% const peutProposer = locals.jePeux && jePeux.publier && personne.statut_verification === "verifie"; %>
     <% if (locals.jePeux && jePeux.publier) { %>
       <div class="carte confiance">
         <h3>Travailler avec cette personne</h3>
-        <p>
-          Publiez votre demande avec le service, l'horaire et le prix :
-          cette personne pourra y répondre.
-        </p>
+        <% if (peutProposer) { %>
+          <p>
+            Publiez une demande pour cette personne : elle la verra en
+            premier.
+          </p>
+        <% } else { %>
+          <p>
+            Publiez votre demande avec le service, l'horaire et le prix :
+            cette personne pourra y répondre.
+          </p>
+        <% } %>
       </div>
     <% } %>
 
     <div class="actions">
-      <% if (locals.jePeux && jePeux.publier) { %>
+      <% if (peutProposer) { %>
+        <a class="bouton" href="/publier-annonce?pour=<%= personne.id %>">
+          <%- include("partiels/icone", { nom: "ajouter" }) %>
+          Publier une demande pour cette personne
+        </a>
+      <% } else if (locals.jePeux && jePeux.publier) { %>
         <a class="bouton" href="/publier-annonce">
           <%- include("partiels/icone", { nom: "ajouter" }) %>
           Publier une demande

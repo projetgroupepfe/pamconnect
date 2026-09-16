@@ -193,6 +193,16 @@ CREATE TABLE IF NOT EXISTS annonces (
   -- NULL : cette demande n'a jamais ete mise en avant.
   mise_en_avant_jusqu_au TEXT,
 
+  -- --- Proposee a une personne ---
+  -- L'employeur a trouve quelqu'un dans la recherche et publie sa demande
+  -- POUR cette personne. Elle la voit en premier, et y repondre ne lui
+  -- coute pas de jeton. La demande reste ouverte aux autres : proposer
+  -- n'est pas choisir.
+  --
+  -- NULL : demande publiee pour tout le monde.
+  -- ON DELETE SET NULL : si le compte disparait, la demande reste.
+  personne_invitee_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL,
+
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 

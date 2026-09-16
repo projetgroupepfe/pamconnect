@@ -118,6 +118,9 @@ void main() {
 
   test("la liste garde l'ordre et la separation decides par le serveur", () {
     final liste = ListeDemandes.depuisJson({
+      'proposees': [
+        {'id': 4, 'titre': 'D', 'misEnAvant': false},
+      ],
       'pourMoi': [
         {'id': 1, 'titre': 'A', 'misEnAvant': true},
       ],
@@ -127,10 +130,22 @@ void main() {
       ],
       'monMetier': 'menagere',
     });
+    expect(liste.proposees.map((d) => d.titre), ['D']);
     expect(liste.pourMoi.map((d) => d.titre), ['A']);
     expect(liste.autres.map((d) => d.titre), ['B', 'C']);
     expect(liste.vide, isFalse);
-    expect(ListeDemandes.depuisJson({'pourMoi': [], 'autres': []}).vide, isTrue);
+    expect(ListeDemandes.depuisJson({'proposees': [], 'pourMoi': [], 'autres': []}).vide, isTrue);
+  });
+
+  test("une demande proposee suffit : la liste n'est pas vide", () {
+    final liste = ListeDemandes.depuisJson({
+      'proposees': [
+        {'id': 4, 'titre': 'D', 'misEnAvant': false},
+      ],
+      'pourMoi': [],
+      'autres': [],
+    });
+    expect(liste.vide, isFalse);
   });
 
   group("les demandes de l'employeur", () {
@@ -144,6 +159,7 @@ void main() {
               'prixLisible': '12 000 FCFA pour la prestation',
               'dureeEstimee': null,
               'lieu': 'Manguier, Yaoundé 1',
+              'proposeeA': 'nom 1',
               'fermee': false,
               'phraseFermeture': null,
               'enAvant': false,
@@ -188,6 +204,8 @@ void main() {
       expect(mes.enCours.map((d) => d.titre), ['Menage deux fois par semaine']);
       expect(mes.terminees.map((d) => d.titre), ['Cuisine tous les jours']);
       expect(mes.terminees.single.phraseFermeture, 'Vous avez retiré cette demande.');
+      expect(mes.enCours.single.proposeeA, 'nom 1');
+      expect(mes.terminees.single.proposeeA, isNull);
     });
 
     test('les decisions du serveur sont lues telles quelles', () {
@@ -255,6 +273,15 @@ void main() {
       expect(lu.metiers, ['metier 1', 'metier 2']);
       expect(lu.unitesTarif.map((u) => u.libelle), ["de l'heure", 'pour la prestation']);
       expect(lu.uniteParDefaut, 'forfaitaire');
+      expect(lu.invitee, isNull);
+    });
+
+    test('la personne a qui la demande est proposee est lue', () {
+      final json = formulaire()..['invitee'] = {'id': 7, 'nom': 'nom 1', 'metier': 'metier 1'};
+      final lu = FormulaireDemande.depuisJson(json);
+      expect(lu.invitee?.id, 7);
+      expect(lu.invitee?.nom, 'nom 1');
+      expect(lu.invitee?.metier, 'metier 1');
     });
 
     test('un choix par defaut absent de la liste est signale', () {
@@ -643,7 +670,9 @@ void main() {
       'tarif': 'tarif 1',
       'avis': {'moyenne': null, 'nombre': 0, 'liste': []},
       'peutPublier': true,
+      'peutProposer': true,
     });
+    expect(lu.peutProposer, isTrue);
     expect(lu.disponibilites.single.jour, 'Lundi');
     expect(lu.avis.moyenne, isNull);
     expect(lu.trancheAge, isNull);
@@ -966,9 +995,11 @@ void main() {
       },
       'employeur': {'nom': 'nom 1', 'verifie': false, 'note': null, 'nombreAvis': 0},
       'prix': {'annonce': null, 'dureeEstimee': null, 'lignes': []},
+      'proposee': false,
       'cout': {'envoyer': 'envoyer 1', 'reste': 'reste 1', 'soldeInsuffisant': true, 'solde': 'solde 1'},
       'limite': null,
     });
+    expect(lu.proposee, isFalse);
     expect(lu.cout?.soldeInsuffisant, isTrue);
     expect(lu.limite, isNull);
     expect(lu.employeur.note, isNull);

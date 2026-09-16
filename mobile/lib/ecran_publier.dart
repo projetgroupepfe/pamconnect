@@ -17,9 +17,13 @@ const _aideArrondissementDepart = "Rempli automatiquement d'après votre quartie
 /// et c'est le serveur qui refuse, avec la phrase que le site affiche aussi.
 /// En cas de succes, il rend la confirmation a l'ecran Mes demandes.
 class EcranPublier extends StatefulWidget {
-  const EcranPublier({super.key, required this.api, this.demandeId});
+  const EcranPublier({super.key, required this.api, this.demandeId, this.pourPersonneId});
 
   final ApiPamConnect api;
+
+  /// Present quand l'employeur publie depuis la fiche d'une personne : la
+  /// demande lui est proposee.
+  final int? pourPersonneId;
 
   /// Present pour modifier une demande existante : le meme formulaire,
   /// prerempli. Absent pour en publier une nouvelle.
@@ -90,7 +94,7 @@ class _EcranPublierState extends State<EcranPublier> {
       final FormulaireDemande formulaire;
       ModificationDemande? modification;
       if (demandeId == null) {
-        formulaire = await widget.api.formulaireDemande();
+        formulaire = await widget.api.formulaireDemande(pour: widget.pourPersonneId);
       } else {
         modification = await widget.api.modificationDemande(demandeId);
         formulaire = modification.formulaire;
@@ -99,6 +103,9 @@ class _EcranPublierState extends State<EcranPublier> {
       setState(() {
         _formulaire = formulaire;
         _unite = formulaire.uniteParDefaut;
+        // Le metier de la personne remplit le champ, comme sur le site :
+        // l'employeur peut le changer.
+        _metierDepart = formulaire.invitee?.metier ?? _metierDepart;
         if (modification != null) _preremplir(formulaire, modification);
       });
     } on ErreurApi catch (erreur) {
@@ -108,7 +115,9 @@ class _EcranPublierState extends State<EcranPublier> {
         return;
       }
       setState(() {
-        if (erreur.refus) {
+        // 400 : la personne ne peut pas recevoir de demande. Reessayer n'y
+        // changerait rien.
+        if (erreur.refus || erreur.code == 400) {
           _refus = erreur.message;
         } else {
           _erreurChargement = erreur.message;
@@ -191,6 +200,7 @@ class _EcranPublierState extends State<EcranPublier> {
         'unite_tarif': _unite ?? '',
         'duree_estimee': _duree.text,
         'conditions': _conditions.text,
+        if (_formulaire?.invitee != null) 'pour': '${_formulaire?.invitee?.id}',
       };
       final demandeId = widget.demandeId;
       // Dans les deux cas, l'ecran rend la phrase du serveur a Mes demandes.
@@ -246,6 +256,7 @@ class _EcranPublierState extends State<EcranPublier> {
     }
 
     final gris = Theme.of(context).textTheme.bodyLarge?.copyWith(color: Couleurs.encreDouce);
+    final invitee = formulaire.invitee;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -255,6 +266,33 @@ class _EcranPublierState extends State<EcranPublier> {
             'arrange vous répondront.',
             style: gris,
           ),
+          // A qui la demande est proposee, dit avant le formulaire, comme sur
+          // le site.
+          if (invitee != null) ...[
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Proposée à ${invitee.nom}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Couleurs.bleu,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Cette personne verra votre demande en premier. D'autres pourront aussi y répondre.",
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encreDouce),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           // Ce qui arrive a l'argent, annonce AVANT le formulaire, comme sur
           // le site.

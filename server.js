@@ -138,6 +138,8 @@ ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
 ajouterColonneSiAbsente("annonces", "annulee", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
 ajouterColonneSiAbsente("annonces", "mise_en_avant_jusqu_au", "TEXT");
+ajouterColonneSiAbsente("annonces", "personne_invitee_id",
+  "INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL");
 
 // CHANGEMENT DE MODELE : le montant d'une annonce n'est plus une
 // indication mais LE PRIX que l'employeur paiera. Le nom de la colonne
@@ -324,6 +326,16 @@ const requetes = {
     WHERE id = ? AND role = 'prestataire' AND est_admin = 0 AND suspendu = 0
   `),
 
+  // A qui un employeur peut proposer sa demande : une personne que la
+  // recherche montre, ET dont l'identite est verifiee. Les autres ne
+  // peuvent pas repondre : leur proposer une demande serait une impasse.
+  personneInvitable: db.prepare(`
+    SELECT id, nom, metier
+    FROM utilisateurs
+    WHERE id = ? AND role = 'prestataire' AND est_admin = 0 AND suspendu = 0
+      AND statut_verification = 'verifie'
+  `),
+
   // LA RECHERCHE EST PUBLIQUE : elle ne charge que ce qu'elle affiche.
   // Un SELECT * ferait remonter le mot de passe hache, l'email, la date
   // de naissance, les noms des fichiers d'identite - et toute colonne
@@ -456,20 +468,24 @@ const requetes = {
     WHERE id = @id
   `),
 
+  // LEFT JOIN : la plupart des demandes ne sont proposees a personne.
   annoncesDeEmployeur: db.prepare(`
-    SELECT *,
-           (mise_en_avant_jusqu_au IS NOT NULL
-            AND mise_en_avant_jusqu_au > datetime('now')) AS enAvant
-    FROM annonces WHERE employeur_id = ? ORDER BY cree_le DESC, id DESC
+    SELECT a.*,
+           p.nom AS nomInvitee,
+           (a.mise_en_avant_jusqu_au IS NOT NULL
+            AND a.mise_en_avant_jusqu_au > datetime('now')) AS enAvant
+    FROM annonces a
+    LEFT JOIN utilisateurs p ON p.id = a.personne_invitee_id
+    WHERE a.employeur_id = ? ORDER BY a.cree_le DESC, a.id DESC
   `),
 
   creerAnnonce: db.prepare(`
     INSERT INTO annonces
       (employeur_id, titre, metier, arrondissement, quartier, horaire,
-       prix, unite_tarif, duree_estimee, conditions)
+       prix, unite_tarif, duree_estimee, conditions, personne_invitee_id)
     VALUES
       (@employeur_id, @titre, @metier, @arrondissement, @quartier, @horaire,
-       @prix, @unite_tarif, @duree_estimee, @conditions)
+       @prix, @unite_tarif, @duree_estimee, @conditions, @personne_invitee_id)
   `),
 
   // JOIN : on recupere la candidature ET le nom du prestataire
@@ -528,17 +544,25 @@ const requetes = {
   // Une fenetre glissante, pas une journee de calendrier. Sinon il
   // suffirait d'envoyer trois reponses a 23 h et trois autres a 1 h du
   // matin - la limite ne tiendrait qu'une nuit sur deux.
+  // Une reponse a une demande PROPOSEE a cette personne ne compte pas :
+  // la limite evite de repondre a tout sans regarder, et c'est l'employeur
+  // qui est venu la chercher.
   candidaturesRecentes: db.prepare(`
-    SELECT COUNT(*) AS n FROM candidatures
-    WHERE prestataire_id = ? AND envoyee_le >= datetime('now', '-1 day')
+    SELECT COUNT(*) AS n
+    FROM candidatures c
+    JOIN annonces a ON a.id = c.annonce_id
+    WHERE c.prestataire_id = ? AND c.envoyee_le >= datetime('now', '-1 day')
+      AND (a.personne_invitee_id IS NULL OR a.personne_invitee_id != c.prestataire_id)
   `),
 
   // Quand la plus ancienne des reponses recentes sortira de la fenetre :
   // c'est le moment ou une place se libere.
   prochaineReponsePossible: db.prepare(`
-    SELECT datetime(MIN(envoyee_le), '+1 day') AS quand
-    FROM candidatures
-    WHERE prestataire_id = ? AND envoyee_le >= datetime('now', '-1 day')
+    SELECT datetime(MIN(c.envoyee_le), '+1 day') AS quand
+    FROM candidatures c
+    JOIN annonces a ON a.id = c.annonce_id
+    WHERE c.prestataire_id = ? AND c.envoyee_le >= datetime('now', '-1 day')
+      AND (a.personne_invitee_id IS NULL OR a.personne_invitee_id != c.prestataire_id)
   `),
 
   // Verifie en UNE requete que la candidature existe ET que l'annonce
@@ -3400,6 +3424,7 @@ function demandesDeLEmployeur(employeurId) {
       horaireLisible: annonce.horaire || "Horaire non précisé",
       prixLisible: prixEnClair(annonce),
       lieu: [annonce.quartier, annonce.arrondissement].filter(Boolean).join(", "),
+      proposeeA: annonce.nomInvitee || null,
       enAvant,
       enAvantJusquAu: enAvant ? dateLisible(annonce.mise_en_avant_jusqu_au) : null,
       // L'ETAT AVANT L'ACTION : une demande deja en avant n'a pas besoin
@@ -3822,8 +3847,39 @@ app.get("/publier-annonce", exigerConnexion, interdireALEquipe, exigerVerificati
     });
   }
 
-  res.render("publier-annonce", { titre: "Publier une demande" });
+  // PROPOSEE A UNE PERSONNE, depuis sa fiche. Son metier remplit le
+  // champ : l'employeur peut le changer.
+  const invitee = lirePersonneInvitee(req.query.pour);
+  if (invitee && invitee.probleme) return afficherProbleme(res, invitee.probleme);
+
+  res.render("publier-annonce", {
+    titre: "Publier une demande",
+    invitee,
+    annonce: invitee ? { metier: invitee.metier } : null,
+  });
 });
+
+// --- Proposer une demande a une personne ---------------------------
+//
+// L'identifiant vient du formulaire, donc de celui qui l'envoie : on
+// revérifie a chaque fois que cette personne peut recevoir la demande.
+//
+// Rien de demande : null. Une personne qui ne peut pas la recevoir : un
+// probleme, qui ne dit pas pourquoi - la raison (suspendue, non verifiee)
+// ne regarde pas l'employeur.
+const PERSONNE_NON_INVITABLE = {
+  code: 400,
+  titre: "Proposition impossible",
+  texte: "Cette personne ne peut pas recevoir de demande pour l'instant.",
+  lien: { url: "/recherche", texte: "Retour à la recherche" },
+};
+
+function lirePersonneInvitee(valeur) {
+  if (valeur == null || String(valeur).trim() === "") return null;
+  const id = Number(valeur);
+  const personne = Number.isInteger(id) && id > 0 ? requetes.personneInvitable.get(id) : null;
+  return personne || { probleme: PERSONNE_NON_INVITABLE };
+}
 
 // --- Enregistrer une annonce ---------------------------------------
 //
@@ -3834,7 +3890,12 @@ function publierDemande(employeurId, donnees) {
   const probleme = verifierAnnonce(donnees);
   if (probleme) return { probleme };
 
-  const champs = champsAnnonce(donnees);
+  const invitee = lirePersonneInvitee(donnees.pour);
+  if (invitee && invitee.probleme) return { probleme: invitee.probleme };
+
+  const champs = Object.assign(champsAnnonce(donnees), {
+    personne_invitee_id: invitee ? invitee.id : null,
+  });
 
   // L'employeur n'a pas publie par plaisir : la somme qu'il annonce est
   // bloquee des maintenant. La personne qui repondra sait ainsi que
@@ -3855,8 +3916,9 @@ function publierDemande(employeurId, donnees) {
   return {
     id,
     titre: "Demande publiée",
-    texte: `Votre demande "${champs.titre}" est en ligne. La somme annoncée ` +
-           `est bloquée par PamConnect jusqu'à la fin du service.`,
+    texte: `Votre demande "${champs.titre}" est en ligne.` +
+           (invitee ? ` ${invitee.nom} la verra en premier.` : "") +
+           ` La somme annoncée est bloquée par PamConnect jusqu'à la fin du service.`,
   };
 }
 
@@ -3875,8 +3937,11 @@ app.post("/annonces", exigerConnexion, interdireALEquipe, exigerVerification, li
   const resultat = publierDemande(req.utilisateur.id, req.body);
 
   if (resultat.probleme) {
+    // Le retour garde la personne a qui la demande etait proposee.
+    const pour = Number(req.body.pour);
+    const retour = "/publier-annonce" + (Number.isInteger(pour) && pour > 0 ? "?pour=" + pour : "");
     return res.status(400).render("message", Object.assign({}, resultat.probleme, {
-      liens: [{ url: "/publier-annonce", texte: "Retour au formulaire" }],
+      liens: [{ url: retour, texte: "Retour au formulaire" }],
     }));
   }
 
@@ -4288,10 +4353,15 @@ app.post("/annonces/:id/annuler", exigerConnexion, interdireALEquipe, lireFormul
   });
 });
 
-app.get("/annonces", (req, res) => {
-  const utilisateur = utilisateurConnecte(req);
-
+// LES DEMANDES RANGEES, UNE SEULE FOIS pour le site et l'application.
+function demandesRangees(utilisateur) {
   const toutes = requetes.toutesLesAnnonces.all();
+  const quiRepond = utilisateur && utilisateur.role === "prestataire" ? utilisateur : null;
+
+  // D'abord celles qu'un employeur a publiees POUR cette personne : il est
+  // venu la chercher, elle doit les voir avant tout le reste.
+  const proposees = quiRepond ? toutes.filter((a) => a.personne_invitee_id === quiRepond.id) : [];
+  const reste = toutes.filter((a) => !proposees.includes(a));
 
   // Les demandes qui correspondent au metier de la personne passent
   // devant. Elles ne sont pas les seules montrees : masquer les autres
@@ -4301,16 +4371,18 @@ app.get("/annonces", (req, res) => {
   // Ce tri n'est possible que depuis que le metier est une valeur de
   // notre liste : tant que c'etait un texte libre, "menage" et
   // "menagere" ne se rencontraient jamais.
-  const monMetier = utilisateur && utilisateur.role === "prestataire"
-    ? utilisateur.metier
-    : null;
+  const monMetier = quiRepond ? quiRepond.metier : null;
 
-  res.render("annonces", {
-    titre: "Demandes",
-    pourMoi: monMetier ? toutes.filter((a) => a.metier === monMetier) : [],
-    autres: monMetier ? toutes.filter((a) => a.metier !== monMetier) : toutes,
+  return {
+    proposees,
+    pourMoi: monMetier ? reste.filter((a) => a.metier === monMetier) : [],
+    autres: monMetier ? reste.filter((a) => a.metier !== monMetier) : reste,
     monMetier,
-  });
+  };
+}
+
+app.get("/annonces", (req, res) => {
+  res.render("annonces", Object.assign({ titre: "Demandes" }, demandesRangees(utilisateurConnecte(req))));
 });
 
 // --- Postuler a une annonce ----------------------------------------
@@ -4413,17 +4485,30 @@ function ecranPourRepondre(u, annonceId) {
 
   mettreAJourLesJetons(u);
 
-  const limite = parametreNombre("candidatures_par_jour");
+  const proposee = reponseSurProposition(annonce, u);
+  const limite = proposee ? null : parametreNombre("candidatures_par_jour");
   const envoyees = requetes.candidaturesRecentes.get(u.id).n;
 
   return {
     annonce,
     reputationEmployeur: reputationDe(annonce.employeur_id),
-    cout: parametreNombre("cout_candidature"),
+    proposee,
+    cout: proposee ? null : parametreNombre("cout_candidature"),
     solde: soldeJetonsDe(u.id).total,
     limite,
     restantAujourdhui: limite === null ? null : Math.max(0, limite - envoyees),
   };
+}
+
+// UNE DEMANDE PROPOSEE A CETTE PERSONNE : sa premiere reponse ne coute
+// pas de jeton et ne compte pas dans la limite du jour. L'employeur est
+// venu la chercher, elle n'a pas a payer pour lui dire oui.
+//
+// UNE REPONSE REFUSEE PUIS RENVOYEE redevient un envoi ordinaire : sans
+// cela, un refus pourrait etre suivi de renvois gratuits sans fin.
+function reponseSurProposition(annonce, u) {
+  return annonce.personne_invitee_id === u.id &&
+    !requetes.maCandidaturePour.get(annonce.id, u.id);
 }
 
 function envoyerReponse(u, annonceId) {
@@ -4440,6 +4525,7 @@ function envoyerReponse(u, annonceId) {
   // ferme la demande, et la personne choisie serait sinon renvoyee vers
   // un ecran qui ne la concerne pas.
   const deja = requetes.maCandidaturePour.get(annonce.id, u.id);
+  const proposee = reponseSurProposition(annonce, u);
 
   if (deja && deja.statut === "acceptee") {
     return {
@@ -4479,7 +4565,7 @@ function envoyerReponse(u, annonceId) {
   // LA LIMITE DU JOUR PASSE AVANT LE SOLDE. Une personne qui a beaucoup
   // de jetons doit lire qu'elle a atteint la limite, pas qu'elle peut
   // payer - sinon la limite ressemble a un probleme d'argent.
-  const limite = parametreNombre("candidatures_par_jour");
+  const limite = proposee ? null : parametreNombre("candidatures_par_jour");
   const envoyees = requetes.candidaturesRecentes.get(u.id).n;
 
   if (limite !== null && envoyees >= limite) {
@@ -4499,7 +4585,7 @@ function envoyerReponse(u, annonceId) {
     };
   }
 
-  const cout = parametreNombre("cout_candidature");
+  const cout = proposee ? null : parametreNombre("cout_candidature");
   const solde = soldeJetonsDe(u.id);
   const manqueDeJetons = (avecReste) => ({
     probleme: {
@@ -4604,6 +4690,7 @@ app.get("/candidatures/nouvelle/:annonceId", exigerConnexion, exigerVerification
     reputationEmployeur: ecran.reputationEmployeur,
     titre: "Répondre à cette demande",
     annonce: ecran.annonce,
+    proposee: ecran.proposee,
     cout: ecran.cout,
     solde: ecran.solde,
     restantAujourdhui: ecran.restantAujourdhui,
@@ -7050,9 +7137,7 @@ app.get("/api/moi", (req, res) => {
 // l'application triait de son cote, les deux ecrans finiraient par ne
 // plus montrer la meme chose.
 app.get("/api/demandes", (req, res) => {
-  const moi = utilisateurConnecte(req);
-  const toutes = requetes.toutesLesAnnonces.all();
-  const monMetier = moi && moi.role === "prestataire" ? moi.metier : null;
+  const { proposees, pourMoi, autres, monMetier } = demandesRangees(utilisateurConnecte(req));
 
   const pourLApplication = (a) => ({
     id: a.id,
@@ -7076,8 +7161,9 @@ app.get("/api/demandes", (req, res) => {
   });
 
   res.json({
-    pourMoi: monMetier ? toutes.filter((a) => a.metier === monMetier).map(pourLApplication) : [],
-    autres: (monMetier ? toutes.filter((a) => a.metier !== monMetier) : toutes).map(pourLApplication),
+    proposees: proposees.map(pourLApplication),
+    pourMoi: pourMoi.map(pourLApplication),
+    autres: autres.map(pourLApplication),
     monMetier,
   });
 });
@@ -7103,6 +7189,7 @@ app.get("/api/mes-demandes", (req, res) => {
       prixLisible: a.prixLisible,
       dureeEstimee: a.duree_estimee || null,
       lieu: a.lieu || null,
+      proposeeA: a.proposeeA,
       fermee: a.fermee,
       phraseFermeture: a.phraseFermeture,
       enAvant: a.enAvant,
@@ -7166,7 +7253,13 @@ app.get("/api/formulaire-demande", (req, res) => {
   const moi = utilisateurConnecte(req);
   if (refusDePublierApi(res, moi)) return;
 
-  res.json(listesDuFormulaireDemande());
+  // ?pour= : la demande est proposee a une personne, depuis sa fiche.
+  const invitee = lirePersonneInvitee(req.query.pour);
+  if (invitee && invitee.probleme) return erreurApi(res, 400, invitee.probleme.texte);
+
+  res.json(Object.assign(listesDuFormulaireDemande(), {
+    invitee: invitee ? { id: invitee.id, nom: invitee.nom, metier: invitee.metier || null } : null,
+  }));
 });
 
 // L'arrondissement d'un quartier, tel que le serveur l'enregistrera.
@@ -7193,7 +7286,8 @@ function formeDeDemandeValide(corps) {
   return Boolean(corps) && typeof corps === "object" && !Array.isArray(corps) &&
     CHAMPS_DEMANDE.every((champ) => corps[champ] == null ||
       typeof corps[champ] === "string" ||
-      (champ === "prix" && typeof corps[champ] === "number"));
+      (champ === "prix" && typeof corps[champ] === "number")) &&
+    (corps.pour == null || typeof corps.pour === "string" || typeof corps.pour === "number");
 }
 
 app.post("/api/demandes", (req, res) => {
@@ -7809,7 +7903,7 @@ app.get("/api/demandes/:id/reponse", (req, res) => {
   const ecran = ecranPourRepondre(moi, Number(req.params.id));
   if (ecran.probleme) return erreurApiDuProbleme(res, ecran.probleme);
 
-  const { annonce, reputationEmployeur, cout, solde, limite, restantAujourdhui } = ecran;
+  const { annonce, reputationEmployeur, proposee, cout, solde, limite, restantAujourdhui } = ecran;
   const detail = detaillerTarif(annonce.prix);
   const pourcentage = Math.round(TAUX_COMMISSION * 100);
 
@@ -7844,6 +7938,8 @@ app.get("/api/demandes/:id/reponse", (req, res) => {
           ]
         : [],
     },
+    // Proposee a cette personne : pas de jeton, pas de limite du jour.
+    proposee,
     cout: cout
       ? {
           envoyer: "− " + jetonsEnClair(cout),
@@ -7922,6 +8018,9 @@ app.get("/api/personnes/:id", (req, res) => {
       liste: avisLisibles(avis),
     },
     peutPublier: Boolean(moi && moi.role === "employeur" && !moi.est_admin),
+    // On ne propose une demande qu'a une personne verifiee : les autres
+    // ne peuvent pas y repondre.
+    peutProposer: Boolean(moi && moi.role === "employeur" && !moi.est_admin && verifiee),
   });
 });
 

@@ -13,7 +13,7 @@
     </div>
   <% } %>
 
-  <% if (pourMoi.length === 0 && autres.length === 0) { %>
+  <% if (proposees.length === 0 && pourMoi.length === 0 && autres.length === 0) { %>
 
     <%# ILLUSTRATION 2 sur 2 : un etat vide. %>
     <div class="vide">
@@ -27,6 +27,24 @@
     </div>
 
   <% } else { %>
+
+    <%# EN PREMIER : les demandes qu'un employeur a publiees pour elle. %>
+    <% if (proposees.length > 0) { %>
+      <h2>Demandes qui vous sont proposées</h2>
+      <p class="aide">
+        <% if (proposees.length === 1) { %>
+          Un employeur a publié cette demande pour vous.
+        <% } else { %>
+          Des employeurs ont publié ces demandes pour vous.
+        <% } %>
+        Y répondre ne vous coûte aucun jeton.
+      </p>
+      <div class="grille">
+        <% proposees.forEach(function (annonce) { %>
+          <%- include("partiels/carte-annonce", { annonce: annonce }) %>
+        <% }); %>
+      </div>
+    <% } %>
 
     <% if (monMetier) { %>
       <h2>Pour vous : <%= monMetier %></h2>

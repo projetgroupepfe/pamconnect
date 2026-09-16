@@ -158,6 +158,19 @@ class _EcranDemandesState extends State<EcranDemandes> {
           child: Text('Aucune demande pour le moment.', textAlign: TextAlign.center, style: gris),
         ),
       if (liste != null && !liste.vide) ...[
+        // EN PREMIER : les demandes qu'un employeur a publiees pour elle.
+        if (liste.proposees.isNotEmpty) ...[
+          const TitreSection('Demandes qui vous sont proposées'),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              '${liste.proposees.length == 1 ? 'Un employeur a publié cette demande pour vous.' : 'Des employeurs ont publié ces demandes pour vous.'} '
+              'Y répondre ne vous coûte aucun jeton.',
+              style: aide,
+            ),
+          ),
+          for (final demande in liste.proposees) _CarteDemande(demande: demande, auRepondre: _repondre),
+        ],
         // Les demandes de son metier passent devant, sans masquer les autres :
         // rien n'empeche une aide-menagere de garder des enfants.
         if (monMetier != null) ...[

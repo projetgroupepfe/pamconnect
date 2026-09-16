@@ -272,7 +272,24 @@ class _EcranRepondreState extends State<EcranRepondre> {
           ),
         ),
         // CE QUE CETTE REPONSE VA COUTER, avant de s'engager.
-        if (cout != null) ...[
+        if (ecran.proposee) ...[
+          const SizedBox(height: 8),
+          const TitreSection('Ce que cette réponse vous coûte'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text.rich(
+                const TextSpan(
+                  children: [
+                    TextSpan(text: 'Rien.', style: fort),
+                    TextSpan(text: ' Cette demande a été publiée pour vous : y répondre ne vous coûte aucun jeton.'),
+                  ],
+                ),
+                style: texte.bodyMedium?.copyWith(color: Couleurs.encreDouce),
+              ),
+            ),
+          ),
+        ] else if (cout != null) ...[
           const SizedBox(height: 8),
           const TitreSection('Ce que cette réponse vous coûte'),
           Card(

@@ -385,6 +385,7 @@ class _CarteDemandePubliee extends StatelessWidget {
     final prix = demande.prixLisible;
     final duree = demande.dureeEstimee;
     final lieu = demande.lieu;
+    final proposeeA = demande.proposeeA;
     final phraseFermeture = demande.phraseFermeture;
     final jusquAu = demande.enAvantJusquAu;
 
@@ -403,6 +404,18 @@ class _CarteDemandePubliee extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              if (proposeeA != null) ...[
+                const SizedBox(height: 4),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(text: 'Proposée à '),
+                      TextSpan(text: proposeeA, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  style: texte.bodyMedium?.copyWith(color: Couleurs.encrePale),
+                ),
+              ],
               if (metier != null) LigneDetail(icone: Icons.work_outline, texte: metier),
               LigneDetail(icone: Icons.calendar_today_outlined, texte: demande.horaire),
               if (prix != null) LigneDetail(icone: Icons.payments_outlined, texte: prix, aide: duree),

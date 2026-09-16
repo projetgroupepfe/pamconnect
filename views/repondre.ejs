@@ -122,7 +122,15 @@
 
     <%# CE QUE CETTE REPONSE VA COUTER, avant de s'engager. La meme regle
         que pour la commission : le prix ne se decouvre pas apres. %>
-    <% if (cout) { %>
+    <% if (locals.proposee) { %>
+      <h2>Ce que cette réponse vous coûte</h2>
+      <div class="carte">
+        <p>
+          <strong>Rien.</strong> Cette demande a été publiée pour vous : y
+          répondre ne vous coûte aucun jeton.
+        </p>
+      </div>
+    <% } else if (cout) { %>
       <h2>Ce que cette réponse vous coûte</h2>
       <div class="carte">
         <div class="detail-tarif">

@@ -72,6 +72,9 @@
         <% } %>
         <div class="carte">
           <h3><%= annonce.titre %></h3>
+          <% if (annonce.proposeeA) { %>
+            <p class="aide">Proposée à <strong><%= annonce.proposeeA %></strong></p>
+          <% } %>
           <ul class="infos">
             <li>
               <%- include("partiels/icone", { nom: "experience" }) %>

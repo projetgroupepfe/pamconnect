@@ -120,8 +120,10 @@ class ApiPamConnect {
 
   /// Les listes du formulaire de publication. Refuse (403) a qui ne peut
   /// pas publier, avec la raison que donne aussi le site.
-  Future<FormulaireDemande> formulaireDemande() async {
-    final donnees = await _appeler('/api/formulaire-demande');
+  ///
+  /// [pour] : la demande est proposee a cette personne, depuis sa fiche.
+  Future<FormulaireDemande> formulaireDemande({int? pour}) async {
+    final donnees = await _appeler('/api/formulaire-demande${pour == null ? '' : '?pour=$pour'}');
     return _interpreter(() => FormulaireDemande.depuisJson(donnees));
   }
 
