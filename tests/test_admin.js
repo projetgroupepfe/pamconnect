@@ -98,6 +98,7 @@ setTimeout(async () => {
   dire("un type de document invente -> 404",
        (await lire("/admin/document/" + soumis.id + "/passeport", cookieAdmin)).status === 404);
 
+  dire("l'equipe controle la date du casier", liste.includes("Vérifiez que l'extrait de casier date de moins de 3 mois."));
   dire("la liste propose d'ouvrir la photo, avec la consigne",
        liste.includes('href="/admin/document/' + soumis.id + '/photo"') &&
        liste.includes("Comparez le visage de la photo à celui de la pièce d'identité avant de valider."));

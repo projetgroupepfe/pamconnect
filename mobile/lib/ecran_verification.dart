@@ -284,7 +284,7 @@ class _EcranVerificationState extends State<EcranVerification> with _ChoixDeDocu
                   const SizedBox(height: 24),
                   _Document(
                     titre: 'Extrait de casier judiciaire',
-                    aide: 'Formats acceptés : ${dossier.extensions.join(', ')}. '
+                    aide: 'Datant de moins de 3 mois. Formats acceptés : ${dossier.extensions.join(', ')}. '
                         '${dossier.tailleMaxMo} Mo maximum par document.',
                     document: _casier,
                     actif: !_envoi,

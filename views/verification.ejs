@@ -73,7 +73,8 @@
           <div class="champ">
             <label for="casier">Extrait de casier judiciaire</label>
             <input type="file" id="casier" name="casier" accept="<%= verification.extensions.join(",") %>" required>
-            <span class="aide">Formats acceptés : <%= verification.extensions.join(", ") %>. <%= verification.tailleMaxMo %> Mo maximum par document.</span>
+            <%# Un extrait recent : la date est imprimee dessus, l'equipe la controle. %>
+            <span class="aide">Datant de moins de 3 mois. Formats acceptés : <%= verification.extensions.join(", ") %>. <%= verification.tailleMaxMo %> Mo maximum par document.</span>
           </div>
 
           <%# Sur un telephone, accept limite aux images propose aussi

@@ -303,6 +303,8 @@ setTimeout(async () => {
        JSON.stringify(ecranPre.extensionsPhoto) === JSON.stringify([".jpg", ".jpeg", ".png"]) &&
        pageSite.includes('name="photo" accept=".jpg,.jpeg,.png"') &&
        pageSite.includes("Une photo de votre visage"));
+  dire("le casier doit dater de moins de 3 mois, dit sur la page",
+       pageSite.includes("Datant de moins de 3 mois. Formats acceptés"));
 
   const ecranEmp = (await ecranApi(parJeton(jetonEmp))).donnees;
   dire("chacun lit sa raison de donner ses documents",
