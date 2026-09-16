@@ -156,8 +156,10 @@ setTimeout(async () => {
   // Fragment court : une phrase longue est coupee par un retour a la
   // ligne dans le gabarit, et la recherche echoue sur du texte pourtant
   // present.
+  // La phrase est desormais au milieu d'une autre : "posez" y prend une
+  // minuscule. On cherche sans tenir compte de la casse.
   dire("et renvoie a la discussion pour poser des questions",
-       fichePub.includes("Posez vos questions avant de choisir"));
+       fichePub.toLowerCase().includes("posez vos questions avant de choisir"));
 
   // La plateforme ne doit jamais laisser croire l'inverse.
   for (const [chemin, cookie, nom] of ecrans) {

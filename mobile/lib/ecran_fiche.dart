@@ -217,21 +217,12 @@ class _EcranFicheState extends State<EcranFiche> {
                   children: [
                     TextSpan(text: "Le badge vert dit une seule chose : l'équipe a contrôlé "),
                     TextSpan(text: "la pièce d'identité et le casier judiciaire", style: fort),
-                    TextSpan(text: '.'),
+                    TextSpan(text: '. Le '),
+                    TextSpan(text: "métier n'est pas vérifié", style: fort),
+                    TextSpan(text: ' : il est déclaré par la personne, posez vos questions avant de choisir.'),
                   ],
                 ),
                 style: gris,
-              ),
-              const SizedBox(height: 8),
-              Text.rich(
-                const TextSpan(
-                  children: [
-                    TextSpan(text: 'Le '),
-                    TextSpan(text: "métier n'est pas vérifié par la plateforme", style: fort),
-                    TextSpan(text: '. Il est déclaré par la personne. Posez vos questions avant de choisir.'),
-                  ],
-                ),
-                style: aide,
               ),
             ],
           ),
@@ -247,8 +238,8 @@ class _EcranFicheState extends State<EcranFiche> {
                   Text('Travailler avec cette personne', style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Text(
-                    'Publiez votre demande avec le service, l\'horaire et le prix. Cette personne pourra y répondre, '
-                    'et vous la choisirez parmi celles qui se proposent.',
+                    "Publiez votre demande avec le service, l'horaire et le prix : cette personne "
+                    'pourra y répondre.',
                     style: gris,
                   ),
                   const SizedBox(height: 12),

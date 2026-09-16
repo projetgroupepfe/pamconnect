@@ -185,12 +185,12 @@ class _CarteCirculation extends StatelessWidget {
           Text.rich(
             const TextSpan(
               children: [
-                TextSpan(text: "Quand un employeur publie une demande, la somme qu'il annonce est "),
-                TextSpan(text: 'bloquée par PamConnect', style: gras),
+                TextSpan(text: 'La somme annoncée dans une demande est '),
+                TextSpan(text: 'bloquée', style: gras),
                 TextSpan(
-                  text: ". Elle ne repart qu'à la fin : chez la personne qui a travaillé une fois le "
-                      "service déclaré effectué, ou chez l'employeur s'il retire sa demande sans avoir "
-                      'choisi personne.',
+                  text: " dès la publication. Elle part chez la personne quand le service est déclaré "
+                      "effectué, ou revient à l'employeur s'il retire sa demande sans avoir choisi "
+                      'personne.',
                 ),
               ],
             ),
@@ -202,11 +202,7 @@ class _CarteCirculation extends StatelessWidget {
               children: [
                 TextSpan(text: 'Les montants affichés ici sont '),
                 TextSpan(text: 'simulés', style: gras),
-                TextSpan(
-                  text: " : aucun argent réel ne circule encore. Encaisser puis reverser une somme est "
-                      "une activité d'intermédiaire financier, qui suppose un agrément et un contrat "
-                      'avec les opérateurs.',
-                ),
+                TextSpan(text: ' : aucun argent réel ne circule.'),
               ],
             ),
             style: texte.bodySmall?.copyWith(color: Couleurs.encrePale),
