@@ -96,11 +96,14 @@ setTimeout(async () => {
     /Aucun montant ne change/];
   dire("les phrases de l'ancien modele ont disparu des trois pages",
        [accueil, vousCherchez, vousProposez].every((corps) => anciennesPhrases.every((phrase) => !phrase.test(corps))));
+  // Le gabarit coupe les phrases par des retours a la ligne : on ramene les
+  // espaces a un seul avant de chercher une phrase entiere.
+  const proposez = vousProposez.replace(/\s+/g, " ");
   dire("la somme est bloquee a la publication et versee a la declaration du service",
        accueil.includes("bloqué dès la publication") && vousCherchez.includes("bloquée dès la publication") &&
-       /quand\s+l'employeur a déclaré le service effectué/.test(vousProposez));
+       proposez.includes("quand l'employeur déclare le service effectué"));
   dire("la page dit que le prix ne baisse plus apres une reponse",
-       vousProposez.includes("Après votre réponse, le prix ne peut plus baisser."));
+       proposez.includes("Après votre réponse, le prix ne peut plus baisser."));
   dire("l'exemple porte son nom et suit la commission",
        vousProposez.includes('<p class="exemple-titre">Exemple de calcul</p>') &&
        vousProposez.includes("<strong>1 000 FCFA</strong>") && vousProposez.includes("<strong>9 000 FCFA</strong>"));

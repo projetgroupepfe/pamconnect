@@ -204,19 +204,16 @@ class _EcranAccueilState extends State<EcranAccueil> {
           paragraphes: const [
             [
               TextSpan(
-                text: "Faire venir quelqu'un chez soi, c'est lui ouvrir sa porte. Aujourd'hui, cela "
-                    "repose surtout sur le bouche-à-oreille. PamConnect contrôle la pièce d'identité "
-                    "et le casier judiciaire avant qu'une personne puisse être retenue, puis supprime "
-                    'ces documents une fois le contrôle fait.',
+                text: "Faire venir quelqu'un chez soi, c'est lui ouvrir sa porte. Nous contrôlons "
+                    "la pièce d'identité et le casier judiciaire avant qu'une personne puisse être "
+                    'retenue, puis nous supprimons ces documents.',
               ),
             ],
             [
               TextSpan(text: 'Nous vérifions '),
               TextSpan(text: 'qui est la personne', style: _gras),
               TextSpan(
-                text: ", pas ce qu'elle sait faire. Le métier est déclaré par chacun ; aucun "
-                    "document ne l'atteste. PamConnect met en relation, elle ne certifie pas un "
-                    'savoir-faire.',
+                text: ", pas ce qu'elle sait faire : le métier est déclaré par chacun.",
               ),
             ],
           ],
@@ -365,7 +362,7 @@ class EcranVousProposez extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           children: [
             const _Chapeau(
-              'Aide-ménagère, technicienne de surface, nounou, gardien, jardinier, cuisinier : '
+              "Ménage, garde d'enfants, gardiennage, jardinage, cuisine : "
               'faites-vous connaître des familles et des entreprises de Yaoundé.',
             ),
             const SizedBox(height: 16),
@@ -379,11 +376,11 @@ class EcranVousProposez extends StatelessWidget {
                     Text.rich(
                       const TextSpan(
                         children: [
-                          TextSpan(text: 'Vous indiquez le tarif que vous demandez pour vos services. Il est '),
+                          TextSpan(text: 'Votre tarif est '),
                           TextSpan(text: 'indicatif', style: _gras),
                           TextSpan(
-                            text: ' : il aide les employeurs à vous trouver. Le montant réellement payé '
-                                'est celui annoncé dans la demande à laquelle vous répondez.',
+                            text: ' : il aide les employeurs à vous trouver. Le montant payé est '
+                                'celui annoncé dans la demande à laquelle vous répondez.',
                           ),
                         ],
                       ),
@@ -392,7 +389,7 @@ class EcranVousProposez extends StatelessWidget {
                     const SizedBox(height: 12),
                     Text(
                       "PamConnect y retient une commission et vous verse le reste quand l'employeur "
-                      'a déclaré le service effectué.',
+                      'déclare le service effectué.',
                       style: corps,
                     ),
                     const SizedBox(height: 12),
@@ -411,8 +408,8 @@ class EcranVousProposez extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Vous voyez ce calcul avant de répondre à une demande, jamais après. '
-                      'Après votre réponse, le prix ne peut plus baisser.',
+                      'Vous voyez ce calcul avant de répondre. Après votre réponse, le prix ne '
+                      'peut plus baisser.',
                       style: texte.bodyMedium?.copyWith(color: Couleurs.encrePale),
                     ),
                   ],
@@ -424,7 +421,7 @@ class EcranVousProposez extends StatelessWidget {
             _CarteAction(
               titre: '1. Créez votre compte',
               morceaux: const [
-                TextSpan(text: 'Votre métier, votre quartier et votre tarif. Cela prend deux minutes.'),
+                TextSpan(text: 'Votre métier, votre quartier et votre tarif.'),
               ],
               bouton: FilledButton.icon(
                 onPressed: proposerSesServices,
@@ -449,10 +446,7 @@ class EcranVousProposez extends StatelessWidget {
             _CarteAction(
               titre: '3. Répondez aux demandes',
               morceaux: const [
-                TextSpan(
-                  text: "Les employeurs indiquent quand ils ont besoin de quelqu'un. Si l'horaire "
-                      'vous arrange, vous répondez.',
-                ),
+                TextSpan(text: "Si l'horaire annoncé vous arrange, vous répondez."),
               ],
               bouton: _BoutonSecondaire(
                 icone: Icons.insert_drive_file_outlined,
