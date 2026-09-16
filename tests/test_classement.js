@@ -200,6 +200,8 @@ setTimeout(async () => {
   dire("l employeur lit ce qu il doit faire", vueEmp.includes("Vous avez trouvé quelqu'un"));
   dire("avec le bouton qui y mene", vueEmp.includes("/publier-annonce"));
   dire("et la raison : la somme est bloquee", vueEmp.includes("dès la publication"));
+  dire("il sait qu'il peut proposer une demande depuis un profil",
+       vueEmp.replace(/\s+/g, " ").includes("Depuis le profil d'une personne vérifiée, publiez une demande pour elle"));
 
   const fiche = await (await lire("/personnes/" + eprouvee.id, emp.cookie)).text();
   dire("la fiche le dit aussi", fiche.includes("Travailler avec cette personne"));

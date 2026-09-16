@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import 'api.dart';
 import 'ecran_connexion.dart';
@@ -11,9 +14,11 @@ import 'theme.dart';
 /// Rechercher : trouver quelqu'un par metier, comme la page Trouver
 /// quelqu'un du site.
 ///
-/// L'application ne demande pas la position : la proximite se mesure a
-/// partir du quartier de l'employeur, et le serveur le dit en une phrase.
-/// Le classement vient du serveur ; son score ne s'affiche jamais.
+/// Deux boutons, comme sur le site : "Chercher pres de moi" demande la
+/// position du telephone a ce moment-la ; "Chercher sans ma position"
+/// laisse la proximite se mesurer a partir du quartier de l'employeur, et
+/// le serveur le dit en une phrase. Le classement vient du serveur ; son
+/// score ne s'affiche jamais.
 class EcranRechercher extends StatefulWidget {
   const EcranRechercher({super.key, required this.api, this.rafraichir = 0});
 
@@ -32,6 +37,13 @@ class _EcranRechercherState extends State<EcranRechercher> {
   String? _erreur;
   bool _enCours = true;
   int _numero = 0;
+
+  // La position de la derniere recherche "pres de moi" : Actualiser la
+  // garde. "Chercher sans ma position" l'efface.
+  double? _latitude;
+  double? _longitude;
+  bool _chercheLaPosition = false;
+  String? _messagePosition;
 
   @override
   void initState() {
@@ -63,7 +75,7 @@ class _EcranRechercherState extends State<EcranRechercher> {
     }
 
     try {
-      final resultat = await widget.api.rechercher(_metier.text);
+      final resultat = await widget.api.rechercher(_metier.text, latitude: _latitude, longitude: _longitude);
       // Une reponse plus ancienne que la derniere recherche est ignoree.
       if (!mounted || numero != _numero) return;
       setState(() {
@@ -83,9 +95,68 @@ class _EcranRechercherState extends State<EcranRechercher> {
     }
   }
 
-  void _lancer() {
+  void _lancerSansPosition() {
     FocusScope.of(context).unfocus();
+    setState(() {
+      _latitude = null;
+      _longitude = null;
+      _messagePosition = null;
+    });
     _chercher();
+  }
+
+  /// "Chercher pres de moi" : la position d'abord, puis la recherche. Si
+  /// elle ne vient pas (refus, localisation coupee, delai depasse), la
+  /// recherche part sans position, avec la phrase du site.
+  Future<void> _lancerPresDeMoi() async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _chercheLaPosition = true;
+      _messagePosition = 'Recherche de votre position...';
+    });
+    final position = await _positionDuTelephone();
+    if (!mounted) return;
+    setState(() {
+      _chercheLaPosition = false;
+      _latitude = position?.latitude;
+      _longitude = position?.longitude;
+      _messagePosition = position == null ? 'Position indisponible. Recherche sans classement par distance.' : null;
+    });
+    await _chercher();
+  }
+
+  /// La position du telephone, ou null. Android pose sa question la
+  /// premiere fois ; apres un refus, on ne la force pas.
+  Future<Position?> _positionDuTelephone() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        return null;
+      }
+      try {
+        // Sans internet, seuls les satellites donnent la position, et dans
+        // une salle ils peuvent ne jamais repondre : 15 secondes au plus.
+        return await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 15),
+          ),
+        );
+      } on TimeoutException {
+        // La derniere position que le telephone connait, si elle a moins
+        // d'une heure : au-dela, la personne a pu changer de quartier.
+        final derniere = await Geolocator.getLastKnownPosition();
+        if (derniere == null) return null;
+        final age = DateTime.now().difference(derniere.timestamp);
+        return age < const Duration(hours: 1) ? derniere : null;
+      }
+    } on Exception {
+      return null;
+    }
   }
 
   Future<void> _voirProfil(PersonneTrouvee personne) async {
@@ -148,7 +219,8 @@ class _EcranRechercherState extends State<EcranRechercher> {
               TextField(
                 controller: _metier,
                 textInputAction: TextInputAction.search,
-                onSubmitted: (_) => _lancer(),
+                // Comme la touche Entree du site : le premier bouton.
+                onSubmitted: (_) => _lancerPresDeMoi(),
                 decoration: const InputDecoration(
                   labelText: 'Quel métier cherchez-vous ?',
                   hintText: 'ex : ménage, nounou, jardinage...',
@@ -156,10 +228,21 @@ class _EcranRechercherState extends State<EcranRechercher> {
               ),
               const SizedBox(height: 12),
               FilledButton.icon(
-                onPressed: _enCours ? null : _lancer,
-                icon: const Icon(Icons.search),
-                label: const Text('Chercher'),
+                onPressed: _enCours || _chercheLaPosition ? null : _lancerPresDeMoi,
+                icon: const Icon(Icons.place_outlined),
+                label: const Text('Chercher près de moi'),
               ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _enCours || _chercheLaPosition ? null : _lancerSansPosition,
+                icon: const Icon(Icons.search),
+                label: const Text('Chercher sans ma position'),
+                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              ),
+              if (_messagePosition != null) ...[
+                const SizedBox(height: 8),
+                Text(_messagePosition!, style: aide),
+              ],
             ],
           ),
         ),
@@ -219,7 +302,8 @@ class _EcranRechercherState extends State<EcranRechercher> {
             ),
           ),
           for (final personne in resultat.personnes) _CartePersonne(personne: personne, auVoirProfil: _voirProfil),
-          // L'IMPASSE : on n'embauche pas depuis une fiche, on publie une demande.
+          // L'IMPASSE : on n'embauche pas en un clic. On propose une demande a
+          // la personne depuis son profil, ou on publie pour tout le monde.
           if (resultat.peutPublier)
             Container(
               padding: const EdgeInsets.all(16),
@@ -233,15 +317,14 @@ class _EcranRechercherState extends State<EcranRechercher> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "On n'embauche pas directement depuis cette page. Publiez votre demande avec le service, "
-                    "l'horaire et le prix : les personnes qui vous intéressent pourront y répondre, et vous "
-                    'choisirez parmi elles.',
+                    "Depuis le profil d'une personne vérifiée, publiez une demande pour elle : elle la verra "
+                    'en premier. Vous pouvez aussi publier une demande pour tout le monde.',
                     style: gris,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "C'est ce qui vous protège : la somme que vous annoncez est bloquée dès la publication, "
-                    "et vous ne payez qu'après le service.",
+                    "La somme que vous annoncez est bloquée dès la publication, et vous ne payez qu'après le "
+                    'service.',
                     style: aide,
                   ),
                   const SizedBox(height: 12),
@@ -329,7 +412,9 @@ class _CartePersonne extends StatelessWidget {
               if (experience != null) LigneDetail(icone: Icons.work_outline, texte: experience),
               if (lieu != null) LigneDetail(icone: Icons.place_outlined, texte: lieu),
               LigneDetail(icone: Icons.payments_outlined, texte: 'Tarif demandé :', enGras: personne.tarif),
-              if (distance != null) LigneDetail(icone: Icons.schedule, texte: distance),
+              // Comme le site : "Distance inconnue" quand la recherche est
+              // partie sans position.
+              LigneDetail(icone: Icons.schedule, texte: distance ?? 'Distance inconnue'),
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: () => auVoirProfil(personne),

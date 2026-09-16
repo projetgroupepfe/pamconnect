@@ -218,14 +218,16 @@
   <% if (locals.jePeux && jePeux.publier && prestataires.length > 0) { %>
     <div class="carte confiance">
       <h3>Vous avez trouvé quelqu'un ?</h3>
+      <%# "Verifiee" : on ne propose une demande qu'a une personne qui peut
+          y repondre. %>
       <p>
-        On n'embauche pas directement depuis cette page. Publiez votre
-        demande avec le service, l'horaire et le prix : les personnes qui
-        vous intéressent pourront y répondre, et vous choisirez parmi elles.
+        Depuis le profil d'une personne vérifiée, publiez une demande pour
+        elle : elle la verra en premier. Vous pouvez aussi publier une
+        demande pour tout le monde.
       </p>
       <p class="aide">
-        C'est ce qui vous protège : la somme que vous annoncez est bloquée
-        dès la publication, et vous ne payez qu'après le service.
+        La somme que vous annoncez est bloquée dès la publication, et vous
+        ne payez qu'après le service.
       </p>
       <div class="actions">
         <a class="bouton" href="/publier-annonce">

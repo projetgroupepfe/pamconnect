@@ -7864,12 +7864,29 @@ app.post("/api/mes-jetons/acheter", (req, res) => {
 //
 // L'application ne demande pas la position : la proximite se mesure a
 // partir du quartier de l'employeur. Le score ne sort jamais.
+function positionValide(latitude, longitude) {
+  const nombre = (valeur) => (typeof valeur === "string" && valeur.trim() !== "" ? Number(valeur) : NaN);
+  const lat = nombre(latitude);
+  const lon = nombre(longitude);
+  return Number.isFinite(lat) && Number.isFinite(lon) &&
+    Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+}
+
 app.get("/api/recherche", (req, res) => {
   const moi = utilisateurConnecte(req);
   if (!moi) return erreurApi(res, 401, "Personne n'est connecté.");
 
   const metier = typeof req.query.metier === "string" ? req.query.metier : "";
-  const recherche = rechercherPersonnes({ metier }, moi);
+
+  // LA POSITION DU TELEPHONE, si la personne l'a donnee avec "Chercher
+  // pres de moi". Les deux nombres ou aucun : une position a moitie
+  // envoyee ou hors de la Terre est refusee, plutot que de chercher sans
+  // position en silence. Elle sert au classement, rien ne l'enregistre.
+  const { latitude, longitude } = req.query;
+  if ((latitude !== undefined || longitude !== undefined) && !positionValide(latitude, longitude)) {
+    return erreurApi(res, 400, "La position envoyée n'est pas valide.");
+  }
+  const recherche = rechercherPersonnes({ metier, latitude, longitude }, moi);
 
   res.json({
     titre: recherche.titre,

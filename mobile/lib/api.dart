@@ -155,8 +155,12 @@ class ApiPamConnect {
 
   /// Les personnes d'un metier, classees par le serveur. Aucune position
   /// n'est envoyee.
-  Future<ResultatRecherche> rechercher(String metier) async {
-    final donnees = await _appeler('/api/recherche?metier=${Uri.encodeQueryComponent(metier)}');
+  /// [latitude] et [longitude] : la position du telephone, avec "Chercher
+  /// pres de moi". La distance et le classement restent calcules par le
+  /// serveur.
+  Future<ResultatRecherche> rechercher(String metier, {double? latitude, double? longitude}) async {
+    final position = latitude == null || longitude == null ? '' : '&latitude=$latitude&longitude=$longitude';
+    final donnees = await _appeler('/api/recherche?metier=${Uri.encodeQueryComponent(metier)}$position');
     return _interpreter(() => ResultatRecherche.depuisJson(donnees));
   }
 

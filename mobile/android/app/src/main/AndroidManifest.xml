@@ -2,6 +2,12 @@
     <!-- L'application parle au serveur PamConnect : sans cette permission,
          la version finale ne pourrait joindre aucune adresse. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- La position ne sert qu'a "Chercher pres de moi", au moment ou la
+         personne appuie. Jamais en arriere-plan : pas de permission
+         ACCESS_BACKGROUND_LOCATION. FINE permet a Android de proposer
+         "position precise" ou "approximative" : la personne choisit. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <!-- usesCleartextTraffic : Android refuse les adresses http:// par defaut.
          Le serveur de demonstration tourne sur l'ordinateur, en http, sur le
          reseau local du partage de connexion. A retirer le jour ou le serveur

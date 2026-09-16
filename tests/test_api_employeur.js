@@ -1172,6 +1172,42 @@ setTimeout(async () => {
   dire("un visiteur n'a pas de quartier : aucune phrase, l'ordre d'inscription reste",
        !pageVisiteur.includes("Sans votre position") &&
        pageVisiteur.indexOf("Test loin") < pageVisiteur.indexOf("Test proche"));
+  console.log(SAUT + "--- RECHERCHER PRES DE MOI ---");
+  // L'employeur est a la position de "loin", a 20 km de "proche" : avec
+  // la position, "loin" passe devant, et le quartier ne compte plus.
+  const ici = { latitude: 3.8480, longitude: 11.5021 };
+  base.prepare("UPDATE utilisateurs SET latitude = ?, longitude = ? WHERE id = ?")
+    .run(ici.latitude, ici.longitude, personneLoin.id);
+  base.prepare("UPDATE utilisateurs SET latitude = ?, longitude = ? WHERE id = ?")
+    .run(ici.latitude + 0.18, ici.longitude, personneProche.id);
+  const avecPosition = (entetes, lat, lon) => json("/api/recherche?metier=" + encodeURIComponent(metierEnBase) +
+    (lat === undefined ? "" : "&latitude=" + lat) + (lon === undefined ? "" : "&longitude=" + lon), undefined, entetes);
+
+  const pres = await avecPosition(cookieDe(emp.cookie), ici.latitude, ici.longitude);
+  const presDonnees = pres.donnees || { personnes: [] };
+  dire("avec la position, la plus proche passe devant",
+       pres.code === 200 && rangDe(presDonnees.personnes, personneLoin.id) >= 0 &&
+       rangDe(presDonnees.personnes, personneLoin.id) < rangDe(presDonnees.personnes, personneProche.id),
+       pres.brut.slice(0, 300));
+  const carteLoin = presDonnees.personnes.find((p) => p.id === personneLoin.id);
+  dire("la distance est ecrite par le serveur", carteLoin && carteLoin.distance === "0.0 km",
+       carteLoin && carteLoin.distance);
+  dire("et la phrase du quartier disparait", presDonnees.phraseLieu === null);
+  dire("sans classement ni score envoye", presDonnees.personnes.every((p) => p.classement === undefined));
+  const pagePres = await (await lire("/recherche?metier=" + encodeURIComponent(metierEnBase) +
+    "&latitude=" + ici.latitude + "&longitude=" + ici.longitude, emp.cookie)).text();
+  dire("la page du site donne le meme ordre", pagePres.indexOf("Test loin") < pagePres.indexOf("Test proche"));
+
+  for (const [nom, lat, lon] of [["une latitude seule", ici.latitude, undefined],
+                                 ["une longitude seule", undefined, ici.longitude],
+                                 ["un texte", "abc", ici.longitude],
+                                 ["une latitude hors de la Terre", 200, ici.longitude],
+                                 ["une longitude vide", ici.latitude, ""]]) {
+    const r = await avecPosition(cookieDe(emp.cookie), lat, lon);
+    dire("refusee : " + nom, r.code === 400 && r.donnees && r.donnees.erreur === "La position envoyée n'est pas valide.",
+         r.code + " " + r.brut.slice(0, 120));
+  }
+
   const motInconnu = await rechercher("zzzz-" + M, cookieDe(emp.cookie));
   dire("un mot sans resultat : une liste vide", motInconnu.code === 200 && motInconnu.donnees.personnes.length === 0);
 
