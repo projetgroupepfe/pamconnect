@@ -249,9 +249,10 @@ class _EcranFicheState extends State<EcranFiche> {
                       label: const Text('Publier une demande pour cette personne'),
                     ),
                   ] else ...[
+                    // Sans verification, on ne repond a aucune demande.
                     Text(
-                      "Publiez votre demande avec le service, l'horaire et le prix : cette personne "
-                      'pourra y répondre.',
+                      "Cette personne ne peut pas encore répondre aux demandes : son identité n'est "
+                      'pas vérifiée.',
                       style: gris,
                     ),
                     const SizedBox(height: 12),

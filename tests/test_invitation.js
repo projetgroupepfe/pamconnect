@@ -125,6 +125,10 @@ setTimeout(async () => {
   const ficheNonVerifiee = await page("/personnes/" + pasVerifiee.id, emp.cookie);
   dire("pas de proposition a une personne non verifiee",
        !ficheNonVerifiee.texte.includes("?pour=") && ficheNonVerifiee.texte.includes("Publier une demande"));
+  // L'ancienne phrase promettait une reponse impossible.
+  dire("et la fiche dit qu'elle ne peut pas encore repondre",
+       ficheNonVerifiee.texte.includes("ne peut pas encore répondre aux demandes") &&
+       !ficheNonVerifiee.texte.includes("pourra y répondre"));
 
   const ficheVisiteur = await page("/personnes/" + elle.id);
   dire("un visiteur ne voit pas le bouton", !ficheVisiteur.texte.includes("?pour="));
