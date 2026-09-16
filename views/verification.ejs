@@ -33,7 +33,7 @@
 
       <div class="carte">
         <p>Votre identité a été validée par notre équipe. Vous n'avez rien d'autre à faire.</p>
-        <p class="discret">Vos documents ont été supprimés de nos serveurs après la validation.</p>
+        <p class="discret">Vos documents ont été supprimés de nos serveurs après la validation. Seule votre photo est gardée.</p>
         <p class="actions"><a class="bouton" href="<%= verification.suite.url %>"><%= verification.suite.texte %></a></p>
       </div>
 
@@ -55,7 +55,7 @@
           Ils sont consultables uniquement par l'équipe qui effectue la vérification.
           Personne d'autre n'y a accès, d'aucun côté.
           <strong>Ils sont définitivement supprimés dès que votre dossier est traité</strong> :
-          seule la mention « identité vérifiée » et sa date sont conservées.
+          seules la mention « identité vérifiée », sa date et votre photo sont conservées.
         </p>
       </div>
 
@@ -74,6 +74,14 @@
             <label for="casier">Extrait de casier judiciaire</label>
             <input type="file" id="casier" name="casier" accept="<%= verification.extensions.join(",") %>" required>
             <span class="aide">Formats acceptés : <%= verification.extensions.join(", ") %>. <%= verification.tailleMaxMo %> Mo maximum par document.</span>
+          </div>
+
+          <%# Sur un telephone, accept limite aux images propose aussi
+              l'appareil photo. %>
+          <div class="champ">
+            <label for="photo">Une photo de votre visage</label>
+            <input type="file" id="photo" name="photo" accept="<%= verification.extensionsPhoto.join(",") %>" required>
+            <span class="aide">L'équipe la compare à votre pièce d'identité. Ensuite, seule la personne avec qui vous travaillerez la verra, une fois le choix fait.</span>
           </div>
 
           <div class="actions">

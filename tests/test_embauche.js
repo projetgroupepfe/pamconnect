@@ -25,6 +25,14 @@ const lire = (chemin, cookie) =>
 const form = (o) => new URLSearchParams(o);
 const fichier = (nom, n, type) => new File([new Uint8Array(n)], nom, { type });
 
+// Une photo avec une vraie en-tete JPEG : le serveur lit les premiers
+// octets et refuse un fichier qui n'est une image que par son nom.
+function photoJpeg(nom, octets) {
+  const contenu = new Uint8Array(octets || 1500);
+  contenu.set([0xff, 0xd8, 0xff, 0xe0]);
+  return new File([contenu], nom || "visage.jpg", { type: "image/jpeg" });
+}
+
 async function creerCompte(mail, role, extra) {
   await poster("/inscription", form(Object.assign(
     { role, nom: mail.split("@")[0], email: mail, motdepasse: "motdepasse123",
@@ -97,6 +105,7 @@ setTimeout(async () => {
   const envoi = new FormData();
   envoi.append("cni", fichier("cni.jpg", 1000, "image/jpeg"));
   envoi.append("casier", fichier("casier.pdf", 1000, "application/pdf"));
+  envoi.append("photo", photoJpeg());
   await poster("/verification", envoi, cPres);
 
   profil = await (await lire("/mes-demandes", cEmp)).text();
@@ -138,6 +147,15 @@ setTimeout(async () => {
   dire("la personne reste choisie", statutCandidature() === "acceptee", statutCandidature());
 
   console.log("\n--- NETTOYAGE ---");
+  // Les fichiers envoyes par la serie ne restent pas sur le disque.
+  const DOCS = require("path").join(PROJET, "data", "documents");
+  base.prepare("SELECT cni_fichier, casier_fichier, photo_envoyee_fichier, photo_fichier FROM utilisateurs WHERE email LIKE ?")
+    .all("%" + M + "%")
+    .flatMap((u) => [u.cni_fichier, u.casier_fichier, u.photo_envoyee_fichier, u.photo_fichier])
+    .forEach((f) => {
+      const chemin = f && require("path").join(DOCS, f);
+      if (chemin && require("fs").existsSync(chemin)) require("fs").unlinkSync(chemin);
+    });
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;
   console.log("  " + n + " comptes de test supprimes");
 

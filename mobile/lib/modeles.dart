@@ -1472,6 +1472,7 @@ class DossierDeVerification {
     required this.chapeau,
     required this.delaiHeures,
     required this.extensions,
+    required this.extensionsPhoto,
     required this.tailleMaxMo,
     required this.remplaceUnDossier,
     this.attente,
@@ -1489,6 +1490,7 @@ class DossierDeVerification {
       chapeau: _lire<String>(json, 'chapeau'),
       delaiHeures: _lire<int>(json, 'delaiHeures'),
       extensions: _lireTextes(json, 'extensions'),
+      extensionsPhoto: _lireTextes(json, 'extensionsPhoto'),
       tailleMaxMo: _lire<num>(json, 'tailleMaxMo'),
       remplaceUnDossier: _lire<bool>(json, 'remplaceUnDossier'),
       attente: _lireObjet(json, 'attente', AttenteDuDossier.depuisJson),
@@ -1503,12 +1505,16 @@ class DossierDeVerification {
   /// Ou aller une fois l'identite validee.
   final LienDuSite suite;
 
-  /// Pourquoi deux documents : la raison n'est pas la meme des deux cotes.
+  /// Pourquoi ces documents et la photo : la raison n'est pas la meme des
+  /// deux cotes.
   final String chapeau;
   final int delaiHeures;
 
   /// ".jpg", ".pdf"... tels que le serveur les accepte.
   final List<String> extensions;
+
+  /// La photo du visage : des images seulement, pas de PDF.
+  final List<String> extensionsPhoto;
   final num tailleMaxMo;
 
   /// Un dossier est deja en examen : un nouvel envoi le remplace.

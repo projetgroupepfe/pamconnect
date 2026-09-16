@@ -138,6 +138,8 @@ ajouterColonneSiAbsente("quartiers", "synonymes", "TEXT NOT NULL DEFAULT ''");
 ajouterColonneSiAbsente("annonces", "annulee", "INTEGER NOT NULL DEFAULT 0");
 ajouterColonneSiAbsente("annonces", "annulee_le", "TEXT");
 ajouterColonneSiAbsente("annonces", "mise_en_avant_jusqu_au", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "photo_envoyee_fichier", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "photo_fichier", "TEXT");
 ajouterColonneSiAbsente("annonces", "personne_invitee_id",
   "INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL");
 
@@ -1094,6 +1096,7 @@ const requetes = {
     UPDATE utilisateurs
     SET cni_fichier = @cni,
         casier_fichier = @casier,
+        photo_envoyee_fichier = @photo,
         statut_verification = 'en attente',
         documents_envoyes_le = datetime('now'),
         verifie_le = NULL,
@@ -1103,7 +1106,10 @@ const requetes = {
 
   dossiersEnAttente: db.prepare(`
     SELECT id, nom, email, role, metier, arrondissement, quartier,
-           documents_envoyes_le
+           documents_envoyes_le,
+           -- Un dossier envoye avant la photo n'en a pas : l'ecran ne
+           -- propose alors pas de l'ouvrir.
+           photo_envoyee_fichier IS NOT NULL AS aUnePhoto
     FROM utilisateurs
     WHERE statut_verification = 'en attente'
     -- Le plus ancien d'abord : c'est celui dont le delai risque de
@@ -1117,13 +1123,18 @@ const requetes = {
 
   // Valider ou refuser efface les deux noms de fichier : les documents
   // eux-memes sont supprimes du disque au meme moment.
+  //
+  // LA PHOTO, ELLE, EST GARDEE si le dossier est valide : elle sert a
+  // chaque service. Un dossier refuse la perd avec ses documents.
   validerVerification: db.prepare(`
     UPDATE utilisateurs
     SET statut_verification = 'verifie',
         verifie_le = datetime('now'),
         motif_refus = NULL,
         cni_fichier = NULL,
-        casier_fichier = NULL
+        casier_fichier = NULL,
+        photo_fichier = COALESCE(photo_envoyee_fichier, photo_fichier),
+        photo_envoyee_fichier = NULL
     WHERE id = ?
   `),
 
@@ -1133,7 +1144,8 @@ const requetes = {
         motif_refus = ?,
         verifie_le = NULL,
         cni_fichier = NULL,
-        casier_fichier = NULL
+        casier_fichier = NULL,
+        photo_envoyee_fichier = NULL
     WHERE id = ?
   `),
 
@@ -2713,6 +2725,9 @@ const DOSSIER_DOCUMENTS = path.join(__dirname, "data", "documents");
 fs.mkdirSync(DOSSIER_DOCUMENTS, { recursive: true });
 
 const EXTENSIONS_AUTORISEES = [".jpg", ".jpeg", ".png", ".pdf"];
+// La photo du visage sera un jour montree a une autre personne : un PDF
+// n'est pas une photo.
+const EXTENSIONS_PHOTO = [".jpg", ".jpeg", ".png"];
 const TAILLE_MAX_OCTETS = 5 * 1024 * 1024; // 5 Mo
 
 const recevoirDocuments = multer({
@@ -2728,10 +2743,13 @@ const recevoirDocuments = multer({
     },
   }),
 
-  limits: { fileSize: TAILLE_MAX_OCTETS, files: 2 },
+  limits: { fileSize: TAILLE_MAX_OCTETS, files: 3 },
 
   fileFilter: (req, fichier, suite) => {
     const extension = path.extname(fichier.originalname).toLowerCase();
+    if (fichier.fieldname === "photo" && !EXTENSIONS_PHOTO.includes(extension)) {
+      return suite(new Error("PHOTO_NON_IMAGE"));
+    }
     if (!EXTENSIONS_AUTORISEES.includes(extension)) {
       return suite(new Error("TYPE_NON_AUTORISE"));
     }
@@ -2740,7 +2758,27 @@ const recevoirDocuments = multer({
 }).fields([
   { name: "cni", maxCount: 1 },
   { name: "casier", maxCount: 1 },
+  { name: "photo", maxCount: 1 },
 ]);
+
+// UNE PHOTO EST-ELLE VRAIMENT UNE IMAGE ? L'extension se choisit en
+// renommant un fichier. Les premiers octets, eux, disent ce qu'il
+// contient : FF D8 FF pour un JPEG, 89 50 4E 47 0D 0A 1A 0A pour un PNG.
+// La photo sera montree a une autre personne : un fichier deguise ne doit
+// pas pouvoir passer.
+function estUneImage(nomFichier) {
+  try {
+    const descripteur = fs.openSync(path.join(DOSSIER_DOCUMENTS, nomFichier), "r");
+    const debut = Buffer.alloc(8);
+    const lus = fs.readSync(descripteur, debut, 0, 8, 0);
+    fs.closeSync(descripteur);
+    const jpeg = lus >= 3 && debut[0] === 0xff && debut[1] === 0xd8 && debut[2] === 0xff;
+    const png = lus === 8 && debut.equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    return jpeg || png;
+  } catch (erreur) {
+    return false;
+  }
+}
 
 // Efface un fichier sans faire planter le serveur s'il n'existe plus.
 function supprimerDocument(nomFichier) {
@@ -5397,14 +5435,15 @@ function ecranDeVerification(u) {
     suite: employeur
       ? { url: "/mes-demandes", texte: "Voir mes demandes" }
       : { url: "/annonces", texte: "Voir les demandes" },
-    // Pourquoi deux documents : la raison n'est pas la meme des deux cotes.
+    // Pourquoi ces documents : la raison n'est pas la meme des deux cotes.
     chapeau: employeur
       ? "Les personnes qui vous répondront se déplaceront chez vous, seules, souvent tôt " +
-        "le matin. Elles ont le droit de savoir qui vous êtes : deux documents sont demandés."
+        "le matin. Elles ont le droit de savoir qui vous êtes : deux documents et une photo sont demandés."
       : "Les employeurs confient l'accès à leur domicile. Pour que votre profil inspire " +
-        "confiance, deux documents sont demandés.",
+        "confiance, deux documents et une photo sont demandés.",
     delaiHeures: DELAI_VERIFICATION_HEURES,
     extensions: EXTENSIONS_AUTORISEES,
+    extensionsPhoto: EXTENSIONS_PHOTO,
     tailleMaxMo: TAILLE_MAX_OCTETS / 1024 / 1024,
     // Un nouvel envoi remplace le dossier en cours d'examen : on le dit.
     remplaceUnDossier: statut === "en attente",
@@ -5423,34 +5462,45 @@ const DOSSIER_DEJA_VALIDE = {
 function recevoirUnDossier(u, recus, erreur) {
   const cni = recus && recus.cni ? recus.cni[0] : null;
   const casier = recus && recus.casier ? recus.casier[0] : null;
+  const photo = recus && recus.photo ? recus.photo[0] : null;
 
   function refus(titre, texte) {
     if (cni) supprimerDocument(cni.filename);
     if (casier) supprimerDocument(casier.filename);
+    if (photo) supprimerDocument(photo.filename);
     return { probleme: { code: 400, titre, texte, lien: { url: "/verification", texte: "Réessayer" } } };
   }
+
+  const PHOTO_PAS_UNE_IMAGE = ["Format non accepté", "La photo de votre visage doit être au format JPEG ou PNG."];
 
   if (erreur) {
     if (erreur.code === "LIMIT_FILE_SIZE") {
       return refus("Fichier trop volumineux",
         `Chaque document doit peser moins de ${TAILLE_MAX_OCTETS / 1024 / 1024} Mo.`);
     }
+    if (erreur.message === "PHOTO_NON_IMAGE") return refus(...PHOTO_PAS_UNE_IMAGE);
     if (erreur.message === "TYPE_NON_AUTORISE") {
       return refus("Format non accepté", `Formats acceptés : ${EXTENSIONS_AUTORISEES.join(", ")}.`);
     }
     return refus("Envoi impossible", "Le fichier n'a pas pu être reçu. Réessayez.");
   }
 
-  if (!cni || !casier) {
-    return refus("Deux documents sont nécessaires",
-      "Il faut envoyer la pièce d'identité ET l'extrait de casier judiciaire.");
+  if (!cni || !casier || !photo) {
+    return refus("Trois envois sont nécessaires",
+      "Il faut envoyer la pièce d'identité, l'extrait de casier judiciaire ET une photo de votre visage.");
   }
 
-  // Un envoi precedent est remplace : on efface les anciens fichiers.
+  if (!estUneImage(photo.filename)) return refus(...PHOTO_PAS_UNE_IMAGE);
+
+  // Un envoi precedent est remplace : on efface les anciens fichiers. La
+  // photo deja acceptee, elle, n'est pas touchee.
   supprimerDocument(u.cni_fichier);
   supprimerDocument(u.casier_fichier);
+  supprimerDocument(u.photo_envoyee_fichier);
 
-  requetes.enregistrerDocuments.run({ cni: cni.filename, casier: casier.filename, id: u.id });
+  requetes.enregistrerDocuments.run({
+    cni: cni.filename, casier: casier.filename, photo: photo.filename, id: u.id,
+  });
 
   return {
     ok: true,
@@ -6894,7 +6944,8 @@ app.get("/admin/document/:id/:type", exigerAdmin, (req, res) => {
 
   const nomFichier =
     req.params.type === "cni" ? dossier.cni_fichier :
-    req.params.type === "casier" ? dossier.casier_fichier : null;
+    req.params.type === "casier" ? dossier.casier_fichier :
+    req.params.type === "photo" ? dossier.photo_envoyee_fichier : null;
 
   // Ceinture et bretelles : ce nom vient de notre base, donc il a la
   // forme que nous lui avons donnee. On le verifie quand meme avant de
@@ -6907,6 +6958,9 @@ app.get("/admin/document/:id/:type", exigerAdmin, (req, res) => {
     });
   }
 
+  // nosniff : le navigateur s'en tient au type annonce et n'essaie pas de
+  // deviner, par exemple, qu'un fichier serait une page a executer.
+  res.set("X-Content-Type-Options", "nosniff");
   res.sendFile(path.join(DOSSIER_DOCUMENTS, nomFichier));
 });
 
@@ -6949,9 +7003,18 @@ app.post("/admin/verification", exigerAdmin, lireFormulaire, (req, res) => {
   }
 
   // Dans les deux cas les documents sont effaces : nous ne conservons
-  // que le statut et sa date (minimisation des donnees personnelles).
+  // que le statut, sa date et, si le dossier est valide, la photo
+  // (minimisation des donnees personnelles : chaque donnee le temps de
+  // son utilite).
   supprimerDocument(dossier.cni_fichier);
   supprimerDocument(dossier.casier_fichier);
+  if (req.body.decision === "valider") {
+    // Une photo plus ancienne est remplacee par celle qui vient d'etre
+    // comparee a la piece d'identite.
+    if (dossier.photo_envoyee_fichier && dossier.photo_fichier) supprimerDocument(dossier.photo_fichier);
+  } else {
+    supprimerDocument(dossier.photo_envoyee_fichier);
+  }
 
   res.redirect("/admin");
 });

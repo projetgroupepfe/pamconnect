@@ -16,7 +16,7 @@ const _cotePhotoMax = 2000.0;
 const _qualitePhoto = 85;
 
 /// La verification d'identite : l'etat du dossier, et l'envoi des deux
-/// documents. La page du site, ecrite par le serveur.
+/// documents et de la photo du visage. La page du site, ecrite par le serveur.
 ///
 /// Sur le site, chaque document se choisit dans un champ de fichier. Sur le
 /// telephone, deux boutons : prendre une photo, ou choisir un fichier (une
@@ -41,6 +41,7 @@ class _EcranVerificationState extends State<EcranVerification> {
 
   DocumentAEnvoyer? _cni;
   DocumentAEnvoyer? _casier;
+  DocumentAEnvoyer? _photo;
   String? _erreurEnvoi;
   bool _envoi = false;
 
@@ -72,6 +73,8 @@ class _EcranVerificationState extends State<EcranVerification> {
     setState(() {
       if (champ == 'cni') {
         _cni = document;
+      } else if (champ == 'photo') {
+        _photo = document;
       } else {
         _casier = document;
       }
@@ -83,6 +86,9 @@ class _EcranVerificationState extends State<EcranVerification> {
     try {
       final photo = await ImagePicker().pickImage(
         source: ImageSource.camera,
+        // La photo du visage se prend en se regardant ; un document, avec
+        // l'appareil de derriere.
+        preferredCameraDevice: champ == 'photo' ? CameraDevice.front : CameraDevice.rear,
         maxWidth: _cotePhotoMax,
         maxHeight: _cotePhotoMax,
         imageQuality: _qualitePhoto,
@@ -126,6 +132,7 @@ class _EcranVerificationState extends State<EcranVerification> {
     if (_envoi) return;
     final cni = _cni;
     final casier = _casier;
+    final photo = _photo;
     setState(() {
       _envoi = true;
       _erreurEnvoi = null;
@@ -135,6 +142,7 @@ class _EcranVerificationState extends State<EcranVerification> {
       final texte = (await widget.api.envoyerDocuments({
         'cni': ?cni,
         'casier': ?casier,
+        'photo': ?photo,
       }))
           .texte;
       if (!mounted) return;
@@ -252,7 +260,10 @@ class _EcranVerificationState extends State<EcranVerification> {
                     style: corps,
                   ),
                   const SizedBox(height: 8),
-                  Text('Vos documents ont été supprimés de nos serveurs après la validation.', style: gris),
+                  Text(
+                    'Vos documents ont été supprimés de nos serveurs après la validation. Seule votre photo est gardée.',
+                    style: gris,
+                  ),
                   if (auVoirSuite != null) ...[
                     const SizedBox(height: 16),
                     FilledButton(onPressed: auVoirSuite, child: Text(dossier.suite.texte)),
@@ -288,7 +299,7 @@ class _EcranVerificationState extends State<EcranVerification> {
                           "Personne d'autre n'y a accès, d'aucun côté. ",
                     ),
                     TextSpan(text: 'Ils sont définitivement supprimés dès que votre dossier est traité', style: gras),
-                    TextSpan(text: ' : seule la mention « identité vérifiée » et sa date sont conservées.'),
+                    TextSpan(text: ' : seules la mention « identité vérifiée », sa date et votre photo sont conservées.'),
                   ],
                 ),
                 style: gris,
@@ -319,6 +330,16 @@ class _EcranVerificationState extends State<EcranVerification> {
                     actif: !_envoi,
                     auPhoto: () => _prendrePhoto('casier'),
                     auFichier: () => _choisirFichier('casier', dossier.extensions),
+                  ),
+                  const SizedBox(height: 24),
+                  _Document(
+                    titre: 'Une photo de votre visage',
+                    aide: "L'équipe la compare à votre pièce d'identité. Ensuite, seule la personne avec qui "
+                        'vous travaillerez la verra, une fois le choix fait.',
+                    document: _photo,
+                    actif: !_envoi,
+                    auPhoto: () => _prendrePhoto('photo'),
+                    auFichier: () => _choisirFichier('photo', dossier.extensionsPhoto),
                   ),
                   const SizedBox(height: 24),
                   if (_erreurEnvoi != null) ...[

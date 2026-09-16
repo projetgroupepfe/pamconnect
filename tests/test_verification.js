@@ -32,6 +32,14 @@ function fichier(nom, octets, type) {
   return new File([new Uint8Array(octets)], nom, { type });
 }
 
+// Une photo avec une vraie en-tete JPEG : le serveur lit les premiers
+// octets et refuse un fichier qui n'est une image que par son nom.
+function photoJpeg(nom, octets) {
+  const contenu = new Uint8Array(octets || 1500);
+  contenu.set([0xff, 0xd8, 0xff, 0xe0]);
+  return new File([contenu], nom || "visage.jpg", { type: "image/jpeg" });
+}
+
 setTimeout(async () => {
   const mdp = "motdepasse123";
   const mail = M + "@example.com";
@@ -56,7 +64,7 @@ setTimeout(async () => {
   f1.append("cni", fichier("cni.jpg", 1000, "image/jpeg"));
   const seul = await poster("/verification", f1, cookie);
   dire("un seul document sur deux -> refuse", seul.code === 400, "code " + seul.code);
-  dire("le message est clair", seul.corps.includes("Deux documents"));
+  dire("le message est clair", seul.corps.includes("Trois envois sont nécessaires"));
 
   const f2 = new FormData();
   f2.append("cni", fichier("virus.exe", 1000, "application/octet-stream"));
@@ -70,6 +78,31 @@ setTimeout(async () => {
   const gros = await poster("/verification", f3, cookie);
   dire("fichier de 6 Mo -> refuse", gros.code === 400 && gros.corps.includes("volumineux"), "code " + gros.code);
 
+  // LA PHOTO DU VISAGE est obligatoire, et c'est une image.
+  const sansPhoto = new FormData();
+  sansPhoto.append("cni", fichier("cni.jpg", 1000, "image/jpeg"));
+  sansPhoto.append("casier", fichier("casier.pdf", 1000, "application/pdf"));
+  const rSansPhoto = await poster("/verification", sansPhoto, cookie);
+  dire("sans photo -> refuse", rSansPhoto.code === 400 && rSansPhoto.corps.includes("une photo de votre visage"),
+       "code " + rSansPhoto.code);
+
+  const photoPdf = new FormData();
+  photoPdf.append("cni", fichier("cni.jpg", 1000, "image/jpeg"));
+  photoPdf.append("casier", fichier("casier.pdf", 1000, "application/pdf"));
+  photoPdf.append("photo", fichier("visage.pdf", 1000, "application/pdf"));
+  const rPhotoPdf = await poster("/verification", photoPdf, cookie);
+  dire("une photo en PDF -> refusee",
+       rPhotoPdf.code === 400 && rPhotoPdf.corps.includes("La photo de votre visage doit être au format JPEG ou PNG."),
+       "code " + rPhotoPdf.code);
+
+  const photoDeguisee = new FormData();
+  photoDeguisee.append("cni", fichier("cni.jpg", 1000, "image/jpeg"));
+  photoDeguisee.append("casier", fichier("casier.pdf", 1000, "application/pdf"));
+  photoDeguisee.append("photo", fichier("pas-une-image.jpg", 1000, "image/jpeg"));
+  const rDeguisee = await poster("/verification", photoDeguisee, cookie);
+  dire("un fichier nomme .jpg qui n'est pas une image -> refuse",
+       rDeguisee.code === 400 && rDeguisee.corps.includes("au format JPEG ou PNG"), "code " + rDeguisee.code);
+
   dire("aucun fichier orphelin laisse sur le disque",
        fs.readdirSync(DOCS).length === fichiersAvant,
        fs.readdirSync(DOCS).length + " fichiers au lieu de " + fichiersAvant);
@@ -79,6 +112,7 @@ setTimeout(async () => {
   const f4 = new FormData();
   f4.append("cni", fichier("ma-cni.jpg", 2000, "image/jpeg"));
   f4.append("casier", fichier("mon-casier.pdf", 3000, "application/pdf"));
+  f4.append("photo", photoJpeg("mon-visage.jpg"));
   const envoi = await poster("/verification", f4, cookie);
   dire("les deux documents sont acceptes", envoi.code === 200 && envoi.corps.includes("Documents envoyés"), "code " + envoi.code);
 
@@ -91,6 +125,9 @@ setTimeout(async () => {
        apres.cni_fichier);
   dire("les fichiers sont bien sur le disque",
        fs.existsSync(path.join(DOCS, apres.cni_fichier)) && fs.existsSync(path.join(DOCS, apres.casier_fichier)));
+  dire("la photo attend le controle, sous un nom tire au hasard",
+       /^[0-9a-f]{32}\.jpg$/.test(String(apres.photo_envoyee_fichier)) && apres.photo_fichier === null &&
+       fs.existsSync(path.join(DOCS, apres.photo_envoyee_fichier)), String(apres.photo_envoyee_fichier));
 
   console.log("\n--- 4. LE TEST DE SECURITE : les documents sont-ils telechargeables ? ---");
   for (const adresse of [
@@ -98,6 +135,8 @@ setTimeout(async () => {
     "/data/documents/" + apres.cni_fichier,
     "/" + apres.cni_fichier,
     "/../data/documents/" + apres.cni_fichier,
+    "/documents/" + apres.photo_envoyee_fichier,
+    "/" + apres.photo_envoyee_fichier,
   ]) {
     const r = await fetch(RACINE + adresse);
     dire("inaccessible : " + adresse, r.status === 404, "code " + r.status);
@@ -234,10 +273,11 @@ setTimeout(async () => {
     const r = await fetch(RACINE + "/api/verification", { method: "POST", body: envoi, headers: entetes || {} });
     return { code: r.status, donnees: await r.json().catch(() => null) };
   };
-  const deuxDocuments = (cniNom, casierNom) => {
+  const dossierComplet = (cniNom, casierNom) => {
     const envoi = new FormData();
     envoi.append("cni", fichier(cniNom, 2000, "image/jpeg"));
     envoi.append("casier", fichier(casierNom, 3000, "application/pdf"));
+    envoi.append("photo", photoJpeg());
     return envoi;
   };
   const jetonPre = await jetonDe(mail);
@@ -259,11 +299,18 @@ setTimeout(async () => {
   dire("les formats et la taille viennent du serveur",
        JSON.stringify(ecranPre.extensions) === JSON.stringify([".jpg", ".jpeg", ".png", ".pdf"]) &&
        ecranPre.tailleMaxMo === 5 && pageSite.includes('accept=".jpg,.jpeg,.png,.pdf"'));
+  dire("la photo n'accepte que des images, sur les deux ecrans",
+       JSON.stringify(ecranPre.extensionsPhoto) === JSON.stringify([".jpg", ".jpeg", ".png"]) &&
+       pageSite.includes('name="photo" accept=".jpg,.jpeg,.png"') &&
+       pageSite.includes("Une photo de votre visage"));
 
   const ecranEmp = (await ecranApi(parJeton(jetonEmp))).donnees;
   dire("chacun lit sa raison de donner ses documents",
        ecranEmp.chapeau.startsWith("Les personnes qui vous répondront") &&
        ecranPre.chapeau.startsWith("Les employeurs confient") && ecranEmp.attente === null);
+  dire("et chacun sait qu'une photo est demandee",
+       ecranEmp.chapeau.endsWith("deux documents et une photo sont demandés.") &&
+       ecranPre.chapeau.endsWith("deux documents et une photo sont demandés."));
 
   const profilEmp = await (await fetch(RACINE + "/api/mon-profil", { headers: parJeton(jetonEmp) })).json();
   const pageProfilEmp = await (await lire("/mon-profil", cEmp)).text();
@@ -277,10 +324,10 @@ setTimeout(async () => {
   const refusApi = await envoyerApi(seulApi, parJeton(jetonEmp));
   dire("un seul document : 400, avec la phrase du site, sans fichier laisse",
        refusApi.code === 400 &&
-       refusApi.donnees.erreur === "Il faut envoyer la pièce d'identité ET l'extrait de casier judiciaire." &&
+       refusApi.donnees.erreur === "Il faut envoyer la pièce d'identité, l'extrait de casier judiciaire ET une photo de votre visage." &&
        fs.readdirSync(DOCS).length === fichiersAvantApi, JSON.stringify(refusApi.donnees));
 
-  const accepteApi = await envoyerApi(deuxDocuments("photo-cni.jpg", "casier.pdf"), parJeton(jetonEmp));
+  const accepteApi = await envoyerApi(dossierComplet("photo-cni.jpg", "casier.pdf"), parJeton(jetonEmp));
   dire("les deux documents par le jeton de l'application : le dossier part en examen",
        accepteApi.code === 200 && accepteApi.donnees.texte.startsWith("Votre dossier est arrivé.") &&
        employeurTest().statut_verification === "en attente" &&
@@ -288,7 +335,7 @@ setTimeout(async () => {
        fs.existsSync(path.join(DOCS, employeurTest().casier_fichier)), JSON.stringify(accepteApi.donnees));
 
   const ancienPre = moi();
-  const remplace = await envoyerApi(deuxDocuments("nouvelle-cni.jpg", "nouveau-casier.pdf"), parJeton(jetonPre));
+  const remplace = await envoyerApi(dossierComplet("nouvelle-cni.jpg", "nouveau-casier.pdf"), parJeton(jetonPre));
   dire("un nouvel envoi remplace le dossier en examen et efface les anciens fichiers",
        remplace.code === 200 && moi().cni_fichier !== ancienPre.cni_fichier &&
        !fs.existsSync(path.join(DOCS, ancienPre.cni_fichier)) &&
@@ -296,7 +343,7 @@ setTimeout(async () => {
 
   base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' WHERE email = ?").run(mailEmp);
   dire("deja verifie : 409",
-       (await envoyerApi(deuxDocuments("cni.jpg", "casier.pdf"), parJeton(jetonEmp))).code === 409);
+       (await envoyerApi(dossierComplet("cni.jpg", "casier.pdf"), parJeton(jetonEmp))).code === 409);
   const ecranValide = (await ecranApi(parJeton(jetonEmp))).donnees;
   const pageValide = await (await lire("/verification", cEmp)).text();
   dire("une fois valide, l'employeur est renvoye vers ses demandes, sur le site aussi",
@@ -304,8 +351,9 @@ setTimeout(async () => {
        pageValide.includes('href="/mes-demandes">Voir mes demandes'));
 
   console.log("\n--- NETTOYAGE ---");
-  base.prepare("SELECT cni_fichier, casier_fichier FROM utilisateurs WHERE email LIKE ?").all("%" + M + "%")
-    .flatMap((compte) => [compte.cni_fichier, compte.casier_fichier])
+  base.prepare("SELECT cni_fichier, casier_fichier, photo_envoyee_fichier, photo_fichier FROM utilisateurs WHERE email LIKE ?")
+    .all("%" + M + "%")
+    .flatMap((compte) => [compte.cni_fichier, compte.casier_fichier, compte.photo_envoyee_fichier, compte.photo_fichier])
     .forEach((f) => {
       if (f && fs.existsSync(path.join(DOCS, f))) fs.unlinkSync(path.join(DOCS, f));
     });

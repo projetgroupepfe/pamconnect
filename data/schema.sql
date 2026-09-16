@@ -70,6 +70,18 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
                       CHECK (statut_verification IN ('non soumis', 'en attente', 'verifie', 'refuse')),
   cni_fichier     TEXT,
   casier_fichier  TEXT,
+
+  -- --- Photo du visage ---
+  -- Envoyee avec les documents, et comparee a la piece d'identite par
+  -- l'equipe : on sait alors que celui qui envoie la piece en est le
+  -- titulaire. A la decision, les documents sont effaces, mais la photo
+  -- acceptee est GARDEE : elle sert a chaque service, pour se reconnaitre
+  -- a la porte. Elle n'est jamais publique.
+  --
+  -- photo_envoyee_fichier : la photo en cours de controle.
+  -- photo_fichier         : la photo acceptee.
+  photo_envoyee_fichier TEXT,
+  photo_fichier   TEXT,
   -- Quand les documents ont ete envoyes. Sans cette date, le delai de
   -- 24 h annonce aux deux cotes ne serait qu'une phrase : rien ne
   -- permettrait de dire si l'equipe le tient.

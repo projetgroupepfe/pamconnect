@@ -858,6 +858,7 @@ void main() {
           'chapeau': 'chapeau 6',
           'delaiHeures': 7,
           'extensions': ['.ext8'],
+          'extensionsPhoto': ['.ext12'],
           'tailleMaxMo': 9,
           'remplaceUnDossier': true,
         };
@@ -866,6 +867,7 @@ void main() {
     expect(lu.attente?.morceaux.last.gras, isTrue);
     expect(lu.suite.texte, 'texte 11');
     expect(lu.tailleMaxMo, 9);
+    expect(lu.extensionsPhoto, ['.ext12']);
     expect(lu.motifRefus, isNull);
     // Sans lien de suite, l'ecran ne saurait pas ou mener apres la validation.
     expect(() => DossierDeVerification.depuisJson(dossier()), throwsA(isA<FormeInattendue>()));

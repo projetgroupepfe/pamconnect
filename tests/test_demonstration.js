@@ -57,6 +57,14 @@ async function creerCompte(suffixe, role, extra) {
 const fichier = (nom, octets, type) =>
   new File([new Uint8Array(octets)], nom, { type });
 
+// Une photo avec une vraie en-tete JPEG : le serveur lit les premiers
+// octets et refuse un fichier qui n'est une image que par son nom.
+function photoJpeg(nom, octets) {
+  const contenu = new Uint8Array(octets || 1500);
+  contenu.set([0xff, 0xd8, 0xff, 0xe0]);
+  return new File([contenu], nom || "visage.jpg", { type: "image/jpeg" });
+}
+
 // Les appels de l'application : du JSON, avec la meme session.
 async function json(chemin, cookie) {
   const r = await fetch(RACINE + chemin, {
@@ -129,6 +137,7 @@ setTimeout(async () => {
   const f = new FormData();
   f.append("cni", fichier("cni.jpg", 2000, "image/jpeg"));
   f.append("casier", fichier("casier.pdf", 3000, "application/pdf"));
+  f.append("photo", photoJpeg());
   const envoi = await poster("/verification", f, pre.cookie);
   dire("les deux documents sont acceptes", envoi.code === 200, "code " + envoi.code);
   dire("l'ecran annonce le delai de 24 heures", envoi.corps.includes("24 heures"));
@@ -150,6 +159,8 @@ setTimeout(async () => {
        (await lire("/admin/document/" + pre.id + "/cni", eq.cookie)).status === 200);
   dire("le casier aussi",
        (await lire("/admin/document/" + pre.id + "/casier", eq.cookie)).status === 200);
+  dire("et la photo du visage, pour la comparer",
+       (await lire("/admin/document/" + pre.id + "/photo", eq.cookie)).status === 200);
   dire("elle n'a aucun jeton avant la validation",
        base.prepare("SELECT COALESCE(SUM(quantite),0) n FROM jetons_mouvements WHERE utilisateur_id = ?")
          .get(pre.id).n === 0);
@@ -161,9 +172,13 @@ setTimeout(async () => {
          .get(pre.id).statut_verification === "verifie");
 
   // La fiche affirme que les documents sont supprimes du disque.
-  const apresValidation = base.prepare("SELECT cni_fichier, casier_fichier FROM utilisateurs WHERE id = ?").get(pre.id);
+  const apresValidation = base.prepare(
+    "SELECT cni_fichier, casier_fichier, photo_fichier FROM utilisateurs WHERE id = ?").get(pre.id);
   dire("les deux documents sont effaces du disque",
        apresValidation.cni_fichier === null && apresValidation.casier_fichier === null);
+  // La fiche le dit aussi : seule la photo est gardee.
+  dire("seule la photo est gardee",
+       Boolean(apresValidation.photo_fichier) && fs.existsSync(path.join(DOCS, apresValidation.photo_fichier)));
 
   // DEUXIEME MOMENT FORT : la validation credite les jetons offerts.
   // La cause et l'effet tiennent dans le meme geste.
@@ -262,8 +277,8 @@ setTimeout(async () => {
   console.log("\n--- NETTOYAGE ---");
   // Les documents ont deja ete effaces par la validation ; on nettoie au
   // cas ou la serie se serait arretee avant.
-  for (const u of base.prepare("SELECT cni_fichier, casier_fichier FROM utilisateurs WHERE email LIKE ?").all("%" + M + "%")) {
-    [u.cni_fichier, u.casier_fichier].forEach((nom) => {
+  for (const u of base.prepare("SELECT cni_fichier, casier_fichier, photo_envoyee_fichier, photo_fichier FROM utilisateurs WHERE email LIKE ?").all("%" + M + "%")) {
+    [u.cni_fichier, u.casier_fichier, u.photo_envoyee_fichier, u.photo_fichier].forEach((nom) => {
       if (nom && fs.existsSync(path.join(DOCS, nom))) fs.unlinkSync(path.join(DOCS, nom));
     });
   }

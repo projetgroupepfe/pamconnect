@@ -86,7 +86,14 @@
              href="/admin/document/<%= dossier.id %>/cni">Ouvrir la pièce d'identité</a>
           <a class="bouton bouton-secondaire" target="_blank" rel="noopener"
              href="/admin/document/<%= dossier.id %>/casier">Ouvrir le casier judiciaire</a>
+          <% if (dossier.aUnePhoto) { %>
+            <a class="bouton bouton-secondaire" target="_blank" rel="noopener"
+               href="/admin/document/<%= dossier.id %>/photo">Ouvrir la photo du visage</a>
+          <% } %>
         </p>
+        <% if (dossier.aUnePhoto) { %>
+          <p class="aide">Comparez le visage de la photo à celui de la pièce d'identité avant de valider.</p>
+        <% } %>
 
         <div class="candidature">
           <div class="actions">

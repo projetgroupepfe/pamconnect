@@ -29,6 +29,14 @@ const lire = (chemin, cookie) =>
 const form = (o) => new URLSearchParams(o);
 const fichier = (nom, octets, type) => new File([new Uint8Array(octets)], nom, { type });
 
+// Une photo avec une vraie en-tete JPEG : le serveur lit les premiers
+// octets et refuse un fichier qui n'est une image que par son nom.
+function photoJpeg(nom, octets) {
+  const contenu = new Uint8Array(octets || 1500);
+  contenu.set([0xff, 0xd8, 0xff, 0xe0]);
+  return new File([contenu], nom || "visage.jpg", { type: "image/jpeg" });
+}
+
 async function creerCompte(mail, role, extra) {
   await poster("/inscription", form(Object.assign(
     { role, nom: mail.split("@")[0], email: mail, motdepasse: "motdepasse123",
@@ -66,11 +74,13 @@ setTimeout(async () => {
   const envoi = new FormData();
   envoi.append("cni", fichier("cni.jpg", 2000, "image/jpeg"));
   envoi.append("casier", fichier("casier.pdf", 3000, "application/pdf"));
+  envoi.append("photo", photoJpeg("visage.jpg", 1500));
   await poster("/verification", envoi, cookiePres);
   const soumis = qui(mailPres);
   dire("statut 'en attente'", soumis.statut_verification === "en attente", soumis.statut_verification);
   dire("les 2 fichiers sont sur le disque",
        fs.existsSync(path.join(DOCS, soumis.cni_fichier)) && fs.existsSync(path.join(DOCS, soumis.casier_fichier)));
+  dire("et la photo du visage aussi", fs.existsSync(path.join(DOCS, String(soumis.photo_envoyee_fichier))));
 
   const liste = await (await lire("/admin", cookieAdmin)).text();
   dire("le dossier apparait dans la liste", liste.includes(mailPres));
@@ -88,8 +98,19 @@ setTimeout(async () => {
   dire("un type de document invente -> 404",
        (await lire("/admin/document/" + soumis.id + "/passeport", cookieAdmin)).status === 404);
 
+  dire("la liste propose d'ouvrir la photo, avec la consigne",
+       liste.includes('href="/admin/document/' + soumis.id + '/photo"') &&
+       liste.includes("Comparez le visage de la photo à celui de la pièce d'identité avant de valider."));
+  const photoDossier = await lire("/admin/document/" + soumis.id + "/photo", cookieAdmin);
+  dire("l'equipe ouvre la photo du visage", photoDossier.status === 200 &&
+       photoDossier.headers.get("x-content-type-options") === "nosniff" &&
+       (await photoDossier.arrayBuffer()).byteLength === 1500, "code " + photoDossier.status);
+  dire("une personne ordinaire ne l'ouvre pas -> 403",
+       (await lire("/admin/document/" + soumis.id + "/photo", cookiePres)).status === 403);
+
   console.log("\n--- 5. Validation : les documents doivent DISPARAITRE ---");
   const cniAvant = soumis.cni_fichier, casierAvant = soumis.casier_fichier;
+  const photoAvant = soumis.photo_envoyee_fichier;
   const validation = await poster("/admin/verification",
     form({ utilisateurId: soumis.id, decision: "valider" }), cookieAdmin);
   dire("redirection vers /admin", validation.code === 302, "code " + validation.code);
@@ -101,6 +122,10 @@ setTimeout(async () => {
   dire("nom du casier efface en base", valide.casier_fichier === null);
   dire("FICHIER CNI supprime du disque", !fs.existsSync(path.join(DOCS, cniAvant)));
   dire("FICHIER casier supprime du disque", !fs.existsSync(path.join(DOCS, casierAvant)));
+  // LA PHOTO, ELLE, EST GARDEE : elle sert a se reconnaitre a la porte.
+  dire("la photo est gardee, devenue la photo acceptee",
+       valide.photo_fichier === photoAvant && valide.photo_envoyee_fichier === null &&
+       fs.existsSync(path.join(DOCS, photoAvant)));
   dire("le dossier a quitte la liste", !(await (await lire("/admin", cookieAdmin)).text()).includes(mailPres));
 
   console.log("\n--- 6. Le badge apparait pour les employeurs ---");
@@ -120,6 +145,7 @@ setTimeout(async () => {
   const envoi2 = new FormData();
   envoi2.append("cni", fichier("cni.jpg", 1000, "image/jpeg"));
   envoi2.append("casier", fichier("casier.pdf", 1000, "application/pdf"));
+  envoi2.append("photo", photoJpeg());
   await poster("/verification", envoi2, cookieRefus);
   const aRefuser = qui(mailRefus);
   await poster("/admin/verification",
@@ -129,6 +155,9 @@ setTimeout(async () => {
   dire("motif enregistre", refuse.motif_refus === "Document illisible", String(refuse.motif_refus));
   dire("documents supprimes du disque aussi",
        !fs.existsSync(path.join(DOCS, aRefuser.cni_fichier)) && !fs.existsSync(path.join(DOCS, aRefuser.casier_fichier)));
+  dire("la photo d'un dossier refuse est supprimee avec lui",
+       refuse.photo_envoyee_fichier === null && refuse.photo_fichier === null &&
+       !fs.existsSync(path.join(DOCS, aRefuser.photo_envoyee_fichier)));
   const profilRefuse = await (await lire("/mon-profil", cookieRefus)).text();
   dire("le prestataire voit le motif sur son profil", profilRefuse.includes("Document illisible"));
   dire("il peut renvoyer un dossier", (await lire("/verification", cookieRefus)).status === 200);
@@ -223,7 +252,7 @@ setTimeout(async () => {
   console.log("\n--- NETTOYAGE ---");
   for (const mail of [mailAdmin, mailPres, mailRefus, mailVrai]) {
     const u = qui(mail);
-    if (u) [u.cni_fichier, u.casier_fichier].forEach((f) => {
+    if (u) [u.cni_fichier, u.casier_fichier, u.photo_envoyee_fichier, u.photo_fichier].forEach((f) => {
       if (f && fs.existsSync(path.join(DOCS, f))) fs.unlinkSync(path.join(DOCS, f));
     });
   }

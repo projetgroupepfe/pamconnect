@@ -211,8 +211,8 @@ class ApiPamConnect {
     return _interpreter(() => DossierDeVerification.depuisJson(donnees));
   }
 
-  /// Les deux documents d'identite ("cni" et "casier"), comme le formulaire
-  /// du site les envoie.
+  /// Les deux documents d'identite et la photo du visage ("cni", "casier" et
+  /// "photo"), comme le formulaire du site les envoie.
   Future<TexteDuServeur> envoyerDocuments(Map<String, DocumentAEnvoyer> documents) async {
     final donnees = await _envoyerFichiers('/api/verification', documents);
     return _interpreter(() => TexteDuServeur.depuisJson(donnees));
