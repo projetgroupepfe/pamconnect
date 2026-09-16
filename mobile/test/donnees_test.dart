@@ -438,7 +438,6 @@ void main() {
           ],
           'serviceTermine': null,
           'peutEcrire': true,
-          'exempleMessage': 'exemple 1',
           'conseilEcriture': 'conseil 1',
           'peutDeclarerService': false,
           'declarationDeLaPersonne': null,

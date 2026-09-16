@@ -675,7 +675,6 @@ class Discussion {
     required this.prix,
     required this.messages,
     required this.peutEcrire,
-    required this.exempleMessage,
     required this.conseilEcriture,
     required this.peutDeclarerService,
     this.metierAutre,
@@ -700,7 +699,6 @@ class Discussion {
       prix: PrixDiscussion.depuisJson(_lire<Map<String, dynamic>>(json, 'prix')),
       messages: _lireListe(json, 'messages', MessageDiscussion.depuisJson),
       peutEcrire: _lire<bool>(json, 'peutEcrire'),
-      exempleMessage: _lire<String>(json, 'exempleMessage'),
       conseilEcriture: _lire<String>(json, 'conseilEcriture'),
       peutDeclarerService: _lire<bool>(json, 'peutDeclarerService'),
       metierAutre: _lireFacultatif<String>(json, 'metierAutre'),
@@ -723,7 +721,6 @@ class Discussion {
   final PrixDiscussion prix;
   final List<MessageDiscussion> messages;
   final bool peutEcrire;
-  final String exempleMessage;
 
   /// Ce que l'on conseille d'ecrire, formule par le serveur.
   final String conseilEcriture;

@@ -144,8 +144,9 @@
             <%# "Votre message" ne disait pas A QUI on ecrit. Une discussion
                 n'a que deux personnes : nommer celle qui lira leve tout doute. %>
             <label for="texte">Écrire à <%= jeSuisEmployeur ? conversation.nomPrestataire : conversation.nomEmployeur %></label>
-            <textarea id="texte" name="texte" rows="4" maxlength="2000" required
-                      placeholder="ex : <%= exempleMessage %>"></textarea>
+            <%# Pas d'exemple en gris : ecrit pour un metier, il tombait a
+                cote sur les autres. Le nom et le conseil guident. %>
+            <textarea id="texte" name="texte" rows="4" maxlength="2000" required></textarea>
             <%# Le conseil vient de conseilPourEcrire : l'application lit le meme. %>
             <p class="aide"><%= conseil %></p>
           </div>

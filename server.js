@@ -2164,39 +2164,13 @@ function risquePaiementHorsPlateforme(texte) {
   return EXPRESSIONS_RISQUE.some((expression) => expression.test(propre));
 }
 
-// Les phrases proposees dans les cadres de saisie.
-//
-// Ce sont des EXEMPLES, pas du contenu de la plateforme : ils montrent
-// comment commencer a quelqu'un qui n'a jamais ecrit dans une
-// application. Ils sont tires au hasard a chaque affichage, pour deux
-// raisons : personne ne recopie mot pour mot la phrase qu'on lui souffle,
-// et une phrase unique repetee des mois finit par ressembler a une
-// consigne officielle.
-//
-// Ils sont rassembles ICI pour pouvoir etre corriges ou completes sans
-// toucher aux ecrans - et ils ne sont pas les memes des deux cotes.
-const EXEMPLES_MESSAGE = {
-  employeur: [
-    "Bonjour, j'ai besoin de quelqu'un lundi, mercredi et samedi de 8h à 12h. Êtes-vous disponible ?",
-    "Bonjour, est-ce que vous travaillez aussi le samedi matin ?",
-    "Bonjour, la maison a trois chambres et un salon. Cela vous convient-il ?",
-  ],
-  prestataire: [
-    "Bonjour, je suis disponible ces trois matinées. Je travaille dans le quartier depuis quatre ans.",
-    "Bonjour, votre horaire me convient. Puis-je commencer lundi prochain ?",
-    "Bonjour, je peux venir le matin. Combien de pièces faut-il faire ?",
-  ],
-};
-
-const EXEMPLES_RAISON = [
-  "C'est trois matinées par semaine, et le quartier est loin de chez moi.",
-  "Le logement est grand, cela me prendra plus de temps que d'habitude.",
-  "Je peux baisser un peu si vous me prenez toutes les semaines.",
-];
-
-function auHasard(liste) {
-  return liste[Math.floor(Math.random() * liste.length)];
-}
+// PAS D'EXEMPLE DANS LE CADRE "ECRIRE A ...". Les exemples tires au
+// hasard avaient ete ecrits pour le menage ("Combien de pieces faut-il
+// faire ?") et s'affichaient sur une demande de cuisine ; d'autres
+// inventaient un horaire qui pouvait contredire la demande. Ce qui guide
+// reste visible : le nom de la personne a qui l'on ecrit, et le conseil
+// sous le cadre. Une liste d'exemples jamais affichee parlait aussi de
+// baisser le prix, contraire au prix fixe : retiree avec les autres.
 
 // ============================================================
 // LES AVIS
@@ -5017,7 +4991,6 @@ function ouvrirDiscussion(candidatureId, utilisateur) {
     conversation,
     jeSuisEmployeur,
     messages: requetes.messagesDeConversation.all(conversation.id),
-    exempleMessage: auHasard(EXEMPLES_MESSAGE[jeSuisEmployeur ? "employeur" : "prestataire"]),
     conseil: conseilPourEcrire(conversation, jeSuisEmployeur),
     monAvis: requetes.monAvisPour.get(conversation.id, utilisateur.id) || null,
     avisRecu: requetes.avisDeLaCandidature.all(conversation.id)
@@ -5132,9 +5105,7 @@ app.get("/messages/:id", exigerConnexion, (req, res) => {
     conversation,
     messages: discussion.messages,
     jeSuisEmployeur,
-    exempleMessage: discussion.exempleMessage,
     conseil: discussion.conseil,
-    exempleRaison: auHasard(EXEMPLES_RAISON),
   });
 });
 
@@ -7503,7 +7474,6 @@ app.get("/api/discussions/:id", (req, res) => {
             : null,
         }
       : null,
-    exempleMessage: discussion.exempleMessage,
     // Elle a declare avoir travaille : l'employeur doit le savoir, c'est
     // lui qui detient la cle du paiement.
     declarationDeLaPersonne: jeSuisEmployeur && c.declaree_par_elle_le && !c.terminee_le

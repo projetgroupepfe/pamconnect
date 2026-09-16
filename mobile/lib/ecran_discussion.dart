@@ -571,8 +571,6 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                   decoration: InputDecoration(
                     labelText: 'Écrire à ${discussion.avec}',
                     alignLabelWithHint: true,
-                    hintText: 'ex : ${discussion.exempleMessage}',
-                    hintMaxLines: 3,
                     // Formule par le serveur : la meme phrase que sur le site.
                     helperText: discussion.conseilEcriture,
                     helperMaxLines: 4,
