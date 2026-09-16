@@ -328,6 +328,24 @@ const requetes = {
     WHERE id = ? AND role = 'prestataire' AND est_admin = 0 AND suspendu = 0
   `),
 
+  // La photo acceptee d'une personne, pour decider qui peut la voir.
+  photoDe: db.prepare(`
+    SELECT id, photo_fichier, suspendu FROM utilisateurs
+    WHERE id = ? AND photo_fichier IS NOT NULL
+  `),
+
+  // Un service convenu entre deux personnes, dans un sens ou dans l'autre :
+  // l'une a choisi l'autre. C'est la seule relation qui ouvre la photo.
+  serviceConvenuEntre: db.prepare(`
+    SELECT 1 AS oui
+    FROM candidatures c
+    JOIN annonces a ON a.id = c.annonce_id
+    WHERE c.statut = 'acceptee'
+      AND ((a.employeur_id = @moi AND c.prestataire_id = @autre)
+        OR (a.employeur_id = @autre AND c.prestataire_id = @moi))
+    LIMIT 1
+  `),
+
   // A qui un employeur peut proposer sa demande : une personne que la
   // recherche montre, ET dont l'identite est verifiee. Les autres ne
   // peuvent pas repondre : leur proposer une demande serait une impasse.
@@ -5017,6 +5035,29 @@ function conseilPourEcrire(conversation, jeSuisEmployeur) {
     : `${base} N'indiquez votre adresse exacte qu'à la personne que vous choisirez.`;
 }
 
+// --- La photo d'une personne ----------------------------------------
+//
+// JAMAIS PUBLIQUE. Elle s'ouvre pour la personne elle-meme, pour l'equipe,
+// et pour l'autre personne d'un service convenu : c'est a la porte qu'elle
+// sert. Ni la recherche, ni la fiche, ni les listes ne la montrent : un
+// visage dans une liste fait choisir sur l'apparence, et expose des
+// personnes a n'importe quel visiteur.
+function peutVoirLaPhoto(moi, personne) {
+  if (moi.id === personne.id) return true;
+  if (personne.suspendu) return false;
+  if (moi.est_admin) return true;
+  return Boolean(requetes.serviceConvenuEntre.get({ moi: moi.id, autre: personne.id }));
+}
+
+// L'adresse de la photo porte le debut du nom du fichier : une nouvelle
+// photo change d'adresse, et le telephone ne garde pas l'ancienne en
+// memoire. Le fichier, lui, ne s'atteint que par cette route.
+function adressePhoto(personne) {
+  return personne && personne.photo_fichier && !personne.suspendu
+    ? `/photos/${personne.id}?v=${personne.photo_fichier.slice(0, 8)}`
+    : null;
+}
+
 function ouvrirDiscussion(candidatureId, utilisateur) {
   const conversation = conversationDe(candidatureId, utilisateur);
   if (!conversation) return null;
@@ -5029,6 +5070,11 @@ function ouvrirDiscussion(candidatureId, utilisateur) {
     conversation,
     jeSuisEmployeur,
     messages: requetes.messagesDeConversation.all(conversation.id),
+    // LE VISAGE DE L'AUTRE, une fois le choix fait. Avant, personne ne
+    // voit le visage de personne.
+    photoAutre: conversation.statut === "acceptee"
+      ? adressePhoto(requetes.photoDe.get(jeSuisEmployeur ? conversation.prestataireId : conversation.employeurId))
+      : null,
     conseil: conseilPourEcrire(conversation, jeSuisEmployeur),
     monAvis: requetes.monAvisPour.get(conversation.id, utilisateur.id) || null,
     avisRecu: requetes.avisDeLaCandidature.all(conversation.id)
@@ -5144,6 +5190,7 @@ app.get("/messages/:id", exigerConnexion, (req, res) => {
     messages: discussion.messages,
     jeSuisEmployeur,
     conseil: discussion.conseil,
+    photoAutre: discussion.photoAutre,
   });
 });
 
@@ -5227,6 +5274,22 @@ function lireFichePublique(personneId, moi) {
     avis: requetes.avisRecus.all(personne.id),
   };
 }
+
+// Une photo refusee, absente ou interdite a ce demandeur : 404, sans dire
+// laquelle des trois. Le nom du fichier est revérifie avant de construire
+// un chemin avec.
+app.get("/photos/:id", (req, res) => {
+  const moi = utilisateurConnecte(req);
+  const personne = requetes.photoDe.get(Number(req.params.id));
+  const nomValide = Boolean(personne) && /^[0-9a-f]{32}\.(jpg|jpeg|png)$/.test(String(personne.photo_fichier));
+
+  if (!moi || !nomValide || !peutVoirLaPhoto(moi, personne)) {
+    return res.status(404).type("text/plain").send("Photo introuvable.");
+  }
+
+  res.set({ "X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=3600" });
+  res.sendFile(path.join(DOSSIER_DOCUMENTS, personne.photo_fichier));
+});
 
 app.get("/personnes/:id", (req, res) => {
   const fiche = lireFichePublique(Number(req.params.id), res.locals.moi);
@@ -7509,6 +7572,7 @@ app.get("/api/discussions/:id", (req, res) => {
     serviceTermine: c.terminee_le ? { par: c.nomEmployeur, le: c.terminee_le } : null,
     peutEcrire: !c.terminee_le,
     conseilEcriture: discussion.conseil,
+    photoAutre: discussion.photoAutre,
     // Clore le service appartient a celui qui l'a recu, une fois quelqu'un
     // choisi, et une seule fois.
     peutDeclarerService: jeSuisEmployeur && c.statut === "acceptee" && !c.terminee_le,

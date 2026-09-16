@@ -684,6 +684,7 @@ class Discussion {
     this.declarationDeLaPersonne,
     this.maDeclaration,
     this.avis,
+    this.photoAutre,
   });
 
   factory Discussion.depuisJson(Map<String, dynamic> json) {
@@ -708,11 +709,16 @@ class Discussion {
       declarationDeLaPersonne: declaration == null ? null : DateDeclaree.depuisJson(declaration, 'nom'),
       maDeclaration: _lireObjet(json, 'maDeclaration', MaDeclaration.depuisJson),
       avis: avis == null ? null : AvisDuService.depuisJson(avis),
+      photoAutre: _lireFacultatif<String>(json, 'photoAutre'),
     );
   }
 
   final int id;
   final String titreDemande;
+
+  /// L'adresse de la photo de l'autre personne, une fois le choix fait et
+  /// si l'equipe l'a controlee.
+  final String? photoAutre;
 
   /// L'autre personne de la discussion.
   final String avec;

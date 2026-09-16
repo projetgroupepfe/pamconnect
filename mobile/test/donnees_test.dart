@@ -441,11 +441,14 @@ void main() {
           'conseilEcriture': 'conseil 1',
           'peutDeclarerService': false,
           'declarationDeLaPersonne': null,
+          'photoAutre': null,
         };
 
     test('elle se lit telle que le serveur la decrit', () {
       final lu = Discussion.depuisJson(discussion());
       expect(lu.avec, 'nom 1');
+      expect(lu.photoAutre, isNull);
+      expect(Discussion.depuisJson(discussion()..['photoAutre'] = 'adresse 1').photoAutre, 'adresse 1');
       expect(lu.messages.single.auteur, 'Vous');
       expect(lu.messages.single.peutSignaler, isFalse);
       expect(lu.prix.lignes.single.montant, '8 000 FCFA');

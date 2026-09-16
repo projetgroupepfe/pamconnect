@@ -8,6 +8,15 @@
         sans savoir a quelle demande elle se rapporte. %>
     <div class="carte">
       <h3><%= conversation.titreAnnonce %></h3>
+      <%# LE VISAGE DE L'AUTRE, une fois le choix fait : il sert a se
+          reconnaitre a la porte. Jamais avant, jamais ailleurs. %>
+      <% if (locals.photoAutre) { %>
+        <div class="fiche-tete">
+          <img class="portrait" src="<%= photoAutre %>" width="56" height="56"
+               alt="Photo de <%= jeSuisEmployeur ? conversation.nomPrestataire : conversation.nomEmployeur %>">
+          <span class="aide">Photo contrôlée par l'équipe</span>
+        </div>
+      <% } %>
       <ul class="infos">
         <li>
           <%- include("partiels/icone", { nom: "profil" }) %>

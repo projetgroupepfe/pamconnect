@@ -435,6 +435,7 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
     final lieu = discussion.lieu;
     final conditions = discussion.conditions;
     final metierAutre = discussion.metierAutre;
+    final photoAutre = discussion.photoAutre;
     final serviceTermine = discussion.serviceTermine;
     final declaration = discussion.declarationDeLaPersonne;
     final maDeclaration = discussion.maDeclaration;
@@ -458,6 +459,23 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                 discussion.titreDemande,
                 style: texte.titleMedium?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
               ),
+              // Le visage de l'autre, une fois le choix fait : il sert a se
+              // reconnaitre a la porte.
+              if (photoAutre != null) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: Couleurs.bleuClair,
+                      backgroundImage: widget.api.imageProtegee(photoAutre),
+                      onBackgroundImageError: (_, _) {},
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text("Photo contrôlée par l'équipe", style: aide)),
+                  ],
+                ),
+              ],
               LigneDetail(
                 icone: Icons.person_outline,
                 texte: 'Avec',

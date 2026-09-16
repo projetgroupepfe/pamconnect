@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/painting.dart';
 import 'package:http/http.dart' as http;
 
 import 'modeles.dart';
@@ -60,6 +61,11 @@ class ApiPamConnect {
   final String racine;
 
   String? _jeton;
+
+  /// Une image que seul un compte autorise peut voir, comme la photo d'une
+  /// personne : le serveur la demande avec le jeton de la session.
+  ImageProvider imageProtegee(String chemin) =>
+      NetworkImage('$racine$chemin', headers: {if (_jeton != null) 'Authorization': 'Bearer $_jeton'});
 
   /// "192.168.1.200:3000/" devient "http://192.168.1.200:3000".
   ///
