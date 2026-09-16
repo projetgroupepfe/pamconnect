@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Depuis Android 8, le fond et le dessin sont separes : le telephone
+     decoupe l'icone en rond ou en carre arrondi selon sa marque. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/fond_icone" />
+    <foreground android:drawable="@mipmap/ic_launcher_dessin" />
+</adaptive-icon>

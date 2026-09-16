@@ -64,6 +64,19 @@ setTimeout(async () => {
          "code " + p.code);
   }
 
+  console.log("\n--- Le logo ---");
+  const logo = await page("/logo.png");
+  const iconeOnglet = await page("/favicon.png");
+  dire("le logo et l'icone d'onglet sont servis par le serveur",
+       logo.code === 200 && iconeOnglet.code === 200, "codes " + logo.code + " " + iconeOnglet.code);
+  const entete = (await page("/")).corps;
+  dire("l'en-tete montre le logo, et l'onglet a son icone",
+       entete.includes('src="/logo.png"') && entete.includes('rel="icon"'));
+  // Le meme bouclier sert d'icone "identite verifiee" ailleurs dans la page :
+  // ce qui compte est qu'il ne soit plus le logo.
+  dire("le logo n'est plus le bouclier dessine",
+       /<a class="logo" href="\/">\s*<img class="logo-image"/.test(entete));
+
   console.log("\n--- Pages de presentation : ce qu'elles promettent ---");
   const accueil = (await page("/")).corps;
   const vousCherchez = (await page("/employeur")).corps;

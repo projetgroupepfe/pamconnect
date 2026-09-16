@@ -9,6 +9,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PamConnect - <%= titre %></title>
   <link rel="stylesheet" href="/style.css">
+  <%# Le logo et l'icone sont des fichiers du projet : ils s'affichent
+      aussi sans connexion, comme le reste du site. %>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/favicon-180.png">
 </head>
 <body>
 
@@ -17,14 +21,9 @@
 
       <div class="marque">
         <a class="logo" href="/">
-          <%# Un bouclier avec une coche : la verification d'identite,
-              qui est la promesse centrale de la plateforme. %>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1F4E79"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-               aria-hidden="true" focusable="false">
-            <path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.7 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.5 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1Z"/>
-            <path d="m9 12 2 2 4-4"/>
-          </svg>
+          <%# Le logo de PamConnect : une maison, et deux personnes reunies
+              au-dessus. Le nom suit a cote, il n'est donc pas dans l'image. %>
+          <img class="logo-image" src="/logo.png" alt="" width="39" height="26">
           <span>Pam<strong>Connect</strong></span>
         </a>
 

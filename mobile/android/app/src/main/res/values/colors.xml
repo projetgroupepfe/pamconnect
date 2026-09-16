@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Le fond de l'icone : blanc, comme l'en-tete du site. -->
+    <color name="fond_icone">#FFFFFF</color>
+</resources>

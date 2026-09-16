@@ -83,8 +83,11 @@ setTimeout(async () => {
   dire("jamais la date de naissance complete", !page.includes("1990-03-08"));
   dire("l'age n'apparait pas non plus pour un employeur qui n'a pas embauche",
        !(await (await lire("/personnes/" + u.id, emp)).text()).includes("35 - 44 ans"));
+  // Un document depose porte un nom TIRE AU HASARD : 32 caracteres, puis
+  // son extension. C'est ce motif qui ne doit jamais sortir. Chercher
+  // ".png" tout court ne marche plus : chaque page porte le logo du site.
   dire("aucun nom de fichier d'identite",
-       !page.includes(".jpg") && !page.includes(".png") && !page.includes(".pdf"));
+       !/[0-9a-f]{32}\.(jpg|jpeg|png|pdf)/i.test(page) && !page.includes("/documents/"));
 
   console.log("\n--- QUI N'A PAS DE FICHE PUBLIQUE ---");
   dire("un employeur n'en a pas", (await lire("/personnes/" + base.prepare(

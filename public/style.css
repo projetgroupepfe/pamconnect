@@ -136,6 +136,8 @@ a:hover { color: var(--bleu-fonce); }
   padding: .6rem 0;
 }
 .logo span  { font-weight: 400; }
+/* Le logo garde la hauteur du nom ecrit a cote. */
+.logo-image { height: 26px; width: auto; display: block; }
 .logo strong { font-weight: 700; }
 
 /* Le nom et la zone couverte forment un bloc, a gauche de l'en-tete. */
