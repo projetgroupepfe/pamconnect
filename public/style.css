@@ -4,7 +4,8 @@
    CONCEPTION MOBILE D'ABORD :
    les regles de base decrivent l'affichage sur telephone.
    Les ajouts pour les grands ecrans sont regroupes tout en bas,
-   dans une seule regle @media (min-width: 760px).
+   dans la regle @media (min-width: 760px), et le menu dans l'en-tete
+   dans la regle @media (min-width: 1080px) qui la suit.
 
    Aucune police ni icone n'est telechargee depuis internet :
    la plateforme s'affiche a l'identique SANS CONNEXION.
@@ -613,13 +614,41 @@ button:hover, .bouton:hover {
   h1 { font-size: 2rem; }
   .accroche h1 { font-size: 2.3rem; }
 
-  /* Le menu remonte dans l'en-tete et redevient une ligne de liens. */
+  .entete-interieur { padding: 0 20px; min-height: 66px; }
+
+  /* Le bas garde la place de la barre de navigation : elle reste en bas
+     jusqu'a 1080 pixels (voir la regle suivante). */
+  .contenu { padding: 2.5rem 20px calc(var(--barre-basse) + 2rem); }
+
+  /* Les boutons reprennent leur largeur naturelle, cote a cote. */
+  button, .bouton { width: auto; min-height: 46px; }
+  .actions { flex-direction: row; flex-wrap: wrap; align-items: center; }
+
+  .grille { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .etapes { grid-template-columns: repeat(3, 1fr); }
+  .metiers { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+
+}
+
+/* ---------- 12 bis. Le menu dans l'en-tete ---------------- */
+/* LE MENU NE REMONTE QUE LA OU IL TIENT. Connecte, un employeur a cinq
+   entrees et leurs pastilles : a cote du logo, du nom et de "Yaounde",
+   il faut pres de 1 000 pixels. Remonte des 760 pixels, le menu
+   recouvrait le nom sur un petit ordinateur. En dessous de 1080 pixels,
+   il reste donc en barre en bas de l'ecran, comme sur le telephone.
+
+   Le menu est pousse a droite, pres de la deconnexion : l'espace libre
+   se place entre la marque (logo, nom, Yaounde) et le menu, et les deux
+   groupes se lisent chacun d'un coup d'oeil. */
+@media (min-width: 1080px) {
+
   .menu {
     position: static;
     display: flex;
     justify-content: flex-end;
     align-items: center;
     gap: .15rem;
+    margin-left: auto;
     background: none;
     border-top: none;
     padding-bottom: 0;
@@ -640,17 +669,14 @@ button:hover, .bouton:hover {
     background-color: var(--trait);
     margin: 0 .4rem;
   }
-  .entete-interieur { padding: 0 20px; min-height: 66px; }
+  .entete-actions { margin-left: .5rem; }
 
-  .contenu { padding: 2.5rem 20px 4rem; }
+  /* L'en-tete deborde de 40 pixels de chaque cote la colonne du contenu :
+     a 1 040 pixels, un employeur avec ses pastilles n'avait qu'une dizaine
+     de pixels entre "Yaounde" et le menu. */
+  .entete-interieur { max-width: 1120px; }
 
-  /* Les boutons reprennent leur largeur naturelle, cote a cote. */
-  button, .bouton { width: auto; min-height: 46px; }
-  .actions { flex-direction: row; flex-wrap: wrap; align-items: center; }
-
-  .grille { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-  .etapes { grid-template-columns: repeat(3, 1fr); }
-  .metiers { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .contenu { padding-bottom: 4rem; }
 
 }
 
