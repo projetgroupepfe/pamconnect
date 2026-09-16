@@ -255,11 +255,11 @@ class _CarteUsage extends StatelessWidget {
               children: [
                 if (jetons.jeSuisEmployeur) ...[
                   const TextSpan(text: 'Mettre une demande en avant', style: gras),
-                  const TextSpan(text: ", pour qu'elle soit vue avant les autres"),
                   if (cout != null) ...[
-                    const TextSpan(text: ', coûte '),
+                    const TextSpan(text: ' coûte '),
                     TextSpan(text: cout, style: gras),
                   ],
+                  const TextSpan(text: ', depuis vos demandes'),
                 ] else ...[
                   const TextSpan(text: 'Répondre à une demande', style: gras),
                   if (cout != null) ...[
@@ -281,13 +281,8 @@ class _CarteUsage extends StatelessWidget {
             ),
             style: paragraphe,
           ),
-          const SizedBox(height: 8),
-          if (jetons.jeSuisEmployeur)
-            Text(
-              'Elle se lance depuis vos demandes, sur celle que vous voulez faire passer devant.',
-              style: aide,
-            )
-          else
+          if (!jetons.jeSuisEmployeur) ...[
+            const SizedBox(height: 8),
             Text.rich(
               const TextSpan(
                 children: [
@@ -298,6 +293,7 @@ class _CarteUsage extends StatelessWidget {
               ),
               style: aide,
             ),
+          ],
           const SizedBox(height: 8),
           Text.rich(
             const TextSpan(
@@ -305,8 +301,8 @@ class _CarteUsage extends StatelessWidget {
                 TextSpan(text: 'Un jeton '),
                 TextSpan(text: "n'est pas de l'argent", style: gras),
                 TextSpan(
-                  text: ' : il ne se donne pas, il ne se retire ni en espèces ni par Mobile Money, et il ne '
-                      'paie jamais une prestation. Pour cela, voir Mon compte.',
+                  text: ' : il ne se donne pas, il ne se retire pas, et il ne paie jamais une prestation. '
+                      'Pour cela, voir Mon compte.',
                 ),
               ],
             ),
@@ -489,7 +485,7 @@ class _CartePack extends StatelessWidget {
   }
 }
 
-/// "Comment se passe le paiement" : une demonstration, dite comme telle.
+/// "Comment se passe le paiement" : la simulation, dite simplement.
 class _CartePaiement extends StatelessWidget {
   const _CartePaiement();
 
@@ -509,22 +505,13 @@ class _CartePaiement extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            "Vous demandez un pack ici. L'équipe confirme ensuite avoir reçu le paiement, et vos jetons "
-            'sont ajoutés à votre solde.',
+            "Vous demandez un pack ici, et l'équipe ajoute les jetons à votre solde.",
             style: texte.bodyMedium?.copyWith(color: Couleurs.encreDouce),
           ),
           const SizedBox(height: 8),
-          Text.rich(
-            const TextSpan(
-              children: [
-                TextSpan(text: 'Démonstration :', style: TextStyle(fontWeight: FontWeight.w600)),
-                TextSpan(
-                  text: " PamConnect n'encaisse aucun paiement pour l'instant. Encaisser de l'argent suppose "
-                      "un agrément et un contrat avec les opérateurs, que la plateforme n'a pas encore. Les "
-                      "demandes sont enregistrées et confirmées à la main par l'équipe.",
-                ),
-              ],
-            ),
+          Text(
+            "PamConnect n'encaisse aucun paiement pour l'instant : chaque demande est confirmée à la "
+            "main par l'équipe.",
             style: texte.bodySmall?.copyWith(color: Couleurs.encrePale),
           ),
         ],

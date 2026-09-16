@@ -28,9 +28,9 @@
 
     <p>
       <% if (jetons.jeSuisEmployeur) { %>
-        <strong>Mettre une demande en avant</strong>, pour qu'elle soit vue
-        avant les autres<% if (jetons.cout) { %>, coûte
-        <strong><%= jetons.cout %></strong><% } %>.
+        <strong>Mettre une demande en avant</strong><% if (jetons.cout) { %> coûte
+        <strong><%= jetons.cout %></strong><% } %>, depuis
+        <a href="/mes-demandes">vos demandes</a>.
       <% } else { %>
         <strong>Répondre à une demande</strong><% if (jetons.cout) { %> coûte
         <strong><%= jetons.cout %></strong><% } %>.
@@ -43,12 +43,7 @@
       <% } %>
     </p>
 
-    <% if (jetons.jeSuisEmployeur) { %>
-      <p class="aide">
-        Elle se lance depuis <a href="/mes-demandes">vos demandes</a>, sur celle
-        que vous voulez faire passer devant.
-      </p>
-    <% } else { %>
+    <% if (!jetons.jeSuisEmployeur) { %>
       <p class="aide">
         Le jeton part <strong>seulement quand votre réponse part</strong>.
       </p>
@@ -56,8 +51,8 @@
 
     <p class="aide">
       Un jeton <strong>n'est pas de l'argent</strong> : il ne se donne pas, il
-      ne se retire ni en espèces ni par Mobile Money, et il ne paie jamais une
-      prestation. Pour cela, voir <a href="/mon-compte">votre compte</a>.
+      ne se retire pas, et il ne paie jamais une prestation. Pour cela, voir
+      <a href="/mon-compte">votre compte</a>.
     </p>
   </div>
 
@@ -196,15 +191,15 @@
         de MTN ou d'Orange. %>
     <div class="carte confiance">
       <h3>Comment se passe le paiement</h3>
+      <%# Le POURQUOI de la simulation (agrement, operateurs) est dans le
+          dossier de soutenance, reponse C8 : ici, la personne apprend ce
+          qui se passe, pas le droit qui l'explique. %>
       <p>
-        Vous demandez un pack ici. L'équipe confirme ensuite avoir reçu le
-        paiement, et vos jetons sont ajoutés à votre solde.
+        Vous demandez un pack ici, et l'équipe ajoute les jetons à votre solde.
       </p>
       <p class="aide">
-        <strong>Démonstration :</strong> PamConnect n'encaisse aucun paiement
-        pour l'instant. Encaisser de l'argent suppose un agrément et un
-        contrat avec les opérateurs, que la plateforme n'a pas encore. Les
-        demandes sont enregistrées et confirmées à la main par l'équipe.
+        PamConnect n'encaisse aucun paiement pour l'instant : chaque demande est
+        confirmée à la main par l'équipe.
       </p>
     </div>
 

@@ -117,8 +117,11 @@ setTimeout(async () => {
   dire("avec son prix en FCFA", page.includes("1 000 FCFA"));
   dire("le pack de 30 aussi", page.includes("3 000 FCFA"));
   dire("la valeur d'un jeton est annoncee", page.includes("100 FCFA"));
+  // La phrase a ete raccourcie : "il ne se retire pas" dit la meme chose
+  // que l'ancienne liste des moyens de retrait.
+  const pageUneLigne = page.replace(/\s+/g, " ");
   dire("il est dit qu'un jeton n'est pas de l'argent",
-       page.includes("ne se retire ni en espèces ni par Mobile Money"));
+       pageUneLigne.includes("n'est pas de l'argent") && pageUneLigne.includes("il ne se retire pas"));
 
   console.log("\n--- DEMANDER UN PACK NE CREDITE RIEN ---");
   // Tant que l'equipe n'a pas constate le paiement, le solde ne bouge pas.
