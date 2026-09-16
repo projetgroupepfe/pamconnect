@@ -19,5 +19,43 @@
     });
   </script>
 
+  <%# VOIR SON MOT DE PASSE. L'oeil se pose dans chaque champ de mot de
+      passe, sur toutes les pages, sans toucher a chaque formulaire. Le
+      champ reste MASQUE par defaut, et sans script il l'est toujours :
+      montrer son mot de passe doit rester un geste volontaire. %>
+  <template id="modeleOeilMotDePasse">
+    <button type="button" class="voir-mdp" aria-pressed="false"
+            aria-label="Afficher le mot de passe" title="Afficher le mot de passe">
+      <%- include("icone", { nom: "oeil", taille: 18 }) %>
+      <%- include("icone", { nom: "oeil-barre", taille: 18 }) %>
+    </button>
+  </template>
+  <script>
+    (function () {
+      var modele = document.getElementById("modeleOeilMotDePasse");
+      if (!modele || !modele.content) return;
+
+      Array.prototype.forEach.call(document.querySelectorAll('input[type="password"]'), function (champ) {
+        var enveloppe = document.createElement("span");
+        enveloppe.className = "champ-mdp";
+        champ.parentNode.insertBefore(enveloppe, champ);
+        enveloppe.appendChild(champ);
+
+        var bouton = modele.content.firstElementChild.cloneNode(true);
+        enveloppe.appendChild(bouton);
+
+        bouton.addEventListener("click", function () {
+          var etaitVisible = champ.type === "text";
+          champ.type = etaitVisible ? "password" : "text";
+          var texte = etaitVisible ? "Afficher le mot de passe" : "Masquer le mot de passe";
+          bouton.setAttribute("aria-pressed", etaitVisible ? "false" : "true");
+          bouton.setAttribute("aria-label", texte);
+          bouton.setAttribute("title", texte);
+          champ.focus();
+        });
+      });
+    })();
+  </script>
+
 </body>
 </html>

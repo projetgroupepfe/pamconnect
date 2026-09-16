@@ -64,6 +64,16 @@ setTimeout(async () => {
          "code " + p.code);
   }
 
+  console.log("\n--- Voir son mot de passe ---");
+  const connexion = (await page("/connexion")).corps;
+  dire("la page de connexion fournit l'oeil, et le champ reste masque",
+       connexion.includes('id="modeleOeilMotDePasse"') &&
+       connexion.includes('aria-label="Afficher le mot de passe"') &&
+       connexion.includes('<input type="password"'));
+  dire("la creation de compte et le changement de mot de passe aussi",
+       (await page("/inscription")).corps.includes('id="modeleOeilMotDePasse"') &&
+       (await page("/mon-profil/modifier", cPre)).corps.includes('id="modeleOeilMotDePasse"'));
+
   console.log("\n--- Le logo ---");
   const logo = await page("/logo.png");
   const iconeOnglet = await page("/favicon.png");

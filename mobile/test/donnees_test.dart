@@ -860,6 +860,19 @@ void main() {
     expect(lien, findsNothing);
   });
 
+  testWidgets('un mot de passe se montre, puis se cache', (tester) async {
+    final controleur = TextEditingController();
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: ChampMotDePasse(controleur: controleur, libelle: 'Mot de passe')),
+    ));
+    expect(find.byTooltip('Afficher le mot de passe'), findsOneWidget);
+    await tester.tap(find.byTooltip('Afficher le mot de passe'));
+    await tester.pump();
+    expect(find.byTooltip('Masquer le mot de passe'), findsOneWidget);
+    expect(find.byTooltip('Afficher le mot de passe'), findsNothing);
+    controleur.dispose();
+  });
+
   test('Mon compte se lit tel que le serveur l ecrit', () {
     final lu = MonCompte.depuisJson({
       'jeSuisEmployeur': true,

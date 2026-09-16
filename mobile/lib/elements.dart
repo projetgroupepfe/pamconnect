@@ -29,7 +29,8 @@ import 'theme.dart';
 //   maison         Icons.home_outlined           menage     Icons.auto_awesome_outlined
 //   enfants        Icons.sentiment_satisfied_outlined
 //   gardien        Icons.shield_outlined         jardin     Icons.eco_outlined
-//   cuisine        Icons.restaurant
+//   cuisine        Icons.restaurant              oeil       Icons.visibility_outlined
+//   oeil-barre     Icons.visibility_off_outlined
 
 /// "Vous avez 3 jetons, dont 3 offerts."
 ///
@@ -547,6 +548,64 @@ class CadreExemple extends StatelessWidget {
 /// Un montant dans un exemple : en orange et en gras, comme ses strong.
 TextSpan montantExemple(String texte) =>
     TextSpan(text: texte, style: const TextStyle(color: Couleurs.orange, fontWeight: FontWeight.w700));
+
+/// Un mot de passe, avec l'oeil qui permet de le relire avant de valider.
+///
+/// MASQUE PAR DEFAUT, comme sur le site : l'afficher reste un geste
+/// volontaire, et le bouton annonce ce qu'il fera.
+class ChampMotDePasse extends StatefulWidget {
+  const ChampMotDePasse({
+    super.key,
+    required this.controleur,
+    required this.libelle,
+    this.aide,
+    this.autofill = const [AutofillHints.password],
+    this.action = TextInputAction.next,
+    this.auValider,
+    this.verifier,
+  });
+
+  final TextEditingController controleur;
+  final String libelle;
+  final String? aide;
+  final List<String> autofill;
+  final TextInputAction action;
+  final void Function(String)? auValider;
+  final String? Function(String?)? verifier;
+
+  @override
+  State<ChampMotDePasse> createState() => _ChampMotDePasseState();
+}
+
+class _ChampMotDePasseState extends State<ChampMotDePasse> {
+  bool _visible = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final libelleBouton = _visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe';
+
+    return TextFormField(
+      controller: widget.controleur,
+      obscureText: !_visible,
+      autocorrect: false,
+      enableSuggestions: false,
+      autofillHints: widget.autofill,
+      textInputAction: widget.action,
+      onFieldSubmitted: widget.auValider,
+      validator: widget.verifier,
+      decoration: InputDecoration(
+        labelText: widget.libelle,
+        helperText: widget.aide,
+        helperMaxLines: 2,
+        suffixIcon: IconButton(
+          onPressed: () => setState(() => _visible = !_visible),
+          icon: Icon(_visible ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+          tooltip: libelleBouton,
+        ),
+      ),
+    );
+  }
+}
 
 /// Des lignes de montants, comme le bloc detail-tarif du site : le meme
 /// cadre au fond clair, les montants en gras et en noir, la commission en

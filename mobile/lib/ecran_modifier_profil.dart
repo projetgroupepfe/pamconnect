@@ -438,17 +438,11 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
           decoration: const InputDecoration(labelText: 'Votre adresse email'),
         ),
         espace,
-        TextField(
-          controller: _motdepasse,
-          obscureText: true,
-          autocorrect: false,
-          enableSuggestions: false,
-          autofillHints: const [AutofillHints.newPassword],
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            labelText: 'Votre mot de passe',
-            helperText: '${formulaire.motDePasseMin} caractères au minimum.',
-          ),
+        ChampMotDePasse(
+          controleur: _motdepasse,
+          libelle: 'Votre mot de passe',
+          aide: '${formulaire.motDePasseMin} caractères au minimum.',
+          autofill: const [AutofillHints.newPassword],
         ),
         espace,
       ],
@@ -832,13 +826,10 @@ class _CarteEmailState extends State<_CarteEmail> {
               ),
             ),
             espace,
-            TextField(
-              controller: _motdepasse,
-              obscureText: true,
-              autocorrect: false,
-              enableSuggestions: false,
-              autofillHints: const [AutofillHints.password],
-              decoration: const InputDecoration(labelText: 'Votre mot de passe'),
+            ChampMotDePasse(
+              controleur: _motdepasse,
+              libelle: 'Votre mot de passe',
+              action: TextInputAction.done,
             ),
             espace,
             if (erreur != null) ...[
@@ -935,26 +926,17 @@ class _CarteMotDePasseState extends State<_CarteMotDePasse> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
-              controller: _ancien,
-              obscureText: true,
-              autocorrect: false,
-              enableSuggestions: false,
-              autofillHints: const [AutofillHints.password],
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(labelText: 'Mot de passe actuel'),
+            ChampMotDePasse(
+              controleur: _ancien,
+              libelle: 'Mot de passe actuel',
             ),
             espace,
-            TextField(
-              controller: _nouveau,
-              obscureText: true,
-              autocorrect: false,
-              enableSuggestions: false,
-              autofillHints: const [AutofillHints.newPassword],
-              decoration: InputDecoration(
-                labelText: 'Nouveau mot de passe',
-                helperText: '${widget.minimum} caractères au minimum.',
-              ),
+            ChampMotDePasse(
+              controleur: _nouveau,
+              libelle: 'Nouveau mot de passe',
+              aide: '${widget.minimum} caractères au minimum.',
+              autofill: const [AutofillHints.newPassword],
+              action: TextInputAction.done,
             ),
             espace,
             if (erreur != null) ...[

@@ -150,7 +150,7 @@ class _EcranRechercherState extends State<EcranRechercher> {
                 textInputAction: TextInputAction.search,
                 onSubmitted: (_) => _lancer(),
                 decoration: const InputDecoration(
-                  labelText: "Qu'est-ce que vous cherchez ?",
+                  labelText: 'Quel métier cherchez-vous ?',
                   hintText: 'ex : ménage, nounou, jardinage...',
                 ),
               ),
@@ -189,17 +189,15 @@ class _EcranRechercherState extends State<EcranRechercher> {
             child: Text.rich(
               const TextSpan(
                 children: [
-                  TextSpan(text: 'Les personnes sont classées selon leur '),
+                  TextSpan(text: "Le classement tient compte de l'"),
                   TextSpan(text: 'identité vérifiée', style: gras),
-                  TextSpan(text: ', leur '),
-                  TextSpan(text: 'moyenne', style: gras),
-                  TextSpan(text: ' et le '),
-                  TextSpan(text: "nombre d'avis", style: gras),
-                  TextSpan(text: ' reçus, les '),
+                  TextSpan(text: ', des '),
+                  TextSpan(text: 'avis', style: gras),
+                  TextSpan(text: ', des '),
                   TextSpan(text: 'services terminés', style: gras),
-                  TextSpan(text: ' sans désaccord, leurs '),
+                  TextSpan(text: ' sans désaccord, des '),
                   TextSpan(text: 'disponibilités', style: gras),
-                  TextSpan(text: ' et la '),
+                  TextSpan(text: ' et de la '),
                   TextSpan(text: 'proximité', style: gras),
                   TextSpan(text: '. Personne ne peut payer pour apparaître en premier.'),
                 ],

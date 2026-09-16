@@ -5,7 +5,7 @@
   <div class="carte">
     <form id="formulaireRecherche" action="/recherche" method="GET">
       <div class="champ">
-        <label for="metier">Qu'est-ce que vous cherchez ?</label>
+        <label for="metier">Quel métier cherchez-vous ?</label>
         <input type="text" id="metier" name="metier"
                placeholder="ex : ménage, nounou, jardinage..."
                value="<%= locals.metierRecherche || "" %>">
@@ -48,17 +48,16 @@
       personne ne peut payer pour monter. %>
   <% if (prestataires.length > 1) { %>
     <p class="aide">
-      Les personnes sont classées selon leur <strong>identité vérifiée</strong>,
-      leur <strong>moyenne</strong> et le <strong>nombre d'avis</strong> reçus,
-      les <strong>services terminés</strong> sans désaccord, leurs
-      <strong>disponibilités</strong> et la <strong>proximité</strong>.
+      Le classement tient compte de l'<strong>identité vérifiée</strong>, des
+      <strong>avis</strong>, des <strong>services terminés</strong> sans désaccord,
+      des <strong>disponibilités</strong> et de la <strong>proximité</strong>.
       Personne ne peut payer pour apparaître en premier.
     </p>
   <% } %>
 
   <% if (prestataires.length === 0) { %>
 
-    <%# ILLUSTRATION 2 sur 3 : un etat vide, pour ne pas laisser
+    <%# ILLUSTRATION 1 sur 2 : un etat vide, pour ne pas laisser
         la personne devant une page blanche. %>
     <div class="vide">
       <svg class="illustration" width="72" height="72" viewBox="0 0 24 24" fill="none"

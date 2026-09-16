@@ -179,8 +179,12 @@ setTimeout(async () => {
 
   console.log(SAUT + "--- LA PAGE DIT CE QUI COMPTE ---");
   // Un classement qu'on n'explique pas est un classement qu'on subit.
+  // La phrase a ete raccourcie : elle dit "des avis" au lieu de "la moyenne
+  // et le nombre d'avis". Ce qui compte pour ce test reste le meme : les
+  // criteres du classement sont nommes sur la page.
   dire("les criteres sont ecrits", page5.includes("identité vérifiée")
-       && page5.includes("nombre d'avis") && page5.includes("services terminés"));
+       && page5.includes("avis") && page5.includes("services terminés")
+       && page5.includes("disponibilités") && page5.includes("proximité"));
   dire("et ce qui n'en fait pas partie",
        page5.includes("Personne ne peut payer pour apparaître en premier"));
   // LE SCORE NE S'AFFICHE PAS : un nombre affiche se compare et finit

@@ -652,13 +652,9 @@ button:hover, .bouton:hover {
   .etapes { grid-template-columns: repeat(3, 1fr); }
   .metiers { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 
-  .accroche { display: grid; grid-template-columns: 1.1fr .9fr; gap: 2.5rem; align-items: center; }
-  .accroche-image { width: 100%; height: auto; }
 }
 
 @media (max-width: 759px) {
-  .accroche-image { display: none; }  /* une illustration de moins a charger */
-
   /* L'EN-TETE DEBORDAIT. Trois blocs se disputaient 375 pixels : le nom,
      le badge de zone et le bouton "Creer un compte". Le badge refuse
      d'aller a la ligne, le bouton garde sa largeur, et le second passait
@@ -778,6 +774,33 @@ button:hover, .bouton:hover {
   color: var(--encre-douce);
 }
 .mention-tarif .icone { color: var(--bleu); }
+
+/* VOIR SON MOT DE PASSE : un oeil pose dans le champ, a droite. Il ne
+   change rien a ce qui est envoye, seulement a ce qui s'affiche. */
+.champ-mdp { position: relative; display: block; }
+.champ-mdp input { padding-right: 3rem; }
+.voir-mdp {
+  position: absolute;
+  right: .35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.2rem;
+  height: 2.2rem;
+  min-height: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: var(--encre-douce);
+  cursor: pointer;
+}
+.voir-mdp:hover { background-color: var(--bleu-clair); color: var(--bleu); border-color: transparent; }
+.voir-mdp .icone + .icone { display: none; }
+.voir-mdp[aria-pressed="true"] .icone:first-child { display: none; }
+.voir-mdp[aria-pressed="true"] .icone + .icone { display: inline-block; }
 
 /* Un champ verrouille : la personne voit son information, mais elle
    ne peut pas la changer. Le fond gris et le curseur barre le disent

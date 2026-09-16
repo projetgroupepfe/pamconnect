@@ -285,14 +285,12 @@ class _EcranConnexionState extends State<EcranConnexion> {
                         : null,
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _motdepasse,
-                    obscureText: true,
-                    autofillHints: const [AutofillHints.password],
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _seConnecter(),
-                    decoration: const InputDecoration(labelText: 'Mot de passe'),
-                    validator: (valeur) =>
+                  ChampMotDePasse(
+                    controleur: _motdepasse,
+                    libelle: 'Mot de passe',
+                    action: TextInputAction.done,
+                    auValider: (_) => _seConnecter(),
+                    verifier: (valeur) =>
                         (valeur == null || valeur.isEmpty) ? 'Indiquez votre mot de passe.' : null,
                   ),
                   const SizedBox(height: 24),
