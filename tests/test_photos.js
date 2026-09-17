@@ -47,9 +47,9 @@ async function poster(chemin, corps, cookie) {
 async function creerCompte(suffixe, role, extra) {
   const mail = (M + "-" + suffixe + "@example.com").toLowerCase();
   await poster("/inscription", form(Object.assign(
-    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", quartier: "Bastos" },
+    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" },
     extra || {})));
-  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123" }));
+  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }));
   base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' WHERE email = ?").run(mail);
   return {
     mail, cookie: c.cookie, nom: "Test " + suffixe,
@@ -153,7 +153,7 @@ setTimeout(async () => {
   dire("elle ouvre celle de l'employeur", (await photo(emp, cookieDe(elle.cookie))).code === 200);
 
   const coAppli = await fetch(RACINE + "/api/connexion", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: emp.mail, motdepasse: "motdepasse123" }) });
+    body: JSON.stringify({ email: emp.mail, motdepasse: "motdepasse123", telephone: "600000000" }) });
   const jeton = (await coAppli.json()).jeton;
   dire("le telephone l'ouvre avec le jeton de la session",
        (await photo(elle, { Authorization: "Bearer " + jeton })).code === 200);
@@ -294,7 +294,7 @@ setTimeout(async () => {
 
   console.log(SAUT + "--- MA PHOTO DEPUIS L'APPLICATION ---");
   const coElle = await fetch(RACINE + "/api/connexion", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: elle.mail, motdepasse: "motdepasse123" }) });
+    body: JSON.stringify({ email: elle.mail, motdepasse: "motdepasse123", telephone: "600000000" }) });
   const jetonElle = { Authorization: "Bearer " + (await coElle.json()).jeton };
   const profilApi = JSON.parse((await lire("/api/mon-profil", jetonElle)).texte);
   dire("le profil de l'application porte la meme carte",
@@ -312,7 +312,7 @@ setTimeout(async () => {
        refusApi.status === 400 && (await refusApi.json()).erreur === "Il faut envoyer une photo de votre visage ET votre pièce d'identité.");
   const jetonPasVerifiee = { Authorization: "Bearer " + (await (await fetch(RACINE + "/api/connexion", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: pasVerifiee.mail, motdepasse: "motdepasse123" }) })).json()).jeton };
+    body: JSON.stringify({ email: pasVerifiee.mail, motdepasse: "motdepasse123", telephone: "600000000" }) })).json()).jeton };
   const fermeApi = await fetch(RACINE + "/api/mon-profil/photo", { headers: jetonPasVerifiee });
   dire("une personne non verifiee : 403, avec le chemin de la verification",
        fermeApi.status === 403 && (await fermeApi.json()).verification === true);

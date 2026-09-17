@@ -58,7 +58,7 @@ async function creerCompte(suffixe, role, extra) {
   await fetch(RACINE + "/inscription", {
     method: "POST",
     body: form(Object.assign(
-      { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", quartier: "Bastos" },
+      { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" },
       extra || {})),
     redirect: "manual",
   });
@@ -74,7 +74,7 @@ setTimeout(async () => {
   const pre = await creerCompte("pre", "prestataire", { metier: "menagere", tarif: "15000" });
 
   console.log(SAUT + "--- SE CONNECTER PAR L'API ---");
-  const bon = await api("/api/connexion", { email: pre.mail, motdepasse: "motdepasse123" });
+  const bon = await api("/api/connexion", { email: pre.mail, motdepasse: "motdepasse123", telephone: "600000000" });
   dire("la connexion repond 200", bon.code === 200, "code " + bon.code);
   dire("et renvoie du JSON", bon.type.includes("application/json"), bon.type);
   dire("elle pose le cookie de session", Boolean(bon.cookie), String(bon.cookie));
@@ -121,13 +121,13 @@ setTimeout(async () => {
   console.log(SAUT + "--- UN COMPTE SUSPENDU L'APPREND ---");
   base.prepare("UPDATE utilisateurs SET suspendu = 1, suspendu_motif = ? WHERE id = ?")
     .run("Essai de la serie", emp.id);
-  const suspendu = await api("/api/connexion", { email: emp.mail, motdepasse: "motdepasse123" });
+  const suspendu = await api("/api/connexion", { email: emp.mail, motdepasse: "motdepasse123", telephone: "600000000" });
   dire("il repond 403, pas 401", suspendu.code === 403, "code " + suspendu.code);
   dire("et le motif est dit", String(suspendu.donnees.erreur).includes("Essai de la serie"));
   base.prepare("UPDATE utilisateurs SET suspendu = 0, suspendu_motif = NULL WHERE id = ?").run(emp.id);
 
   console.log(SAUT + "--- LES DEMANDES, TRIEES COMME SUR LA PAGE ---");
-  const cookieEmp = (await api("/api/connexion", { email: emp.mail, motdepasse: "motdepasse123" })).cookie;
+  const cookieEmp = (await api("/api/connexion", { email: emp.mail, motdepasse: "motdepasse123", telephone: "600000000" })).cookie;
   await fetch(RACINE + "/annonces", {
     method: "POST", headers: { Cookie: cookieEmp }, redirect: "manual",
     body: form({ titre: M + " menage", metier: "menagere", quartier: "Mvan",
@@ -174,7 +174,7 @@ setTimeout(async () => {
     return { code: r.status, type: r.headers.get("content-type") || "", brut, donnees };
   };
 
-  const connexionApp = await api("/api/connexion", { email: pre.mail, motdepasse: "motdepasse123" });
+  const connexionApp = await api("/api/connexion", { email: pre.mail, motdepasse: "motdepasse123", telephone: "600000000" });
   const jeton = connexionApp.donnees && connexionApp.donnees.jeton;
   dire("la connexion rend le jeton a l'application",
        /^[0-9a-f]{64}$/.test(String(jeton)), String(jeton).slice(0, 12));
@@ -221,8 +221,8 @@ setTimeout(async () => {
   // Deux sessions pour la meme personne, une par le site et une par
   // l'application : chacune doit tomber a son premier usage.
   const sanctionnee = await creerCompte("sanction", "prestataire", { metier: "menagere", tarif: "15000" });
-  const sessionSite = await api("/api/connexion", { email: sanctionnee.mail, motdepasse: "motdepasse123" });
-  const sessionApp = await api("/api/connexion", { email: sanctionnee.mail, motdepasse: "motdepasse123" });
+  const sessionSite = await api("/api/connexion", { email: sanctionnee.mail, motdepasse: "motdepasse123", telephone: "600000000" });
+  const sessionApp = await api("/api/connexion", { email: sanctionnee.mail, motdepasse: "motdepasse123", telephone: "600000000" });
   const sonCookie = sessionSite.cookie;
   const sonJeton = sessionApp.donnees.jeton;
   const pageAvec = (ck) => fetch(RACINE + "/mes-reponses", { headers: { Cookie: ck }, redirect: "manual" });
@@ -257,7 +257,7 @@ setTimeout(async () => {
        (await avecJeton("/api/moi", null, sonJeton)).code === 401);
   dire("l'ancien cookie non plus", (await pageAvec(sonCookie)).status === 302);
   dire("mais elle peut se reconnecter",
-       (await api("/api/connexion", { email: sanctionnee.mail, motdepasse: "motdepasse123" })).code === 200);
+       (await api("/api/connexion", { email: sanctionnee.mail, motdepasse: "motdepasse123", telephone: "600000000" })).code === 200);
 
   // LES AUTRES NE SONT PAS TOUCHES.
   dire("un compte non suspendu garde son acces", (await avecJeton("/api/moi", null, jeton)).code === 200);
@@ -297,7 +297,7 @@ setTimeout(async () => {
   // ne doit rien en garder.
   const parApp = await api("/api/inscription", {
     role: "employeur", nom: "  Test insc emp  ", email: " " + adresse("emp").toUpperCase() + " ",
-    motdepasse: "motdepasse123", quartier: "Bastos", metier: "menagere", tarif: "15000",
+    motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos", metier: "menagere", tarif: "15000",
     date_naissance: "1995-06-15", experience_annees: "4", disponibilites: deuxCreneaux,
   });
   const ligneEmp = ligneDe(adresse("emp"));
@@ -310,10 +310,10 @@ setTimeout(async () => {
        ligneEmp.metier === null && ligneEmp.tarif === null && ligneEmp.date_naissance === null &&
        ligneEmp.experience_annees === null && ligneEmp.disponibilites === null);
   dire("il se connecte aussitot",
-       (await api("/api/connexion", { email: adresse("emp"), motdepasse: "motdepasse123" })).code === 200);
+       (await api("/api/connexion", { email: adresse("emp"), motdepasse: "motdepasse123", telephone: "600000000" })).code === 200);
 
   const personneApp = await api("/api/inscription", {
-    role: "prestataire", nom: "Test insc pre", email: adresse("pre"), motdepasse: "motdepasse123",
+    role: "prestataire", nom: "Test insc pre", email: adresse("pre"), motdepasse: "motdepasse123", telephone: "600000000",
     quartier: "Bastos", metier: "menagere", tarif: 15000, date_naissance: "1995-06-15",
     experience_annees: "4", disponibilites: deuxCreneaux,
   });
@@ -325,14 +325,14 @@ setTimeout(async () => {
        deuxCreneaux.every((c) => String(lignePre.disponibilites).split("|").includes(c)), personneApp.brut);
 
   const essai = (s, extra) => api("/api/inscription", Object.assign(
-    { role: "employeur", nom: "Test insc " + s, email: adresse(s), motdepasse: "motdepasse123" }, extra));
+    { role: "employeur", nom: "Test insc " + s, email: adresse(s), motdepasse: "motdepasse123", telephone: "600000000" }, extra));
   const erreur = (r) => (r.donnees && r.donnees.erreur) || "";
   const sansRole = await essai("role", { role: "equipe" });
   const sansNom = await essai("nom", { nom: "   " });
   const sansArobase = await essai("mail", { email: M + "-insc-mail.example.com" });
   const court = await essai("court", { motdepasse: "12345" });
   const doublon = await essai("emp", { motdepasse: "x" });
-  const sansMetier = await essai("metier", { role: "prestataire", tarif: "15000" });
+  const sansMetier = await essai("metier", { role: "prestataire", telephone: "600000000", tarif: "15000" });
   const pasDuTexte = await essai("objet", { nom: { texte: "x" } });
   dire("un role hors de la liste est refuse", sansRole.code === 400 && erreur(sansRole).startsWith("Indiquez si"));
   dire("un nom fait d'espaces est refuse", sansNom.code === 400 && erreur(sansNom) === "Indiquez votre nom complet.");
@@ -351,7 +351,7 @@ setTimeout(async () => {
     const r = await fetch(RACINE + "/inscription", {
       method: "POST", redirect: "manual",
       body: form(Object.assign({ role: "employeur", nom: "Test insc " + s, email: adresse(s),
-                                 motdepasse: "motdepasse123" }, extra)),
+                                 motdepasse: "motdepasse123", telephone: "600000000" }, extra)),
     });
     return { code: r.status, corps: await r.text() };
   };

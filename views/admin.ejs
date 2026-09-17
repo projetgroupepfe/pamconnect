@@ -56,6 +56,11 @@
               doit savoir qui elle regarde. %>
           <strong><%= dossier.role === "employeur" ? "Employeur" : dossier.metier %></strong><br>
           <%= dossier.email %><br>
+          <%# L'equipe appelle : le numero est sous ses yeux, et le lien
+              compose directement depuis un telephone. %>
+          <% if (dossier.telephone) { %>
+            <a href="tel:+237<%= dossier.telephone %>"><%= dossier.telephone %></a><br>
+          <% } %>
           <%= dossier.arrondissement %><%= dossier.quartier ? ", " + dossier.quartier : "" %>
         </p>
 

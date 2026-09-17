@@ -31,6 +31,15 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
   email           TEXT    NOT NULL UNIQUE,
 
   motdepasse      TEXT    NOT NULL,
+
+  -- Le numero qui permet a l'equipe d'appeler. Neuf chiffres, sans
+  -- espaces ni indicatif : deux ecritures du meme numero feraient sinon
+  -- deux numeros differents.
+  --
+  -- IL N'APPARAIT SUR AUCUNE FICHE PUBLIQUE : seule l'equipe le voit, et
+  -- c'est par lui qu'elle met un employeur et un prestataire en relation.
+  telephone       TEXT,
+
   arrondissement  TEXT,
   quartier        TEXT,
 

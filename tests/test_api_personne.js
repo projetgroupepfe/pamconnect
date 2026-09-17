@@ -39,12 +39,12 @@ async function poster(chemin, corps, cookie) {
 async function creerCompte(suffixe, role, extra, verifier) {
   const mail = (M + "-" + suffixe + "@example.com").toLowerCase();
   await poster("/inscription", form(Object.assign(
-    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", quartier: "Bastos" },
+    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" },
     extra || {})));
   if (verifier !== false) {
     base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' WHERE email = ?").run(mail);
   }
-  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123" }));
+  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }));
   const id = base.prepare("SELECT id FROM utilisateurs WHERE email = ?").get(mail).id;
   return { mail, id, cookie: c.cookie };
 }
@@ -95,7 +95,7 @@ setTimeout(async () => {
   const retiree = nouvelleDemande("retiree", true);
   const seconde = nouvelleDemande("seconde", false);
 
-  const jetonElle = (await json("/api/connexion", { email: elle.mail, motdepasse: "motdepasse123" })).donnees.jeton;
+  const jetonElle = (await json("/api/connexion", { email: elle.mail, motdepasse: "motdepasse123", telephone: "600000000" })).donnees.jeton;
   const parJeton = { Authorization: "Bearer " + jetonElle };
   const ecranApi = (id, entetes) => json("/api/demandes/" + id + "/reponse", undefined, entetes);
   const repondre = (id, entetes) => json("/api/demandes/" + id + "/reponse", {}, entetes);

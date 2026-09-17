@@ -30,9 +30,9 @@ async function poster(chemin, corps, cookie) {
 async function creerCompte(suffixe, role, extra) {
   const mail = M + "-" + suffixe + "@example.com";
   await poster("/inscription", form(Object.assign(
-    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", quartier: "Bastos" },
+    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" },
     extra || {})));
-  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123" }));
+  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }));
 
   // Publier exige une identite verifiee. Ce n'est pas le sujet de cette
   // serie : on la donne ici, a la creation, plutot qu'en une ligne posee

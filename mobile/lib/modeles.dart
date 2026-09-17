@@ -1368,6 +1368,8 @@ class MonProfil {
   const MonProfil({
     required this.nom,
     required this.fonction,
+    this.telephone,
+    this.telephoneAAjouter,
     required this.email,
     required this.badges,
     required this.disponibilites,
@@ -1388,6 +1390,8 @@ class MonProfil {
   factory MonProfil.depuisJson(Map<String, dynamic> json) => MonProfil(
         nom: _lire<String>(json, 'nom'),
         fonction: _lire<String>(json, 'fonction'),
+        telephone: _lireFacultatif<String>(json, 'telephone'),
+        telephoneAAjouter: _lireFacultatif<String>(json, 'telephoneAAjouter'),
         email: _lire<String>(json, 'email'),
         badges: _lireListe(json, 'badges', BadgeDuProfil.depuisJson),
         disponibilites: _lireListe(json, 'disponibilites', Creneau.depuisJson),
@@ -1409,6 +1413,13 @@ class MonProfil {
 
   /// "Employeur", ou le metier de la personne qui repond.
   final String fonction;
+
+  /// LE NUMERO NE SE MONTRE QU'ICI : c'est son propre profil. Aucune fiche
+  /// publique ne le porte, seule l'equipe le voit ailleurs.
+  final String? telephone;
+
+  /// La phrase a afficher a un compte cree avant ce champ.
+  final String? telephoneAAjouter;
   final String email;
   final List<BadgeDuProfil> badges;
   final List<Creneau> disponibilites;
@@ -1634,6 +1645,7 @@ class AnneesNaissance {
 class FormulaireProfil {
   const FormulaireProfil({
     required this.nom,
+    required this.telephone,
     required this.quartier,
     required this.quartiers,
     required this.arrondissements,
@@ -1655,6 +1667,7 @@ class FormulaireProfil {
   factory FormulaireProfil.depuisJson(Map<String, dynamic> json) {
     final formulaire = FormulaireProfil(
       nom: _lire<String>(json, 'nom'),
+      telephone: _lire<String>(json, 'telephone'),
       quartier: _lire<String>(json, 'quartier'),
       quartiers: _lireTextes(json, 'quartiers'),
       arrondissements: _lireTextes(json, 'arrondissements'),
@@ -1681,6 +1694,10 @@ class FormulaireProfil {
   }
 
   final String nom;
+
+  /// Le numero par lequel l'equipe appelle. Vide pour un compte cree avant
+  /// ce champ : l'ecran le demande alors.
+  final String telephone;
   final String quartier;
   final List<String> quartiers;
   final List<String> arrondissements;

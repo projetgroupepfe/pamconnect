@@ -45,7 +45,7 @@ setTimeout(async () => {
   const mail = M + "@example.com";
 
   await poster("/inscription", formulaire({
-    role: "prestataire", nom: "Verif Test", email: mail, motdepasse: mdp,
+    role: "prestataire", telephone: "600000000", nom: "Verif Test", email: mail, motdepasse: mdp,
     arrondissement: "Yaounde 1", metier: "MetierVerif", tarif: "10000",
   }));
   const connexion = await poster("/connexion", formulaire({ email: mail, motdepasse: mdp }));
@@ -145,7 +145,7 @@ setTimeout(async () => {
   console.log("\n--- 5. Un employeur ne peut pas envoyer de documents ---");
   const mailEmp = M + "-emp@example.com";
   await poster("/inscription", formulaire({
-    role: "employeur", nom: "Emp", email: mailEmp, motdepasse: mdp, arrondissement: "Yaounde 1",
+    role: "employeur", telephone: "600000000", nom: "Emp", email: mailEmp, motdepasse: mdp, arrondissement: "Yaounde 1",
   }));
   const coEmp = await poster("/connexion", formulaire({ email: mailEmp, motdepasse: mdp }));
   const rEmp = await fetch(RACINE + "/verification", { headers: { Cookie: coEmp.cookie.split(";")[0] } });
@@ -240,7 +240,7 @@ setTimeout(async () => {
 
   const mailEq = M + "-eq@example.com";
   await poster("/inscription", formulaire({
-    role: "employeur", nom: "Equipe Test", email: mailEq, motdepasse: mdp, quartier: "Bastos",
+    role: "employeur", telephone: "600000000", nom: "Equipe Test", email: mailEq, motdepasse: mdp, quartier: "Bastos",
   }));
   const coEq = await poster("/connexion", formulaire({ email: mailEq, motdepasse: mdp }));
   const cEq = coEq.cookie.split(";")[0];

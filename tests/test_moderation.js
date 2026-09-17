@@ -30,9 +30,9 @@ async function poster(chemin, corps, cookie) {
 async function creerCompte(suffixe, role, extra) {
   const mail = M + "-" + suffixe + "@example.com";
   await poster("/inscription", form(Object.assign(
-    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", quartier: "Bastos" },
+    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" },
     extra || {})));
-  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123" }));
+  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }));
 
   // A LA CREATION, pas en une ligne posee plus haut : un compte cree au
   // milieu de la serie ne serait pas couvert, et il ne pourrait ni
@@ -128,7 +128,7 @@ setTimeout(async () => {
   dire("et elle y lit le motif",
        (await clicSuivant.text()).includes("tentative de paiement hors plateforme"));
 
-  const tentative = await poster("/connexion", form({ email: pre.mail, motdepasse: "motdepasse123" }));
+  const tentative = await poster("/connexion", form({ email: pre.mail, motdepasse: "motdepasse123", telephone: "600000000" }));
   dire("la connexion est refusee", tentative.code === 403, "code " + tentative.code);
   dire("la personne sait pourquoi", tentative.corps.includes("tentative de paiement hors plateforme"));
   dire("on ne lui dit pas 'mot de passe incorrect'",
@@ -158,7 +158,7 @@ setTimeout(async () => {
   base.prepare("UPDATE utilisateurs SET suspendu = 0, suspendu_motif = NULL WHERE email = ?").run(pre.mail);
   dire("sanction levee, l'ancienne session ne revient pas",
        (await lire("/mes-reponses", pre.cookie)).status === 302);
-  const preReconnectee = await poster("/connexion", form({ email: pre.mail, motdepasse: "motdepasse123" }));
+  const preReconnectee = await poster("/connexion", form({ email: pre.mail, motdepasse: "motdepasse123", telephone: "600000000" }));
   dire("elle se reconnecte", preReconnectee.code === 200 && Boolean(preReconnectee.cookie),
        "code " + preReconnectee.code);
   await poster("/messages/" + msg2.id + "/signaler", form({ candidatureId: String(conv.id) }), preReconnectee.cookie);
@@ -209,7 +209,7 @@ setTimeout(async () => {
   // Une connexion reussie REND une page d'accueil, elle ne redirige pas.
   // Un compte suspendu, lui, recoit 403 "Compte suspendu".
   const reconnexion = await poster("/connexion",
-    form({ email: pre2.mail, motdepasse: "motdepasse123" }));
+    form({ email: pre2.mail, motdepasse: "motdepasse123", telephone: "600000000" }));
   dire("la personne peut toujours se connecter",
        reconnexion.code === 200 && reconnexion.corps.includes("Bienvenue"),
        "code " + reconnexion.code);

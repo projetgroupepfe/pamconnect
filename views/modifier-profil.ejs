@@ -12,6 +12,16 @@
                  autocomplete="name" required>
         </div>
 
+        <%# C'est par cet ecran qu'un compte cree avant ce champ renseigne
+            son numero. %>
+        <div class="champ">
+          <label for="telephone">Votre numéro de téléphone</label>
+          <input type="tel" id="telephone" name="telephone" autocomplete="tel"
+                 inputmode="tel" placeholder="6XX XX XX XX"
+                 value="<%= utilisateur.telephone || '' %>" required>
+          <span class="aide">Ce numéro sert à l'équipe PamConnect pour vous appeler. Il n'est jamais montré aux autres utilisateurs.</span>
+        </div>
+
         <%# Arrondissement et quartier servent a se rencontrer. Un compte
             d'equipe ne rencontre personne : ces deux champs ne lui sont
             pas demandes. %>

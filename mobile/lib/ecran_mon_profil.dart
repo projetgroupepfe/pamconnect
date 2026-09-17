@@ -365,6 +365,19 @@ class _EcranMonProfilState extends State<EcranMonProfil> {
               ],
               if (lieu != null) LigneDetail(icone: Icons.place_outlined, texte: lieu),
               LigneDetail(icone: Icons.mail_outline, texte: profil.email),
+              // Le numero ne se montre qu'ici : c'est son propre profil.
+              if (profil.telephone != null) ...[
+                LigneDetail(icone: Icons.phone_outlined, texte: profil.telephone!),
+                Padding(
+                  padding: const EdgeInsets.only(left: 32),
+                  child: Text("visible par l'équipe PamConnect seulement", style: aide),
+                ),
+              ],
+              if (profil.telephoneAAjouter != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(profil.telephoneAAjouter!, style: aide),
+                ),
               // Les badges ne disent QUE ce que la plateforme a verifie ou ce
               // que la personne a declare.
               if (profil.badges.isNotEmpty) ...[

@@ -23,9 +23,9 @@ async function inscrire(suffixe, metier) {
   const mail = M + "-" + suffixe + "@example.com";
   await fetch(RACINE + "/inscription", { method: "POST", body: form({
     role: "prestataire", nom: "Test " + suffixe, email: mail,
-    motdepasse: "motdepasse123", quartier: "Bastos", metier, tarif: "10000" }) });
+    motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos", metier, tarif: "10000" }) });
   const r = await fetch(RACINE + "/connexion", { method: "POST", redirect: "manual",
-    body: form({ email: mail, motdepasse: "motdepasse123" }) });
+    body: form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }) });
   return { mail, cookie: r.headers.getSetCookie()[0].split(";")[0] };
 }
 
@@ -68,9 +68,9 @@ setTimeout(async () => {
   const emp = await (async () => {
     const mail = M + "-emp@example.com";
     await fetch(RACINE + "/inscription", { method: "POST", body: form({
-      role: "employeur", nom: "Emp", email: mail, motdepasse: "motdepasse123", quartier: "Bastos" }) });
+      role: "employeur", nom: "Emp", email: mail, motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" }) });
     const r = await fetch(RACINE + "/connexion", { method: "POST", redirect: "manual",
-      body: form({ email: mail, motdepasse: "motdepasse123" }) });
+      body: form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }) });
     return { mail, cookie: r.headers.getSetCookie()[0].split(";")[0] };
   })();
 

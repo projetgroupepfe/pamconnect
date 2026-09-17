@@ -74,7 +74,7 @@ setTimeout(async () => {
   const preMail = MARQUE + "-prestataire@example.com";
   const insc1 = await requete("/inscription", { method: "POST",
     body: form({ role: "employeur", nom: "Employeur Test", email: empMail,
-                 motdepasse: "motdepasse123", arrondissement: "Yaounde 3", quartier: "Bastos" }) });
+                 motdepasse: "motdepasse123", telephone: "600000000", arrondissement: "Yaounde 3", quartier: "Bastos" }) });
   v("inscription employeur acceptee", insc1.code === 200 && insc1.corps.includes("Merci"), "code " + insc1.code);
   v("le charset est bien pose (accents)", (insc1.entetes["content-type"] || "").includes("utf-8"), insc1.entetes["content-type"]);
   // Ce test verifie l'ENCODAGE, pas la formulation : des accents lisibles
@@ -82,20 +82,20 @@ setTimeout(async () => {
   v("les accents passent", /[éèêàçôû]/.test(insc1.corps) && !insc1.corps.includes("Ã"));
 
   const insc2 = await requete("/inscription", { method: "POST",
-    body: form({ role: "employeur", nom: "Doublon", email: empMail.toUpperCase(),
+    body: form({ role: "employeur", telephone: "600000000", nom: "Doublon", email: empMail.toUpperCase(),
                  motdepasse: "x", arrondissement: "Yaounde 1" }) });
   v("email en double refuse (409)", insc2.code === 409, "code " + insc2.code);
 
   const inscXss = await requete("/inscription", { method: "POST",
     body: form({ role: "prestataire", nom: "<script>alert(1)</script>", email: preMail,
-                 motdepasse: "motdepasse123", arrondissement: "Yaounde 5",
+                 motdepasse: "motdepasse123", telephone: "600000000", arrondissement: "Yaounde 5",
                  metier: "Menage", tarif: "5000" }) });
   v("inscription prestataire acceptee", inscXss.code === 200);
   v("XSS toujours neutralise", inscXss.corps.includes("&lt;script&gt;") && !inscXss.corps.includes("<script>alert(1)</script>"));
 
   console.log("\n--- PARTIE 3 : ancien code (pas encore migre) ---");
   const coEmp = await requete("/connexion", { method: "POST",
-    body: form({ email: empMail, motdepasse: "motdepasse123" }) });
+    body: form({ email: empMail, motdepasse: "motdepasse123", telephone: "600000000" }) });
   v("connexion employeur reussie", coEmp.code === 200 && coEmp.corps.includes("Bienvenue"), "code " + coEmp.code);
   v("un cookie de session est bien pose", !!coEmp.cookie, String(coEmp.cookie));
   const cookieEmp = coEmp.cookie;
@@ -108,7 +108,7 @@ setTimeout(async () => {
 
 
   const coMaj = await requete("/connexion", { method: "POST",
-    body: form({ email: empMail.toUpperCase(), motdepasse: "motdepasse123" }) });
+    body: form({ email: empMail.toUpperCase(), motdepasse: "motdepasse123", telephone: "600000000" }) });
   v("connexion insensible aux majuscules", coMaj.corps.includes("Bienvenue"));
 
   const profil1 = await requete("/mon-profil", { cookie: cookieEmp });
@@ -143,7 +143,7 @@ setTimeout(async () => {
   v("visiteur non connecte : invite a se connecter", liste.corps.includes("Connectez-vous"));
 
   const coPre = await requete("/connexion", { method: "POST",
-    body: form({ email: preMail, motdepasse: "motdepasse123" }) });
+    body: form({ email: preMail, motdepasse: "motdepasse123", telephone: "600000000" }) });
   const cookiePre = coPre.cookie;
   v("connexion prestataire reussie", !!cookiePre);
 

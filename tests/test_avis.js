@@ -40,9 +40,9 @@ async function poster(chemin, corps, cookie) {
 async function creerCompte(suffixe, role, extra) {
   const mail = (M + "-" + suffixe + "@example.com").toLowerCase();
   await poster("/inscription", form(Object.assign(
-    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", quartier: "Bastos" },
+    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" },
     extra || {})));
-  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123" }));
+  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }));
   base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' WHERE email = ?").run(mail);
   return {
     mail, cookie: c.cookie,

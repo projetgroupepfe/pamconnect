@@ -34,9 +34,9 @@ async function poster(chemin, corps, cookie) {
 async function creerCompte(suffixe, role, extra) {
   const mail = M + "-" + suffixe + "@example.com";
   await poster("/inscription", form(Object.assign(
-    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", quartier: "Bastos" },
+    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" },
     extra || {})));
-  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123" }));
+  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }));
   return { mail, cookie: c.cookie };
 }
 

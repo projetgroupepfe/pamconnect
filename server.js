@@ -112,6 +112,7 @@ ajouterColonneSiAbsente("annonces", "conditions", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "date_naissance", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "experience_annees", "INTEGER");
 ajouterColonneSiAbsente("utilisateurs", "disponibilites", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "telephone", "TEXT");
 ajouterColonneSiAbsente("messages", "signalement_decision", "TEXT");
 ajouterColonneSiAbsente("messages", "signalement_traite_par", "INTEGER");
 ajouterColonneSiAbsente("messages", "signalement_traite_le", "TEXT");
@@ -293,10 +294,10 @@ const requetes = {
 
   creerUtilisateur: db.prepare(`
     INSERT INTO utilisateurs
-      (role, nom, email, motdepasse, arrondissement, quartier, metier, tarif,
+      (role, nom, email, telephone, motdepasse, arrondissement, quartier, metier, tarif,
        latitude, longitude, date_naissance, experience_annees, disponibilites)
     VALUES
-      (@role, @nom, @email, @motdepasse, @arrondissement, @quartier, @metier, @tarif,
+      (@role, @nom, @email, @telephone, @motdepasse, @arrondissement, @quartier, @metier, @tarif,
        @latitude, @longitude, @date_naissance, @experience_annees, @disponibilites)
   `),
 
@@ -1139,6 +1140,7 @@ const requetes = {
   majProfil: db.prepare(`
     UPDATE utilisateurs
     SET nom = @nom,
+        telephone = @telephone,
         arrondissement = @arrondissement,
         quartier = @quartier,
         metier = @metier,
@@ -1174,7 +1176,7 @@ const requetes = {
   `),
 
   dossiersEnAttente: db.prepare(`
-    SELECT id, nom, email, role, metier, arrondissement, quartier,
+    SELECT id, nom, email, telephone, role, metier, arrondissement, quartier,
            documents_envoyes_le,
            -- Un dossier envoye avant la photo n'en a pas : l'ecran ne
            -- propose alors pas de l'ouvrir.
@@ -3148,6 +3150,53 @@ function adresseEmailValide(email) {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
 }
 
+// LE NUMERO DE TELEPHONE, ecrit comme chacun l'ecrit : avec des espaces,
+// des points, ou precede de +237. On ne garde que les chiffres, et on
+// retire l'indicatif du pays : "+237 6XX XX XX XX" et "6XXXXXXXX" sont le
+// meme numero, et deux ecritures ne doivent pas faire deux numeros.
+//
+// Au Cameroun, un numero tient en NEUF chiffres : les mobiles commencent
+// par 6, les fixes par 2. Renvoie null si ce n'en est pas un.
+function normaliserTelephone(valeur) {
+  let chiffres = String(valeur || "").replace(/[^0-9]/g, "");
+
+  // L'indicatif n'est retire que s'il en reste bien neuf chiffres : un
+  // fixe peut lui-meme commencer par 237.
+  if (chiffres.length === 12 && chiffres.startsWith("237")) chiffres = chiffres.slice(3);
+
+  return /^[26][0-9]{8}$/.test(chiffres) ? chiffres : null;
+}
+
+// Le meme numero, lisible : 6XX XX XX XX.
+function formaterTelephone(numero) {
+  const chiffres = String(numero || "");
+  if (chiffres.length !== 9) return chiffres;
+  return `${chiffres.slice(0, 3)} ${chiffres.slice(3, 5)} ${chiffres.slice(5, 7)} ${chiffres.slice(7)}`;
+}
+
+// Les memes deux phrases a l'inscription et dans Modifier mon profil.
+const TELEPHONE_VIDE = {
+  titre: "Numéro de téléphone obligatoire",
+  texte: "Le numéro de téléphone est obligatoire : c'est par là que l'équipe vous joint.",
+};
+const TELEPHONE_INVALIDE = {
+  titre: "Numéro invalide",
+  texte: "Ce numéro ne ressemble pas à un numéro camerounais. Écrivez-le en neuf chiffres, " +
+         "par exemple sous la forme 6XX XX XX XX.",
+};
+
+// Le numero saisi, ou le probleme a afficher. Ecrit UNE SEULE FOIS pour
+// l'inscription, Modifier mon profil, le site et l'application.
+function lireTelephone(donnees) {
+  const saisi = String(donnees.telephone || "").trim();
+  if (!saisi) return { probleme: TELEPHONE_VIDE };
+
+  const numero = normaliserTelephone(saisi);
+  if (!numero) return { probleme: TELEPHONE_INVALIDE };
+
+  return { numero };
+}
+
 // Le formulaire vide : les listes de Modifier mon profil, le choix du
 // role et l'exemple. Les champs de la personne qui repond sont prepares :
 // ils s'affichent des que ce role est choisi, comme sur le site.
@@ -3192,6 +3241,11 @@ function inscrire(donnees) {
   };
   if (requetes.utilisateurParEmail.get(email)) return dejaUtilisee;
 
+  // L'EQUIPE APPELLE : sans numero, une inscription ne sert a rien. Il est
+  // demande aux deux roles, et ne sortira jamais de l'espace de l'equipe.
+  const telephone = lireTelephone(donnees);
+  if (telephone.probleme) return refus(400, telephone.probleme.titre, telephone.probleme.texte);
+
   // La meme longueur que pour changer de mot de passe. Avant, seul le
   // changement l'exigeait : un compte pouvait naitre avec "1".
   const motdepasse = String(donnees.motdepasse || "");
@@ -3221,6 +3275,7 @@ function inscrire(donnees) {
       role: role.valeur,
       nom,
       email,
+      telephone: telephone.numero,
       motdepasse: hacherMotDePasse(motdepasse),
       arrondissement: lieu.arrondissement,
       quartier: lieu.quartier,
@@ -3388,6 +3443,14 @@ function monProfil(u) {
 
   return {
     nom: u.nom,
+    // LE NUMERO NE SORT PAS D'ICI : il apparait sur son propre profil et
+    // dans l'espace de l'equipe, jamais sur une fiche publique.
+    telephone: u.telephone ? formaterTelephone(u.telephone) : null,
+    // Un compte cree avant ce champ n'a pas encore de numero : on le lui
+    // demande sans lui fermer la plateforme.
+    telephoneAAjouter: u.telephone
+      ? null
+      : "Ajoutez votre numéro de téléphone pour que l'équipe puisse vous joindre.",
     // Un message de l'equipe n'est PAS une sanction ; un avertissement,
     // si. Chacun reste affiche tant que la personne ne l'a pas lu.
     messageEquipe: u.message_equipe && !u.message_equipe_lu
@@ -3623,6 +3686,7 @@ function formulaireMonProfil(u) {
 
   return {
     nom: u.nom,
+    telephone: u.telephone ? formaterTelephone(u.telephone) : "",
     quartier: u.quartier || "",
     arrondissement: u.arrondissement || null,
     quartiers: quartiers.map((q) => q.nom),
@@ -3674,12 +3738,20 @@ function enregistrerMonProfil(moi, donnees) {
     if (probleme) return { probleme: { code: 400, ...probleme, lien: retour } };
   }
 
+  // Le numero est demande ici aussi : c'est par cet ecran qu'un compte
+  // cree avant son existence le renseigne.
+  const telephone = lireTelephone(donnees);
+  if (telephone.probleme) {
+    return { probleme: { code: 400, ...telephone.probleme, lien: retour } };
+  }
+
   const lieu = resoudreLieu(donnees);
   const experience = String(donnees.experience_annees ?? "").trim();
 
   requetes.majProfil.run({
     id: moi.id,
     nom: String(donnees.nom).trim(),
+    telephone: telephone.numero,
     // Un compte d'equipe ne rend visite a personne : son arrondissement
     // et son quartier ne servent a rien, on ne les lui demande pas et on
     // ne les conserve pas. Une donnee inutile est une donnee de trop.

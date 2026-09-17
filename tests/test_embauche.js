@@ -35,10 +35,10 @@ function photoJpeg(nom, octets) {
 
 async function creerCompte(mail, role, extra) {
   await poster("/inscription", form(Object.assign(
-    { role, nom: mail.split("@")[0], email: mail, motdepasse: "motdepasse123",
+    { role, nom: mail.split("@")[0], email: mail, motdepasse: "motdepasse123", telephone: "600000000",
       arrondissement: "Yaounde 1", tarif: role === "prestataire" ? "10000" : "" },
     extra || {})));
-  return (await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123" }))).cookie;
+  return (await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }))).cookie;
 }
 
 setTimeout(async () => {

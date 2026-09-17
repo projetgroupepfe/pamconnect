@@ -27,10 +27,10 @@ const lire = (chemin, cookie) =>
 async function creerCompte(suffixe, role, extra) {
   const mail = M + "-" + suffixe + "@example.com";
   await fetch(RACINE + "/inscription", { method: "POST", body: form(Object.assign(
-    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", quartier: "Bastos" },
+    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" },
     extra || {})) });
   const r = await fetch(RACINE + "/connexion", { method: "POST", redirect: "manual",
-    body: form({ email: mail, motdepasse: "motdepasse123" }) });
+    body: form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }) });
   return { mail, cookie: r.headers.getSetCookie()[0].split(";")[0] };
 }
 

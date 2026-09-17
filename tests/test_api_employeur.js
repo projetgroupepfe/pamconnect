@@ -39,10 +39,10 @@ async function poster(chemin, corps, cookie) {
 async function creerCompte(suffixe, role, extra) {
   const mail = (M + "-" + suffixe + "@example.com").toLowerCase();
   await poster("/inscription", form(Object.assign(
-    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", quartier: "Bastos" },
+    { role, nom: "Test " + suffixe, email: mail, motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" },
     extra || {})));
   base.prepare("UPDATE utilisateurs SET statut_verification = 'verifie' WHERE email = ?").run(mail);
-  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123" }));
+  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }));
   const id = base.prepare("SELECT id FROM utilisateurs WHERE email = ?").get(mail).id;
   return { mail, id, cookie: c.cookie };
 }
@@ -161,7 +161,7 @@ setTimeout(async () => {
        !choisie.peutChoisir && !choisie.peutRefuser && !ecartee.peutChoisir && !ecartee.peutRefuser);
 
   console.log(SAUT + "--- LES LIENS MENENT A MES DEMANDES ---");
-  const reconnexion = await poster("/connexion", form({ email: emp.mail, motdepasse: "motdepasse123" }));
+  const reconnexion = await poster("/connexion", form({ email: emp.mail, motdepasse: "motdepasse123", telephone: "600000000" }));
   dire("apres la connexion, l'employeur est envoye sur ses demandes",
        reconnexion.corps.includes("Voir mes demandes") && !reconnexion.corps.includes("Voir mon profil"));
   const formulaireWeb = await (await lire("/publier-annonce", emp.cookie)).text();
@@ -197,8 +197,8 @@ setTimeout(async () => {
 
   const mailNonVerifie = M + "-nonverifie@example.com";
   await poster("/inscription", form({ role: "employeur", nom: "Test nonverifie", email: mailNonVerifie,
-                                      motdepasse: "motdepasse123", quartier: "Bastos" }));
-  const nonVerifie = await poster("/connexion", form({ email: mailNonVerifie, motdepasse: "motdepasse123" }));
+                                      motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" }));
+  const nonVerifie = await poster("/connexion", form({ email: mailNonVerifie, motdepasse: "motdepasse123", telephone: "600000000" }));
   const formNonVerifie = await json("/api/formulaire-demande", undefined, cookieDe(nonVerifie.cookie));
   dire("un employeur non verifie lit la meme raison que sur le site",
        formNonVerifie.code === 403 && erreurDe(formNonVerifie).startsWith("Avant de publier une demande"),
@@ -261,7 +261,7 @@ setTimeout(async () => {
        parPreWeb.code === 403 && compter(M + " forcee") === 0, "code " + parPreWeb.code);
 
   console.log(SAUT + "--- PUBLIER : LA MEME DEMANDE DES DEUX COTES ---");
-  const coAppli = await json("/api/connexion", { email: emp.mail, motdepasse: "motdepasse123" });
+  const coAppli = await json("/api/connexion", { email: emp.mail, motdepasse: "motdepasse123", telephone: "600000000" });
   const jeton = coAppli.donnees && coAppli.donnees.jeton;
   const publiee = await json("/api/demandes", complet(M + " appli"), { Authorization: "Bearer " + jeton });
   dire("publiee depuis l'application, avec le jeton : 201",
@@ -939,7 +939,7 @@ setTimeout(async () => {
   dire("un objet a la place du nom : 400",
        (await enregistrerProfil({ nom: { faux: true } }, cookieDe(emp.cookie))).code === 400);
   const arrondissementBastos = base.prepare("SELECT arrondissement FROM quartiers WHERE nom = 'Bastos'").get().arrondissement;
-  const enrEmp = await enregistrerProfil({ nom: "Test emp", quartier: "bastos", arrondissement: "",
+  const enrEmp = await enregistrerProfil({ nom: "Test emp", telephone: "600000000", quartier: "bastos", arrondissement: "",
                                            metier: "Ménage à domicile", tarif: "5000" },
                                          { Authorization: "Bearer " + jeton });
   const apresEmp = ligneDe(emp.id);
@@ -954,7 +954,7 @@ setTimeout(async () => {
        formulairePre.code === 200 && formulairePreDonnees.pourPersonne === true && formulairePreDonnees.metier === metierEnBase && formulairePreDonnees.tarif === "15000" &&
        formulairePreDonnees.jours.length === 7 && formulairePreDonnees.jours.every((j) => j.creneaux.length === formulairePreDonnees.moments.length) &&
        formulairePreDonnees.anneesNaissance.a - formulairePreDonnees.anneesNaissance.de === 102, formulairePre.brut.slice(0, 300));
-  const profilDeBase = { nom: "Test verifiee", quartier: "Bastos", metier: metierEnBase, tarif: "15000" };
+  const profilDeBase = { nom: "Test verifiee", telephone: "600000000", quartier: "Bastos", metier: metierEnBase, tarif: "15000" };
   const avecChamp = (champs) => Object.assign({}, profilDeBase, champs);
   const tranche = await enregistrerProfil(avecChamp({ tarif: "15250" }), cookieDe(verifiee.cookie));
   dire("un tarif hors tranches : 400", tranche.code === 400 && tranche.brut.includes("par tranches de 500"), tranche.brut);
@@ -1010,7 +1010,7 @@ setTimeout(async () => {
   const emailEnBase = (id) => base.prepare("SELECT email FROM utilisateurs WHERE id = ?").get(id).email;
   dire("sans session : 401", (await changerEmail({})).code === 401 && (await changerMotDePasse({})).code === 401);
   dire("un compte d'equipe : 403",
-       (await changerEmail({ nouveau: "equipe@example.com", motdepasse: "motdepasse123" }, cookieDe(equipe.cookie))).code === 403);
+       (await changerEmail({ nouveau: "equipe@example.com", motdepasse: "motdepasse123", telephone: "600000000" }, cookieDe(equipe.cookie))).code === 403);
   const formAvecCles = (await formProfil(cookieDe(emp.cookie))).donnees;
   dire("le formulaire donne l'adresse actuelle et la longueur minimale",
        formAvecCles.email === emp.mail && formAvecCles.motDePasseMin === 6, JSON.stringify(formAvecCles.email));
@@ -1020,20 +1020,20 @@ setTimeout(async () => {
   dire("sans le bon mot de passe : 403, l'adresse ne change pas",
        emailSansMotDePasse.code === 403 && emailEnBase(emp.id) === emp.mail, emailSansMotDePasse.brut);
   dire("une adresse sans @ : 400",
-       (await changerEmail({ nouveau: "pas-une-adresse", motdepasse: "motdepasse123" }, cookieDe(emp.cookie))).code === 400);
+       (await changerEmail({ nouveau: "pas-une-adresse", motdepasse: "motdepasse123", telephone: "600000000" }, cookieDe(emp.cookie))).code === 400);
   dire("la meme adresse : 400",
-       (await changerEmail({ nouveau: emp.mail, motdepasse: "motdepasse123" }, cookieDe(emp.cookie))).code === 400);
+       (await changerEmail({ nouveau: emp.mail, motdepasse: "motdepasse123", telephone: "600000000" }, cookieDe(emp.cookie))).code === 400);
   dire("l'adresse d'un autre compte : 409",
-       (await changerEmail({ nouveau: verifiee.mail, motdepasse: "motdepasse123" }, cookieDe(emp.cookie))).code === 409);
+       (await changerEmail({ nouveau: verifiee.mail, motdepasse: "motdepasse123", telephone: "600000000" }, cookieDe(emp.cookie))).code === 409);
   dire("un objet a la place de l'adresse : 400",
-       (await changerEmail({ nouveau: { faux: true }, motdepasse: "motdepasse123" }, cookieDe(emp.cookie))).code === 400);
-  const emailChange = await changerEmail({ nouveau: NOUVEL_EMAIL.toUpperCase(), motdepasse: "motdepasse123" },
+       (await changerEmail({ nouveau: { faux: true }, motdepasse: "motdepasse123", telephone: "600000000" }, cookieDe(emp.cookie))).code === 400);
+  const emailChange = await changerEmail({ nouveau: NOUVEL_EMAIL.toUpperCase(), motdepasse: "motdepasse123", telephone: "600000000" },
                                          { Authorization: "Bearer " + jeton });
   dire("la nouvelle adresse est enregistree en minuscules, et la session reste ouverte",
        emailChange.code === 200 && emailChange.donnees.email === NOUVEL_EMAIL && emailEnBase(emp.id) === NOUVEL_EMAIL &&
        (await monProfilApi({ Authorization: "Bearer " + jeton })).code === 200, emailChange.brut);
   dire("on se connecte avec la nouvelle adresse",
-       (await json("/api/connexion", { email: NOUVEL_EMAIL, motdepasse: "motdepasse123" })).code === 200);
+       (await json("/api/connexion", { email: NOUVEL_EMAIL, motdepasse: "motdepasse123", telephone: "600000000" })).code === 200);
 
   const motDePasseSansAncien = await changerMotDePasse({ ancien: "pas-le-bon", nouveau: "motdepasse456" }, cookieDe(emp.cookie));
   dire("sans l'ancien mot de passe : 403", motDePasseSansAncien.code === 403, motDePasseSansAncien.brut);
@@ -1044,7 +1044,7 @@ setTimeout(async () => {
   dire("le nouveau mot de passe est actif, l'ancien ne marche plus",
        motDePasseChange.code === 200 &&
        (await json("/api/connexion", { email: NOUVEL_EMAIL, motdepasse: "motdepasse456" })).code === 200 &&
-       (await json("/api/connexion", { email: NOUVEL_EMAIL, motdepasse: "motdepasse123" })).code === 401,
+       (await json("/api/connexion", { email: NOUVEL_EMAIL, motdepasse: "motdepasse123", telephone: "600000000" })).code === 401,
        motDePasseChange.brut);
   const pageAvecCles = await (await lire("/mon-profil/modifier", emp.cookie)).text();
   dire("la page du site montre la nouvelle adresse et la meme longueur minimale",

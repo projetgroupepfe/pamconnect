@@ -23,7 +23,7 @@ setTimeout(async () => {
   console.log("\n--- CE QUI EST SAISI EST BIEN ENREGISTRE ---");
   const mail = M + "-p@example.com";
   const corps = form({ role: "prestataire", nom: "Test Enrichi", email: mail,
-    motdepasse: "motdepasse123", quartier: "Bastos", metier: "menagere", tarif: "15000",
+    motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos", metier: "menagere", tarif: "15000",
     date_naissance: "1995-06-15", experience_annees: "4" });
   // Un creneau invente est glisse au milieu des vrais.
   ["lundi-matin", "lundi-soir", "samedi-matin", "sorcier-minuit"]
@@ -40,7 +40,7 @@ setTimeout(async () => {
   dire("le creneau invente est ecarte", !u.disponibilites.includes("sorcier"));
 
   const r = await fetch(RACINE + "/connexion", { method: "POST", redirect: "manual",
-    body: form({ email: mail, motdepasse: "motdepasse123" }) });
+    body: form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }) });
   const cookie = r.headers.getSetCookie()[0].split(";")[0];
 
   console.log("\n--- LA DATE COMPLETE N'EST JAMAIS AFFICHEE ---");
@@ -52,9 +52,9 @@ setTimeout(async () => {
   const emp = await (async () => {
     const m = M + "-e@example.com";
     await fetch(RACINE + "/inscription", { method: "POST", body: form({
-      role: "employeur", nom: "Emp", email: m, motdepasse: "motdepasse123", quartier: "Bastos" }) });
+      role: "employeur", nom: "Emp", email: m, motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" }) });
     const rr = await fetch(RACINE + "/connexion", { method: "POST", redirect: "manual",
-      body: form({ email: m, motdepasse: "motdepasse123" }) });
+      body: form({ email: m, motdepasse: "motdepasse123", telephone: "600000000" }) });
     return rr.headers.getSetCookie()[0].split(";")[0];
   })();
 
@@ -90,7 +90,7 @@ setTimeout(async () => {
 
   console.log("\n--- LA PLATEFORME EST RESERVEE AUX MAJEURS ---");
   const mineur = await fetch(RACINE + "/inscription", { method: "POST", body: form({
-    role: "prestataire", nom: "Jeune", email: M + "-j@example.com", motdepasse: "motdepasse123",
+    role: "prestataire", nom: "Jeune", email: M + "-j@example.com", motdepasse: "motdepasse123", telephone: "600000000",
     quartier: "Bastos", metier: "menagere", tarif: "5000", date_naissance: "2015-01-01" }) });
   dire("une date donnant moins de 18 ans est refusee", mineur.status === 400,
        "code " + mineur.status);
@@ -98,7 +98,7 @@ setTimeout(async () => {
        !base.prepare("SELECT id FROM utilisateurs WHERE email = ?").get(M + "-j@example.com"));
 
   const sansDate = await fetch(RACINE + "/inscription", { method: "POST", body: form({
-    role: "prestataire", nom: "Sans", email: M + "-s@example.com", motdepasse: "motdepasse123",
+    role: "prestataire", nom: "Sans", email: M + "-s@example.com", motdepasse: "motdepasse123", telephone: "600000000",
     quartier: "Bastos", metier: "menagere", tarif: "5000" }) });
   dire("la date reste facultative", sansDate.status === 200, "code " + sansDate.status);
 
@@ -118,13 +118,13 @@ setTimeout(async () => {
   const ancien = M + "-ancien@example.com";
   await fetch(RACINE + "/inscription", { method: "POST", body: form({
     role: "prestataire", nom: "Compte Ancien", email: ancien,
-    motdepasse: "motdepasse123", quartier: "Bastos", metier: "menagere", tarif: "12000" }) });
+    motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos", metier: "menagere", tarif: "12000" }) });
   base.prepare(`UPDATE utilisateurs
     SET date_naissance = NULL, experience_annees = NULL, disponibilites = NULL
     WHERE email = ?`).run(ancien);
   const idAncien = base.prepare("SELECT id FROM utilisateurs WHERE email = ?").get(ancien).id;
   const rAncien = await fetch(RACINE + "/connexion", { method: "POST", redirect: "manual",
-    body: form({ email: ancien, motdepasse: "motdepasse123" }) });
+    body: form({ email: ancien, motdepasse: "motdepasse123", telephone: "600000000" }) });
   const ckAncien = rAncien.headers.getSetCookie()[0].split(";")[0];
 
   const casse = (t) => /ReferenceError|TypeError|Cannot read/.test(t);
@@ -149,9 +149,9 @@ setTimeout(async () => {
   const empAncien = await (async () => {
     const m = M + "-empa@example.com";
     await fetch(RACINE + "/inscription", { method: "POST", body: form({
-      role: "employeur", nom: "EmpA", email: m, motdepasse: "motdepasse123", quartier: "Bastos" }) });
+      role: "employeur", nom: "EmpA", email: m, motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" }) });
     const rr = await fetch(RACINE + "/connexion", { method: "POST", redirect: "manual",
-      body: form({ email: m, motdepasse: "motdepasse123" }) });
+      body: form({ email: m, motdepasse: "motdepasse123", telephone: "600000000" }) });
     return rr.headers.getSetCookie()[0].split(";")[0];
   })();
   // Publier une demande ET y repondre exigent une identite verifiee.

@@ -46,8 +46,8 @@ setTimeout(async () => {
   const emp = M + "-emp@example.com";
   const pre = M + "-pre@example.com";
 
-  await q("/inscription", { method: "POST", body: f({ role: "employeur", nom: "Emp", email: emp, motdepasse: mdp, arrondissement: "Yaounde 1" }) });
-  await q("/inscription", { method: "POST", body: f({ role: "prestataire", nom: "Pre", email: pre, motdepasse: mdp, arrondissement: "Yaounde 1", metier: "MetierDoublon", tarif: "10000" }) });
+  await q("/inscription", { method: "POST", body: f({ role: "employeur", telephone: "600000000", nom: "Emp", email: emp, motdepasse: mdp, arrondissement: "Yaounde 1" }) });
+  await q("/inscription", { method: "POST", body: f({ role: "prestataire", telephone: "600000000", nom: "Pre", email: pre, motdepasse: mdp, arrondissement: "Yaounde 1", metier: "MetierDoublon", tarif: "10000" }) });
 
   const cEmp = (await q("/connexion", { method: "POST", body: f({ email: emp, motdepasse: mdp }) })).cookie;
   const cPre = (await q("/connexion", { method: "POST", body: f({ email: pre, motdepasse: mdp }) })).cookie;

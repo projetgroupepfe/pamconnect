@@ -39,10 +39,10 @@ function photoJpeg(nom, octets) {
 
 async function creerCompte(mail, role, extra) {
   await poster("/inscription", form(Object.assign(
-    { role, nom: mail.split("@")[0], email: mail, motdepasse: "motdepasse123",
+    { role, nom: mail.split("@")[0], email: mail, motdepasse: "motdepasse123", telephone: "600000000",
       arrondissement: "Yaounde 1", tarif: role === "prestataire" ? "10000" : "" },
     extra || {})));
-  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123" }));
+  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }));
   return c.cookie;
 }
 
@@ -201,15 +201,15 @@ setTimeout(async () => {
   const MOTS = ["en tant que employeur", "en tant que prestataire",
                 "en tant qu'employeur", "en tant qu'prestataire"];
   for (const [mail, qui] of [[mailAdmin, "equipe"], [mailVrai, "employeur"], [mailPres, "prestataire"]]) {
-    const page = (await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123" }))).corps;
+    const page = (await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }))).corps;
     dire("connexion (" + qui + ") : aucun mot de la colonne role",
          !MOTS.some((m) => page.includes(m)) && !page.includes("Connexion réussie en tant que"));
   }
 
   // Chaque compte est envoye la ou il a quelque chose a faire.
-  const accueilEquipe = (await poster("/connexion", form({ email: mailAdmin, motdepasse: "motdepasse123" }))).corps;
+  const accueilEquipe = (await poster("/connexion", form({ email: mailAdmin, motdepasse: "motdepasse123", telephone: "600000000" }))).corps;
   dire("l'equipe est envoyee vers l'espace equipe", accueilEquipe.includes('href="/admin"'));
-  const accueilPres = (await poster("/connexion", form({ email: mailPres, motdepasse: "motdepasse123" }))).corps;
+  const accueilPres = (await poster("/connexion", form({ email: mailPres, motdepasse: "motdepasse123", telephone: "600000000" }))).corps;
   dire("le prestataire est envoye vers les annonces", accueilPres.includes('href="/annonces"'));
 
   console.log("\n--- L'ESPACE EQUIPE EST INVISIBLE POUR LES AUTRES ---");

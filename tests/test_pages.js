@@ -33,13 +33,13 @@ setTimeout(async () => {
   const pre = M + "-pre@example.com";
   const adm = M + "-adm@example.com";
 
-  await poster("/inscription", form({ role: "employeur", nom: "Emp Pages", email: emp,
+  await poster("/inscription", form({ role: "employeur", telephone: "600000000", nom: "Emp Pages", email: emp,
     motdepasse: mdp, arrondissement: "Yaounde 1" }));
-  await poster("/inscription", form({ role: "prestataire", nom: "Pre Pages", email: pre,
+  await poster("/inscription", form({ role: "prestataire", telephone: "600000000", nom: "Pre Pages", email: pre,
     motdepasse: mdp, arrondissement: "Yaounde 1", metier: "MetierPages", tarif: "10000" }));
   // Un compte par metier : l'employeur publie, l'equipe verifie. Les
   // melanger cacherait les regles qui separent justement les deux.
-  await poster("/inscription", form({ role: "employeur", nom: "Adm Pages", email: adm,
+  await poster("/inscription", form({ role: "employeur", telephone: "600000000", nom: "Adm Pages", email: adm,
     motdepasse: mdp, arrondissement: "Yaounde 1" }));
   const cEmp = (await poster("/connexion", form({ email: emp, motdepasse: mdp }))).cookie;
   const cPre = (await poster("/connexion", form({ email: pre, motdepasse: mdp }))).cookie;

@@ -48,7 +48,7 @@ setTimeout(async () => {
   console.log("\n--- 1. Le contournement est-il bloque ? ---");
   const pirate = MARQUE + "-pirate@example.com";
   const r1 = await requete("/inscription", { method: "POST", body: form({
-    role: "prestataire", nom: "Pirate", email: pirate, motdepasse: mdp,
+    role: "prestataire", telephone: "600000000", nom: "Pirate", email: pirate, motdepasse: mdp,
     arrondissement: "Yaounde 1" }) });          // <-- aucun metier
   v("prestataire sans metier refuse (400)", r1.code === 400, "code " + r1.code);
   v("le message explique pourquoi", r1.corps.includes("obligatoire"));
@@ -56,21 +56,21 @@ setTimeout(async () => {
 
   const espaces = MARQUE + "-espaces@example.com";
   const r2 = await requete("/inscription", { method: "POST", body: form({
-    role: "prestataire", nom: "Espaces", email: espaces, motdepasse: mdp,
+    role: "prestataire", telephone: "600000000", nom: "Espaces", email: espaces, motdepasse: mdp,
     arrondissement: "Yaounde 1", metier: "   " }) });   // <-- que des espaces
   v("un metier fait d'espaces est refuse aussi", r2.code === 400 && !compte(espaces), "code " + r2.code);
 
   console.log("\n--- 2. Pas de regression pour les employeurs ---");
   const empMail = MARQUE + "-emp@example.com";
   const r3 = await requete("/inscription", { method: "POST", body: form({
-    role: "employeur", nom: "Employeur Test", email: empMail, motdepasse: mdp,
+    role: "employeur", telephone: "600000000", nom: "Employeur Test", email: empMail, motdepasse: mdp,
     arrondissement: "Yaounde 4" }) });
   v("employeur sans metier toujours accepte", r3.code === 200 && !!compte(empMail), "code " + r3.code);
 
   console.log("\n--- 3. Prestataire SANS tarif -> refuse ---");
   const sansTarif = MARQUE + "-sans-tarif@example.com";
   const r4 = await requete("/inscription", { method: "POST", body: form({
-    role: "prestataire", nom: "Sans Tarif", email: sansTarif, motdepasse: mdp,
+    role: "prestataire", telephone: "600000000", nom: "Sans Tarif", email: sansTarif, motdepasse: mdp,
     arrondissement: "Yaounde 5", metier: "MetierTest" }) });   // metier oui, tarif non
   v("prestataire sans tarif refuse (400)", r4.code === 400, "code " + r4.code);
   v("le message explique pourquoi", r4.corps.includes("Tarif obligatoire"));
@@ -78,7 +78,7 @@ setTimeout(async () => {
 
   const tarifZero = MARQUE + "-zero@example.com";
   const r5 = await requete("/inscription", { method: "POST", body: form({
-    role: "prestataire", nom: "Zero", email: tarifZero, motdepasse: mdp,
+    role: "prestataire", telephone: "600000000", nom: "Zero", email: tarifZero, motdepasse: mdp,
     arrondissement: "Yaounde 5", metier: "MetierTest", tarif: "0" }) });
   v("un tarif a zero est refuse aussi", r5.code === 400 && !compte(tarifZero), "code " + r5.code);
 
@@ -87,7 +87,7 @@ setTimeout(async () => {
   for (const tarif of ["250", "750"]) {
     const mail = MARQUE + "-tarif" + tarif + "@example.com";
     const r = await requete("/inscription", { method: "POST", body: form({
-      role: "prestataire", nom: "Tarif " + tarif, email: mail, motdepasse: mdp,
+      role: "prestataire", telephone: "600000000", nom: "Tarif " + tarif, email: mail, motdepasse: mdp,
       arrondissement: "Yaounde 5", metier: "MetierTest", tarif }) });
     v("un tarif de " + tarif + " FCFA est refuse", r.code === 400 && !compte(mail), "code " + r.code);
   }
@@ -95,7 +95,7 @@ setTimeout(async () => {
   console.log("\n--- 4. Prestataire AVEC tarif : la commission est transparente ---");
   const tarifMail = MARQUE + "-tarif@example.com";
   await requete("/inscription", { method: "POST", body: form({
-    role: "prestataire", nom: "Tarif Test", email: tarifMail, motdepasse: mdp,
+    role: "prestataire", telephone: "600000000", nom: "Tarif Test", email: tarifMail, motdepasse: mdp,
     arrondissement: "Yaounde 5", metier: "MetierTest", tarif: "10000" }) });
   const coTarif = await requete("/connexion", { method: "POST", body: form({ email: tarifMail, motdepasse: mdp }) });
   const pTarif = await requete("/mon-profil", { cookie: coTarif.cookie });

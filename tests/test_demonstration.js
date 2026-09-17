@@ -47,9 +47,9 @@ async function poster(chemin, corps, cookie) {
 async function creerCompte(suffixe, role, extra) {
   const mail = (M + "-" + suffixe + "@example.com").toLowerCase();
   await poster("/inscription", form(Object.assign(
-    { role, nom: "Demo " + suffixe, email: mail, motdepasse: "motdepasse123", quartier: "Bastos" },
+    { role, nom: "Demo " + suffixe, email: mail, motdepasse: "motdepasse123", telephone: "600000000", quartier: "Bastos" },
     extra || {})));
-  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123" }));
+  const c = await poster("/connexion", form({ email: mail, motdepasse: "motdepasse123", telephone: "600000000" }));
   return { mail, cookie: c.cookie,
            id: base.prepare("SELECT id FROM utilisateurs WHERE email = ?").get(mail).id };
 }

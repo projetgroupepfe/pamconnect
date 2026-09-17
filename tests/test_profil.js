@@ -48,10 +48,10 @@ setTimeout(async () => {
   const preMail = MARQUE + "-pre@example.com";
 
   await requete("/inscription", { method: "POST", body: form({
-    role: "employeur", nom: "Mariam Test", email: empMail, motdepasse: mdp,
+    role: "employeur", telephone: "600000000", nom: "Mariam Test", email: empMail, motdepasse: mdp,
     arrondissement: "Yaounde 4", quartier: "Manguier" }) });
   await requete("/inscription", { method: "POST", body: form({
-    role: "prestataire", nom: "Anna Test", email: preMail, motdepasse: mdp,
+    role: "prestataire", telephone: "600000000", nom: "Anna Test", email: preMail, motdepasse: mdp,
     arrondissement: "Yaounde 5", quartier: "Bastos", metier: "Menage", tarif: "5000" }) });
 
   const coEmp = await requete("/connexion", { method: "POST", body: form({ email: empMail, motdepasse: mdp }) });

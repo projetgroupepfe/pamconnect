@@ -99,7 +99,23 @@
         <%- include("partiels/icone", { nom: "email" }) %>
         <span><%= utilisateur.email %></span>
       </li>
+      <%# Le numero n'apparaît QUE sur son propre profil et dans l'espace
+          de l'equipe. Aucune fiche publique ne le montre. %>
+      <% if (profil.telephone) { %>
+        <li>
+          <%- include("partiels/icone", { nom: "telephone" }) %>
+          <span><%= profil.telephone %>
+            <span class="aide">visible par l'équipe PamConnect seulement</span>
+          </span>
+        </li>
+      <% } %>
     </ul>
+
+    <% if (profil.telephoneAAjouter) { %>
+      <p class="aide"><%= profil.telephoneAAjouter %>
+        <a href="/mon-profil/modifier">Modifier mon profil</a>
+      </p>
+    <% } %>
 
     <% if (utilisateur.role === "prestataire") { %>
 

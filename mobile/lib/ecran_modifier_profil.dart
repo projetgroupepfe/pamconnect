@@ -62,6 +62,7 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
   final _motdepasse = TextEditingController();
 
   final _nom = TextEditingController();
+  final _telephone = TextEditingController();
   final _experience = TextEditingController();
   final _tarif = TextEditingController();
 
@@ -101,7 +102,7 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
   void dispose() {
     _attenteQuartier?.cancel();
     _attenteTarif?.cancel();
-    for (final controleur in [_nom, _experience, _tarif, _email, _motdepasse]) {
+    for (final controleur in [_nom, _telephone, _experience, _tarif, _email, _motdepasse]) {
       controleur.dispose();
     }
     super.dispose();
@@ -134,6 +135,7 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
         }
         _erreurChargement = null;
         _nom.text = formulaire.nom;
+        _telephone.text = formulaire.telephone;
         _experience.text = formulaire.experienceAnnees;
         _tarif.text = formulaire.tarif;
         // Une valeur absente de la liste ne peut pas etre selectionnee.
@@ -295,6 +297,7 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
           'motdepasse': _motdepasse.text,
         },
         'nom': _nom.text,
+        'telephone': _telephone.text,
         'quartier': _quartier?.text ?? '',
         'arrondissement': _arrondissement ?? '',
         if (personne) ...{
@@ -426,6 +429,21 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
         textCapitalization: TextCapitalization.words,
         textInputAction: TextInputAction.next,
         decoration: InputDecoration(labelText: inscription != null ? 'Votre nom complet' : 'Votre nom'),
+      ),
+      espace,
+      // L'EQUIPE APPELLE : sans numero, personne ne peut etre mis en
+      // relation. Demande aux deux roles, comme sur le site.
+      TextField(
+        controller: _telephone,
+        keyboardType: TextInputType.phone,
+        textInputAction: TextInputAction.next,
+        decoration: const InputDecoration(
+          labelText: 'Votre numéro de téléphone',
+          hintText: '6XX XX XX XX',
+          helperText: "Ce numéro sert à l'équipe PamConnect pour vous appeler.\n"
+              "Il n'est jamais montré aux autres utilisateurs.",
+          helperMaxLines: 3,
+        ),
       ),
       espace,
       if (inscription != null) ...[

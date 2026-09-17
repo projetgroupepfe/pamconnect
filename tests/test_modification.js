@@ -32,9 +32,9 @@ setTimeout(async () => {
   const pre = M + "-pre@example.com";
   const qui = (mail) => base.prepare("SELECT * FROM utilisateurs WHERE email = ?").get(mail);
 
-  await poster("/inscription", form({ role: "employeur", nom: "Emp Avant", email: emp,
+  await poster("/inscription", form({ role: "employeur", telephone: "600000000", nom: "Emp Avant", email: emp,
     motdepasse: mdp, arrondissement: "Yaoundé 1", quartier: "Nsam" }));
-  await poster("/inscription", form({ role: "prestataire", nom: "Pre Avant", email: pre,
+  await poster("/inscription", form({ role: "prestataire", telephone: "600000000", nom: "Pre Avant", email: pre,
     motdepasse: mdp, arrondissement: "Yaoundé 1", quartier: "Mvan",
     metier: "MetierAvant", tarif: "5000" }));
 
@@ -60,7 +60,7 @@ setTimeout(async () => {
 
   console.log("\n--- 2. Modification acceptee ---");
   const r1 = await poster("/mon-profil/modifier", form({
-    nom: "Pre Apres", arrondissement: "Yaoundé 5", quartier: "Bastos",
+    nom: "Pre Apres", telephone: "600000000", arrondissement: "Yaoundé 5", quartier: "Bastos",
     metier: "MetierApres", tarif: "12000" }), cPre);
   dire("la modification passe", r1.code === 200 && r1.corps.includes("mis à jour"), "code " + r1.code);
 
@@ -86,30 +86,30 @@ setTimeout(async () => {
 
   console.log("\n--- 3. Les regles du profil tiennent aussi ici ---");
   const sansMetier = await poster("/mon-profil/modifier", form({
-    nom: "Pre Apres", arrondissement: "Yaoundé 5", quartier: "Bastos",
+    nom: "Pre Apres", telephone: "600000000", arrondissement: "Yaoundé 5", quartier: "Bastos",
     metier: "   ", tarif: "12000" }), cPre);
   dire("metier vide -> 400", sansMetier.code === 400, "code " + sansMetier.code);
   dire("rien n'a change", qui(pre).metier === "MetierApres");
 
   const tarifZero = await poster("/mon-profil/modifier", form({
-    nom: "Pre Apres", arrondissement: "Yaoundé 5", quartier: "Bastos",
+    nom: "Pre Apres", telephone: "600000000", arrondissement: "Yaoundé 5", quartier: "Bastos",
     metier: "MetierApres", tarif: "0" }), cPre);
   dire("tarif a zero -> 400", tarifZero.code === 400, "code " + tarifZero.code);
   dire("le tarif n'a pas bouge", qui(pre).tarif === 12000);
 
   const horsTranche = await poster("/mon-profil/modifier", form({
-    nom: "Pre Apres", arrondissement: "Yaoundé 5", quartier: "Bastos",
+    nom: "Pre Apres", telephone: "600000000", arrondissement: "Yaoundé 5", quartier: "Bastos",
     metier: "MetierApres", tarif: "12250" }), cPre);
   dire("tarif hors tranche de 500 -> 400", horsTranche.code === 400, "code " + horsTranche.code);
   dire("le tarif n'a toujours pas bouge", qui(pre).tarif === 12000);
 
   const sansNom = await poster("/mon-profil/modifier", form({
-    nom: "  ", arrondissement: "Yaoundé 5", metier: "MetierApres", tarif: "12000" }), cPre);
+    nom: "  ", telephone: "600000000", arrondissement: "Yaoundé 5", metier: "MetierApres", tarif: "12000" }), cPre);
   dire("nom vide -> 400", sansNom.code === 400, "code " + sansNom.code);
 
   console.log("\n--- 4. Un employeur n'herite pas d'un metier ---");
   const rEmp = await poster("/mon-profil/modifier", form({
-    nom: "Emp Apres", arrondissement: "Yaoundé 3", quartier: "Mokolo",
+    nom: "Emp Apres", telephone: "600000000", arrondissement: "Yaoundé 3", quartier: "Mokolo",
     metier: "MetierPirate", tarif: "99999" }), cEmp);
   dire("la modification passe", rEmp.code === 200, "code " + rEmp.code);
   const empModifie = qui(emp);
@@ -120,12 +120,12 @@ setTimeout(async () => {
   console.log("\n--- 5. La position n'est jamais effacee par erreur ---");
   base.prepare("UPDATE utilisateurs SET latitude = 3.85, longitude = 11.5 WHERE email = ?").run(pre);
   await poster("/mon-profil/modifier", form({
-    nom: "Pre Apres", arrondissement: "Yaoundé 5", quartier: "Bastos",
+    nom: "Pre Apres", telephone: "600000000", arrondissement: "Yaoundé 5", quartier: "Bastos",
     metier: "MetierApres", tarif: "12000" }), cPre);   // aucune position envoyee
   dire("sans position envoyee, l'ancienne est conservee", qui(pre).latitude === 3.85);
 
   await poster("/mon-profil/modifier", form({
-    nom: "Pre Apres", arrondissement: "Yaoundé 5", quartier: "Bastos",
+    nom: "Pre Apres", telephone: "600000000", arrondissement: "Yaoundé 5", quartier: "Bastos",
     metier: "MetierApres", tarif: "12000",
     latitude: "3.9", longitude: "11.6" }), cPre);
   dire("avec une position envoyee, elle est mise a jour", qui(pre).latitude === 3.9);

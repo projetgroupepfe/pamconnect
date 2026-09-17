@@ -721,6 +721,8 @@ void main() {
     final lu = MonProfil.depuisJson({
       'nom': 'nom 1',
       'fonction': 'fonction 1',
+      'telephone': '600 00 00 00',
+      'telephoneAAjouter': null,
       'messageEquipe': {'texte': 'texte 1', 'le': 'date 1'},
       'avertissement': null,
       'verification': {'statut': 'verifie', 'libelle': 'libelle 1', 'attente': null},
@@ -736,6 +738,7 @@ void main() {
       'aLire': 1,
     });
     expect(lu.messageEquipe?.texte, 'texte 1');
+    expect(lu.telephone, '600 00 00 00');
     expect(lu.avertissement, isNull);
     expect(lu.tarif, isNull);
     expect(lu.avis.vide, 'phrase 1');
@@ -765,6 +768,7 @@ void main() {
   test('le formulaire de mon profil garde les cases cochees par le serveur', () {
     Map<String, dynamic> formulaire(List<dynamic> creneaux) => {
           'nom': 'nom 1',
+          'telephone': '600000000',
           'quartier': 'quartier 1',
           'arrondissement': null,
           'quartiers': ['quartier 1'],
@@ -803,6 +807,7 @@ void main() {
   test('Creer un compte lit les choix et l exemple du serveur', () {
     Map<String, dynamic> formulaire({required List<dynamic> roles, Object? exemple}) => {
           'nom': '',
+          'telephone': '',
           'quartier': '',
           'arrondissement': null,
           'quartiers': ['quartier 1'],
