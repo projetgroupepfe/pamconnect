@@ -55,10 +55,11 @@
       </ul>
 
       <% if (d.refusees.length > 0) { %>
-        <%# CE QUI A DEJA ETE TENTE. Sans cette liste, l'equipe
-            rappellerait les memes personnes au meme prix. %>
+        <%# CE QUI A DEJA ETE TENTE, pour cette demande-la. C'est une
+            information, pas une exclusion : la personne reste dans la
+            liste d'appels, ici et sur les autres demandes. %>
         <p class="aide">
-          Déjà refusé :
+          Prix déjà refusés :
           <% d.refusees.forEach(function (r, i) { %><%= i > 0 ? " · " : "" %><%= r.nom %> à <%= r.prix %><% }); %>
         </p>
       <% } %>

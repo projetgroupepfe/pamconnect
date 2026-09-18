@@ -121,7 +121,10 @@ setTimeout(async () => {
   dire("la demande reste ouverte après un refus", toujoursOuverte.annulee === 0);
 
   ecran = await (await lire("/admin/mises-en-relation", eq.cookie)).text();
-  dire("l'écran rappelle ce qui a déjà été refusé", ecran.includes("Déjà refusé"));
+  dire("l'écran rappelle les prix déjà refusés", ecran.includes("Prix déjà refusés"));
+  // LE REFUS N'ECARTE PERSONNE : la personne refusee reste appelable,
+  // ici comme sur les autres demandes. C'est un prix qui a ete refuse.
+  dire("la personne refusée reste dans la liste d'appels", ecran.includes("Test pre"));
 
   console.log("\n--- 4. DEUXIEME ESSAI : L'EMPLOYEUR ACCEPTE ---");
   await poster("/admin/mises-en-relation",

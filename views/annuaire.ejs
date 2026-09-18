@@ -77,6 +77,12 @@
                 <span><a href="tel:<%= p.appel %>"><%= p.telephone %></a></span>
               </li>
             <% } %>
+            <% if (p.email) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "email" }) %>
+                <span><%= p.email %></span>
+              </li>
+            <% } %>
             <% if (p.quartier) { %>
               <li>
                 <%- include("partiels/icone", { nom: "lieu" }) %>
@@ -147,6 +153,15 @@
       <label for="telephone-ajout">Numéro de téléphone</label>
       <input type="tel" id="telephone-ajout" name="telephone" required
              placeholder="ex : 6XX XX XX XX">
+    </div>
+
+    <div class="champ">
+      <label for="email-ajout">Adresse email <span class="aide">(si elle en a une)</span></label>
+      <input type="email" id="email-ajout" name="email" maxlength="120">
+      <small class="aide">
+        Une autre façon de la joindre. Elle ne lui ouvre pas de compte, et
+        reste libre si elle s'inscrit elle-même plus tard.
+      </small>
     </div>
 
     <div class="champ">

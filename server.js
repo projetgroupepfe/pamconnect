@@ -115,6 +115,7 @@ ajouterColonneSiAbsente("utilisateurs", "experience_annees", "INTEGER");
 ajouterColonneSiAbsente("utilisateurs", "disponibilites", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "telephone", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "mise_en_avant_jusqu_au", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "email_contact", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "ajoute_par",
   "INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL");
 ajouterColonneSiAbsente("messages", "signalement_decision", "TEXT");
@@ -808,8 +809,12 @@ const requetes = {
     ORDER BY m.id DESC LIMIT 1
   `),
 
-  // Les prix deja refuses par l'employeur : l'equipe ne rappelle pas
-  // deux fois la meme personne au meme prix.
+  // Les prix deja refuses par l'employeur, pour cette demande-la.
+  //
+  // C'EST UNE INFORMATION, PAS UNE EXCLUSION. La personne refusee reste
+  // dans la liste d'appels : le meme employeur peut la rappeler a un
+  // autre prix, et un autre employeur peut vouloir exactement le meme
+  // service. Ce qui a ete refuse, c'est un prix, pas quelqu'un.
   fichesRefusees: db.prepare(`
     SELECT m.prix_employeur, m.note, u.nom AS nomPrestataire
     FROM mises_en_relation m
@@ -921,7 +926,7 @@ const requetes = {
   annuaire: db.prepare(`
     SELECT u.id, u.nom, u.role, u.metier, u.quartier, u.arrondissement,
            u.telephone, u.tarif, u.statut_verification, u.suspendu,
-           u.ajoute_par, u.cree_le,
+           u.ajoute_par, u.email_contact, u.cree_le,
            q.nom AS nomAjoutePar,
            (SELECT COUNT(*) FROM candidatures c
              WHERE c.prestataire_id = u.id AND c.terminee_le IS NOT NULL) AS servicesFaits,
@@ -952,11 +957,11 @@ const requetes = {
 
   ajouterPersonne: db.prepare(`
     INSERT INTO utilisateurs
-      (role, nom, email, telephone, motdepasse, arrondissement, quartier,
-       metier, tarif, ajoute_par)
+      (role, nom, email, email_contact, telephone, motdepasse, arrondissement,
+       quartier, metier, tarif, ajoute_par)
     VALUES
-      (@role, @nom, @email, @telephone, @motdepasse, @arrondissement, @quartier,
-       @metier, @tarif, @par)
+      (@role, @nom, @email, @contact, @telephone, @motdepasse, @arrondissement,
+       @quartier, @metier, @tarif, @par)
   `),
 
   nombreDansLAnnuaire: db.prepare(`
@@ -7198,6 +7203,9 @@ function ecranAnnuaire(criteres) {
       arrondissement: p.arrondissement,
       telephone: p.telephone ? formaterTelephone(p.telephone) : null,
       appel: p.telephone ? "+237" + p.telephone : null,
+      // L'adresse de connexion d'un compte inscrit, ou celle que
+      // l'equipe a notee pour une personne ajoutee.
+      email: p.ajoute_par ? p.email_contact : null,
       tarif: p.tarif ? formaterMontant(p.tarif) : null,
       verification: p.statut_verification,
       suspendu: p.suspendu === 1,
@@ -7244,6 +7252,16 @@ function ajouterAuRepertoire(admin, donnees) {
              "trouver quand une demande arrivera." } };
   }
 
+  // L'ADRESSE EMAIL, SI LA PERSONNE EN A UNE. Facultative : beaucoup de
+  // gens n'en ont pas, et on n'en invente pas a leur place. Elle sert a
+  // les joindre, jamais a les connecter - son compte ne s'ouvre pas.
+  const contact = String(donnees.email || "").trim().toLowerCase().slice(0, 120);
+
+  if (contact && !adresseEmailValide(contact)) {
+    return { probleme: { code: 400, titre: "Adresse email à revoir",
+      texte: "Écrivez une adresse complète, ou laissez la case vide." } };
+  }
+
   const tarifSaisi = String(donnees.tarif || "").trim();
   const tarif = tarifSaisi ? Math.round(Number(tarifSaisi)) : null;
 
@@ -7265,9 +7283,11 @@ function ajouterAuRepertoire(admin, donnees) {
   const pose = requetes.ajouterPersonne.run({
     role,
     nom,
-    // Un identifiant technique, pas une adresse : cette personne n'a pas
-    // donne d'email, et on n'en invente pas.
+    // L'IDENTIFIANT DE CONNEXION est technique, et il l'est meme quand
+    // l'equipe a note une adresse : celle-ci reste libre pour le jour ou
+    // la personne voudra s'inscrire elle-meme.
     email: "annuaire-" + telephone.numero,
+    contact: contact || null,
     telephone: telephone.numero,
     motdepasse: motDePasseImpossible(),
     arrondissement: lieu ? lieu.arrondissement : null,

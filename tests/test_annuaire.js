@@ -106,6 +106,32 @@ setTimeout(async () => {
     form({ nom: M + " Autre", telephone: "677000004", role: "prestataire", metier: "jardinier" }), eq.cookie);
   dire("le même numéro n'entre pas deux fois", doublon.code === 409, "code " + doublon.code);
 
+  console.log("\n--- 4 bis. L'ADRESSE EMAIL, SI ELLE EN A UNE ---");
+  const mauvaise = await poster("/admin/utilisateurs",
+    form({ nom: M + " Plombier", telephone: "677000006", role: "prestataire",
+           metier: "jardinier", email: "pas-une-adresse" }), eq.cookie);
+  dire("une adresse incomplète est refusée", mauvaise.code === 400, "code " + mauvaise.code);
+
+  await poster("/admin/utilisateurs",
+    form({ nom: M + " Plombier", telephone: "677000006", role: "prestataire",
+           metier: "jardinier", email: M + "-plombier@example.com" }), eq.cookie);
+  const avecMail = base.prepare("SELECT * FROM utilisateurs WHERE nom = ?").get(M + " Plombier");
+  dire("l'adresse notée par l'équipe est gardée",
+       avecMail && avecMail.email_contact === M + "-plombier@example.com",
+       String(avecMail && avecMail.email_contact));
+
+  // ELLE RESTE LIBRE : l'identifiant de connexion est technique, donc la
+  // personne pourra s'inscrire elle-meme avec sa propre adresse.
+  dire("elle n'est pas devenue son identifiant de connexion",
+       avecMail && avecMail.email === "annuaire-677000006", String(avecMail && avecMail.email));
+
+  const inscription = await poster("/inscription",
+    form({ role: "prestataire", nom: M + " Plombier", email: M + "-plombier@example.com",
+           motdepasse: "motdepasse123", telephone: "677000007", quartier: "Bastos",
+           metier: "jardinier", tarif: "8000" }));
+  dire("la personne peut s'inscrire elle-même avec cette adresse",
+       inscription.code === 200, "code " + inscription.code);
+
   console.log("\n--- 5. LA PIECE VUE EN PERSONNE ---");
   await poster("/admin/utilisateurs",
     form({ nom: M + " Menuisier", telephone: "677000005", role: "prestataire",

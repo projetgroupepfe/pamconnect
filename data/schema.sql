@@ -155,6 +155,18 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
   -- a l'eteindre a la bonne minute.
   mise_en_avant_jusqu_au TEXT,
 
+  -- L'ADRESSE EMAIL D'UNE PERSONNE AJOUTEE PAR L'EQUIPE.
+  --
+  -- Elle est rangee A PART de la colonne email, qui est un IDENTIFIANT DE
+  -- CONNEXION, unique. Melanger les deux fermerait la porte a la personne
+  -- le jour ou elle voudrait s'inscrire elle-meme : son adresse serait
+  -- deja prise, et la plateforme ne sait pas reinitialiser un mot de
+  -- passe.
+  --
+  -- Ici, c'est une simple facon de la joindre quand le telephone ne
+  -- repond pas. Facultative : beaucoup de gens n'ont pas d'email.
+  email_contact   TEXT,
+
   -- QUI A CREE CE COMPTE. Vide quand la personne s'est inscrite
   -- elle-meme ; renseigne quand l'equipe l'a ajoutee a son annuaire,
   -- souvent apres l'avoir rencontree.
