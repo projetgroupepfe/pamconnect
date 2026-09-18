@@ -1,0 +1,40 @@
+<%- include("partiels/tete") %>
+
+  <div class="colonne">
+    <h1>Mot de passe oublié</h1>
+
+    <%# AUCUN EMAIL N'EST ENVOYE : c'est l'equipe qui appelle, sur le
+        numero deja enregistre. La personne doit le savoir avant de
+        remplir, sinon elle attendra un message qui ne viendra pas. %>
+    <div class="carte confiance">
+      <h3>Comment ça se passe</h3>
+      <p>
+        L'équipe PamConnect appelle le <strong>numéro de téléphone de votre
+        compte</strong> et vous donne un code. Vous entrez ce code et vous
+        choisissez vous-même votre nouveau mot de passe.
+      </p>
+      <p class="aide">
+        L'équipe ne connaît jamais votre mot de passe.
+      </p>
+    </div>
+
+    <div class="carte">
+      <form action="/mot-de-passe-oublie" method="POST">
+        <div class="champ">
+          <label for="email">Adresse email de votre compte</label>
+          <input type="email" id="email" name="email" autocomplete="email" required>
+        </div>
+        <div class="actions">
+          <button type="submit">Demander un appel</button>
+          <a class="bouton bouton-secondaire" href="/connexion">Retour</a>
+        </div>
+      </form>
+    </div>
+
+    <p class="aide">
+      Vous avez déjà un code ?
+      <a href="/nouveau-mot-de-passe">Choisir votre nouveau mot de passe</a>.
+    </p>
+  </div>
+
+<%- include("partiels/pied") %>

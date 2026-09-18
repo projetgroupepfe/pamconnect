@@ -1,0 +1,44 @@
+<%- include("partiels/tete") %>
+
+  <div class="colonne">
+    <h1>Code à lire au téléphone</h1>
+
+    <%# AFFICHE UNE SEULE FOIS. Le code est range hache, comme un mot de
+        passe : personne ne pourra le relire, pas meme l'equipe. %>
+    <div class="carte confiance">
+      <h3><%= personne.nom %></h3>
+      <% if (personne.telephone) { %>
+        <p>
+          Appelez le
+          <a href="tel:<%= personne.appel %>"><strong><%= personne.telephone %></strong></a>,
+          assurez-vous que c'est bien elle, puis lisez-lui ce code.
+        </p>
+      <% } else { %>
+        <p class="aide">
+          Cette personne n'a pas de numéro enregistré : demandez-lui de l'ajouter
+          avant de lui donner un code.
+        </p>
+      <% } %>
+
+      <div class="detail-tarif">
+        <div class="ligne-tarif total">
+          <span>Code</span>
+          <strong><%= code %></strong>
+        </div>
+      </div>
+
+      <p class="aide">
+        Valable <%= minutes %> minutes, une seule fois. <strong>Il ne sera plus
+        affiché</strong> : si vous le perdez, donnez-en un autre.
+      </p>
+    </div>
+
+    <p class="actions">
+      <a class="bouton bouton-secondaire" href="/admin/utilisateurs">
+        <%- include("partiels/icone", { nom: "profil" }) %>
+        Retour à l'annuaire
+      </a>
+    </p>
+  </div>
+
+<%- include("partiels/pied") %>

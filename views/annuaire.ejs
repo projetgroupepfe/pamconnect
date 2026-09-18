@@ -68,6 +68,9 @@
             <% if (p.suspendu) { %>
               <span class="badge badge-refuse">Suspendue</span>
             <% } %>
+            <% if (p.attendUnCode) { %>
+              <span class="badge badge-en-attente">Attend un code de connexion</span>
+            <% } %>
           </p>
 
           <ul class="infos">
@@ -123,14 +126,26 @@
             </li>
           </ul>
 
-          <% if (!p.estEmployeur) { %>
-            <p class="actions">
+          <p class="actions">
+            <% if (!p.estEmployeur) { %>
               <a class="bouton bouton-secondaire" href="/personnes/<%= p.id %>">
                 <%- include("partiels/icone", { nom: "profil" }) %>
                 Voir sa fiche
               </a>
-            </p>
-          <% } %>
+            <% } %>
+            <%# ROUVRIR UN ACCES PERDU. Appelez d'abord, assurez-vous que
+                c'est bien la personne, puis lisez-lui le code. %>
+            <% if (!p.ajoutee && !p.suspendu) { %>
+              <form action="/admin/utilisateurs/<%= p.id %>/code" method="POST"
+                    data-question="Donner un code de connexion à <%= p.nom %> ?"
+                    data-precision="Appelez son numéro et assurez-vous que c'est bien elle avant de lui lire le code. Votre nom sera gardé.">
+                <button class="bouton bouton-secondaire" type="submit">
+                  <%- include("partiels/icone", { nom: "telephone" }) %>
+                  Donner un code
+                </button>
+              </form>
+            <% } %>
+          </p>
         </div>
       <% }); %>
     </div>

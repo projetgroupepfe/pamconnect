@@ -196,6 +196,16 @@
       <% } %>
     </div>
 
+    <%# LA TRACE D'UN MOT DE PASSE CHANGE APRES UN APPEL. Si la personne
+        ne reconnait pas ce changement, c'est que quelqu'un d'autre l'a
+        demande a sa place, et elle doit pouvoir le voir. %>
+    <% if (profil.motDePasseChangeLe) { %>
+      <p class="aide">
+        Mot de passe changé le <strong><%= profil.motDePasseChangeLe %></strong>.
+        Si ce n'est pas vous, signalez-le à l'équipe.
+      </p>
+    <% } %>
+
     <%# CE QUE LES AUTRES DISENT DE MOI, avec le seul recours possible :
         le signaler. On ne peut pas effacer un avis qui nous vise - il
         deviendrait sinon inutile a ceux qui le lisent. %>

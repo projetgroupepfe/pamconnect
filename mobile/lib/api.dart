@@ -93,6 +93,24 @@ class ApiPamConnect {
     return connexion.moi;
   }
 
+  /// UN MOT DE PASSE OUBLIE. Aucun email n'est envoye : l'equipe appelle
+  /// le numero deja au dossier et lit un code a usage unique.
+  ///
+  /// La reponse est la meme que le compte existe ou non : dire "adresse
+  /// inconnue" apprendrait a n'importe qui quelles adresses ont un compte.
+  Future<PhraseDuServeur> demanderUnCode(String email) async {
+    final donnees = await _appeler('/api/mot-de-passe-oublie', corps: {'email': email});
+    return _interpreter(() => PhraseDuServeur.depuisJson(donnees));
+  }
+
+  /// Le code lu au telephone, et le mot de passe que la personne choisit
+  /// elle-meme. L'equipe ne le connait jamais.
+  Future<PhraseDuServeur> choisirUnMotDePasse(String email, String code, String motdepasse) async {
+    final donnees = await _appeler('/api/nouveau-mot-de-passe',
+        corps: {'email': email, 'code': code, 'motdepasse': motdepasse});
+    return _interpreter(() => PhraseDuServeur.depuisJson(donnees));
+  }
+
   /// Qui est connecte, avec le solde de jetons a jour. C'est aussi ce qui
   /// revele une session perdue : la liste des demandes, elle, est publique.
   Future<Moi> moi() async {

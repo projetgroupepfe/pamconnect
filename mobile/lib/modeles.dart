@@ -1886,6 +1886,20 @@ class ServiceRecu {
   final String? moyen;
 }
 
+/// Un titre et une phrase ecrits par le serveur, que l'ecran affiche tels
+/// quels. Le site et l'application disent alors exactement la meme chose.
+class PhraseDuServeur {
+  const PhraseDuServeur({required this.titre, required this.texte});
+
+  factory PhraseDuServeur.depuisJson(Map<String, dynamic> json) => PhraseDuServeur(
+        titre: _lire<String>(json, 'titre'),
+        texte: _lire<String>(json, 'texte'),
+      );
+
+  final String titre;
+  final String texte;
+}
+
 /// Mon compte (/api/mon-compte).
 class MonCompte {
   const MonCompte({required this.jeSuisEmployeur, required this.recus, required this.envoyes, this.totalRecu});

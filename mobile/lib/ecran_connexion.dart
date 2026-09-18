@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api.dart';
 import 'ecran_accueil.dart';
 import 'ecran_modifier_profil.dart';
+import 'ecran_mot_de_passe_oublie.dart';
 import 'ecran_principal.dart';
 import 'elements.dart';
 import 'modeles.dart';
@@ -167,6 +168,23 @@ class _EcranConnexionState extends State<EcranConnexion> {
     if (_adresseValide()) await _ouvrirInscription();
   }
 
+  /// L'adresse deja tapee part avec : la personne ne la retape pas.
+  Future<void> _motDePasseOublie() async {
+    if (!_adresseValide()) return;
+
+    final phrase = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => EcranMotDePasseOublie(
+          api: ApiPamConnect(_adresse.text),
+          email: _email.text.trim(),
+        ),
+      ),
+    );
+
+    if (!mounted || phrase == null) return;
+    setState(() => _confirmation = phrase);
+  }
+
   /// Une fois le compte cree, on revient ici, meme depuis l'accueil :
   /// l'adresse revient remplie, il ne reste que le mot de passe a taper.
   Future<void> _ouvrirInscription({bool proposerSesServices = false}) async {
@@ -313,6 +331,16 @@ class _EcranConnexionState extends State<EcranConnexion> {
                     onPressed: _enCours ? null : _creerUnCompte,
                     style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                     child: const Text('Créer un compte'),
+                  ),
+                  const SizedBox(height: 8),
+                  // Le lien "Mot de passe oublie ?" du site. Il mene a
+                  // l'appel de l'equipe, pas a un email : la plateforme
+                  // n'en envoie pas.
+                  OutlinedButton.icon(
+                    onPressed: _enCours ? null : _motDePasseOublie,
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                    icon: const Icon(Icons.phone_outlined),
+                    label: const Text('Mot de passe oublié ?'),
                   ),
                   const SizedBox(height: 8),
                   // L'entree Accueil du site : ce qu'est PamConnect, avant tout compte.

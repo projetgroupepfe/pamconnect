@@ -1,0 +1,37 @@
+<%- include("partiels/tete") %>
+
+  <div class="colonne">
+    <h1>Choisir un nouveau mot de passe</h1>
+    <p class="chapeau">
+      Entrez le code que l'équipe vous a lu au téléphone.
+    </p>
+
+    <div class="carte">
+      <form action="/nouveau-mot-de-passe" method="POST">
+        <div class="champ">
+          <label for="email">Adresse email de votre compte</label>
+          <input type="email" id="email" name="email" autocomplete="email" required>
+        </div>
+        <div class="champ">
+          <label for="code">Code reçu au téléphone</label>
+          <input type="text" id="code" name="code" inputmode="numeric"
+                 autocomplete="one-time-code" maxlength="6" required>
+        </div>
+        <div class="champ">
+          <label for="motdepasse">Nouveau mot de passe</label>
+          <input type="password" id="motdepasse" name="motdepasse"
+                 autocomplete="new-password" minlength="<%= motDePasseMin %>" required>
+          <small class="aide">
+            Au moins <%= motDePasseMin %> caractères. Vous êtes la seule personne
+            à le connaître.
+          </small>
+        </div>
+        <div class="actions">
+          <button type="submit">Changer mon mot de passe</button>
+          <a class="bouton bouton-secondaire" href="/mot-de-passe-oublie">Demander un code</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<%- include("partiels/pied") %>

@@ -155,6 +155,26 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
   -- a l'eteindre a la bonne minute.
   mise_en_avant_jusqu_au TEXT,
 
+  -- UN MOT DE PASSE OUBLIE SE RATTRAPE PAR UN APPEL.
+  --
+  -- La personne demande de l'aide ; l'equipe appelle LE NUMERO QUI EST
+  -- DEJA AU DOSSIER, s'assure que c'est bien elle, et lui lit un code a
+  -- usage unique. La personne entre ce code et choisit elle-meme son
+  -- nouveau mot de passe : l'equipe ne le connait jamais.
+  --
+  -- LE CODE EST RANGE HACHE, comme un mot de passe. Un code lisible dans
+  -- la base ouvrirait tous les comptes qui en attendent un.
+  --
+  -- CETTE PORTE EXISTE, ET ELLE EST TRACEE. Qui a delivre le code, et
+  -- quand le mot de passe a ete change : la personne le lit sur son
+  -- profil. Un abus se voit.
+  code_connexion        TEXT,
+  code_expire_le        TEXT,
+  code_demande_le       TEXT,
+  code_donne_par        INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL,
+  code_essais           INTEGER NOT NULL DEFAULT 0,
+  motdepasse_change_le  TEXT,
+
   -- L'ADRESSE EMAIL D'UNE PERSONNE AJOUTEE PAR L'EQUIPE.
   --
   -- Elle est rangee A PART de la colonne email, qui est un IDENTIFIANT DE

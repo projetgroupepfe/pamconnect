@@ -116,6 +116,13 @@ ajouterColonneSiAbsente("utilisateurs", "disponibilites", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "telephone", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "mise_en_avant_jusqu_au", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "email_contact", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "code_connexion", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "code_expire_le", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "code_demande_le", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "code_donne_par",
+  "INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL");
+ajouterColonneSiAbsente("utilisateurs", "code_essais", "INTEGER NOT NULL DEFAULT 0");
+ajouterColonneSiAbsente("utilisateurs", "motdepasse_change_le", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "ajoute_par",
   "INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL");
 ajouterColonneSiAbsente("messages", "signalement_decision", "TEXT");
@@ -926,7 +933,7 @@ const requetes = {
   annuaire: db.prepare(`
     SELECT u.id, u.nom, u.role, u.metier, u.quartier, u.arrondissement,
            u.telephone, u.tarif, u.statut_verification, u.suspendu,
-           u.ajoute_par, u.email_contact, u.cree_le,
+           u.ajoute_par, u.email_contact, u.code_demande_le, u.cree_le,
            q.nom AS nomAjoutePar,
            (SELECT COUNT(*) FROM candidatures c
              WHERE c.prestataire_id = u.id AND c.terminee_le IS NOT NULL) AS servicesFaits,
@@ -962,6 +969,52 @@ const requetes = {
     VALUES
       (@role, @nom, @email, @contact, @telephone, @motdepasse, @arrondissement,
        @quartier, @metier, @tarif, @par)
+  `),
+
+  // --- Le rattrapage d'un mot de passe oublie ---------------------
+  demanderUnCode: db.prepare(`
+    UPDATE utilisateurs
+       SET code_demande_le = datetime('now')
+     WHERE id = @id AND est_admin = 0 AND suspendu = 0
+  `),
+
+  poserUnCode: db.prepare(`
+    UPDATE utilisateurs
+       SET code_connexion  = @code,
+           code_expire_le  = datetime('now', @duree),
+           code_donne_par  = @par,
+           code_essais     = 0,
+           code_demande_le = NULL
+     WHERE id = @id AND est_admin = 0 AND suspendu = 0
+  `),
+
+  compterUnEssai: db.prepare(`
+    UPDATE utilisateurs SET code_essais = code_essais + 1 WHERE id = ?
+  `),
+
+  effacerLeCode: db.prepare(`
+    UPDATE utilisateurs
+       SET code_connexion = NULL, code_expire_le = NULL,
+           code_donne_par = NULL, code_essais = 0, code_demande_le = NULL
+     WHERE id = ?
+  `),
+
+  // Le mot de passe et la trace du changement, ensemble : la personne
+  // doit pouvoir lire sur son profil que son acces a ete rouvert.
+  poserNouveauMotDePasse: db.prepare(`
+    UPDATE utilisateurs
+       SET motdepasse            = @motdepasse,
+           motdepasse_change_le  = datetime('now'),
+           code_connexion        = NULL,
+           code_expire_le        = NULL,
+           code_essais           = 0,
+           code_demande_le       = NULL
+     WHERE id = @id
+  `),
+
+  nombreCodesDemandes: db.prepare(`
+    SELECT COUNT(*) AS n FROM utilisateurs
+     WHERE code_demande_le IS NOT NULL AND est_admin = 0
   `),
 
   nombreDansLAnnuaire: db.prepare(`
@@ -3578,6 +3631,10 @@ function monProfil(u) {
       attente: statut === "en attente" ? phraseAttenteVerification(u.documents_envoyes_le) : null,
     },
     lieu: equipe ? null : [u.arrondissement, u.quartier].filter(Boolean).join(", ") || null,
+    // LA TRACE D'UN MOT DE PASSE CHANGE APRES UN APPEL. Elle reste
+    // affichee : si la personne ne reconnait pas ce changement, c'est
+    // que quelqu'un d'autre l'a demande a sa place.
+    motDePasseChangeLe: u.motdepasse_change_le ? dateLisible(u.motdepasse_change_le) : null,
     // JUSQU'A QUAND L'EQUIPE M'APPELLE EN PREMIER. Absent quand la mise
     // en avant est finie, ou quand il n'y en a jamais eu.
     miseEnAvantJusquAu: personne && !equipe
@@ -4010,20 +4067,12 @@ app.post("/mon-profil/email", exigerConnexion, lireFormulaire, (req, res) => {
 
 // --- Changer son mot de passe --------------------------------------
 //
-// LIMITE CONNUE : on ne peut changer son mot de passe qu'en connaissant
-// l'ancien. Il n'existe AUCUNE recuperation : un mot de passe oublie
-// signifie un compte perdu, et pour une aide-menagere, la perte de son
-// statut verifie.
+// EN CONNAISSANT L'ANCIEN. C'est le chemin normal, et il ne fait
+// intervenir personne d'autre.
 //
-// La solution correcte est l'envoi d'un lien de reinitialisation que la
-// personne complete elle-meme : le support ne connait alors jamais le
-// mot de passe. Elle suppose un service d'envoi d'emails.
-//
-// Nous avons volontairement ECARTE la solution consistant a permettre a
-// l'equipe de reinitialiser un mot de passe : elle lui donnerait la
-// capacite de se connecter a la place de n'importe qui. Principe du
-// moindre privilege - l'equipe verifie des documents, elle n'a pas a
-// pouvoir agir au nom des utilisateurs.
+// Celui qui l'a oublie passe par l'equipe : elle appelle le numero deja
+// au dossier et lui lit un code a usage unique. Voir plus bas, "UN MOT
+// DE PASSE OUBLIE".
 const MOT_DE_PASSE_MIN = 6;
 app.locals.motDePasseMin = MOT_DE_PASSE_MIN;
 
@@ -7163,6 +7212,176 @@ app.post("/admin/mises-en-relation/:id/reponse", exigerAdmin, lireFormulaire, (r
   res.redirect("/admin/mises-en-relation");
 });
 
+// --- UN MOT DE PASSE OUBLIE ----------------------------------------
+//
+// AUCUN EMAIL N'EST ENVOYE. La plateforme n'a pas de service d'envoi, et
+// le numero de telephone, lui, est deja au dossier : c'est par la que
+// l'equipe joint les gens tous les jours.
+//
+// Trois moments, et trois personnes differentes :
+//
+//   1. la personne demande de l'aide depuis l'ecran de connexion ;
+//   2. l'equipe appelle LE NUMERO DEJA ENREGISTRE, s'assure que c'est
+//      bien elle, et lui lit un code a six chiffres ;
+//   3. la personne entre ce code et choisit ELLE-MEME son mot de passe.
+//
+// L'EQUIPE NE CONNAIT JAMAIS LE MOT DE PASSE. Elle ouvre la porte, elle
+// n'entre pas. Reste qu'une porte existe : quelqu'un de l'equipe
+// pourrait delivrer un code et s'en servir. C'est pourquoi le nom de qui
+// l'a delivre est garde, et la date du changement s'affiche sur le
+// profil de la personne - un abus se voit.
+const CODE_VALIDE_MINUTES = 30;
+const CODE_ESSAIS_MAX = 5;
+
+// Six chiffres, tires au hasard : assez court pour etre lu au telephone,
+// assez large pour qu'on ne le devine pas en cinq essais.
+function tirerUnCode() {
+  return String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+}
+
+// La meme reponse, que le compte existe ou non. Dire "cette adresse est
+// inconnue" apprendrait a n'importe qui quelles adresses ont un compte.
+const DEMANDE_DE_CODE_ENVOYEE = {
+  titre: "L'équipe va vous appeler",
+  texte: "Si un compte porte cette adresse, l'équipe PamConnect appellera le " +
+         "numéro de téléphone qui y est enregistré et vous donnera un code. " +
+         "Gardez votre téléphone près de vous.",
+};
+
+app.get("/mot-de-passe-oublie", (req, res) => {
+  res.render("mot-de-passe-oublie", { titre: "Mot de passe oublié" });
+});
+
+app.post("/mot-de-passe-oublie", lireFormulaire, (req, res) => {
+  const email = String(req.body.email || "").trim().toLowerCase();
+  const utilisateur = requetes.utilisateurParEmail.get(email);
+
+  // Une personne ajoutee par l'equipe n'a pas de compte a rouvrir : elle
+  // n'en a jamais ouvert un.
+  if (utilisateur && !utilisateur.est_admin && !utilisateur.ajoute_par) {
+    requetes.demanderUnCode.run({ id: utilisateur.id });
+  }
+
+  res.render("message", {
+    titre: DEMANDE_DE_CODE_ENVOYEE.titre,
+    texte: DEMANDE_DE_CODE_ENVOYEE.texte,
+    liens: [{ url: "/nouveau-mot-de-passe", texte: "J'ai reçu mon code" }],
+  });
+});
+
+// L'EQUIPE A APPELE : elle lit le code a la personne. Il n'est affiche
+// qu'ICI, une seule fois, et range hache : personne ne peut le relire.
+app.post("/admin/utilisateurs/:id/code", exigerAdmin, lireFormulaire, (req, res) => {
+  const personne = requetes.utilisateurParId.get(Number(req.params.id));
+
+  if (!personne || personne.est_admin) {
+    return afficherProbleme(res, { code: 404, titre: "Personne introuvable",
+      texte: "Ce compte n'existe pas, ou c'est un compte de l'équipe.",
+      lien: { url: "/admin/utilisateurs", texte: "Retour à l'annuaire" } });
+  }
+
+  if (personne.ajoute_par) {
+    return afficherProbleme(res, { code: 409, titre: "Cette personne n'a pas de compte en ligne",
+      texte: "Sa fiche a été ajoutée par l'équipe : il n'y a pas d'accès à rouvrir. " +
+             "Elle peut s'inscrire elle-même avec sa propre adresse.",
+      lien: { url: "/admin/utilisateurs", texte: "Retour à l'annuaire" } });
+  }
+
+  if (personne.suspendu) {
+    return afficherProbleme(res, { code: 409, titre: "Ce compte est suspendu",
+      texte: "Rouvrir l'accès d'un compte suspendu n'aurait aucun effet : la porte " +
+             "reste fermée tant que la suspension dure.",
+      lien: { url: "/admin/utilisateurs", texte: "Retour à l'annuaire" } });
+  }
+
+  const code = tirerUnCode();
+
+  requetes.poserUnCode.run({
+    id: personne.id,
+    code: hacherMotDePasse(code),
+    duree: `+${CODE_VALIDE_MINUTES} minutes`,
+    par: req.utilisateur.id,
+  });
+
+  res.render("code-donne", {
+    titre: "Code à lire au téléphone",
+    personne: {
+      nom: personne.nom,
+      telephone: personne.telephone ? formaterTelephone(personne.telephone) : null,
+      appel: personne.telephone ? "+237" + personne.telephone : null,
+    },
+    code,
+    minutes: CODE_VALIDE_MINUTES,
+  });
+});
+
+app.get("/nouveau-mot-de-passe", (req, res) => {
+  res.render("nouveau-mot-de-passe", { titre: "Choisir un nouveau mot de passe" });
+});
+
+function reouvrirAvecUnCode(donnees) {
+  const email = String(donnees.email || "").trim().toLowerCase();
+  const code = String(donnees.code || "").trim();
+  const utilisateur = requetes.utilisateurParEmail.get(email);
+
+  // LA MEME REPONSE POUR TOUT CE QUI RATE. Distinguer "adresse inconnue"
+  // de "code faux" dirait quelles adresses ont un compte, et lesquelles
+  // attendent un code.
+  const refus = { code: 401, titre: "Code refusé",
+    texte: "Ce code ne correspond pas, ou il n'est plus valable. L'équipe peut " +
+           "vous en donner un autre.",
+    lien: { url: "/mot-de-passe-oublie", texte: "Demander un nouveau code" } };
+
+  if (!utilisateur || !utilisateur.code_connexion || utilisateur.suspendu) {
+    return { probleme: refus };
+  }
+
+  // CINQ ESSAIS. Au-dela, le code est efface : six chiffres se devinent
+  // en un million de tentatives, pas en cinq, mais un code qu'on peut
+  // essayer sans fin finit par tomber.
+  if (utilisateur.code_essais >= CODE_ESSAIS_MAX) {
+    requetes.effacerLeCode.run(utilisateur.id);
+    return { probleme: refus };
+  }
+
+  const expire = String(utilisateur.code_expire_le || "").replace(" ", "T") + "Z";
+  if (!utilisateur.code_expire_le || Date.parse(expire) < Date.now()) {
+    return { probleme: refus };
+  }
+
+  if (!verifierMotDePasse(code, utilisateur.code_connexion)) {
+    requetes.compterUnEssai.run(utilisateur.id);
+    return { probleme: refus };
+  }
+
+  const nouveau = String(donnees.motdepasse || "");
+
+  if (nouveau.length < MOT_DE_PASSE_MIN) {
+    return { probleme: { code: 400, titre: "Mot de passe trop court",
+      texte: `Choisissez un mot de passe d'au moins ${MOT_DE_PASSE_MIN} caractères.`,
+      lien: { url: "/nouveau-mot-de-passe", texte: "Réessayer" } } };
+  }
+
+  requetes.poserNouveauMotDePasse.run({
+    id: utilisateur.id,
+    motdepasse: hacherMotDePasse(nouveau),
+  });
+
+  return { ok: true, nom: utilisateur.nom };
+}
+
+app.post("/nouveau-mot-de-passe", lireFormulaire, (req, res) => {
+  const resultat = reouvrirAvecUnCode(req.body);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
+  res.render("message", {
+    titre: "Votre mot de passe est changé",
+    texte: "Vous pouvez vous connecter avec votre nouveau mot de passe. La date de " +
+           "ce changement est inscrite sur votre profil.",
+    liens: [{ url: "/connexion", texte: "Se connecter" }],
+  });
+});
+
 // --- Espace equipe : l'annuaire ------------------------------------
 //
 // LA LISTE DE CEUX QU'ON PEUT APPELER. Elle reunit deux populations que
@@ -7210,6 +7429,7 @@ function ecranAnnuaire(criteres) {
       verification: p.statut_verification,
       suspendu: p.suspendu === 1,
       ajoutee: Boolean(p.ajoute_par),
+      attendUnCode: Boolean(p.code_demande_le),
       parQui: p.nomAjoutePar,
       inscriteLe: dateLisible(p.cree_le),
       services: p.role === "prestataire" ? p.servicesFaits : p.demandesPubliees,
@@ -7705,6 +7925,7 @@ app.get("/admin", exigerAdmin, (req, res) => {
     demandesATraiter: requetes.nombreDemandesATraiter.get().n,
     paiementsEnAttente: requetes.nombrePaiementsEnAttente.get().n,
     personnesConnues: requetes.nombreDansLAnnuaire.get().n,
+    codesDemandes: requetes.nombreCodesDemandes.get().n,
     achatsJetons: requetes.nombreAchatsJetonsEnAttente.get().n,
     avisSignales: requetes.nombreAvisSignales.get().n,
   });
@@ -8057,6 +8278,36 @@ app.post("/api/connexion", (req, res) => {
   // du site ne l'affichent jamais, et leur cookie reste illisible par le
   // JavaScript des pages (httpOnly).
   res.json({ jeton: token, moi: moiPourApi(utilisateur) });
+});
+
+// --- Un mot de passe oublie, depuis l'application --------------------
+//
+// Les memes regles que sur le site, ecrites une seule fois plus haut :
+// la meme reponse que le compte existe ou non, le meme code a usage
+// unique, les memes cinq essais.
+app.post("/api/mot-de-passe-oublie", (req, res) => {
+  const email = String((req.body && req.body.email) || "").trim().toLowerCase();
+  const utilisateur = requetes.utilisateurParEmail.get(email);
+
+  if (utilisateur && !utilisateur.est_admin && !utilisateur.ajoute_par) {
+    requetes.demanderUnCode.run({ id: utilisateur.id });
+  }
+
+  res.json({ titre: DEMANDE_DE_CODE_ENVOYEE.titre, texte: DEMANDE_DE_CODE_ENVOYEE.texte });
+});
+
+app.post("/api/nouveau-mot-de-passe", (req, res) => {
+  const resultat = reouvrirAvecUnCode(req.body || {});
+
+  if (resultat.probleme) {
+    return erreurApi(res, resultat.probleme.code, resultat.probleme.texte);
+  }
+
+  res.json({
+    titre: "Votre mot de passe est changé",
+    texte: "Vous pouvez vous connecter avec votre nouveau mot de passe. La date de " +
+           "ce changement est inscrite sur votre profil.",
+  });
 });
 
 // --- Creer un compte depuis l'application ----------------------------
