@@ -144,6 +144,15 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
   avertissement_le    TEXT,
   avertissement_lu    INTEGER NOT NULL DEFAULT 0 CHECK (avertissement_lu IN (0, 1)),
 
+  -- QUI A CREE CE COMPTE. Vide quand la personne s'est inscrite
+  -- elle-meme ; renseigne quand l'equipe l'a ajoutee a son annuaire,
+  -- souvent apres l'avoir rencontree.
+  --
+  -- Une personne ajoutee ainsi n'a pas choisi de mot de passe, et on n'en
+  -- invente pas un a sa place : son compte ne s'ouvre pas en ligne, il
+  -- sert a l'equipe pour l'appeler.
+  ajoute_par      INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL,
+
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 

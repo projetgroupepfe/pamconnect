@@ -114,6 +114,8 @@ ajouterColonneSiAbsente("utilisateurs", "date_naissance", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "experience_annees", "INTEGER");
 ajouterColonneSiAbsente("utilisateurs", "disponibilites", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "telephone", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "ajoute_par",
+  "INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL");
 ajouterColonneSiAbsente("messages", "signalement_decision", "TEXT");
 ajouterColonneSiAbsente("messages", "signalement_traite_par", "INTEGER");
 ajouterColonneSiAbsente("messages", "signalement_traite_le", "TEXT");
@@ -887,6 +889,57 @@ const requetes = {
     LIMIT 8
   `),
 
+  // --- L'annuaire de l'equipe -------------------------------------
+  //
+  // TOUT LE MONDE DANS UNE SEULE LISTE, filtrable : separer les inscrits
+  // des personnes ajoutees ferait deux ecrans a lire, alors que la
+  // question de l'equipe est toujours la meme - qui puis-je appeler pour
+  // ce metier, dans ce quartier ?
+  annuaire: db.prepare(`
+    SELECT u.id, u.nom, u.role, u.metier, u.quartier, u.arrondissement,
+           u.telephone, u.tarif, u.statut_verification, u.suspendu,
+           u.ajoute_par, u.cree_le,
+           q.nom AS nomAjoutePar,
+           (SELECT COUNT(*) FROM candidatures c
+             WHERE c.prestataire_id = u.id AND c.terminee_le IS NOT NULL) AS servicesFaits,
+           (SELECT COUNT(*) FROM annonces a WHERE a.employeur_id = u.id) AS demandesPubliees,
+           (SELECT a.metier FROM annonces a WHERE a.employeur_id = u.id
+             ORDER BY a.id DESC LIMIT 1) AS dernierBesoin
+    FROM utilisateurs u
+    LEFT JOIN utilisateurs q ON q.id = u.ajoute_par
+    WHERE u.est_admin = 0
+      AND (@role = '' OR u.role = @role)
+      AND (@origine = ''
+           OR (@origine = 'inscrit' AND u.ajoute_par IS NULL)
+           OR (@origine = 'ajoute'  AND u.ajoute_par IS NOT NULL))
+      AND (@motif = '%%'
+           OR LOWER(u.nom) LIKE @motif
+           OR LOWER(COALESCE(u.metier, '')) LIKE @motif
+           OR LOWER(COALESCE(u.quartier, '')) LIKE @motif
+           OR COALESCE(u.telephone, '') LIKE @motif)
+    ORDER BY u.ajoute_par IS NOT NULL, u.nom
+  `),
+
+  // Deux fiches pour la meme personne seraient pires que pas de fiche du
+  // tout : l'equipe appellerait deux fois, et ne saurait pas laquelle
+  // tient a jour.
+  personneParTelephone: db.prepare(`
+    SELECT id, nom, role FROM utilisateurs WHERE telephone = ?
+  `),
+
+  ajouterPersonne: db.prepare(`
+    INSERT INTO utilisateurs
+      (role, nom, email, telephone, motdepasse, arrondissement, quartier,
+       metier, tarif, ajoute_par)
+    VALUES
+      (@role, @nom, @email, @telephone, @motdepasse, @arrondissement, @quartier,
+       @metier, @tarif, @par)
+  `),
+
+  nombreDansLAnnuaire: db.prepare(`
+    SELECT COUNT(*) AS n FROM utilisateurs WHERE est_admin = 0
+  `),
+
   // --- Les paiements ----------------------------------------------
   //
   // Une ligne par mise en relation acceptee, ecrite au premier
@@ -1576,6 +1629,14 @@ function hacherMotDePasse(motDePasse) {
   const sel = crypto.randomBytes(16).toString("hex");
   const hache = crypto.scryptSync(motDePasse, sel, 64).toString("hex");
   return `${sel}:${hache}`;
+}
+
+// UN COMPTE SANS CONNEXION. La personne ajoutee par l'equipe n'a pas
+// choisi de mot de passe, et on n'en invente pas un a sa place : on range
+// une valeur tiree au hasard dont personne ne connait l'original. Aucune
+// saisie ne peut donc ouvrir ce compte.
+function motDePasseImpossible() {
+  return "sans-connexion:" + crypto.randomBytes(64).toString("hex");
 }
 
 function verifierMotDePasse(motDePasseSaisi, motDePasseHache) {
@@ -6941,6 +7002,141 @@ app.post("/admin/mises-en-relation/:id/reponse", exigerAdmin, lireFormulaire, (r
   res.redirect("/admin/mises-en-relation");
 });
 
+// --- Espace equipe : l'annuaire ------------------------------------
+//
+// LA LISTE DE CEUX QU'ON PEUT APPELER. Elle reunit deux populations que
+// l'equipe traite de la meme facon : les personnes inscrites elles-memes,
+// et celles qu'elle a rencontrees et ajoutees - un menuisier sans
+// telephone intelligent reste quelqu'un a qui confier un service.
+//
+// D'OU VIENT CHAQUE FICHE EST ECRIT SUR CHACUNE. Une personne ajoutee par
+// l'equipe n'a pas de compte en ligne : elle n'a choisi aucun mot de
+// passe, et on n'en invente pas a sa place.
+function ecranAnnuaire(criteres) {
+  const cherche = String(criteres.q || "").trim().slice(0, 60);
+  const role = criteres.role === "employeur" || criteres.role === "prestataire"
+    ? criteres.role : "";
+  const origine = criteres.origine === "inscrit" || criteres.origine === "ajoute"
+    ? criteres.origine : "";
+
+  const lignes = requetes.annuaire.all({
+    role,
+    origine,
+    motif: "%" + cherche.toLowerCase() + "%",
+  });
+
+  return {
+    cherche,
+    role,
+    origine,
+    total: requetes.nombreDansLAnnuaire.get().n,
+    personnes: lignes.map((p) => ({
+      id: p.id,
+      nom: p.nom,
+      estEmployeur: p.role === "employeur",
+      // Le metier pour celle qui travaille, le dernier besoin pour celui
+      // qui cherche : dans les deux cas, ce que l'equipe veut savoir
+      // avant d'appeler.
+      quoi: p.role === "prestataire" ? p.metier : p.dernierBesoin,
+      quartier: p.quartier,
+      arrondissement: p.arrondissement,
+      telephone: p.telephone ? formaterTelephone(p.telephone) : null,
+      appel: p.telephone ? "+237" + p.telephone : null,
+      tarif: p.tarif ? formaterMontant(p.tarif) : null,
+      verification: p.statut_verification,
+      suspendu: p.suspendu === 1,
+      ajoutee: Boolean(p.ajoute_par),
+      parQui: p.nomAjoutePar,
+      inscriteLe: dateLisible(p.cree_le),
+      services: p.role === "prestataire" ? p.servicesFaits : p.demandesPubliees,
+    })),
+  };
+}
+
+app.get("/admin/utilisateurs", exigerAdmin, (req, res) => {
+  res.render("annuaire", Object.assign({ titre: "Annuaire" }, ecranAnnuaire(req.query)));
+});
+
+function ajouterAuRepertoire(admin, donnees) {
+  const nom = String(donnees.nom || "").trim().slice(0, 80);
+
+  if (nom.length < 2) {
+    return { probleme: { code: 400, titre: "Nom manquant",
+      texte: "Écrivez le nom de la personne, tel qu'elle le donne." } };
+  }
+
+  const role = donnees.role === "employeur" ? "employeur" : "prestataire";
+
+  const telephone = lireTelephone(donnees);
+  if (telephone.probleme) {
+    return { probleme: Object.assign({ code: 400 }, telephone.probleme) };
+  }
+
+  // DEUX FICHES POUR LA MEME PERSONNE seraient pires que pas de fiche :
+  // l'equipe appellerait deux fois, sans savoir laquelle est a jour.
+  const deja = requetes.personneParTelephone.get(telephone.numero);
+  if (deja) {
+    return { probleme: { code: 409, titre: "Ce numéro est déjà connu",
+      texte: `${deja.nom} porte déjà ce numéro dans l'annuaire.` } };
+  }
+
+  const metier = String(donnees.metier || "").trim().slice(0, 60);
+
+  if (role === "prestataire" && !metier) {
+    return { probleme: { code: 400, titre: "Métier manquant",
+      texte: "Dites ce que cette personne sait faire : c'est ce qui la fera " +
+             "trouver quand une demande arrivera." } };
+  }
+
+  const tarifSaisi = String(donnees.tarif || "").trim();
+  const tarif = tarifSaisi ? Math.round(Number(tarifSaisi)) : null;
+
+  if (tarifSaisi && (!(tarif > 0) || !montantAccepte(tarif))) {
+    return { probleme: { code: 400, titre: "Tarif à revoir",
+      texte: `Le tarif indicatif doit être ${regleMontantLisible()}, ou laissé vide.` } };
+  }
+
+  // Le quartier se reconnait comme partout ailleurs : les accents et les
+  // orthographes declarees sont rattrapes, et l'arrondissement suit.
+  const lieu = quartiersParCle.get(normaliserNom(String(donnees.quartier || "")));
+
+  // L'EQUIPE PEUT AVOIR VU LA PIECE EN MAIN. C'est le seul cas ou une
+  // identite est validee sans dossier envoye : quelqu'un de l'equipe a
+  // rencontre la personne. La case est decochee par defaut, et une fiche
+  // non validee ne sera pas proposee pour une mise en relation.
+  const vue = donnees.piece_vue === "oui";
+
+  const pose = requetes.ajouterPersonne.run({
+    role,
+    nom,
+    // Un identifiant technique, pas une adresse : cette personne n'a pas
+    // donne d'email, et on n'en invente pas.
+    email: "annuaire-" + telephone.numero,
+    telephone: telephone.numero,
+    motdepasse: motDePasseImpossible(),
+    arrondissement: lieu ? lieu.arrondissement : null,
+    quartier: lieu ? lieu.nom : (String(donnees.quartier || "").trim().slice(0, 60) || null),
+    metier: role === "prestataire" ? metier : null,
+    tarif: role === "prestataire" ? tarif : null,
+    par: admin.id,
+  });
+
+  if (vue) requetes.validerVerification.run(pose.lastInsertRowid);
+
+  return { ok: true };
+}
+
+app.post("/admin/utilisateurs", exigerAdmin, lireFormulaire, (req, res) => {
+  const resultat = ajouterAuRepertoire(req.utilisateur, req.body);
+
+  if (resultat.probleme) {
+    return afficherProbleme(res, Object.assign({}, resultat.probleme,
+      { lien: { url: "/admin/utilisateurs", texte: "Retour à l'annuaire" } }));
+  }
+
+  res.redirect("/admin/utilisateurs");
+});
+
 // --- Espace equipe : les paiements ---------------------------------
 //
 // LA PLATEFORME NE DEPLACE PAS D'ARGENT, elle en garde la trace.
@@ -7339,6 +7535,7 @@ app.get("/admin", exigerAdmin, (req, res) => {
     problemesOuverts: requetes.nombreProblemesOuverts.get().n,
     demandesATraiter: requetes.nombreDemandesATraiter.get().n,
     paiementsEnAttente: requetes.nombrePaiementsEnAttente.get().n,
+    personnesConnues: requetes.nombreDansLAnnuaire.get().n,
     achatsJetons: requetes.nombreAchatsJetonsEnAttente.get().n,
     avisSignales: requetes.nombreAvisSignales.get().n,
   });

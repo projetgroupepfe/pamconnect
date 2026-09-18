@@ -25,6 +25,10 @@
       <%- include("partiels/icone", { nom: "info" }) %>
       Problèmes signalés<% if (problemesOuverts > 0) { %> (<%= problemesOuverts %>)<% } %>
     </a>
+    <a class="bouton bouton-secondaire" href="/admin/utilisateurs">
+      <%- include("partiels/icone", { nom: "profil" }) %>
+      Annuaire<% if (personnesConnues > 0) { %> (<%= personnesConnues %>)<% } %>
+    </a>
     <a class="bouton bouton-secondaire" href="/admin/mises-en-relation">
       <%- include("partiels/icone", { nom: "telephone" }) %>
       Mises en relation<% if (demandesATraiter > 0) { %> (<%= demandesATraiter %>)<% } %>

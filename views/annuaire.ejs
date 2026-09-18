@@ -1,0 +1,213 @@
+<%- include("partiels/tete") %>
+
+  <h1>Annuaire</h1>
+  <p class="chapeau">
+    Les <%= total %> personnes que l'équipe peut appeler : celles qui se sont
+    inscrites, et celles qu'elle a ajoutées.
+  </p>
+
+  <%# LA RECHERCHE D'ABORD. L'equipe arrive ici avec une question precise :
+      qui, pour ce metier, dans ce quartier ? %>
+  <form action="/admin/utilisateurs" method="GET">
+    <div class="champ">
+      <label for="q">Chercher</label>
+      <input type="search" id="q" name="q" value="<%= cherche %>"
+             placeholder="ex : un nom, un métier, un quartier, un numéro">
+    </div>
+
+    <div class="champ">
+      <label for="role">Rôle</label>
+      <select id="role" name="role">
+        <option value="" <%= role === "" ? "selected" : "" %>>Tout le monde</option>
+        <option value="prestataire" <%= role === "prestataire" ? "selected" : "" %>>Prestataires</option>
+        <option value="employeur" <%= role === "employeur" ? "selected" : "" %>>Employeurs</option>
+      </select>
+    </div>
+
+    <div class="champ">
+      <label for="origine">Origine</label>
+      <select id="origine" name="origine">
+        <option value="" <%= origine === "" ? "selected" : "" %>>Toutes</option>
+        <option value="inscrit" <%= origine === "inscrit" ? "selected" : "" %>>Inscrits eux-mêmes</option>
+        <option value="ajoute" <%= origine === "ajoute" ? "selected" : "" %>>Ajoutés par l'équipe</option>
+      </select>
+    </div>
+
+    <p class="actions">
+      <button class="bouton" type="submit">
+        <%- include("partiels/icone", { nom: "recherche" }) %>
+        Chercher
+      </button>
+      <a class="bouton bouton-secondaire" href="/admin/utilisateurs">Tout revoir</a>
+    </p>
+  </form>
+
+  <% if (personnes.length === 0) { %>
+
+    <div class="vide">
+      <p>Personne ne correspond.</p>
+    </div>
+
+  <% } else { %>
+
+    <div class="grille">
+      <% personnes.forEach(function (p) { %>
+        <div class="carte">
+          <h3><%= p.nom %></h3>
+          <div class="metier">
+            <%= p.estEmployeur ? "Employeur" : (p.quoi || "Métier non renseigné") %>
+          </div>
+
+          <p>
+            <%# D'OU VIENT CETTE FICHE, ecrit sur chacune. %>
+            <% if (p.ajoutee) { %>
+              <span class="badge badge-en-attente">Ajoutée par l'équipe</span>
+            <% } else { %>
+              <span class="badge badge-verifie">Inscrite elle-même</span>
+            <% } %>
+            <% if (p.suspendu) { %>
+              <span class="badge badge-refuse">Suspendue</span>
+            <% } %>
+          </p>
+
+          <ul class="infos">
+            <% if (p.telephone) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "telephone" }) %>
+                <span><a href="tel:<%= p.appel %>"><%= p.telephone %></a></span>
+              </li>
+            <% } %>
+            <% if (p.quartier) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "lieu" }) %>
+                <span><%= p.quartier %><%= p.arrondissement ? ", " + p.arrondissement : "" %></span>
+              </li>
+            <% } %>
+            <% if (p.estEmployeur && p.quoi) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "recherche" }) %>
+                <span>Cherchait : <%= p.quoi %></span>
+              </li>
+            <% } %>
+            <% if (p.tarif) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "remuneration" }) %>
+                <span>Tarif indicatif : <%= p.tarif %></span>
+              </li>
+            <% } %>
+            <li>
+              <%- include("partiels/icone", { nom: "valider" }) %>
+              <span><%= libelleVerification(p.verification) %></span>
+            </li>
+            <li>
+              <%- include("partiels/icone", { nom: "experience" }) %>
+              <span>
+                <%= p.estEmployeur ? "Demandes publiées" : "Services effectués" %> : <%= p.services %>
+              </span>
+            </li>
+            <li>
+              <%- include("partiels/icone", { nom: "calendrier" }) %>
+              <span>
+                <% if (p.ajoutee) { %>
+                  Ajoutée le <%= p.inscriteLe %><%= p.parQui ? " par " + p.parQui : "" %> · pas de compte en ligne
+                <% } else { %>
+                  Inscrite le <%= p.inscriteLe %>
+                <% } %>
+              </span>
+            </li>
+          </ul>
+
+          <% if (!p.estEmployeur) { %>
+            <p class="actions">
+              <a class="bouton bouton-secondaire" href="/personnes/<%= p.id %>">
+                <%- include("partiels/icone", { nom: "profil" }) %>
+                Voir sa fiche
+              </a>
+            </p>
+          <% } %>
+        </div>
+      <% }); %>
+    </div>
+
+  <% } %>
+
+  <h2>Ajouter une personne</h2>
+  <p class="chapeau">
+    Pour quelqu'un que l'équipe a rencontré et qui n'utilise pas la
+    plateforme. Cette fiche ne lui ouvre aucun compte en ligne.
+  </p>
+
+  <form action="/admin/utilisateurs" method="POST">
+    <div class="champ">
+      <label for="nom-ajout">Nom</label>
+      <input type="text" id="nom-ajout" name="nom" maxlength="80" required>
+    </div>
+
+    <div class="champ">
+      <label for="telephone-ajout">Numéro de téléphone</label>
+      <input type="tel" id="telephone-ajout" name="telephone" required
+             placeholder="ex : 6XX XX XX XX">
+    </div>
+
+    <div class="champ">
+      <label for="role-ajout">Rôle</label>
+      <select id="role-ajout" name="role">
+        <option value="prestataire">Propose ses services</option>
+        <option value="employeur">Cherche quelqu'un</option>
+      </select>
+    </div>
+
+    <div class="champ">
+      <label for="metier-ajout">Métier <span class="aide">(si elle propose ses services)</span></label>
+      <input type="text" id="metier-ajout" name="metier" maxlength="60"
+             list="liste-metiers-annuaire">
+      <datalist id="liste-metiers-annuaire">
+        <% metiers.forEach(function (m) { %>
+          <option value="<%= m.nom %>"></option>
+        <% }); %>
+      </datalist>
+    </div>
+
+    <div class="champ">
+      <label for="quartier-ajout">Quartier</label>
+      <input type="text" id="quartier-ajout" name="quartier" maxlength="60"
+             list="liste-quartiers-annuaire">
+      <datalist id="liste-quartiers-annuaire">
+        <% quartiers.forEach(function (q) { %>
+          <option value="<%= q.nom %>"></option>
+        <% }); %>
+      </datalist>
+    </div>
+
+    <div class="champ">
+      <label for="tarif-ajout">Tarif indicatif <span class="aide">(facultatif)</span></label>
+      <input type="number" id="tarif-ajout" name="tarif"
+             min="<%= montantMinimum %>" step="<%= pasMontant %>">
+    </div>
+
+    <%# LA SEULE IDENTITE VALIDEE SANS DOSSIER ENVOYE. Quelqu'un de
+        l'equipe a vu la piece en main. Decochee, la fiche sert a rappeler
+        la personne, mais elle ne sera pas proposee pour un service. %>
+    <div class="champ">
+      <label for="piece-vue">
+        <input type="checkbox" id="piece-vue" name="piece_vue" value="oui">
+        J'ai vu sa pièce d'identité en personne
+      </label>
+    </div>
+
+    <p class="actions">
+      <button class="bouton" type="submit">
+        <%- include("partiels/icone", { nom: "ajouter" }) %>
+        Ajouter à l'annuaire
+      </button>
+    </p>
+  </form>
+
+  <p class="actions">
+    <a class="bouton bouton-secondaire" href="/admin">
+      <%- include("partiels/icone", { nom: "equipe" }) %>
+      Retour à l'espace équipe
+    </a>
+  </p>
+
+<%- include("partiels/pied") %>
