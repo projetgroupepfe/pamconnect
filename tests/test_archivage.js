@@ -154,8 +154,10 @@ setTimeout(async () => {
 
   // LE POINT CENTRAL : sa declaration ne libere aucun argent. L'employeur
   // paie apres le service, et c'est l'equipe qui enregistre ce paiement.
-  dire("aucune somme n'est engagee",
-       !base.prepare("SELECT etat FROM versements WHERE annonce_id = ?").get(aJ.id));
+  dire("aucun paiement n'est enregistre",
+       !base.prepare(
+         "SELECT p.id FROM paiements p JOIN mises_en_relation m ON m.id = p.mise_en_relation_id "
+         + "WHERE m.annonce_id = ?").get(aJ.id));
   dire("et le service n'est pas clos", apresJ.terminee_le === null);
   dire("la discussion reste ouverte a l'ecriture",
        (await poster("/messages/" + cJ.id, form({ texte: M + " a bientot" }), preJ.cookie)).code === 302);

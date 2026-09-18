@@ -25,9 +25,13 @@
       <%- include("partiels/icone", { nom: "info" }) %>
       Problèmes signalés<% if (problemesOuverts > 0) { %> (<%= problemesOuverts %>)<% } %>
     </a>
-    <a class="bouton bouton-secondaire" href="/admin/versements">
+    <a class="bouton bouton-secondaire" href="/admin/mises-en-relation">
+      <%- include("partiels/icone", { nom: "telephone" }) %>
+      Mises en relation<% if (demandesATraiter > 0) { %> (<%= demandesATraiter %>)<% } %>
+    </a>
+    <a class="bouton bouton-secondaire" href="/admin/paiements">
       <%- include("partiels/icone", { nom: "remuneration" }) %>
-      Versements<% if (versementsBloques > 0) { %> (<%= versementsBloques %>)<% } %>
+      Paiements<% if (paiementsEnAttente > 0) { %> (<%= paiementsEnAttente %>)<% } %>
     </a>
     <a class="bouton bouton-secondaire" href="/admin/jetons">
       <%- include("partiels/icone", { nom: "jeton" }) %>

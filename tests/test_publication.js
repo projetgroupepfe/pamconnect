@@ -81,8 +81,9 @@ setTimeout(async () => {
   dire("aucun prix n'y est inscrit", demande && demande.prix === null, String(demande && demande.prix));
 
   console.log("\n--- 2. Aucune somme n'est bloquée ---");
-  const versement = base.prepare("SELECT * FROM versements WHERE annonce_id = ?").get(demande.id);
-  dire("la publication ne bloque plus aucune somme", !versement);
+  const relation = base.prepare(
+    "SELECT id FROM mises_en_relation WHERE annonce_id = ?").get(demande.id);
+  dire("la publication n'engage aucun prix", !relation);
   dire("la page de publication ne parle plus de somme bloquée",
        !(await q("/publier-annonce", { cookie: cEmp })).corps.includes("bloquée par PamConnect"));
 

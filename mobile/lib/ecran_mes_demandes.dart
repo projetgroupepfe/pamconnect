@@ -334,7 +334,7 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
             "Retirées ou pourvues. Elles n'apparaissent plus dans la liste publique, "
-            'mais vos discussions et vos versements y restent rattachés.',
+            'mais vos discussions y restent rattachées.',
             style: gris,
           ),
         ),

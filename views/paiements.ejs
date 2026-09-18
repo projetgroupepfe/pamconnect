@@ -1,0 +1,149 @@
+<%- include("partiels/tete") %>
+
+  <h1>Paiements</h1>
+  <p class="chapeau">
+    L'employeur paie PamConnect après le service, PamConnect reverse à la
+    personne. Notez ici ce qui est reçu, puis ce qui est reversé.
+  </p>
+
+  <div class="carte confiance">
+    <h3>Ce que cette page est</h3>
+    <p class="aide">
+      Une trace, pas un portefeuille : l'argent passe par l'agence ou par
+      Mobile Money, jamais par la plateforme.
+    </p>
+  </div>
+
+  <% if (services.length === 0) { %>
+
+    <div class="vide">
+      <p>Aucun service à suivre.</p>
+    </div>
+
+  <% } %>
+
+  <% services.forEach(function (s) { %>
+    <div class="carte">
+
+      <h3><%= s.titreDemande %></h3>
+      <div class="metier"><%= s.metier %></div>
+
+      <p>
+        <span class="badge <%= s.etat === "termine" ? "badge-verifie" : s.etat === "a_reverser" ? "badge-en-attente" : "badge-non-soumis" %>">
+          <%= s.etat === "termine" ? "Terminé" : s.etat === "a_reverser" ? "À reverser" : "À recevoir" %>
+        </span>
+        <% if (!s.serviceTermine) { %>
+          <span class="badge badge-en-attente">Service pas encore déclaré</span>
+        <% } %>
+      </p>
+
+      <div class="detail-tarif">
+        <div class="ligne-tarif">
+          <span>L'employeur doit payer</span>
+          <strong><%= s.prixEmployeur %></strong>
+        </div>
+        <div class="ligne-tarif">
+          <span>Commission PamConnect</span>
+          <span class="retenue"><%= s.commission %></span>
+        </div>
+        <div class="ligne-tarif total">
+          <span>À reverser à <%= s.prestataire %></span>
+          <strong><%= s.prixPrestataire %></strong>
+        </div>
+      </div>
+
+      <ul class="infos">
+        <li>
+          <%- include("partiels/icone", { nom: "profil" }) %>
+          <span>
+            <strong><%= s.employeur %></strong>
+            <% if (s.telephoneEmployeur) { %>
+              <a href="tel:<%= s.appelEmployeur %>"><%= s.telephoneEmployeur %></a>
+            <% } %>
+          </span>
+        </li>
+        <li>
+          <%- include("partiels/icone", { nom: "telephone" }) %>
+          <span>
+            <strong><%= s.prestataire %></strong>
+            <% if (s.telephonePrestataire) { %>
+              <a href="tel:<%= s.appelPrestataire %>"><%= s.telephonePrestataire %></a>
+            <% } %>
+          </span>
+        </li>
+        <% if (s.recu) { %>
+          <li>
+            <%- include("partiels/icone", { nom: "valider" }) %>
+            <span>Reçu <strong><%= s.recu.montant %></strong> le <%= s.recu.date %> (<%= s.recu.moyen %>)</span>
+          </li>
+        <% } %>
+        <% if (s.reverse) { %>
+          <li>
+            <%- include("partiels/icone", { nom: "valider" }) %>
+            <span>Reversé <strong><%= s.reverse.montant %></strong> le <%= s.reverse.date %> (<%= s.reverse.moyen %>)</span>
+          </li>
+        <% } %>
+      </ul>
+
+      <%# RECEVOIR D'ABORD, REVERSER ENSUITE. On ne reverse pas une somme
+          qui n'est pas arrivee : le formulaire de reversement n'apparait
+          qu'une fois le paiement note. %>
+      <% if (!s.recu) { %>
+        <form action="/admin/paiements/<%= s.id %>/recu" method="POST">
+          <div class="champ">
+            <label for="recu-<%= s.id %>">Montant reçu de l'employeur</label>
+            <input type="number" id="recu-<%= s.id %>" name="montant" min="1" required>
+          </div>
+          <div class="champ">
+            <label for="moyen-recu-<%= s.id %>">Comment</label>
+            <select id="moyen-recu-<%= s.id %>" name="moyen" required>
+              <option value="Agence PamConnect">Agence PamConnect</option>
+              <option value="Mobile Money">Mobile Money</option>
+              <option value="Espèces">Espèces</option>
+            </select>
+          </div>
+          <p class="actions">
+            <button class="bouton" type="submit">
+              <%- include("partiels/icone", { nom: "remuneration" }) %>
+              Enregistrer le paiement reçu
+            </button>
+          </p>
+        </form>
+      <% } else if (!s.reverse) { %>
+        <form action="/admin/paiements/<%= s.id %>/reverse" method="POST">
+          <div class="champ">
+            <label for="reverse-<%= s.id %>">Montant reversé à <%= s.prestataire %></label>
+            <input type="number" id="reverse-<%= s.id %>" name="montant" min="1" required>
+          </div>
+          <div class="champ">
+            <label for="moyen-reverse-<%= s.id %>">Comment</label>
+            <select id="moyen-reverse-<%= s.id %>" name="moyen" required>
+              <option value="Agence PamConnect">Agence PamConnect</option>
+              <option value="Mobile Money">Mobile Money</option>
+              <option value="Espèces">Espèces</option>
+            </select>
+          </div>
+          <p class="actions">
+            <button class="bouton" type="submit">
+              <%- include("partiels/icone", { nom: "envoi" }) %>
+              Enregistrer le reversement
+            </button>
+          </p>
+        </form>
+      <% } %>
+
+    </div>
+  <% }); %>
+
+  <p class="actions">
+    <a class="bouton bouton-secondaire" href="/admin">
+      <%- include("partiels/icone", { nom: "equipe" }) %>
+      Retour à l'espace équipe
+    </a>
+    <a class="bouton bouton-secondaire" href="/admin/mises-en-relation">
+      <%- include("partiels/icone", { nom: "telephone" }) %>
+      Mises en relation
+    </a>
+  </p>
+
+<%- include("partiels/pied") %>

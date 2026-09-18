@@ -6,11 +6,11 @@ import 'elements.dart';
 import 'modeles.dart';
 import 'theme.dart';
 
-/// Mon compte : ce que l'argent est devenu. Pour l'employeur, les sommes
-/// qu'il a posees ; pour la personne qui repond, ce qu'elle a recu.
+/// Mon compte : ce que l'employeur doit payer apres un service, et ce que
+/// la personne qui a travaille a recu.
 ///
-/// Aucun numero Mobile Money ni compte bancaire : la plateforme n'en
-/// demande pas, et les montants sont simules.
+/// Aucun numero Mobile Money ni compte bancaire : l'argent ne passe pas
+/// par la plateforme, qui en garde seulement la trace.
 class EcranMonCompte extends StatefulWidget {
   const EcranMonCompte({super.key, required this.api});
 
@@ -89,31 +89,30 @@ class _EcranMonCompteState extends State<EcranMonCompte> {
         Avertissement(texte: erreur),
         const SizedBox(height: 16),
       ],
-      // CE QUE CETTE PAGE N'EST PAS : un portefeuille. Le solde est un
-      // montant du, et les montants sont simules.
+      // CE QUE CETTE PAGE N'EST PAS : un portefeuille. C'est une trace.
       const _CarteCirculation(),
       const SizedBox(height: 8),
-      if (compte.jeSuisEmployeur) ..._versementsEnvoyes(context, compte) else ..._versementsRecus(context, compte),
+      if (compte.jeSuisEmployeur) ..._servicesAPayer(context, compte) else ..._servicesRecus(context, compte),
     ];
   }
 
-  List<Widget> _versementsEnvoyes(BuildContext context, MonCompte compte) {
+  List<Widget> _servicesAPayer(BuildContext context, MonCompte compte) {
     final texte = Theme.of(context).textTheme;
     return [
-      const TitreSection('Vos versements'),
+      const TitreSection('Vos services'),
       if (compte.envoyes.isEmpty) ...[
-        Text('Aucun versement pour le moment.', style: texte.bodyLarge?.copyWith(color: Couleurs.encreDouce)),
+        Text('Aucun service pour le moment.', style: texte.bodyLarge?.copyWith(color: Couleurs.encreDouce)),
         const SizedBox(height: 4),
         Text(
-          'Une somme est bloquée dès que vous publiez une demande.',
+          "Un montant apparaît ici quand l'équipe vous a mis en relation.",
           style: texte.bodyMedium?.copyWith(color: Couleurs.encrePale),
         ),
       ] else
-        for (final versement in compte.envoyes) _CarteVersementEnvoye(versement: versement),
+        for (final service in compte.envoyes) _CarteServiceAPayer(service: service),
     ];
   }
 
-  List<Widget> _versementsRecus(BuildContext context, MonCompte compte) {
+  List<Widget> _servicesRecus(BuildContext context, MonCompte compte) {
     final texte = Theme.of(context).textTheme;
     final aide = texte.bodyMedium?.copyWith(color: Couleurs.encrePale);
     final total = compte.totalRecu;
@@ -134,12 +133,14 @@ class _EcranMonCompteState extends State<EcranMonCompte> {
               Text.rich(
                 const TextSpan(
                   children: [
+                    TextSpan(text: 'Vous recevez '),
                     TextSpan(
-                      text: 'Ce montant est la somme de vos services terminés, commission déduite. '
-                          'Le transfert vers votre propre compte se fait ',
+                      text: 'exactement le prix que vous annoncez',
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    TextSpan(text: 'en dehors de PamConnect', style: TextStyle(fontWeight: FontWeight.w600)),
-                    TextSpan(text: ' : la plateforme ne demande ni numéro Mobile Money, ni compte bancaire.'),
+                    TextSpan(
+                      text: " à l'équipe : la commission s'ajoute par-dessus, elle ne vous est pas retirée.",
+                    ),
                   ],
                 ),
                 style: aide,
@@ -150,19 +151,16 @@ class _EcranMonCompteState extends State<EcranMonCompte> {
       ),
       const SizedBox(height: 8),
       if (compte.recus.isEmpty) ...[
-        Text('Aucun versement pour le moment.', style: texte.bodyLarge?.copyWith(color: Couleurs.encreDouce)),
+        Text('Aucun service pour le moment.', style: texte.bodyLarge?.copyWith(color: Couleurs.encreDouce)),
         const SizedBox(height: 4),
-        Text(
-          "Vous recevez la somme d'une demande lorsque l'employeur déclare le service effectué.",
-          style: aide,
-        ),
+        Text("L'équipe vous appelle quand un service vous est proposé.", style: aide),
       ] else
-        for (final versement in compte.recus) _CarteVersementRecu(versement: versement),
+        for (final service in compte.recus) _CarteServiceRecu(service: service),
     ];
   }
 }
 
-/// "Comment l'argent circule sur PamConnect", le texte du site.
+/// "Comment l'argent circule", le texte du site.
 class _CarteCirculation extends StatelessWidget {
   const _CarteCirculation();
 
@@ -178,33 +176,24 @@ class _CarteCirculation extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Comment l'argent circule sur PamConnect",
+            "Comment l'argent circule",
             style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           Text.rich(
             const TextSpan(
               children: [
-                TextSpan(text: 'La somme annoncée dans une demande est '),
-                TextSpan(text: 'bloquée', style: gras),
-                TextSpan(
-                  text: " dès la publication. Elle part chez la personne quand le service est déclaré "
-                      "effectué, ou revient à l'employeur s'il retire sa demande sans avoir choisi "
-                      'personne.',
-                ),
+                TextSpan(text: "Rien n'est payé à la publication. Après le service, l'employeur paie "),
+                TextSpan(text: 'PamConnect', style: gras),
+                TextSpan(text: ", qui reverse à la personne qui a travaillé."),
               ],
             ),
             style: texte.bodyMedium?.copyWith(color: Couleurs.encreDouce),
           ),
           const SizedBox(height: 8),
-          Text.rich(
-            const TextSpan(
-              children: [
-                TextSpan(text: 'Les montants affichés ici sont '),
-                TextSpan(text: 'simulés', style: gras),
-                TextSpan(text: ' : aucun argent réel ne circule.'),
-              ],
-            ),
+          Text(
+            "Le paiement se fait à l'agence ou par Mobile Money, jamais sur la plateforme : "
+            "elle en garde seulement la trace.",
             style: texte.bodySmall?.copyWith(color: Couleurs.encrePale),
           ),
         ],
@@ -213,28 +202,26 @@ class _CarteCirculation extends StatelessWidget {
   }
 }
 
-class _CarteVersementEnvoye extends StatelessWidget {
-  const _CarteVersementEnvoye({required this.versement});
+class _CarteServiceAPayer extends StatelessWidget {
+  const _CarteServiceAPayer({required this.service});
 
-  final VersementEnvoye versement;
+  final ServiceAPayer service;
 
   @override
   Widget build(BuildContext context) {
     final texte = Theme.of(context).textTheme;
     final aide = texte.bodyMedium?.copyWith(color: Couleurs.encrePale);
-    final denoue = versement.denoue;
-    // La couleur suit l'etat : le vert pour ce qui est verse, l'ambre pour
+    final paye = service.paye;
+    // La couleur suit l'etat : le vert pour ce qui est paye, l'ambre pour
     // ce qui attend, comme sur le site.
-    final pastille = switch (versement.etat) {
-      'bloque' => Pastille(texte: versement.libelleEtat, fond: Couleurs.ambreFond, couleur: Couleurs.ambre),
-      'rembourse' => Pastille(texte: versement.libelleEtat, fond: Couleurs.trait, couleur: Couleurs.encreDouce),
-      _ => Pastille(
-          texte: versement.libelleEtat,
-          icone: Icons.check,
-          fond: Couleurs.vertFond,
-          couleur: Couleurs.vert,
-        ),
-    };
+    final pastille = service.etat == 'paye'
+        ? Pastille(
+            texte: service.libelleEtat,
+            icone: Icons.check,
+            fond: Couleurs.vertFond,
+            couleur: Couleurs.vert,
+          )
+        : Pastille(texte: service.libelleEtat, fond: Couleurs.ambreFond, couleur: Couleurs.ambre);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -245,9 +232,10 @@ class _CarteVersementEnvoye extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                versement.titreDemande,
+                service.titreDemande,
                 style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
               ),
+              Text('Avec ${service.avec}', style: texte.bodyMedium?.copyWith(color: Couleurs.encreDouce)),
               const SizedBox(height: 8),
               pastille,
               Padding(
@@ -257,28 +245,25 @@ class _CarteVersementEnvoye extends StatelessWidget {
                     const Icon(Icons.payments_outlined, size: 18, color: Couleurs.encreDouce),
                     const SizedBox(width: 8),
                     Text(
-                      versement.montant,
+                      service.montant,
                       style: const TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre),
                     ),
                   ],
                 ),
               ),
-              LigneDetail(icone: Icons.calendar_today_outlined, texte: 'Bloqué le ${versement.bloqueLe}'),
-              if (denoue != null) LigneDetail(icone: Icons.check, texte: denoue),
-              // L'OBLIGATION, ecrite la ou la somme est encore bloquee.
-              if (versement.rappelDeclaration) ...[
+              LigneDetail(icone: Icons.calendar_today_outlined, texte: 'Convenu le ${service.convenuLe}'),
+              if (paye != null) LigneDetail(icone: Icons.check, texte: paye),
+              // L'OBLIGATION, ecrite la ou la somme est encore due.
+              if (service.rappelPaiement) ...[
                 const SizedBox(height: 12),
                 Text.rich(
                   const TextSpan(
                     children: [
                       TextSpan(
-                        text: 'Après chaque service effectué, déclarez-le à PamConnect.',
+                        text: 'Après le service, payez ce montant à PamConnect.',
                         style: TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre),
                       ),
-                      TextSpan(
-                        text: " C'est ce qui déclenche le versement. Sans cette déclaration, la personne "
-                            "qui a travaillé n'est pas payée, et un désaccord s'ouvre pour rien.",
-                      ),
+                      TextSpan(text: " L'équipe le reverse ensuite à la personne qui a travaillé."),
                     ],
                   ),
                   style: aide,
@@ -292,14 +277,16 @@ class _CarteVersementEnvoye extends StatelessWidget {
   }
 }
 
-class _CarteVersementRecu extends StatelessWidget {
-  const _CarteVersementRecu({required this.versement});
+class _CarteServiceRecu extends StatelessWidget {
+  const _CarteServiceRecu({required this.service});
 
-  final VersementRecu versement;
+  final ServiceRecu service;
 
   @override
   Widget build(BuildContext context) {
     final texte = Theme.of(context).textTheme;
+    final verseLe = service.verseLe;
+    final moyen = service.moyen;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -310,13 +297,26 @@ class _CarteVersementRecu extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                versement.titreDemande,
+                service.titreDemande,
                 style: texte.titleSmall?.copyWith(color: Couleurs.bleu, fontWeight: FontWeight.w600),
               ),
-              Text('Chez ${versement.chez}', style: texte.bodyMedium?.copyWith(color: Couleurs.encreDouce)),
+              Text('Chez ${service.chez}', style: texte.bodyMedium?.copyWith(color: Couleurs.encreDouce)),
               const SizedBox(height: 8),
-              DetailMontants(lignes: versement.lignes),
-              LigneDetail(icone: Icons.calendar_today_outlined, texte: 'Versé le ${versement.verseLe}'),
+              service.reverse
+                  ? Pastille(
+                      texte: service.libelleEtat,
+                      icone: Icons.check,
+                      fond: Couleurs.vertFond,
+                      couleur: Couleurs.vert,
+                    )
+                  : Pastille(texte: service.libelleEtat, fond: Couleurs.ambreFond, couleur: Couleurs.ambre),
+              const SizedBox(height: 8),
+              DetailMontants(lignes: service.lignes),
+              if (verseLe != null)
+                LigneDetail(
+                  icone: Icons.calendar_today_outlined,
+                  texte: 'Reversé le $verseLe${moyen != null ? ' ($moyen)' : ''}',
+                ),
             ],
           ),
         ),

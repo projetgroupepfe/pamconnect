@@ -342,7 +342,7 @@ Future<bool> confirmerAvoirTravaille(BuildContext context, String employeur) => 
       context,
       question: 'Confirmez-vous avoir effectué ce service ?',
       precision: 'Votre déclaration sera enregistrée avec sa date. Elle ne vous paie pas : '
-          "c'est $employeur qui déclenche le versement en le confirmant.",
+          "l'équipe PamConnect vous reverse après le paiement de $employeur.",
       action: 'Déclarer',
     );
 

@@ -746,9 +746,9 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                   ),
                 ] else ...[
                   Text(
-                    "Le dire ne vous paie pas tout de suite : c'est ${maDeclaration.employeur} qui déclenche le "
-                    'versement en le confirmant. Mais votre déclaration est enregistrée avec sa date, et '
-                    "l'équipe la verra s'il ne confirme rien.",
+                    'Le dire ne vous paie pas tout de suite : ${maDeclaration.employeur} le confirme de son '
+                    "côté, puis l'équipe PamConnect vous reverse. Votre déclaration est enregistrée avec sa "
+                    "date, et l'équipe la verra s'il ne confirme rien.",
                     style: gris,
                   ),
                   const SizedBox(height: 12),

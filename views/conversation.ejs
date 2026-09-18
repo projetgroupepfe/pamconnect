@@ -175,16 +175,16 @@
           <% } else { %>
             <h3>Avez-vous effectué ce service ?</h3>
             <p>
-              Le dire ne vous paie pas tout de suite : c'est
-              <%= conversation.nomEmployeur %> qui déclenche le versement en le
-              confirmant. Mais votre déclaration est enregistrée avec sa date, et
-              l'équipe la verra s'il ne confirme rien.
+              Le dire ne vous paie pas tout de suite :
+              <%= conversation.nomEmployeur %> le confirme de son côté, puis
+              l'équipe PamConnect vous reverse. Votre déclaration est enregistrée
+              avec sa date, et l'équipe la verra s'il ne confirme rien.
             </p>
             <%# Une question avant de declarer, sur les deux appareils : la
                 declaration est datee et ne s'efface pas. %>
             <form action="/candidatures/<%= conversation.id %>/jai-effectue" method="POST"
                   data-question="Confirmez-vous avoir effectué ce service ?"
-                  data-precision="Votre déclaration sera enregistrée avec sa date. Elle ne vous paie pas : c'est <%= conversation.nomEmployeur %> qui déclenche le versement en le confirmant.">
+                  data-precision="Votre déclaration sera enregistrée avec sa date. Elle ne vous paie pas : l'équipe PamConnect vous reverse après le paiement de <%= conversation.nomEmployeur %>.">
               <div class="actions">
                 <button type="submit" class="bouton-secondaire">
                   <%- include("partiels/icone", { nom: "valider" }) %>

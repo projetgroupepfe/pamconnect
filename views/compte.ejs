@@ -3,34 +3,28 @@
   <h1>Mon compte</h1>
 
   <%# CE QUE CETTE PAGE N'EST PAS. Elle n'affiche aucun numero Mobile
-      Money ni coordonnee bancaire : la plateforme n'en demande pas. Le
-      solde est un montant DU, pas un portefeuille. %>
+      Money ni coordonnee bancaire : la plateforme n'en range pas. %>
   <div class="carte confiance">
-    <h3>Comment l'argent circule sur PamConnect</h3>
-    <%# Le POURQUOI juridique de la simulation (agrement, operateurs) est
-        dans le dossier de soutenance, reponse C8. Ici, ce qui compte pour
-        la personne est que les montants sont simules. %>
+    <h3>Comment l'argent circule</h3>
     <p>
-      La somme annoncée dans une demande est <strong>bloquée</strong> dès la
-      publication. Elle part chez la personne quand le service est déclaré
-      effectué, ou revient à l'employeur s'il retire sa demande sans avoir
-      choisi personne.
+      Rien n'est payé à la publication. Après le service, l'employeur paie
+      PamConnect, qui reverse à la personne qui a travaillé.
     </p>
     <p class="aide">
-      Les montants affichés ici sont <strong>simulés</strong> : aucun argent
-      réel ne circule.
+      Le paiement se fait à l'agence ou par Mobile Money, jamais sur la
+      plateforme : elle en garde seulement la trace.
     </p>
   </div>
 
   <% if (jeSuisEmployeur) { %>
 
-    <h2>Vos versements</h2>
+    <h2>Vos services</h2>
 
     <% if (envoyes.length === 0) { %>
       <div class="vide">
-        <p>Aucun versement pour le moment.</p>
+        <p>Aucun service pour le moment.</p>
         <p class="aide">
-          Une somme est bloquée dès que vous publiez une demande.
+          Un montant apparaît ici quand l'équipe vous a mis en relation.
         </p>
       </div>
     <% } else { %>
@@ -38,11 +32,10 @@
         <% envoyes.forEach(function (v) { %>
           <div class="carte">
             <h3><%= v.titreDemande %></h3>
+            <div class="metier">Avec <%= v.avec %></div>
 
             <p>
-              <%# La couleur suit l'etat ; les mots viennent de monCompte,
-                  que l'application lit aussi. %>
-              <span class="badge <%= { bloque: "badge-en-attente", rembourse: "badge-non-soumis" }[v.etat] || "badge-verifie" %>"><%= v.libelleEtat %></span>
+              <span class="badge <%= v.etat === "paye" ? "badge-verifie" : "badge-en-attente" %>"><%= v.libelleEtat %></span>
             </p>
 
             <ul class="infos">
@@ -52,25 +45,21 @@
               </li>
               <li>
                 <%- include("partiels/icone", { nom: "calendrier" }) %>
-                <span>Bloqué le <%= v.bloqueLe %></span>
+                <span>Convenu le <%= v.convenuLe %></span>
               </li>
-              <% if (v.denoue) { %>
+              <% if (v.paye) { %>
                 <li>
                   <%- include("partiels/icone", { nom: "valider" }) %>
-                  <span><%= v.denoue %></span>
+                  <span><%= v.paye %></span>
                 </li>
               <% } %>
             </ul>
 
-            <% if (v.rappelDeclaration) { %>
-              <%# L'OBLIGATION, ecrite la ou la somme est encore bloquee.
-                  Un employeur qui oublie de declarer laisse une personne
-                  sans paiement, et cree un desaccord que rien ne justifiait. %>
+            <% if (v.rappelPaiement) { %>
+              <%# L'OBLIGATION, ecrite la ou la somme est encore due. %>
               <p class="aide">
-                <strong>Après chaque service effectué, déclarez-le à PamConnect.</strong>
-                C'est ce qui déclenche le versement. Sans cette déclaration,
-                la personne qui a travaillé n'est pas payée, et un désaccord
-                s'ouvre pour rien.
+                <strong>Après le service, payez ce montant à PamConnect.</strong>
+                L'équipe le reverse ensuite à la personne qui a travaillé.
               </p>
             <% } %>
           </div>
@@ -90,19 +79,17 @@
         </div>
       </div>
       <p class="aide">
-        Ce montant est la somme de vos services terminés, commission
-        déduite. Le transfert vers votre propre compte se fait
-        <strong>en dehors de PamConnect</strong> : la plateforme ne demande
-        ni numéro Mobile Money, ni compte bancaire.
+        Vous recevez <strong>exactement le prix que vous annoncez</strong> à
+        l'équipe : la commission s'ajoute par-dessus, elle ne vous est pas
+        retirée.
       </p>
     </div>
 
     <% if (recus.length === 0) { %>
       <div class="vide">
-        <p>Aucun versement pour le moment.</p>
+        <p>Aucun service pour le moment.</p>
         <p class="aide">
-          Vous recevez la somme d'une demande lorsque l'employeur déclare
-          le service effectué.
+          L'équipe vous appelle quand un service vous est proposé.
         </p>
       </div>
     <% } else { %>
@@ -112,25 +99,27 @@
             <h3><%= v.titreDemande %></h3>
             <div class="metier">Chez <%= v.chez %></div>
 
+            <p>
+              <span class="badge <%= v.reverse ? "badge-verifie" : "badge-en-attente" %>"><%= v.libelleEtat %></span>
+            </p>
+
             <div class="detail-tarif">
               <% v.lignes.forEach(function (ligne) { %>
                 <div class="ligne-tarif<%= ligne.total ? " total" : "" %>">
                   <span><%= ligne.libelle %></span>
-                  <% if (ligne.retenue) { %>
-                    <span class="retenue"><%= ligne.montant %></span>
-                  <% } else { %>
-                    <strong><%= ligne.montant %></strong>
-                  <% } %>
+                  <strong><%= ligne.montant %></strong>
                 </div>
               <% }); %>
             </div>
 
-            <ul class="infos">
-              <li>
-                <%- include("partiels/icone", { nom: "calendrier" }) %>
-                <span>Versé le <%= v.verseLe %></span>
-              </li>
-            </ul>
+            <% if (v.verseLe) { %>
+              <ul class="infos">
+                <li>
+                  <%- include("partiels/icone", { nom: "calendrier" }) %>
+                  <span>Reversé le <%= v.verseLe %><%= v.moyen ? " (" + v.moyen + ")" : "" %></span>
+                </li>
+              </ul>
+            <% } %>
           </div>
         <% }); %>
       </div>

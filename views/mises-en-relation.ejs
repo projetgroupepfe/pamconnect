@@ -1,0 +1,200 @@
+<%- include("partiels/tete") %>
+
+  <h1>Mises en relation</h1>
+  <p class="chapeau">
+    Appelez la personne et notez le prix qu'elle annonce. Appelez ensuite
+    l'employeur : il entend ce prix, commission comprise.
+  </p>
+
+  <% if (demandes.length === 0) { %>
+
+    <div class="vide">
+      <p>Aucune demande à mettre en relation.</p>
+    </div>
+
+  <% } %>
+
+  <% demandes.forEach(function (d) { %>
+    <div class="carte">
+
+      <h3><%= d.titre %></h3>
+      <div class="metier"><%= d.metier %></div>
+
+      <ul class="infos">
+        <li>
+          <%- include("partiels/icone", { nom: "lieu" }) %>
+          <span><%= d.quartier %><%= d.arrondissement ? ", " + d.arrondissement : "" %></span>
+        </li>
+        <li>
+          <%- include("partiels/icone", { nom: "disponibilite" }) %>
+          <span><%= d.horaire %><%= d.dureeEstimee ? " (" + d.dureeEstimee + ")" : "" %></span>
+        </li>
+        <li>
+          <%- include("partiels/icone", { nom: "profil" }) %>
+          <span>
+            <strong><%= d.employeur.nom %></strong>
+            <% if (d.employeur.telephone) { %>
+              <a href="tel:<%= d.employeur.appel %>"><%= d.employeur.telephone %></a>
+            <% } %>
+          </span>
+        </li>
+        <% if (d.budget) { %>
+          <%# LE BUDGET NE SORT PAS D'ICI. Il dit a l'equipe quel prix
+              l'employeur acceptera ; personne d'autre ne le voit. %>
+          <li>
+            <%- include("partiels/icone", { nom: "remuneration" }) %>
+            <span>Budget annoncé : <strong><%= d.budget %></strong> <span class="aide">(équipe seulement)</span></span>
+          </li>
+        <% } %>
+        <% if (d.pourvue) { %>
+          <li>
+            <%- include("partiels/icone", { nom: "info" }) %>
+            <span>L'employeur a déjà retenu quelqu'un : il reste à noter le prix.</span>
+          </li>
+        <% } %>
+      </ul>
+
+      <% if (d.refusees.length > 0) { %>
+        <%# CE QUI A DEJA ETE TENTE. Sans cette liste, l'equipe
+            rappellerait les memes personnes au meme prix. %>
+        <p class="aide">
+          Déjà refusé :
+          <% d.refusees.forEach(function (r, i) { %><%= i > 0 ? " · " : "" %><%= r.nom %> à <%= r.prix %><% }); %>
+        </p>
+      <% } %>
+
+      <% if (d.fiche) { %>
+
+        <%# DEUXIEME APPEL : l'employeur. %>
+        <div class="detail-tarif">
+          <div class="ligne-tarif">
+            <span>Prix annoncé par <%= d.fiche.nom %></span>
+            <strong><%= d.fiche.prixPrestataire %></strong>
+          </div>
+          <div class="ligne-tarif">
+            <span>Commission PamConnect (<%= pourcentageCommission %> %)</span>
+            <strong>+ <%= d.fiche.commission %></strong>
+          </div>
+          <div class="ligne-tarif total">
+            <span>À annoncer à l'employeur</span>
+            <strong><%= d.fiche.prixEmployeur %></strong>
+          </div>
+        </div>
+
+        <% if (d.fiche.note) { %>
+          <p class="aide"><%= d.fiche.note %></p>
+        <% } %>
+
+        <form action="/admin/mises-en-relation/<%= d.fiche.id %>/reponse" method="POST">
+          <div class="champ">
+            <label for="note-employeur-<%= d.id %>">Ce que l'employeur a dit <span class="aide">(facultatif)</span></label>
+            <input type="text" id="note-employeur-<%= d.id %>" name="note" maxlength="200">
+          </div>
+          <p class="actions">
+            <button class="bouton" type="submit" name="decision" value="accepte">
+              <%- include("partiels/icone", { nom: "valider" }) %>
+              Il accepte
+            </button>
+            <button class="bouton bouton-secondaire" type="submit" name="decision" value="refuse">
+              <%- include("partiels/icone", { nom: "refuser" }) %>
+              Il refuse
+            </button>
+          </p>
+        </form>
+
+      <% } else { %>
+
+        <%# PREMIER APPEL : la personne qui fera le travail. Celles qui
+            ont signale leur interet d'abord : elles ont deja lu la
+            demande, l'appel est plus court. %>
+        <% const aAppeler = d.interesses.concat(d.autres); %>
+
+        <% if (aAppeler.length === 0) { %>
+          <p class="aide">
+            Personne à appeler pour ce métier. Ajoutez des prestataires vérifiés.
+          </p>
+        <% } else { %>
+
+          <ul class="infos">
+            <% aAppeler.forEach(function (p) { %>
+              <li>
+                <%- include("partiels/icone", { nom: "telephone" }) %>
+                <span>
+                  <strong><%= p.nom %></strong>
+                  <% if (p.telephone) { %>
+                    <a href="tel:<%= p.appel %>"><%= p.telephone %></a>
+                  <% } %>
+                  <span class="aide">
+                    <%= p.quartier || "" %><% if (p.tarif) { %> · tarif indicatif <%= p.tarif %><% } %><% if (p.moyenne) { %> · <%= p.moyenne %>/5<% } %>
+                  </span>
+                  <% if (p.dejaChoisie) { %>
+                    <span class="badge badge-verifie">Retenue</span>
+                  <% } else if (d.interesses.some(function (i) { return i.id === p.id; })) { %>
+                    <span class="badge badge-en-attente">Intéressée</span>
+                  <% } %>
+                </span>
+              </li>
+            <% }); %>
+          </ul>
+
+          <form action="/admin/mises-en-relation" method="POST">
+            <input type="hidden" name="annonceId" value="<%= d.id %>">
+
+            <div class="champ">
+              <label for="personne-<%= d.id %>">Personne appelée</label>
+              <select id="personne-<%= d.id %>" name="prestataireId" required>
+                <% aAppeler.forEach(function (p) { %>
+                  <option value="<%= p.id %>"><%= p.nom %><%= p.quartier ? " (" + p.quartier + ")" : "" %></option>
+                <% }); %>
+              </select>
+            </div>
+
+            <div class="champ">
+              <label for="prix-<%= d.id %>">Prix qu'elle annonce</label>
+              <input type="number" id="prix-<%= d.id %>" name="prix"
+                     min="<%= montantMinimum %>" step="<%= pasMontant %>" required>
+              <p class="aide"><%= regleMontantLisible() %>. La commission s'ajoute par-dessus.</p>
+            </div>
+
+            <p class="actions">
+              <button class="bouton" type="submit">
+                <%- include("partiels/icone", { nom: "remuneration" }) %>
+                Enregistrer ce prix
+              </button>
+            </p>
+          </form>
+
+        <% } %>
+
+      <% } %>
+
+      <%# ECRIRE A L'EMPLOYEUR, quand l'appel n'aboutit pas. %>
+      <form action="/admin/message/<%= d.employeur.id %>" method="POST">
+        <div class="champ">
+          <label for="message-<%= d.id %>">Écrire à <%= d.employeur.nom %></label>
+          <input type="text" id="message-<%= d.id %>" name="texte" maxlength="500"
+                 placeholder="ex : Nous avons essayé de vous joindre.">
+        </div>
+        <p class="actions">
+          <button class="bouton bouton-secondaire" type="submit">
+            <%- include("partiels/icone", { nom: "envoi" }) %>
+            Envoyer
+          </button>
+        </p>
+      </form>
+
+    </div>
+  <% }); %>
+
+  <p class="actions">
+    <a class="bouton bouton-secondaire" href="/admin">
+      <%- include("partiels/icone", { nom: "equipe" }) %>
+      Retour à l'espace équipe
+    </a>
+    <a class="bouton bouton-secondaire" href="/admin/paiements">
+      <%- include("partiels/icone", { nom: "remuneration" }) %>
+      Paiements
+    </a>
+  </p>
+
+<%- include("partiels/pied") %>

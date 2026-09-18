@@ -276,8 +276,9 @@ setTimeout(async () => {
   dire("le quartier est reconnu et son arrondissement trouve",
        deLAppli.quartier === unQuartier.nom && deLAppli.arrondissement === unQuartier.arrondissement,
        JSON.stringify(deLAppli));
-  const bloque = base.prepare("SELECT montant, etat FROM versements WHERE annonce_id = ?").get(publiee.donnees.id);
-  dire("aucune somme n'est bloquee a la publication", !bloque, JSON.stringify(bloque));
+  const relation = base.prepare(
+    "SELECT id FROM mises_en_relation WHERE annonce_id = ?").get(publiee.donnees.id);
+  dire("publier n'engage aucun prix", !relation, JSON.stringify(relation));
 
   const apresPublication = await mesDemandes(emp.cookie);
   dire("elle apparait dans Mes demandes de l'application",
@@ -524,8 +525,10 @@ setTimeout(async () => {
   dire("l'employeur declare le service effectue depuis l'application", finService.code === 200, finService.brut);
   // LE PAIEMENT SE FAIT APRES LE SERVICE, hors de la plateforme, et
   // l'equipe l'enregistrera : la declaration ne verse plus rien.
-  const verse = base.prepare("SELECT etat FROM versements WHERE annonce_id = ?").get(idAChoisir);
-  dire("aucune somme n'est versee par la declaration", !verse, JSON.stringify(verse));
+  const paye = base.prepare(
+    "SELECT p.id FROM paiements p JOIN mises_en_relation m ON m.id = p.mise_en_relation_id "
+    + "WHERE m.annonce_id = ?").get(idAChoisir);
+  dire("aucune somme n'est versee par la declaration", !paye, JSON.stringify(paye));
   dire("declarer deux fois : 409", (await terminer(cChoisie, cookieDe(emp.cookie))).code === 409);
   dire("dans Mes demandes, le bouton dit maintenant Relire la discussion",
        (await reponseDansMesDemandes(cChoisie)).libelleDiscussion === "Relire la discussion");
@@ -608,7 +611,8 @@ setTimeout(async () => {
   const modifier = (id, corps, entetes) => json("/api/demandes/" + id, corps, entetes);
   const ligneDemande = (id) =>
     base.prepare("SELECT titre, budget, annulee, mise_en_avant_jusqu_au FROM annonces WHERE id = ?").get(id);
-  const sommeBloquee = (id) => base.prepare("SELECT montant, etat FROM versements WHERE annonce_id = ?").get(id);
+  const prixConvenu = (id) => base.prepare(
+    "SELECT prix_employeur FROM mises_en_relation WHERE annonce_id = ?").get(id);
 
   dire("sans session : 401", (await modification(idAModifier)).code === 401);
   dire("une personne qui repond : 403", (await modification(idAModifier, cookieDe(verifiee.cookie))).code === 403);
@@ -702,7 +706,7 @@ setTimeout(async () => {
   const retraitApi = await retirerApi(idAModifier, { Authorization: "Bearer " + jeton });
   dire("le retrait passe depuis l'application", retraitApi.code === 200 && ligneDemande(idAModifier).annulee === 1,
        retraitApi.brut);
-  dire("aucune somme n'etait engagee", !sommeBloquee(idAModifier));
+  dire("aucun prix n'etait convenu", !prixConvenu(idAModifier));
   dire("retirer deux fois : 409", (await retirerApi(idAModifier, cookieDe(emp.cookie))).code === 409);
   const reponseDePre3 = base.prepare("SELECT id FROM candidatures WHERE annonce_id = ?").get(idAModifier).id;
   dire("la personne qui avait repondu garde sa discussion",

@@ -1811,55 +1811,79 @@ class AdresseChangee {
 }
 
 /// Une somme posee par l'employeur, et ce qu'elle est devenue.
-class VersementEnvoye {
-  const VersementEnvoye({
+class ServiceAPayer {
+  const ServiceAPayer({
     required this.titreDemande,
+    required this.avec,
     required this.etat,
     required this.libelleEtat,
     required this.montant,
-    required this.bloqueLe,
-    required this.rappelDeclaration,
-    this.denoue,
+    required this.convenuLe,
+    required this.rappelPaiement,
+    required this.serviceTermine,
+    this.paye,
   });
 
-  factory VersementEnvoye.depuisJson(Map<String, dynamic> json) => VersementEnvoye(
+  factory ServiceAPayer.depuisJson(Map<String, dynamic> json) => ServiceAPayer(
         titreDemande: _lire<String>(json, 'titreDemande'),
+        avec: _lire<String>(json, 'avec'),
         etat: _lire<String>(json, 'etat'),
         libelleEtat: _lire<String>(json, 'libelleEtat'),
         montant: _lire<String>(json, 'montant'),
-        bloqueLe: _lire<String>(json, 'bloqueLe'),
-        rappelDeclaration: _lire<bool>(json, 'rappelDeclaration'),
-        denoue: _lireFacultatif<String>(json, 'denoue'),
+        convenuLe: _lire<String>(json, 'convenuLe'),
+        rappelPaiement: _lire<bool>(json, 'rappelPaiement'),
+        serviceTermine: _lire<bool>(json, 'serviceTermine'),
+        paye: _lireFacultatif<String>(json, 'paye'),
       );
 
   final String titreDemande;
 
-  /// "bloque", "rembourse" ou "verse" : seulement pour la couleur.
+  /// La personne que l'equipe a mise en relation avec lui.
+  final String avec;
+
+  /// "a_payer" ou "paye" : seulement pour la couleur.
   final String etat;
   final String libelleEtat;
   final String montant;
-  final String bloqueLe;
-  final bool rappelDeclaration;
+  final String convenuLe;
+  final bool rappelPaiement;
+  final bool serviceTermine;
 
-  /// "Verse le ..." ou "Rendu le ...", absent tant que la somme est bloquee.
-  final String? denoue;
+  /// "Recu le 12/09/2026 (Mobile Money)", absent tant que rien n'est paye.
+  final String? paye;
 }
 
-/// Ce que la personne a recu pour un service.
-class VersementRecu {
-  const VersementRecu({required this.titreDemande, required this.chez, required this.lignes, required this.verseLe});
+/// Ce que la personne a recu pour un service, ou recevra.
+class ServiceRecu {
+  const ServiceRecu({
+    required this.titreDemande,
+    required this.chez,
+    required this.lignes,
+    required this.reverse,
+    required this.libelleEtat,
+    this.verseLe,
+    this.moyen,
+  });
 
-  factory VersementRecu.depuisJson(Map<String, dynamic> json) => VersementRecu(
+  factory ServiceRecu.depuisJson(Map<String, dynamic> json) => ServiceRecu(
         titreDemande: _lire<String>(json, 'titreDemande'),
         chez: _lire<String>(json, 'chez'),
         lignes: _lireListe(json, 'lignes', LigneTarif.depuisJson),
-        verseLe: _lire<String>(json, 'verseLe'),
+        reverse: _lire<bool>(json, 'reverse'),
+        libelleEtat: _lire<String>(json, 'libelleEtat'),
+        verseLe: _lireFacultatif<String>(json, 'verseLe'),
+        moyen: _lireFacultatif<String>(json, 'moyen'),
       );
 
   final String titreDemande;
   final String chez;
   final List<LigneTarif> lignes;
-  final String verseLe;
+
+  /// Vrai quand l'equipe a deja reverse la somme.
+  final bool reverse;
+  final String libelleEtat;
+  final String? verseLe;
+  final String? moyen;
 }
 
 /// Mon compte (/api/mon-compte).
@@ -1868,14 +1892,14 @@ class MonCompte {
 
   factory MonCompte.depuisJson(Map<String, dynamic> json) => MonCompte(
         jeSuisEmployeur: _lire<bool>(json, 'jeSuisEmployeur'),
-        recus: _lireListe(json, 'recus', VersementRecu.depuisJson),
-        envoyes: _lireListe(json, 'envoyes', VersementEnvoye.depuisJson),
+        recus: _lireListe(json, 'recus', ServiceRecu.depuisJson),
+        envoyes: _lireListe(json, 'envoyes', ServiceAPayer.depuisJson),
         totalRecu: _lireFacultatif<String>(json, 'totalRecu'),
       );
 
   final bool jeSuisEmployeur;
-  final List<VersementRecu> recus;
-  final List<VersementEnvoye> envoyes;
+  final List<ServiceRecu> recus;
+  final List<ServiceAPayer> envoyes;
 
   /// Seulement pour la personne qui repond aux demandes.
   final String? totalRecu;

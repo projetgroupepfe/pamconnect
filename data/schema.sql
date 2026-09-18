@@ -541,54 +541,91 @@ CREATE INDEX IF NOT EXISTS idx_problemes_ouverts ON problemes (decision);
 
 
 -- ------------------------------------------------------------------
--- Table versements : la somme annoncee, bloquee par la plateforme.
+-- Table mises_en_relation : la fiche que l'equipe tient par demande.
 --
--- SIMULATION. Aucun argent reel ne circule. Encaisser la somme d'une
+-- LE PRIX NE VIENT PAS DE LA PLATEFORME. Il vient de la personne qui
+-- fera le travail : l'equipe l'appelle, la personne annonce son prix, et
+-- l'equipe l'ecrit ici tel quel. La plateforme y ajoute sa commission,
+-- et c'est CE montant-la que l'equipe annonce ensuite a l'employeur.
+--
+-- Les deux montants sont gardes. Ne garder que celui annonce a
+-- l'employeur obligerait a recalculer la part de la personne a chaque
+-- lecture ; et le jour ou la commission changerait, toutes les fiches
+-- anciennes se mettraient a mentir.
+--
+-- PLUSIEURS FICHES PAR DEMANDE, UNE SEULE ACCEPTEE. Quand l'employeur
+-- refuse un prix, la fiche reste avec son refus, et l'equipe en ouvre
+-- une autre avec quelqu'un d'autre. Effacer la premiere effacerait le
+-- travail deja fait, et l'equipe rappellerait les memes personnes.
+--
+--   'en cours' : le prix est enregistre, l'employeur n'a pas repondu
+--   'acceptee' : l'employeur a dit oui, les deux sont mis en relation
+--   'refusee'  : l'employeur a dit non
+CREATE TABLE IF NOT EXISTS mises_en_relation (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+
+  annonce_id        INTEGER NOT NULL REFERENCES annonces(id)     ON DELETE CASCADE,
+  prestataire_id    INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+
+  -- Ce que la personne a annonce au telephone, et ce que l'employeur
+  -- entendra : ce prix augmente de la commission.
+  prix_prestataire  INTEGER NOT NULL,
+  commission        INTEGER NOT NULL,
+  prix_employeur    INTEGER NOT NULL,
+
+  appel_prestataire_le  TEXT NOT NULL DEFAULT (datetime('now')),
+  appel_employeur_le    TEXT,
+
+  statut            TEXT    NOT NULL DEFAULT 'en cours'
+                            CHECK (statut IN ('en cours', 'acceptee', 'refusee')),
+
+  -- Ce que l'equipe veut retenir de l'appel : "rappeler apres 18 h",
+  -- "trouve le prix trop eleve". Facultatif.
+  note              TEXT,
+
+  faite_par         INTEGER REFERENCES utilisateurs(id),
+  cree_le           TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_relations_annonce ON mises_en_relation (annonce_id);
+CREATE INDEX IF NOT EXISTS idx_relations_statut  ON mises_en_relation (statut);
+
+
+-- ------------------------------------------------------------------
+-- Table paiements : ce que PamConnect a recu, et ce qu'elle a reverse.
+--
+-- L'ARGENT NE TRANSITE PAS PAR LA PLATEFORME. Encaisser la somme d'une
 -- personne pour la reverser a une autre est une activite d'intermediaire
 -- financier, reglementee par la COBAC dans la zone CEMAC : elle suppose
 -- une entite juridique, un agrement ou un partenariat avec un
 -- etablissement agree, et un contrat de production avec MTN et Orange.
--- Aucun de ces prerequis n'est accessible ici. Les ecrans l'annoncent.
+-- Aucun de ces prerequis n'est accessible ici.
 --
--- L'argent suit LA DEMANDE, jamais une candidature. Refuser quelqu'un ne
--- libere donc rien : la demande reste ouverte, d'autres personnes
--- peuvent encore y repondre, et la somme reste bloquee.
+-- L'employeur paie donc PamConnect APRES le service, a l'agence ou par
+-- Mobile Money, et PamConnect reverse a la personne qui a travaille.
+-- Cette table en garde la TRACE : deux montants, deux dates, deux
+-- moyens. Ce qui est recu moins ce qui est reverse est la commission.
 --
---   'bloque'    : la demande est ouverte, ou pourvue et pas encore faite
---   'rembourse' : l'employeur a retire sa demande sans choisir personne
---   'verse'     : le service a ete declare effectue
---
--- Le solde d'une personne n'a pas de table a lui : c'est la somme des
--- versements dont elle est beneficiaire. Un total range a cote de ses
--- lignes pourrait diverger d'elles ; calcule, il ne le peut pas.
-CREATE TABLE IF NOT EXISTS versements (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+-- DEUX TEMPS DISTINCTS, et c'est voulu : l'equipe peut avoir recu sans
+-- avoir encore reverse, et l'ecran doit pouvoir le dire. Une seule
+-- colonne "paye" ne dirait pas ou en est l'argent de quelqu'un.
+CREATE TABLE IF NOT EXISTS paiements (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
 
-  -- Une demande, un versement. C'est la publication qui le cree.
-  annonce_id      INTEGER NOT NULL UNIQUE REFERENCES annonces(id)     ON DELETE CASCADE,
-  employeur_id    INTEGER NOT NULL        REFERENCES utilisateurs(id) ON DELETE CASCADE,
+  mise_en_relation_id INTEGER NOT NULL UNIQUE
+                              REFERENCES mises_en_relation(id) ON DELETE CASCADE,
 
-  montant         INTEGER NOT NULL,
-  cree_le         TEXT    NOT NULL DEFAULT (datetime('now')),
+  montant_recu        INTEGER,
+  recu_le             TEXT,
+  moyen_reception     TEXT,
 
-  etat            TEXT    NOT NULL DEFAULT 'bloque'
-                          CHECK (etat IN ('bloque', 'rembourse', 'verse')),
+  montant_reverse     INTEGER,
+  reverse_le          TEXT,
+  moyen_reversement   TEXT,
 
-  -- Renseignes au denouement seulement.
-  denoue_le       TEXT,
-  beneficiaire_id INTEGER REFERENCES utilisateurs(id),
-  commission      INTEGER,
-  net             INTEGER,
-
-  -- Renseignes seulement quand c'est l'EQUIPE qui a tranche, faute
-  -- d'accord entre les deux. Une decision qui deplace l'argent de
-  -- quelqu'un doit pouvoir etre expliquee plus tard : on garde qui l'a
-  -- prise et le motif qu'elle a ecrit.
-  decide_par      INTEGER REFERENCES utilisateurs(id),
-  motif_decision  TEXT
+  enregistre_par      INTEGER REFERENCES utilisateurs(id),
+  cree_le             TEXT    NOT NULL DEFAULT (datetime('now'))
 );
-
-CREATE INDEX IF NOT EXISTS idx_versements_etat ON versements (etat);
 
 CREATE INDEX IF NOT EXISTS idx_quartiers_arrond ON quartiers (arrondissement);
 CREATE INDEX IF NOT EXISTS idx_messages_candidature ON messages (candidature_id);
@@ -695,7 +732,7 @@ CREATE INDEX IF NOT EXISTS idx_jetons_achats_etat ON jetons_achats (etat);
 -- Table jetons_mouvements : tout ce qui entre et sort d'un solde
 -- ------------------------------------------------------------------
 -- IL N'Y A PAS DE COLONNE "solde". Le solde est la SOMME de ces lignes,
--- exactement comme pour les versements : un total range a cote de son
+-- exactement comme pour les paiements : un total range a cote de son
 -- historique peut diverger de lui, calcule il ne le peut pas.
 --
 -- quantite est positive quand des jetons entrent, negative quand ils

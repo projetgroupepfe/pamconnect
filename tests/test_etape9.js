@@ -130,9 +130,9 @@ setTimeout(async () => {
   v("POST /annonces publie l'annonce", post.code === 200
     && Boolean(base.prepare("SELECT id FROM annonces WHERE titre = ?").get(titreAnnonce)),
     "code " + post.code);
-  v("et aucune somme n'est bloquee",
+  v("et aucun prix n'est engage",
     !base.prepare(
-      "SELECT v.id FROM versements v JOIN annonces a ON a.id = v.annonce_id "
+      "SELECT m.id FROM mises_en_relation m JOIN annonces a ON a.id = m.annonce_id "
       + "WHERE a.titre = ?").get(titreAnnonce));
 
   console.log("\n--- PARTIE 4 : GET /annonces migre vers Express ---");

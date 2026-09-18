@@ -930,18 +930,20 @@ void main() {
       'envoyes': [
         {
           'titreDemande': 'titre 1',
-          'etat': 'bloque',
+          'avec': 'nom 1',
+          'etat': 'a_payer',
           'libelleEtat': 'libelle 1',
           'montant': 'montant 1',
-          'bloqueLe': 'date 1',
-          'denoue': null,
-          'rappelDeclaration': true,
+          'convenuLe': 'date 1',
+          'paye': null,
+          'rappelPaiement': true,
+          'serviceTermine': false,
         },
       ],
     });
     expect(lu.totalRecu, isNull);
-    expect(lu.envoyes.single.denoue, isNull);
-    expect(lu.envoyes.single.rappelDeclaration, isTrue);
+    expect(lu.envoyes.single.paye, isNull);
+    expect(lu.envoyes.single.rappelPaiement, isTrue);
     expect(() => MonCompte.depuisJson({'jeSuisEmployeur': true}), throwsA(isA<FormeInattendue>()));
   });
 

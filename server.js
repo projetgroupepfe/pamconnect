@@ -131,8 +131,6 @@ ajouterColonneSiAbsente("candidatures", "terminee_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "statut_change_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "declaree_par_elle_le", "TEXT");
 ajouterColonneSiAbsente("candidatures", "envoyee_le", "TEXT");
-ajouterColonneSiAbsente("versements", "decide_par", "INTEGER");
-ajouterColonneSiAbsente("versements", "motif_decision", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "message_equipe", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "message_equipe_le", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "message_equipe_lu", "INTEGER NOT NULL DEFAULT 0");
@@ -213,65 +211,6 @@ db.exec(fs.readFileSync(path.join(__dirname, "data", "schema.sql"), "utf-8"));
 
     db.prepare("UPDATE parametres SET valeur = ? WHERE cle = 'packs_jetons'").run(propre);
     console.log("Packs de jetons : format simplifie -> " + propre);
-  }
-}
-
-// RATTRAPAGE : les demandes publiees avant l'existence du sequestre n'ont
-// pas de versement. La regle veut que toute demande en porte un - sinon
-// l'ecran de l'equipe serait vide et les comptes des personnes aussi.
-//
-// Chaque versement manquant est reconstruit A PARTIR DE LA DEMANDE
-// elle-meme : son prix, son auteur, son etat. Aucun montant n'est
-// invente, et rien n'est ecrase : seules les demandes SANS versement
-// sont traitees.
-//
-// Place APRES db.exec : la table versements doit exister.
-{
-  const sans = db.prepare(`
-    SELECT a.id, a.employeur_id, a.prix, a.annulee,
-           (SELECT c.prestataire_id FROM candidatures c
-             WHERE c.annonce_id = a.id AND c.statut = 'acceptee'
-             ORDER BY c.id LIMIT 1) AS retenu,
-           (SELECT c.terminee_le FROM candidatures c
-             WHERE c.annonce_id = a.id AND c.statut = 'acceptee'
-             ORDER BY c.id LIMIT 1) AS termineeLe
-    FROM annonces a
-    WHERE a.prix > 0
-      AND NOT EXISTS (SELECT 1 FROM versements v WHERE v.annonce_id = a.id)
-  `).all();
-
-  if (sans.length > 0) {
-    const poser = db.prepare(`
-      INSERT INTO versements
-        (annonce_id, employeur_id, montant, etat, denoue_le, beneficiaire_id, commission, net)
-      VALUES (@annonce, @employeur, @montant, @etat, @denoue, @beneficiaire, @commission, @net)
-    `);
-
-    for (const a of sans) {
-      const commission = Math.round(a.prix * 0.10);
-
-      // Le service a eu lieu : la somme est deja partie.
-      if (a.retenu && a.termineeLe) {
-        poser.run({ annonce: a.id, employeur: a.employeur_id, montant: a.prix,
-          etat: "verse", denoue: a.termineeLe, beneficiaire: a.retenu,
-          commission, net: a.prix - commission });
-
-      // Demande retiree sans que personne n'ait ete choisi : rendue.
-      } else if (a.annulee === 1 && !a.retenu) {
-        poser.run({ annonce: a.id, employeur: a.employeur_id, montant: a.prix,
-          etat: "rembourse", denoue: null, beneficiaire: null,
-          commission: null, net: null });
-
-      // Tout le reste attend : demande ouverte, ou pourvue et pas encore
-      // declaree effectuee.
-      } else {
-        poser.run({ annonce: a.id, employeur: a.employeur_id, montant: a.prix,
-          etat: "bloque", denoue: null, beneficiaire: null,
-          commission: null, net: null });
-      }
-    }
-
-    console.log(`Versements reconstruits pour ${sans.length} demande(s) deja publiee(s)`);
   }
 }
 
@@ -822,58 +761,6 @@ const requetes = {
     UPDATE utilisateurs SET avertissement_lu = 1 WHERE id = ?
   `),
 
-  // La publication bloque la somme annoncee.
-  bloquerVersement: db.prepare(`
-    INSERT INTO versements (annonce_id, employeur_id, montant)
-    VALUES (@annonce, @employeur, @montant)
-  `),
-
-  // Le prix d'une demande peut changer tant que personne n'a repondu.
-  // La somme bloquee doit suivre, sinon les deux chiffres divergent.
-  ajusterVersement: db.prepare(`
-    UPDATE versements SET montant = @montant
-    WHERE annonce_id = @annonce AND etat = 'bloque'
-  `),
-
-  rembourserVersement: db.prepare(`
-    UPDATE versements
-    SET etat = 'rembourse', denoue_le = datetime('now')
-    WHERE annonce_id = @annonce AND etat = 'bloque'
-  `),
-
-  verserVersement: db.prepare(`
-    UPDATE versements
-    SET etat            = 'verse',
-        denoue_le       = datetime('now'),
-        beneficiaire_id = @beneficiaire,
-        commission      = @commission,
-        net             = @net
-    WHERE annonce_id = @annonce AND etat = 'bloque'
-  `),
-
-  // L'equipe verse a la personne. Meme calcul que la declaration de
-  // l'employeur - seule la trace differe.
-  verserParEquipe: db.prepare(`
-    UPDATE versements
-    SET etat            = 'verse',
-        denoue_le       = datetime('now'),
-        beneficiaire_id = @beneficiaire,
-        commission      = @commission,
-        net             = @net,
-        decide_par      = @par,
-        motif_decision  = @motif
-    WHERE annonce_id = @annonce AND etat = 'bloque'
-  `),
-
-  rembourserParEquipe: db.prepare(`
-    UPDATE versements
-    SET etat           = 'rembourse',
-        denoue_le      = datetime('now'),
-        decide_par     = @par,
-        motif_decision = @motif
-    WHERE annonce_id = @annonce AND etat = 'bloque'
-  `),
-
   // La candidature acceptee d'une demande, avec ce qu'il faut pour
   // savoir si un desaccord existe et qui en est l'autre partie.
   candidatureRetenue: db.prepare(`
@@ -883,79 +770,225 @@ const requetes = {
     ORDER BY c.id LIMIT 1
   `),
 
-  versementDeLAnnonce: db.prepare(`
-    SELECT * FROM versements WHERE annonce_id = ?
-  `),
-
-  // Le solde n'est jamais range quelque part : il est recalcule. Un
-  // total garde a cote de ses lignes finit toujours par leur mentir.
-  soldeDe: db.prepare(`
-    SELECT COALESCE(SUM(net), 0) AS solde
-    FROM versements WHERE beneficiaire_id = ? AND etat = 'verse'
-  `),
-
-  mesVersementsRecus: db.prepare(`
-    SELECT v.montant, v.commission, v.net, v.denoue_le,
-           a.titre AS titreAnnonce,
-           e.nom   AS nomEmployeur
-    FROM versements v
-    JOIN annonces     a ON a.id = v.annonce_id
-    JOIN utilisateurs e ON e.id = v.employeur_id
-    WHERE v.beneficiaire_id = ? AND v.etat = 'verse'
-    ORDER BY v.denoue_le DESC, v.id DESC
-  `),
-
-  mesVersementsEnvoyes: db.prepare(`
-    SELECT v.montant, v.etat, v.cree_le, v.denoue_le, v.net,
-           a.titre   AS titreAnnonce,
-           a.annulee AS demandeFermee,
-           b.nom     AS nomBeneficiaire
-    FROM versements v
-    JOIN annonces a ON a.id = v.annonce_id
-    LEFT JOIN utilisateurs b ON b.id = v.beneficiaire_id
-    WHERE v.employeur_id = ?
-    ORDER BY v.cree_le DESC, v.id DESC
-  `),
-
-  // TOUT ce que l'equipe doit voir : l'argent qui entre, celui qui
-  // sort, et pour quel metier. Une plateforme qui garde l'argent de
-  // quelqu'un doit pouvoir dire ce qu'elle en a fait.
+  // --- La mise en relation, tenue par l'equipe ---------------------
   //
-  // Les sommes bloquees d'abord, la plus ancienne en tete : ce sont les
-  // seules qui attendent quelque chose. Les autres sont une trace.
-  tousLesVersements: db.prepare(`
-    SELECT v.id, v.montant, v.cree_le, v.etat,
-           v.denoue_le, v.commission, v.net,
-           v.motif_decision,
-           q.nom AS nomDecideur,
-           a.id      AS annonceId,
+  // Le prix vient de la personne qui fera le travail. L'equipe l'ecrit
+  // tel quel ; la commission et le prix annonce a l'employeur sont
+  // calcules par le serveur, jamais saisis a la main.
+  creerMiseEnRelation: db.prepare(`
+    INSERT INTO mises_en_relation
+      (annonce_id, prestataire_id, prix_prestataire, commission, prix_employeur,
+       note, faite_par)
+    VALUES (@annonce, @prestataire, @prix, @commission, @prixEmployeur, @note, @par)
+  `),
+
+  miseEnRelationParId: db.prepare(`
+    SELECT m.*,
            a.titre   AS titreAnnonce,
-           a.metier  AS metierAnnonce,
            a.annulee AS demandeFermee,
-           e.id      AS employeurId,
-           e.nom     AS nomEmployeur,
-           e.email   AS emailEmployeur,
-           b.nom     AS nomBeneficiaire,
-           (SELECT u.nom FROM candidatures c
-              JOIN utilisateurs u ON u.id = c.prestataire_id
-             WHERE c.annonce_id = a.id AND c.statut = 'acceptee'
-             LIMIT 1) AS nomRetenu,
+           u.nom     AS nomPrestataire
+    FROM mises_en_relation m
+    JOIN annonces     a ON a.id = m.annonce_id
+    JOIN utilisateurs u ON u.id = m.prestataire_id
+    WHERE m.id = ?
+  `),
+
+  // La fiche en attente de la reponse de l'employeur. La derniere :
+  // une demande peut en avoir porte plusieurs, refusees avant celle-ci.
+  ficheEnCours: db.prepare(`
+    SELECT m.*,
+           u.nom       AS nomPrestataire,
+           u.telephone AS telephonePrestataire
+    FROM mises_en_relation m
+    JOIN utilisateurs u ON u.id = m.prestataire_id
+    WHERE m.annonce_id = ? AND m.statut = 'en cours'
+    ORDER BY m.id DESC LIMIT 1
+  `),
+
+  // Les prix deja refuses par l'employeur : l'equipe ne rappelle pas
+  // deux fois la meme personne au meme prix.
+  fichesRefusees: db.prepare(`
+    SELECT m.prix_employeur, m.note, u.nom AS nomPrestataire
+    FROM mises_en_relation m
+    JOIN utilisateurs u ON u.id = m.prestataire_id
+    WHERE m.annonce_id = ? AND m.statut = 'refusee'
+    ORDER BY m.id
+  `),
+
+  reponseDeLEmployeur: db.prepare(`
+    UPDATE mises_en_relation
+    SET statut             = @statut,
+        appel_employeur_le = datetime('now'),
+        note               = @note
+    WHERE id = @id AND statut = 'en cours'
+  `),
+
+  // Ce que l'equipe a devant elle : les demandes qui attendent encore
+  // d'etre mises en relation. Celles ou quelqu'un s'est deja manifeste
+  // d'abord : ce sont les plus faciles a conclure.
+  demandesATraiter: db.prepare(`
+    SELECT a.id, a.titre, a.metier, a.quartier, a.arrondissement,
+           a.horaire, a.duree_estimee, a.budget, a.cree_le, a.annulee,
+           e.id                  AS employeurId,
+           e.nom                 AS nomEmployeur,
+           e.telephone           AS telephoneEmployeur,
+           e.statut_verification AS verificationEmployeur,
+           (SELECT COUNT(*) FROM candidatures c
+             WHERE c.annonce_id = a.id AND c.statut = 'en attente') AS nbInteresses
+    FROM annonces a
+    JOIN utilisateurs e ON e.id = a.employeur_id
+    WHERE NOT EXISTS (SELECT 1 FROM mises_en_relation m
+                       WHERE m.annonce_id = a.id AND m.statut = 'acceptee')
+      AND (a.annulee = 0
+           OR EXISTS (SELECT 1 FROM candidatures c
+                       WHERE c.annonce_id = a.id AND c.statut = 'acceptee'))
+    ORDER BY nbInteresses > 0 DESC, a.cree_le, a.id
+  `),
+
+  nombreDemandesATraiter: db.prepare(`
+    SELECT COUNT(*) AS n
+    FROM annonces a
+    WHERE NOT EXISTS (SELECT 1 FROM mises_en_relation m
+                       WHERE m.annonce_id = a.id AND m.statut = 'acceptee')
+      AND (a.annulee = 0
+           OR EXISTS (SELECT 1 FROM candidatures c
+                       WHERE c.annonce_id = a.id AND c.statut = 'acceptee'))
+  `),
+
+  // Les personnes qui ont dit que le service les interessait. L'equipe
+  // les appelle en premier : elles ont deja lu la demande.
+  interessesDeLaDemande: db.prepare(`
+    SELECT c.id AS candidatureId, c.statut,
+           u.id AS prestataireId, u.nom, u.metier, u.quartier, u.tarif,
+           u.telephone, u.statut_verification AS verification,
+           (SELECT ROUND(AVG(note), 1) FROM avis v
+             WHERE v.vise_id = u.id AND v.masque = 0) AS moyenne
+    FROM candidatures c
+    JOIN utilisateurs u ON u.id = c.prestataire_id
+    WHERE c.annonce_id = ? AND c.statut IN ('en attente', 'acceptee')
+    ORDER BY c.statut = 'acceptee' DESC, c.id
+  `),
+
+  // Et si personne ne s'est manifeste, les prestataires du metier, ceux
+  // du quartier en tete. Seules les personnes verifiees : l'equipe ne
+  // met en relation que des identites controlees.
+  autresPrestatairesPour: db.prepare(`
+    SELECT u.id AS prestataireId, u.nom, u.metier, u.quartier, u.tarif,
+           u.telephone,
+           (SELECT ROUND(AVG(note), 1) FROM avis v
+             WHERE v.vise_id = u.id AND v.masque = 0) AS moyenne
+    FROM utilisateurs u
+    WHERE u.role = 'prestataire' AND u.est_admin = 0 AND u.suspendu = 0
+      AND u.statut_verification = 'verifie'
+      AND LOWER(u.metier) = LOWER(@metier)
+      AND NOT EXISTS (SELECT 1 FROM candidatures c
+                       WHERE c.annonce_id = @annonce AND c.prestataire_id = u.id)
+    ORDER BY LOWER(u.quartier) = LOWER(@quartier) DESC, u.nom
+    LIMIT 8
+  `),
+
+  // --- Les paiements ----------------------------------------------
+  //
+  // Une ligne par mise en relation acceptee, ecrite au premier
+  // enregistrement : tant que rien n'est recu, il n'y a rien a ranger.
+  misesEnRelationAcceptees: db.prepare(`
+    SELECT m.id, m.prix_prestataire, m.commission, m.prix_employeur,
+           m.appel_employeur_le,
+           a.id     AS annonceId,
+           a.titre  AS titreAnnonce,
+           a.metier AS metierAnnonce,
+           e.nom    AS nomEmployeur,
+           e.telephone AS telephoneEmployeur,
+           u.nom    AS nomPrestataire,
+           u.telephone AS telephonePrestataire,
+           p.montant_recu, p.recu_le, p.moyen_reception,
+           p.montant_reverse, p.reverse_le, p.moyen_reversement,
            (SELECT c.terminee_le FROM candidatures c
              WHERE c.annonce_id = a.id AND c.statut = 'acceptee'
-             LIMIT 1) AS serviceTermineLe,
-           (SELECT c.declaree_par_elle_le FROM candidatures c
-             WHERE c.annonce_id = a.id AND c.statut = 'acceptee'
-             LIMIT 1) AS declareeParElleLe
-    FROM versements v
-    JOIN annonces     a ON a.id = v.annonce_id
-    JOIN utilisateurs e ON e.id = v.employeur_id
-    LEFT JOIN utilisateurs b ON b.id = v.beneficiaire_id
-    LEFT JOIN utilisateurs q ON q.id = v.decide_par
-    ORDER BY v.etat = 'bloque' DESC, v.cree_le, v.id
+             LIMIT 1) AS serviceTermineLe
+    FROM mises_en_relation m
+    JOIN annonces     a ON a.id = m.annonce_id
+    JOIN utilisateurs e ON e.id = a.employeur_id
+    JOIN utilisateurs u ON u.id = m.prestataire_id
+    LEFT JOIN paiements p ON p.mise_en_relation_id = m.id
+    WHERE m.statut = 'acceptee'
+    ORDER BY p.reverse_le IS NOT NULL, m.appel_employeur_le, m.id
   `),
 
-  nombreVersementsBloques: db.prepare(`
-    SELECT COUNT(*) AS n FROM versements WHERE etat = 'bloque'
+  paiementDeLaRelation: db.prepare(`
+    SELECT * FROM paiements WHERE mise_en_relation_id = ?
+  `),
+
+  ouvrirPaiement: db.prepare(`
+    INSERT INTO paiements (mise_en_relation_id, enregistre_par)
+    VALUES (@relation, @par)
+  `),
+
+  enregistrerReception: db.prepare(`
+    UPDATE paiements
+    SET montant_recu    = @montant,
+        recu_le         = datetime('now'),
+        moyen_reception = @moyen,
+        enregistre_par  = @par
+    WHERE mise_en_relation_id = @relation
+  `),
+
+  enregistrerReversement: db.prepare(`
+    UPDATE paiements
+    SET montant_reverse   = @montant,
+        reverse_le        = datetime('now'),
+        moyen_reversement = @moyen,
+        enregistre_par    = @par
+    WHERE mise_en_relation_id = @relation
+  `),
+
+  // Ce qui attend encore quelque chose : un paiement a recevoir, ou un
+  // reversement a faire.
+  nombrePaiementsEnAttente: db.prepare(`
+    SELECT COUNT(*) AS n
+    FROM mises_en_relation m
+    LEFT JOIN paiements p ON p.mise_en_relation_id = m.id
+    WHERE m.statut = 'acceptee'
+      AND (p.id IS NULL OR p.recu_le IS NULL OR p.reverse_le IS NULL)
+  `),
+
+  // Le total recu par une personne n'est range nulle part : c'est la
+  // somme de ses reversements. Un total garde a cote de ses lignes finit
+  // toujours par leur mentir.
+  totalReverseA: db.prepare(`
+    SELECT COALESCE(SUM(p.montant_reverse), 0) AS total
+    FROM paiements p
+    JOIN mises_en_relation m ON m.id = p.mise_en_relation_id
+    WHERE m.prestataire_id = ? AND p.reverse_le IS NOT NULL
+  `),
+
+  mesServicesPayes: db.prepare(`
+    SELECT m.prix_prestataire, m.commission, m.prix_employeur,
+           p.montant_reverse, p.reverse_le, p.moyen_reversement,
+           a.titre AS titreAnnonce,
+           e.nom   AS nomEmployeur
+    FROM mises_en_relation m
+    JOIN annonces     a ON a.id = m.annonce_id
+    JOIN utilisateurs e ON e.id = a.employeur_id
+    LEFT JOIN paiements p ON p.mise_en_relation_id = m.id
+    WHERE m.prestataire_id = ? AND m.statut = 'acceptee'
+    ORDER BY p.reverse_le IS NULL DESC, p.reverse_le DESC, m.id DESC
+  `),
+
+  mesServicesAPayer: db.prepare(`
+    SELECT m.prix_employeur, m.appel_employeur_le,
+           p.montant_recu, p.recu_le, p.moyen_reception,
+           a.titre AS titreAnnonce,
+           u.nom   AS nomPrestataire,
+           (SELECT c.terminee_le FROM candidatures c
+             WHERE c.annonce_id = a.id AND c.statut = 'acceptee'
+             LIMIT 1) AS serviceTermineLe
+    FROM mises_en_relation m
+    JOIN annonces     a ON a.id = m.annonce_id
+    JOIN utilisateurs u ON u.id = m.prestataire_id
+    LEFT JOIN paiements p ON p.mise_en_relation_id = m.id
+    WHERE a.employeur_id = ? AND m.statut = 'acceptee'
+    ORDER BY p.recu_le IS NULL DESC, m.id DESC
   `),
 
   signalerProbleme: db.prepare(`
@@ -1602,6 +1635,19 @@ function detaillerTarif(tarifBrut) {
   return { brut, commission, net: brut - commission };
 }
 
+// LE PRIX D'UN SERVICE, tel qu'il se fixe au telephone : la personne
+// annonce le sien, la plateforme ajoute sa commission, et c'est ce
+// total que l'employeur entend. La personne, elle, recoit exactement ce
+// qu'elle a annonce.
+//
+// Ecrit ICI et nulle part ailleurs : l'equipe ne saisit qu'un chiffre,
+// les deux autres en decoulent.
+function prixAvecCommission(prixPrestataire) {
+  const prix = Math.round(Number(prixPrestataire) || 0);
+  const commission = Math.round(prix * TAUX_COMMISSION);
+  return { prix, commission, prixEmployeur: prix + commission };
+}
+
 // Affiche le tarif tel que l'employeur le paiera.
 function formaterTarif(tarif) {
   const brut = Math.round(Number(tarif) || 0);
@@ -1778,7 +1824,6 @@ const DELAI_VERIFICATION_HEURES = 24;
 //
 // CE NOMBRE EST UN CHOIX, pas une regle du metier. Il se change ici, en
 // une ligne.
-const DELAI_ALERTE_VERSEMENT_JOURS = 7;
 
 // Depuis combien de temps ce dossier attend-il, et le delai est-il tenu ?
 //
@@ -1812,26 +1857,6 @@ function attenteLisible(envoyeLe) {
   if (a.heures < 1) return "il y a moins d'une heure";
   if (a.heures === 1) return "il y a 1 heure";
   return "il y a " + a.heures + " heures";
-}
-
-// Depuis combien de jours une somme est-elle bloquee, et faut-il que
-// l'equipe s'en inquiete ? Meme lecture du temps que pour les dossiers
-// d'identite : la date est en temps universel, on le dit a Date.parse.
-function attenteVersement(creeLe) {
-  if (!creeLe) return null;
-
-  const depart = Date.parse(String(creeLe).replace(" ", "T") + "Z");
-  if (Number.isNaN(depart)) return null;
-
-  const jours = Math.floor((Date.now() - depart) / 86400000);
-
-  // "0 jour" est juste et illisible : une somme posee il y a deux heures
-  // n'attend pas depuis zero jour, elle attend depuis aujourd'hui.
-  const lisible = jours < 1 ? "aujourd'hui"
-                : jours === 1 ? "1 jour"
-                : jours + " jours";
-
-  return { jours, lisible, depasse: jours >= DELAI_ALERTE_VERSEMENT_JOURS };
 }
 
 function libelleVerification(statut) {
@@ -2739,12 +2764,11 @@ app.locals.montantMinimum = MONTANT_MINIMUM_FCFA;
 app.locals.pasMontant = PAS_MONTANT_FCFA;
 app.locals.conditionsMax = CONDITIONS_MAX_CARACTERES;
 app.locals.detaillerTarif = detaillerTarif;
+app.locals.regleMontantLisible = regleMontantLisible;
 app.locals.pourcentageCommission = Math.round(TAUX_COMMISSION * 100);
 app.locals.libelleVerification = libelleVerification;
 app.locals.phraseCandidature = phraseCandidature;
 app.locals.attenteVerification = attenteVerification;
-app.locals.attenteVersement = attenteVersement;
-app.locals.delaiAlerteVersementJours = DELAI_ALERTE_VERSEMENT_JOURS;
 app.locals.attenteLisible = attenteLisible;
 app.locals.delaiVerificationHeures = DELAI_VERIFICATION_HEURES;
 app.locals.libelleUnite = libelleUnite;
@@ -4440,11 +4464,7 @@ function retirerDemande(annonceId, utilisateur) {
     };
   }
 
-  // Fermer la demande et rendre la somme : les deux ensemble, ou aucun.
-  db.transaction(() => {
-    requetes.annulerAnnonce.run({ id: annonce.id });
-    requetes.rembourserVersement.run({ annonce: annonce.id });
-  })();
+  requetes.annulerAnnonce.run({ id: annonce.id });
 
   return {
     annonce,
@@ -5978,26 +5998,11 @@ function declarerServiceEffectue(candidatureId, utilisateur) {
     };
   }
 
-  // Le service est fait : la somme bloquee part chez la personne qui a
-  // travaille, commission deduite. C'est le seul chemin par lequel elle
-  // y arrive - aucun bouton ne verse de l'argent directement.
-  //
-  // TOUT OU RIEN : un service clos sans son versement laisserait la
-  // personne impayee, dans une discussion qu'on ne peut plus rouvrir.
-  db.transaction(() => {
-    requetes.terminerService.run({ id: conversation.id });
-
-    const versement = requetes.versementDeLAnnonce.get(conversation.annonceId);
-    if (versement && versement.etat === "bloque") {
-      const detail = detaillerTarif(versement.montant);
-      requetes.verserVersement.run({
-        annonce: conversation.annonceId,
-        beneficiaire: conversation.prestataireId,
-        commission: detail.commission,
-        net: detail.net,
-      });
-    }
-  })();
+  // LA DECLARATION NE DEPLACE AUCUN ARGENT. Elle dit que le service a
+  // eu lieu : c'est ce qui permet a l'employeur de payer PamConnect, et
+  // a l'equipe d'enregistrer le reversement. Payer depuis un bouton
+  // serait un mouvement d'argent que la plateforme ne fait pas.
+  requetes.terminerService.run({ id: conversation.id });
 
   return { conversation, ok: true };
 }
@@ -6490,47 +6495,57 @@ app.post("/admin/problemes/:id", exigerAdmin, lireFormulaire, (req, res) => {
 
 // MON COMPTE.
 //
-// Le compte d'une personne qui travaille : ce qu'elle a recu, et pour
-// quel service. Celui d'un employeur : ce qu'il a bloque, rembourse ou
-// verse.
+// Ce qu'une personne a recu pour ses services, ou ce qu'un employeur
+// doit payer apres eux.
 //
-// Aucune coordonnee bancaire ni Mobile Money n'y est stockee. Un numero
-// de telephone est une donnee personnelle et un moyen de contact direct,
-// et la plateforme n'en demande pas. Le solde est un montant du, pas un
-// portefeuille : le versement reel se ferait ailleurs.
-// Ecrit UNE SEULE FOIS pour le site et l'application : l'etat de chaque
-// somme, ses mots et ses dates.
+// Aucune coordonnee bancaire ni Mobile Money n'y est rangee. L'argent ne
+// passe pas par la plateforme : l'employeur paie PamConnect apres le
+// service, et PamConnect reverse a la personne. Cette page en est la
+// TRACE, pas un portefeuille.
+//
+// Ecrit UNE SEULE FOIS pour le site et l'application : les memes mots et
+// les memes nombres des deux cotes.
 function monCompte(u) {
   const jeSuisEmployeur = u.role === "employeur";
-  const pourcentage = Math.round(TAUX_COMMISSION * 100);
 
   return {
     jeSuisEmployeur,
-    totalRecu: jeSuisEmployeur ? null : formaterMontant(requetes.soldeDe.get(u.id).solde),
-    recus: jeSuisEmployeur ? [] : requetes.mesVersementsRecus.all(u.id).map((v) => ({
-      titreDemande: v.titreAnnonce,
-      chez: v.nomEmployeur,
+    totalRecu: jeSuisEmployeur
+      ? null
+      : formaterMontant(requetes.totalReverseA.get(u.id).total),
+
+    // LA PERSONNE RECOIT SON PRIX ENTIER. La commission est ajoutee au
+    // prix annonce, elle n'en est pas retiree : ce que l'employeur paie
+    // en plus ne sort pas de sa poche a elle.
+    recus: jeSuisEmployeur ? [] : requetes.mesServicesPayes.all(u.id).map((p) => ({
+      titreDemande: p.titreAnnonce,
+      chez: p.nomEmployeur,
+      reverse: Boolean(p.reverse_le),
+      libelleEtat: p.reverse_le ? "Reversé" : "En attente du reversement",
       lignes: [
-        { libelle: "Somme annoncée", montant: formaterMontant(v.montant), retenue: false, total: false },
-        { libelle: `Commission PamConnect (${pourcentage} %)`,
-          montant: "− " + formaterMontant(v.commission), retenue: true, total: false },
-        { libelle: "Vous avez reçu", montant: formaterMontant(v.net), retenue: false, total: true },
+        { libelle: "Prix que vous avez annoncé", retenue: false,
+          montant: formaterMontant(p.prix_prestataire), total: false },
+        { libelle: p.reverse_le ? "PamConnect vous a reversé" : "PamConnect vous reversera",
+          montant: formaterMontant(p.reverse_le ? p.montant_reverse : p.prix_prestataire),
+          retenue: false, total: true },
       ],
-      verseLe: dateLisible(v.denoue_le),
+      verseLe: p.reverse_le ? dateLisible(p.reverse_le) : null,
+      moyen: p.moyen_reversement || null,
     })),
-    envoyes: jeSuisEmployeur ? requetes.mesVersementsEnvoyes.all(u.id).map((v) => ({
-      titreDemande: v.titreAnnonce,
-      etat: v.etat,
-      libelleEtat: v.etat === "bloque" ? "Bloqué par PamConnect"
-        : v.etat === "rembourse" ? "Rendu"
-        : `Versé à ${v.nomBeneficiaire}`,
-      montant: formaterMontant(v.montant),
-      bloqueLe: dateLisible(v.cree_le),
-      denoue: v.denoue_le
-        ? `${v.etat === "rembourse" ? "Rendu" : "Versé"} le ${dateLisible(v.denoue_le)}`
+
+    envoyes: jeSuisEmployeur ? requetes.mesServicesAPayer.all(u.id).map((p) => ({
+      titreDemande: p.titreAnnonce,
+      avec: p.nomPrestataire,
+      etat: p.recu_le ? "paye" : "a_payer",
+      libelleEtat: p.recu_le ? "Payé à PamConnect" : "À payer après le service",
+      montant: formaterMontant(p.recu_le ? p.montant_recu : p.prix_employeur),
+      convenuLe: dateLisible(p.appel_employeur_le),
+      paye: p.recu_le
+        ? `Reçu le ${dateLisible(p.recu_le)}` + (p.moyen_reception ? ` (${p.moyen_reception})` : "")
         : null,
-      // L'OBLIGATION, ecrite la ou la somme est encore bloquee.
-      rappelDeclaration: v.etat === "bloque",
+      // L'OBLIGATION, ecrite la ou la somme est encore due.
+      rappelPaiement: !p.recu_le,
+      serviceTermine: Boolean(p.serviceTermineLe),
     })) : [],
   };
 }
@@ -6710,108 +6725,350 @@ app.post("/mes-jetons/acheter", exigerConnexion, interdireALEquipe, lireFormulai
   });
 });
 
-// L'EQUIPE TRANCHE UN DESACCORD SUR UNE SOMME BLOQUEE.
+// --- Espace equipe : mettre deux personnes en relation -------------
 //
-// C'est la SEULE action de toute la plateforme qui deplace de l'argent
-// sans qu'un des deux interesses l'ait demande. Elle est donc encadree :
+// C'EST ICI QUE LE PRIX SE FIXE, et nulle part ailleurs sur la
+// plateforme. L'equipe appelle la personne qui fera le travail, ecrit le
+// prix qu'elle annonce, puis appelle l'employeur et lui annonce ce prix
+// augmente de la commission.
 //
-//   - elle n'existe qu'en cas de desaccord : quelqu'un a ete choisi, et
-//     soit la personne a declare avoir travaille, soit le delai est
-//     depasse. Avant cela, l'employeur n'a pas encore eu sa chance ;
-//   - un motif ECRIT est obligatoire, dans les deux sens ;
-//   - le nom de qui decide et son motif sont conserves : une decision
-//     qui deplace l'argent de quelqu'un doit pouvoir etre expliquee des
-//     mois plus tard.
-app.post("/admin/versements/:annonceId", exigerAdmin, lireFormulaire, (req, res) => {
-  const annonceId = Number(req.params.annonceId);
-  const versement = requetes.versementDeLAnnonce.get(annonceId);
+// DEUX APPELS, DEUX MOMENTS. Le premier ouvre la fiche, le second la
+// conclut. Les confondre supposerait que l'employeur repond toujours du
+// premier coup, et qu'un refus n'existe pas.
+function ecranMisesEnRelation() {
+  const demandes = requetes.demandesATraiter.all().map((a) => {
+    const enCours = requetes.ficheEnCours.get(a.id);
 
-  if (!versement) {
-    return res.status(404).render("message", {
-      titre: "Versement introuvable",
-      texte: "Aucune somme n'est enregistrée pour cette demande.",
-      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
-    });
-  }
+    return {
+      id: a.id,
+      titre: a.titre,
+      metier: a.metier,
+      quartier: a.quartier,
+      arrondissement: a.arrondissement,
+      horaire: a.horaire,
+      dureeEstimee: a.duree_estimee,
+      // LE BUDGET NE SORT PAS D'ICI : il aide l'equipe a savoir quel
+      // prix l'employeur acceptera, il n'est montre a personne d'autre.
+      budget: a.budget != null ? formaterMontant(a.budget) : null,
+      publieeLe: dateLisible(a.cree_le),
+      pourvue: a.annulee === 1,
 
-  if (versement.etat !== "bloque") {
-    return res.status(409).render("message", {
-      titre: "Cette somme est déjà dénouée",
-      texte: "Elle a déjà été versée ou rendue. On ne rejuge pas une somme " +
-             "qui a bougé : la trace du premier examen disparaîtrait.",
-      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
-    });
-  }
+      employeur: {
+        id: a.employeurId,
+        nom: a.nomEmployeur,
+        telephone: a.telephoneEmployeur ? formaterTelephone(a.telephoneEmployeur) : null,
+        appel: a.telephoneEmployeur ? "+237" + a.telephoneEmployeur : null,
+        verifie: a.verificationEmployeur === "verifie",
+      },
 
-  const retenue = requetes.candidatureRetenue.get(annonceId);
+      interesses: requetes.interessesDeLaDemande.all(a.id).map(personneAAppeler),
+      autres: a.metier
+        ? requetes.autresPrestatairesPour.all({
+            metier: a.metier, quartier: a.quartier || "", annonce: a.id,
+          }).map(personneAAppeler)
+        : [],
 
-  if (!retenue) {
-    return res.status(409).render("message", {
-      titre: "Personne n'a été choisi",
-      texte: "Il n'y a rien à arbitrer : tant que l'employeur n'a retenu " +
-             "personne, sa demande peut vivre ou être retirée normalement.",
-      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
-    });
-  }
+      fiche: enCours ? ficheLisible(enCours) : null,
+      refusees: requetes.fichesRefusees.all(a.id).map((m) => ({
+        nom: m.nomPrestataire,
+        prix: formaterMontant(m.prix_employeur),
+        note: m.note,
+      })),
+    };
+  });
 
-  // L'employeur doit avoir eu sa chance. Trancher avant, ce serait
-  // decider a sa place alors qu'il n'a encore rien manque.
-  const attente = attenteVersement(versement.cree_le);
-  const desaccord = Boolean(retenue.declaree_par_elle_le) || Boolean(attente && attente.depasse);
+  return { demandes };
+}
 
-  if (!desaccord) {
-    return res.status(409).render("message", {
-      titre: "Rien à arbitrer pour le moment",
-      texte: "L'employeur n'a pas encore dépassé le délai, et la personne n'a " +
-             "pas déclaré avoir travaillé. Laissez-leur le temps de s'accorder.",
-      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
-    });
-  }
+// Une personne que l'equipe peut appeler : son nom, son numero, et de
+// quoi decider s'il vaut la peine de l'appeler.
+function personneAAppeler(p) {
+  return {
+    id: p.prestataireId,
+    nom: p.nom,
+    metier: p.metier,
+    quartier: p.quartier,
+    tarif: p.tarif ? formaterMontant(p.tarif) : null,
+    telephone: p.telephone ? formaterTelephone(p.telephone) : null,
+    appel: p.telephone ? "+237" + p.telephone : null,
+    moyenne: p.moyenne,
+    verifie: p.verification ? p.verification === "verifie" : true,
+    dejaChoisie: p.statut === "acceptee",
+  };
+}
 
-  const motif = String(req.body.motif || "").trim().slice(0, 200);
+function ficheLisible(m) {
+  return {
+    id: m.id,
+    nom: m.nomPrestataire,
+    telephone: m.telephonePrestataire ? formaterTelephone(m.telephonePrestataire) : null,
+    appel: m.telephonePrestataire ? "+237" + m.telephonePrestataire : null,
+    prixPrestataire: formaterMontant(m.prix_prestataire),
+    commission: formaterMontant(m.commission),
+    prixEmployeur: formaterMontant(m.prix_employeur),
+    appeleeLe: dateLisible(m.appel_prestataire_le),
+    note: m.note,
+  };
+}
 
-  if (!motif) {
-    return res.status(400).render("message", {
-      titre: "Motif obligatoire",
-      texte: "Vous déplacez l'argent de quelqu'un. Écrivez pourquoi : sans motif, " +
-             "personne ne pourra expliquer cette décision plus tard.",
-      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
-    });
-  }
-
-  if (req.body.decision === "verser") {
-    const detail = detaillerTarif(versement.montant);
-
-    requetes.verserParEquipe.run({
-      annonce: annonceId,
-      beneficiaire: retenue.prestataire_id,
-      commission: detail.commission,
-      net: detail.net,
-      par: req.utilisateur.id,
-      motif,
-    });
-  } else {
-    requetes.rembourserParEquipe.run({
-      annonce: annonceId,
-      par: req.utilisateur.id,
-      motif,
-    });
-  }
-
-  // Dans les deux cas l'affaire est close : la discussion rejoint les
-  // services termines. La laisser ouverte inviterait a discuter d'un
-  // dossier deja tranche.
-  requetes.terminerService.run({ id: retenue.id });
-
-  res.redirect("/admin/versements");
+app.get("/admin/mises-en-relation", exigerAdmin, (req, res) => {
+  res.render("mises-en-relation", Object.assign(
+    { titre: "Mises en relation" }, ecranMisesEnRelation()));
 });
 
-// --- Espace equipe : les sommes bloquees ---------------------------
-app.get("/admin/versements", exigerAdmin, (req, res) => {
-  res.render("versements", {
-    titre: "Versements",
-    versements: requetes.tousLesVersements.all(),
+// L'EQUIPE A APPELE LA PERSONNE : elle ecrit le prix annonce.
+function ouvrirMiseEnRelation(admin, donnees) {
+  const annonce = requetes.annonceParId.get(Number(donnees.annonceId));
+
+  if (!annonce) {
+    return { probleme: { code: 404, titre: "Demande introuvable",
+      texte: "Cette demande n'existe plus." } };
+  }
+
+  if (requetes.ficheEnCours.get(annonce.id)) {
+    return { probleme: { code: 409, titre: "Une fiche attend déjà",
+      texte: "Vous avez déjà enregistré un prix pour cette demande. Notez " +
+             "d'abord la réponse de l'employeur." } };
+  }
+
+  const personne = requetes.utilisateurParId.get(Number(donnees.prestataireId));
+
+  if (!personne || personne.role !== "prestataire" || personne.est_admin) {
+    return { probleme: { code: 400, titre: "Personne introuvable",
+      texte: "Choisissez la personne que vous venez d'appeler." } };
+  }
+
+  // L'EQUIPE NE MET EN RELATION QUE DES IDENTITES CONTROLEES. Envoyer
+  // quelqu'un chez un particulier sans avoir vu ses pièces serait le
+  // contraire de ce que la plateforme promet.
+  if (personne.statut_verification !== "verifie") {
+    return { probleme: { code: 409, titre: "Identité non vérifiée",
+      texte: "Cette personne n'a pas encore été vérifiée. Traitez son dossier " +
+             "avant de la mettre en relation." } };
+  }
+
+  const saisi = Math.round(Number(String(donnees.prix || "").trim()));
+
+  if (!(saisi > 0) || !montantAccepte(saisi)) {
+    return { probleme: { code: 400, titre: "Prix à revoir",
+      texte: `Écrivez le prix annoncé par la personne : ${regleMontantLisible()}.` } };
+  }
+
+  const detail = prixAvecCommission(saisi);
+
+  requetes.creerMiseEnRelation.run({
+    annonce: annonce.id,
+    prestataire: personne.id,
+    prix: detail.prix,
+    commission: detail.commission,
+    prixEmployeur: detail.prixEmployeur,
+    note: String(donnees.note || "").trim().slice(0, 200) || null,
+    par: admin.id,
   });
+
+  return { ok: true };
+}
+
+app.post("/admin/mises-en-relation", exigerAdmin, lireFormulaire, (req, res) => {
+  const resultat = ouvrirMiseEnRelation(req.utilisateur, req.body);
+
+  if (resultat.probleme) {
+    return afficherProbleme(res, Object.assign({}, resultat.probleme,
+      { lien: { url: "/admin/mises-en-relation", texte: "Retour aux mises en relation" } }));
+  }
+
+  res.redirect("/admin/mises-en-relation");
+});
+
+// L'EQUIPE A APPELE L'EMPLOYEUR : il accepte le prix, ou il le refuse.
+//
+// TOUT OU RIEN quand il accepte : la personne est retenue, les autres
+// sont prevenues, et la demande quitte la liste. Une fiche acceptee sur
+// une demande restee ouverte laisserait d'autres personnes repondre a
+// une place deja prise.
+function noterReponseEmployeur(admin, ficheId, donnees) {
+  const fiche = requetes.miseEnRelationParId.get(ficheId);
+
+  if (!fiche) {
+    return { probleme: { code: 404, titre: "Fiche introuvable",
+      texte: "Cette mise en relation n'existe pas." } };
+  }
+
+  if (fiche.statut !== "en cours") {
+    return { probleme: { code: 409, titre: "Cette fiche est déjà conclue",
+      texte: "L'employeur a déjà répondu. On ne rejuge pas une mise en relation " +
+             "déjà notée : la trace du premier appel disparaîtrait." } };
+  }
+
+  const accepte = donnees.decision === "accepte";
+  const note = String(donnees.note || "").trim().slice(0, 200) || null;
+
+  db.transaction(() => {
+    requetes.reponseDeLEmployeur.run({
+      id: fiche.id,
+      statut: accepte ? "acceptee" : "refusee",
+      note,
+    });
+
+    if (!accepte) return;
+
+    // La personne a peut-etre signale son interet, ou l'equipe l'a
+    // trouvee elle-meme : dans ce cas sa reponse est creee ici, car
+    // c'est elle qui ouvre la discussion entre les deux.
+    let candidature = requetes.maCandidaturePour.get(fiche.annonce_id, fiche.prestataire_id);
+
+    if (!candidature) {
+      const pose = requetes.creerCandidature.run(fiche.annonce_id, fiche.prestataire_id);
+      candidature = { id: pose.lastInsertRowid };
+    }
+
+    requetes.changerStatutCandidature.run("acceptee", candidature.id);
+    requetes.refuserLesAutres.run({ annonce: fiche.annonce_id, choisie: candidature.id });
+    requetes.annulerAnnonce.run({ id: fiche.annonce_id });
+  })();
+
+  return { ok: true };
+}
+
+app.post("/admin/mises-en-relation/:id/reponse", exigerAdmin, lireFormulaire, (req, res) => {
+  const resultat = noterReponseEmployeur(req.utilisateur, Number(req.params.id), req.body);
+
+  if (resultat.probleme) {
+    return afficherProbleme(res, Object.assign({}, resultat.probleme,
+      { lien: { url: "/admin/mises-en-relation", texte: "Retour aux mises en relation" } }));
+  }
+
+  res.redirect("/admin/mises-en-relation");
+});
+
+// --- Espace equipe : les paiements ---------------------------------
+//
+// LA PLATEFORME NE DEPLACE PAS D'ARGENT, elle en garde la trace.
+// L'employeur paie PamConnect apres le service, PamConnect reverse a la
+// personne, et l'equipe ecrit ici ce qui est entre et ce qui est sorti.
+//
+// Deux enregistrements separes : recevoir et reverser ne se font pas le
+// meme jour, et un ecran qui les confondrait empecherait de dire ou en
+// est l'argent de quelqu'un.
+function ecranPaiements() {
+  const services = requetes.misesEnRelationAcceptees.all().map((m) => ({
+    id: m.id,
+    titreDemande: m.titreAnnonce,
+    metier: m.metierAnnonce,
+    employeur: m.nomEmployeur,
+    appelEmployeur: m.telephoneEmployeur ? "+237" + m.telephoneEmployeur : null,
+    telephoneEmployeur: m.telephoneEmployeur ? formaterTelephone(m.telephoneEmployeur) : null,
+    prestataire: m.nomPrestataire,
+    appelPrestataire: m.telephonePrestataire ? "+237" + m.telephonePrestataire : null,
+    telephonePrestataire: m.telephonePrestataire ? formaterTelephone(m.telephonePrestataire) : null,
+
+    prixPrestataire: formaterMontant(m.prix_prestataire),
+    commission: formaterMontant(m.commission),
+    prixEmployeur: formaterMontant(m.prix_employeur),
+
+    serviceTermine: Boolean(m.serviceTermineLe),
+    convenuLe: dateLisible(m.appel_employeur_le),
+
+    recu: m.recu_le ? {
+      montant: formaterMontant(m.montant_recu),
+      date: dateLisible(m.recu_le),
+      moyen: m.moyen_reception,
+    } : null,
+
+    reverse: m.reverse_le ? {
+      montant: formaterMontant(m.montant_reverse),
+      date: dateLisible(m.reverse_le),
+      moyen: m.moyen_reversement,
+    } : null,
+
+    // Ce qu'il reste a faire, en un mot : l'ecran s'en sert pour ranger
+    // et pour colorer.
+    etat: !m.recu_le ? "a_recevoir" : !m.reverse_le ? "a_reverser" : "termine",
+  }));
+
+  return { services };
+}
+
+app.get("/admin/paiements", exigerAdmin, (req, res) => {
+  res.render("paiements", Object.assign({ titre: "Paiements" }, ecranPaiements()));
+});
+
+const MOYENS_DE_PAIEMENT = ["Agence PamConnect", "Mobile Money", "Espèces"];
+
+function enregistrerUnMouvement(admin, relationId, donnees, sens) {
+  const fiche = requetes.miseEnRelationParId.get(relationId);
+
+  if (!fiche || fiche.statut !== "acceptee") {
+    return { probleme: { code: 404, titre: "Service introuvable",
+      texte: "Aucune mise en relation acceptée ne correspond." } };
+  }
+
+  const paiement = requetes.paiementDeLaRelation.get(fiche.id);
+
+  if (sens === "reverse" && !(paiement && paiement.recu_le)) {
+    return { probleme: { code: 409, titre: "Rien à reverser",
+      texte: "Enregistrez d'abord le montant reçu de l'employeur : on ne reverse " +
+             "pas une somme qui n'est pas arrivée." } };
+  }
+
+  if (sens === "recu" && paiement && paiement.recu_le) {
+    return { probleme: { code: 409, titre: "Paiement déjà enregistré",
+      texte: "Le montant reçu pour ce service est déjà noté." } };
+  }
+
+  if (sens === "reverse" && paiement && paiement.reverse_le) {
+    return { probleme: { code: 409, titre: "Reversement déjà enregistré",
+      texte: "Le reversement de ce service est déjà noté." } };
+  }
+
+  const montant = Math.round(Number(String(donnees.montant || "").trim()));
+
+  if (!(montant > 0)) {
+    return { probleme: { code: 400, titre: "Montant à revoir",
+      texte: "Écrivez en chiffres le montant que vous avez réellement manipulé." } };
+  }
+
+  const moyen = MOYENS_DE_PAIEMENT.includes(donnees.moyen) ? donnees.moyen : null;
+
+  if (!moyen) {
+    return { probleme: { code: 400, titre: "Moyen manquant",
+      texte: "Dites comment l'argent est passé : à l'agence, par Mobile Money " +
+             "ou en espèces." } };
+  }
+
+  db.transaction(() => {
+    if (!paiement) requetes.ouvrirPaiement.run({ relation: fiche.id, par: admin.id });
+
+    const ecrire = sens === "recu"
+      ? requetes.enregistrerReception
+      : requetes.enregistrerReversement;
+
+    ecrire.run({ relation: fiche.id, montant, moyen, par: admin.id });
+  })();
+
+  return { ok: true };
+}
+
+app.post("/admin/paiements/:id/recu", exigerAdmin, lireFormulaire, (req, res) => {
+  const resultat = enregistrerUnMouvement(req.utilisateur, Number(req.params.id), req.body, "recu");
+
+  if (resultat.probleme) {
+    return afficherProbleme(res, Object.assign({}, resultat.probleme,
+      { lien: { url: "/admin/paiements", texte: "Retour aux paiements" } }));
+  }
+
+  res.redirect("/admin/paiements");
+});
+
+app.post("/admin/paiements/:id/reverse", exigerAdmin, lireFormulaire, (req, res) => {
+  const resultat = enregistrerUnMouvement(req.utilisateur, Number(req.params.id), req.body, "reverse");
+
+  if (resultat.probleme) {
+    return afficherProbleme(res, Object.assign({}, resultat.probleme,
+      { lien: { url: "/admin/paiements", texte: "Retour aux paiements" } }));
+  }
+
+  res.redirect("/admin/paiements");
 });
 
 // --- Espace equipe : les jetons ------------------------------------
@@ -7080,7 +7337,8 @@ app.get("/admin", exigerAdmin, (req, res) => {
     statistiques: requetes.statistiquesVerification.all(),
     signalementsOuverts: requetes.nombreSignalementsOuverts.get().n,
     problemesOuverts: requetes.nombreProblemesOuverts.get().n,
-    versementsBloques: requetes.nombreVersementsBloques.get().n,
+    demandesATraiter: requetes.nombreDemandesATraiter.get().n,
+    paiementsEnAttente: requetes.nombrePaiementsEnAttente.get().n,
     achatsJetons: requetes.nombreAchatsJetonsEnAttente.get().n,
     avisSignales: requetes.nombreAvisSignales.get().n,
   });
@@ -7172,7 +7430,7 @@ app.post("/admin/message/:id", exigerAdmin, lireFormulaire, (req, res) => {
     return res.status(404).render("message", {
       titre: "Personne introuvable",
       texte: "Ce compte n'existe pas, ou c'est un compte de l'équipe.",
-      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
+      liens: [{ url: "/admin/mises-en-relation", texte: "Retour aux mises en relation" }],
     });
   }
 
@@ -7183,13 +7441,13 @@ app.post("/admin/message/:id", exigerAdmin, lireFormulaire, (req, res) => {
       titre: "Écrivez votre message",
       texte: "Quelques mots suffisent, mais la personne doit comprendre ce que " +
              "vous attendez d'elle.",
-      liens: [{ url: "/admin/versements", texte: "Retour aux versements" }],
+      liens: [{ url: "/admin/mises-en-relation", texte: "Retour aux mises en relation" }],
     });
   }
 
   requetes.ecrireMessageEquipe.run({ id: destinataire.id, texte });
 
-  res.redirect("/admin/versements");
+  res.redirect("/admin/mises-en-relation");
 });
 
 app.post("/message-equipe/lu", exigerConnexion, (req, res) => {
