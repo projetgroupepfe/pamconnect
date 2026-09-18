@@ -114,6 +114,7 @@ ajouterColonneSiAbsente("utilisateurs", "date_naissance", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "experience_annees", "INTEGER");
 ajouterColonneSiAbsente("utilisateurs", "disponibilites", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "telephone", "TEXT");
+ajouterColonneSiAbsente("utilisateurs", "mise_en_avant_jusqu_au", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "ajoute_par",
   "INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL");
 ajouterColonneSiAbsente("messages", "signalement_decision", "TEXT");
@@ -863,12 +864,14 @@ const requetes = {
     SELECT c.id AS candidatureId, c.statut,
            u.id AS prestataireId, u.nom, u.metier, u.quartier, u.tarif,
            u.telephone, u.statut_verification AS verification,
+           (u.mise_en_avant_jusqu_au IS NOT NULL
+            AND u.mise_en_avant_jusqu_au > datetime('now')) AS enAvant,
            (SELECT ROUND(AVG(note), 1) FROM avis v
              WHERE v.vise_id = u.id AND v.masque = 0) AS moyenne
     FROM candidatures c
     JOIN utilisateurs u ON u.id = c.prestataire_id
     WHERE c.annonce_id = ? AND c.statut IN ('en attente', 'acceptee')
-    ORDER BY c.statut = 'acceptee' DESC, c.id
+    ORDER BY c.statut = 'acceptee' DESC, enAvant DESC, c.id
   `),
 
   // Et si personne ne s'est manifeste, les prestataires du metier, ceux
@@ -877,6 +880,8 @@ const requetes = {
   autresPrestatairesPour: db.prepare(`
     SELECT u.id AS prestataireId, u.nom, u.metier, u.quartier, u.tarif,
            u.telephone,
+           (u.mise_en_avant_jusqu_au IS NOT NULL
+            AND u.mise_en_avant_jusqu_au > datetime('now')) AS enAvant,
            (SELECT ROUND(AVG(note), 1) FROM avis v
              WHERE v.vise_id = u.id AND v.masque = 0) AS moyenne
     FROM utilisateurs u
@@ -885,8 +890,26 @@ const requetes = {
       AND LOWER(u.metier) = LOWER(@metier)
       AND NOT EXISTS (SELECT 1 FROM candidatures c
                        WHERE c.annonce_id = @annonce AND c.prestataire_id = u.id)
-    ORDER BY LOWER(u.quartier) = LOWER(@quartier) DESC, u.nom
+    ORDER BY enAvant DESC, LOWER(u.quartier) = LOWER(@quartier) DESC, u.nom
     LIMIT 8
+  `),
+
+  // La mise en avant d'un profil : la meme forme que celle d'une demande.
+  // La condition finale empeche de prolonger une mise en avant en cours -
+  // quelqu'un qui clique deux fois paierait deux fois.
+  mettreEnAvantProfil: db.prepare(`
+    UPDATE utilisateurs
+       SET mise_en_avant_jusqu_au = datetime('now', @duree)
+     WHERE id = @id
+       AND (mise_en_avant_jusqu_au IS NULL
+            OR mise_en_avant_jusqu_au <= datetime('now'))
+  `),
+
+  monProfilEnAvant: db.prepare(`
+    SELECT mise_en_avant_jusqu_au,
+           (mise_en_avant_jusqu_au IS NOT NULL
+            AND mise_en_avant_jusqu_au > datetime('now')) AS enAvant
+    FROM utilisateurs WHERE id = ?
   `),
 
   // --- L'annuaire de l'equipe -------------------------------------
@@ -2764,10 +2787,11 @@ function mettreAJourLesJetons(personne) {
 // Un employeur met une demande en avant, une personne qui propose ses
 // services repond a une demande. Deux actions, deux prix, et jamais
 // l'un sur l'ecran de l'autre.
-function coutDeLAction(role) {
-  return parametreNombre(role === "employeur"
-    ? "cout_mise_en_avant"
-    : "cout_candidature");
+// CE QUE LES JETONS ACHETENT, des deux cotes : une mise en avant.
+// Repondre a une demande est redevenu gratuit, et le role ne change plus
+// le prix - seulement ce qui est mis en avant.
+function coutDeLAction() {
+  return parametreNombre("cout_mise_en_avant");
 }
 
 // CE QU'UN NOMBRE DE JETONS PERMET DE FAIRE, en toutes lettres.
@@ -2780,13 +2804,13 @@ function actionsPossibles(estEmployeur, nombre) {
 
   return estEmployeur
     ? `mettre ${n} ${n > 1 ? "demandes" : "demande"} en avant`
-    : `répondre à ${n} ${n > 1 ? "demandes" : "demande"}`;
+    : `mettre votre profil en avant ${n} ${n > 1 ? "fois" : "fois"}`;
 }
 
 // La meme chose au singulier indefini, pour les phrases qui parlent
 // d'une action sans la compter : "il vous manque 5 jetons pour ...".
 function uneAction(estEmployeur) {
-  return estEmployeur ? "mettre une demande en avant" : "répondre à une demande";
+  return estEmployeur ? "mettre une demande en avant" : "mettre votre profil en avant";
 }
 
 function soldeJetonsDe(personneId) {
@@ -3549,6 +3573,12 @@ function monProfil(u) {
       attente: statut === "en attente" ? phraseAttenteVerification(u.documents_envoyes_le) : null,
     },
     lieu: equipe ? null : [u.arrondissement, u.quartier].filter(Boolean).join(", ") || null,
+    // JUSQU'A QUAND L'EQUIPE M'APPELLE EN PREMIER. Absent quand la mise
+    // en avant est finie, ou quand il n'y en a jamais eu.
+    miseEnAvantJusquAu: personne && !equipe
+      && u.mise_en_avant_jusqu_au && u.mise_en_avant_jusqu_au > new Date().toISOString().slice(0, 19).replace("T", " ")
+      ? dateLisible(u.mise_en_avant_jusqu_au)
+      : null,
     email: u.email,
     badges: personne
       ? badgesDe(u).map((b) => ({ texte: b.texte, verifie: b.cle === "verifie" }))
@@ -3602,6 +3632,8 @@ app.get("/mon-profil", exigerConnexion, (req, res) => {
   // CETTE PAGE DIT QUI JE SUIS, PAS CE QUE JE FAIS. Ses demandes ou
   // ses reponses ont leur propre page : melangees ici, elles
   // repoussaient hors de l'ecran les informations et les avis.
+  const profil = monProfil(req.utilisateur);
+
   res.render("profil", {
     titre: "Mon profil",
     utilisateur: req.utilisateur,
@@ -3611,7 +3643,8 @@ app.get("/mon-profil", exigerConnexion, (req, res) => {
     reputation: reputationDe(req.utilisateur.id),
     mesAvis: requetes.avisRecus.all(req.utilisateur.id),
     // Les phrases et les decisions de la page, lues aussi par l'application.
-    profil: monProfil(req.utilisateur),
+    profil,
+    profilEnAvant: profil.miseEnAvantJusquAu,
   });
 });
 
@@ -4452,6 +4485,128 @@ function mettreEnAvantDemande(annonceId, utilisateur) {
            `Après cette date, elle reprend sa place sans que vous ayez rien à faire.`,
   };
 }
+
+// LA MISE EN AVANT D'UN PROFIL.
+//
+// ELLE NE TOUCHE PAS LA RECHERCHE DES EMPLOYEURS. Personne ne paie pour
+// passer devant quelqu'un de mieux note : le classement d'une recherche
+// reste celui du merite, et c'etait deja la regle.
+//
+// Ce que les jetons achetent, c'est d'etre APPELE PLUS TOT par l'equipe :
+// quand une demande de ce metier arrive, le profil en avant est en tete
+// de sa liste d'appels.
+const PROFIL_A_VERIFIER_POUR_LA_MISE_EN_AVANT = {
+  code: 409,
+  titre: "Votre identité n'est pas encore vérifiée",
+  texte: "L'équipe n'appelle que des personnes vérifiées : mettre votre profil " +
+         "en avant avant cela ne changerait rien.",
+  lien: { url: "/mon-profil", texte: "Retour à mon profil" },
+};
+
+function ecranMiseEnAvantProfil(utilisateur) {
+  if (utilisateur.role !== "prestataire") {
+    return { probleme: { code: 403, titre: "Réservé aux personnes qui proposent leurs services",
+      texte: "Un employeur met ses demandes en avant, pas son profil.",
+      lien: { url: "/mes-demandes", texte: "Retour à mes demandes" } } };
+  }
+
+  if (utilisateur.statut_verification !== "verifie") {
+    return { probleme: PROFIL_A_VERIFIER_POUR_LA_MISE_EN_AVANT };
+  }
+
+  mettreAJourLesJetons(utilisateur);
+
+  const etat = requetes.monProfilEnAvant.get(utilisateur.id);
+
+  return {
+    cout: parametreNombre("cout_mise_en_avant"),
+    jours: parametreNombre("duree_mise_en_avant_jours"),
+    solde: soldeJetonsDe(utilisateur.id).total,
+    finActuelle: etat && etat.enAvant ? dateLisible(etat.mise_en_avant_jusqu_au) : null,
+  };
+}
+
+function mettreEnAvantMonProfil(utilisateur) {
+  const ecran = ecranMiseEnAvantProfil(utilisateur);
+  if (ecran.probleme) return { probleme: ecran.probleme };
+
+  const retour = { url: "/mon-profil", texte: "Retour à mon profil" };
+  const versJetons = { url: "/mes-jetons", texte: "Voir mes jetons" };
+
+  // DEJA EN AVANT : on refuse au lieu de prolonger. Prolonger
+  // silencieusement ferait payer deux fois quelqu'un qui a clique deux
+  // fois, sans qu'il puisse s'en apercevoir.
+  if (ecran.finActuelle) {
+    return { probleme: { code: 409, titre: "Votre profil est déjà en avant",
+      texte: `Il le reste jusqu'au ${ecran.finActuelle}. Vous pourrez le remettre ` +
+             "en avant après cette date.",
+      lien: retour } };
+  }
+
+  if (!ecran.cout || !ecran.jours) {
+    return { probleme: { code: 503, titre: "Option indisponible",
+      texte: "Le prix de la mise en avant n'a pas encore été réglé par l'équipe.",
+      lien: retour } };
+  }
+
+  if (ecran.solde < ecran.cout) {
+    return { probleme: { code: 402, titre: "Il vous manque des jetons",
+      texte: `Mettre votre profil en avant coûte ${jetonsEnClair(ecran.cout)}. ` +
+             `Il vous reste ${jetonsEnClair(ecran.solde)}.`,
+      lien: versJetons } };
+  }
+
+  // LES DEUX ECRITURES SONT INDIVISIBLES : un profil mis en avant sans
+  // jeton preleve serait gratuit, un jeton preleve sans mise en avant
+  // serait un vol.
+  const poser = db.transaction(() => {
+    if (!depenserJetons(utilisateur, ecran.cout, "mise_en_avant",
+          "Mise en avant de mon profil")) {
+      return false;
+    }
+
+    return requetes.mettreEnAvantProfil.run({
+      id: utilisateur.id,
+      duree: `+${Math.round(ecran.jours)} days`,
+    }).changes > 0;
+  });
+
+  if (!poser()) {
+    return { probleme: { code: 402, titre: "Il vous manque des jetons",
+      texte: `Mettre votre profil en avant coûte ${jetonsEnClair(ecran.cout)}.`,
+      lien: versJetons } };
+  }
+
+  const apres = requetes.monProfilEnAvant.get(utilisateur.id);
+
+  return {
+    ok: true,
+    titre: "Votre profil est mis en avant",
+    texte: `L'équipe vous appelle en premier pour les demandes de votre métier ` +
+           `jusqu'au ${dateLisible(apres.mise_en_avant_jusqu_au)}. ` +
+           `${jetonsEnClair(ecran.cout)} a été prélevé. Votre place dans la ` +
+           `recherche des employeurs, elle, ne change pas : elle dépend de vos avis.`,
+  };
+}
+
+app.get("/mon-profil/mise-en-avant", exigerConnexion, interdireALEquipe, (req, res) => {
+  const ecran = ecranMiseEnAvantProfil(req.utilisateur);
+  if (ecran.probleme) return afficherProbleme(res, ecran.probleme);
+
+  res.render("mettre-profil-en-avant", Object.assign(
+    { titre: "Mettre mon profil en avant" }, ecran));
+});
+
+app.post("/mon-profil/mise-en-avant", exigerConnexion, interdireALEquipe, lireFormulaire, (req, res) => {
+  const resultat = mettreEnAvantMonProfil(req.utilisateur);
+  if (resultat.probleme) return afficherProbleme(res, resultat.probleme);
+
+  res.render("message", {
+    titre: resultat.titre,
+    texte: resultat.texte,
+    liens: [{ url: "/mon-profil", texte: "Retour à mon profil" }],
+  });
+});
 
 app.get("/annonces/:id/mettre-en-avant", exigerConnexion, interdireALEquipe, (req, res) => {
   const ecran = ecranDeMiseEnAvant(Number(req.params.id), req.utilisateur);
@@ -6648,7 +6803,7 @@ function mesJetons(u) {
   // Ce que coute UNE action pour cette personne-la. La page s'en sert
   // pour dire ce que son solde permet - au lieu d'afficher un nombre
   // de jetons dont personne ne sait ce qu'il vaut.
-  const coutAction = coutDeLAction(u.role);
+  const coutAction = coutDeLAction();
   const possible = coutAction ? Math.floor(solde.total / coutAction) : 0;
 
   return {
@@ -6854,6 +7009,7 @@ function personneAAppeler(p) {
     appel: p.telephone ? "+237" + p.telephone : null,
     moyenne: p.moyenne,
     verifie: p.verification ? p.verification === "verifie" : true,
+    enAvant: p.enAvant === 1,
     dejaChoisie: p.statut === "acceptee",
   };
 }
@@ -7275,7 +7431,6 @@ app.get("/admin/jetons", exigerAdmin, (req, res) => {
     traites: requetes.derniersAchatsJetonsTraites.all(),
     valeurJeton: valeurDuJeton(),
     packs: packsEnVente(),
-    coutCandidature: parametreNombre("cout_candidature"),
     coutMiseEnAvant: parametreNombre("cout_mise_en_avant"),
     candidaturesParJour: parametreNombre("candidatures_par_jour"),
     dureeMiseEnAvant: parametreNombre("duree_mise_en_avant_jours"),
@@ -7431,16 +7586,15 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
     });
   }
 
-  // CE QU'UNE ACTION COUTE. Zero serait une action gratuite, ce qui vide
-  // les jetons de leur seul role : faire reflechir avant d'agir.
-  const coutCandidature = Math.round(Number(req.body.cout_candidature));
+  // CE QUE COUTE UNE MISE EN AVANT. C'est le seul prix en jetons qui
+  // reste : repondre a une demande est gratuit. Zero serait une mise en
+  // avant offerte, ce qui viderait le jeton de son role.
   const coutMiseEnAvant = Math.round(Number(req.body.cout_mise_en_avant));
 
-  if (!Number.isFinite(coutCandidature) || coutCandidature <= 0 ||
-      !Number.isFinite(coutMiseEnAvant) || coutMiseEnAvant <= 0) {
+  if (!Number.isFinite(coutMiseEnAvant) || coutMiseEnAvant <= 0) {
     return res.status(400).render("message", {
       titre: "Coût invalide",
-      texte: "Une action doit coûter au moins un jeton. " +
+      texte: "Une mise en avant doit coûter au moins un jeton. " +
              "À zéro, elle serait gratuite et le jeton ne servirait plus à rien.",
       liens: [{ url: "/admin/jetons", texte: "Retour aux jetons" }],
     });
@@ -7495,11 +7649,6 @@ app.post("/admin/parametres", exigerAdmin, lireFormulaire, (req, res) => {
     requetes.majParametre.run({
       cle: "bienvenue_jours",
       valeur: String(joursValidite),
-      par: req.utilisateur.id,
-    });
-    requetes.majParametre.run({
-      cle: "cout_candidature",
-      valeur: String(coutCandidature),
       par: req.utilisateur.id,
     });
     requetes.majParametre.run({

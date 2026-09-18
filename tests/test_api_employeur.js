@@ -1078,7 +1078,7 @@ setTimeout(async () => {
 
   const jetonsPre = (await mesJetonsApi(cookieDe(verifiee.cookie))).donnees;
   dire("la personne qui repond lit la phrase de son role",
-       jetonsPre.jeSuisEmployeur === false && jetonsPre.uneAction === "répondre à une demande");
+       jetonsPre.jeSuisEmployeur === false && jetonsPre.uneAction === "mettre votre profil en avant");
 
   console.log(SAUT + "--- RECHERCHER ---");
   const rechercher = (metier, entetes) =>

@@ -144,6 +144,17 @@ CREATE TABLE IF NOT EXISTS utilisateurs (
   avertissement_le    TEXT,
   avertissement_lu    INTEGER NOT NULL DEFAULT 0 CHECK (avertissement_lu IN (0, 1)),
 
+  -- JUSQU'A QUAND CE PROFIL PASSE EN TETE DE LA LISTE DE L'EQUIPE.
+  --
+  -- Il ne passe devant personne dans la recherche d'un employeur : on ne
+  -- paie pas pour etre vu par quelqu'un qui cherche autre chose. Ce que
+  -- les jetons achetent, c'est d'etre APPELE PLUS TOT par l'equipe quand
+  -- une demande de son metier arrive.
+  --
+  -- Une date, pas un drapeau : un drapeau demanderait que quelqu'un pense
+  -- a l'eteindre a la bonne minute.
+  mise_en_avant_jusqu_au TEXT,
+
   -- QUI A CREE CE COMPTE. Vide quand la personne s'est inscrite
   -- elle-meme ; renseigne quand l'equipe l'a ajoutee a son annuaire,
   -- souvent apres l'avoir rencontree.
@@ -690,16 +701,14 @@ INSERT OR IGNORE INTO parametres (cle, valeur) VALUES
   ('bienvenue_prestataire', '3'),
   ('bienvenue_jours', '60'),
 
-  -- CE QU'UNE ACTION COUTE. Ces deux nombres ne servent pas encore a
-  -- prelever quoi que ce soit : ils servent d'abord a DIRE la verite.
-  -- Sans eux, la page annonce "des jetons vous sont offerts" sans
-  -- pouvoir dire ce qu'ils permettent de faire.
-  ('cout_candidature', '1'),
+  -- CE QUE COUTE UNE MISE EN AVANT. Le seul prix en jetons : repondre a
+  -- une demande est gratuit. Le meme nombre des deux cotes - une demande
+  -- qui passe devant les autres, un profil que l'equipe appelle en
+  -- premier.
   ('cout_mise_en_avant', '20'),
 
-  -- COMBIEN DE REPONSES PAR 24 HEURES, quel que soit le solde. Le jeton
-  -- fait reflechir, il n'empeche pas quelqu'un de tres motive de repondre
-  -- a tout. Cette limite-la si.
+  -- COMBIEN DE REPONSES PAR 24 HEURES. Repondre ne coute rien ; sans
+  -- cette limite, une seule personne pourrait repondre a tout.
   ('candidatures_par_jour', '3'),
   ('duree_mise_en_avant_jours', '7');
 

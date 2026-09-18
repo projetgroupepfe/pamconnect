@@ -123,33 +123,18 @@
         </small>
       </div>
 
-      <h3>Ce qu'une action coûte</h3>
+      <h3>Ce qu'une mise en avant coûte</h3>
 
-      <%# Ces deux nombres ne prelevent encore rien : ils servent a DIRE
-          la verite sur la page de chacun. Les etapes suivantes les
-          depenseront. %>
+      <%# LE SEUL PRIX EN JETONS QUI RESTE. Repondre a une demande est
+          gratuit : les jetons ne servent plus qu'a passer devant. %>
       <div class="champ">
-        <label for="cout-candidature">Répondre à une demande, en jetons</label>
-        <input id="cout-candidature" type="number" name="cout_candidature"
-               value="<%= coutCandidature === null ? "" : coutCandidature %>"
-               min="1" step="1" inputmode="numeric" required>
-        <small class="aide">
-          Ce que dépense une personne qui propose ses services pour répondre
-          à une demande.
-          <% if (coutCandidature !== null && valeurJeton !== null) { %>
-            Soit <strong><%= formaterMontant(coutCandidature * valeurJeton) %></strong>.
-          <% } %>
-        </small>
-      </div>
-
-      <div class="champ">
-        <label for="cout-avant">Mettre une demande en avant, en jetons</label>
+        <label for="cout-avant">Une mise en avant, en jetons</label>
         <input id="cout-avant" type="number" name="cout_mise_en_avant"
                value="<%= coutMiseEnAvant === null ? "" : coutMiseEnAvant %>"
                min="1" step="1" inputmode="numeric" required>
         <small class="aide">
-          Ce que dépense un employeur pour que sa demande passe devant les
-          autres.
+          Le même prix des deux côtés : une demande qui passe devant les
+          autres, un profil que l'équipe appelle en premier.
           <% if (coutMiseEnAvant !== null && valeurJeton !== null) { %>
             Soit <strong><%= formaterMontant(coutMiseEnAvant * valeurJeton) %></strong>.
           <% } %>
@@ -162,8 +147,7 @@
                value="<%= dureeMiseEnAvant === null ? "" : dureeMiseEnAvant %>"
                min="1" step="1" inputmode="numeric" required>
         <small class="aide">
-          Combien de temps la demande passe devant les autres du même métier.
-          Ensuite elle reprend sa place toute seule.
+          Ensuite la demande, ou le profil, reprend sa place toute seule.
         </small>
       </div>
 

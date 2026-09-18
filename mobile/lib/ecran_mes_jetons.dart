@@ -261,11 +261,12 @@ class _CarteUsage extends StatelessWidget {
                   ],
                   const TextSpan(text: ', depuis vos demandes'),
                 ] else ...[
-                  const TextSpan(text: 'Répondre à une demande', style: gras),
+                  const TextSpan(text: 'Mettre votre profil en avant', style: gras),
                   if (cout != null) ...[
                     const TextSpan(text: ' coûte '),
                     TextSpan(text: cout, style: gras),
                   ],
+                  const TextSpan(text: ', depuis votre profil'),
                 ],
                 const TextSpan(text: '.'),
                 if (permet != null) ...[
@@ -282,13 +283,17 @@ class _CarteUsage extends StatelessWidget {
             style: paragraphe,
           ),
           if (!jetons.jeSuisEmployeur) ...[
+            // CE QUE LES JETONS N'ACHETENT PAS. Repondre est gratuit, et
+            // la place dans la recherche d'un employeur ne se paie pas.
             const SizedBox(height: 8),
             Text.rich(
               const TextSpan(
                 children: [
-                  TextSpan(text: 'Le jeton part '),
-                  TextSpan(text: 'seulement quand votre réponse part', style: gras),
-                  TextSpan(text: '.'),
+                  TextSpan(text: 'Répondre à une demande est gratuit.', style: gras),
+                  TextSpan(
+                    text: " La mise en avant vous fait appeler en premier par l'équipe ; elle ne "
+                        'change rien à votre place dans la recherche.',
+                  ),
                 ],
               ),
               style: aide,

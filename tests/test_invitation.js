@@ -65,7 +65,6 @@ const formReglages = (o) => {
   p.append("bienvenue_employeur", "10");
   p.append("bienvenue_prestataire", "0");
   p.append("bienvenue_jours", "60");
-  p.append("cout_candidature", "1");
   p.append("cout_mise_en_avant", "20");
   p.append("candidatures_par_jour", String(o.parJour));
   p.append("duree_mise_en_avant_jours", "7");

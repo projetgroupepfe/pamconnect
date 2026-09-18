@@ -32,8 +32,9 @@
         <strong><%= jetons.cout %></strong><% } %>, depuis
         <a href="/mes-demandes">vos demandes</a>.
       <% } else { %>
-        <strong>Répondre à une demande</strong><% if (jetons.cout) { %> coûte
-        <strong><%= jetons.cout %></strong><% } %>.
+        <strong>Mettre votre profil en avant</strong><% if (jetons.cout) { %> coûte
+        <strong><%= jetons.cout %></strong><% } %>, depuis
+        <a href="/mon-profil">votre profil</a>.
       <% } %>
       <% if (jetons.permet) { %>
         Votre solde vous permet de
@@ -44,8 +45,13 @@
     </p>
 
     <% if (!jetons.jeSuisEmployeur) { %>
+      <%# CE QUE LES JETONS N'ACHETENT PAS. Repondre a une demande est
+          gratuit, et la place dans la recherche d'un employeur ne se
+          paie pas : elle depend des avis. %>
       <p class="aide">
-        Le jeton part <strong>seulement quand votre réponse part</strong>.
+        <strong>Répondre à une demande est gratuit.</strong> La mise en avant
+        vous fait appeler en premier par l'équipe ; elle ne change rien à
+        votre place dans la recherche.
       </p>
     <% } %>
 

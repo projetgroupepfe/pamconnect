@@ -132,6 +132,9 @@
                   <% } else if (d.interesses.some(function (i) { return i.id === p.id; })) { %>
                     <span class="badge badge-en-attente">Intéressée</span>
                   <% } %>
+                  <% if (p.enAvant) { %>
+                    <span class="badge badge-verifie">Mise en avant</span>
+                  <% } %>
                 </span>
               </li>
             <% }); %>

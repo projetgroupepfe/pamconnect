@@ -188,13 +188,14 @@ setTimeout(async () => {
   const pageJetons = await (await lire("/mes-jetons", pre.cookie)).text();
   dire("sa page dit d ou ils viennent", pageJetons.includes("Offerts à la vérification"));
   dire("et jusqu a quand ils durent", pageJetons.includes("à utiliser avant le"));
-  dire("et ce qu'ils lui permettent", pageJetons.includes("répondre à 3 demandes"));
+  dire("et ce qu'il lui manque pour une mise en avant",
+       pageJetons.includes("Il vous manque"));
   const jetonsApp = await json("/api/mes-jetons", pre.cookie);
   // La phrase autour des chiffres est ecrite par chaque ecran ; les
   // chiffres, eux, viennent du serveur.
-  dire("sur le telephone, les 3 jetons offerts, leur date limite et ce qu'ils permettent",
+  dire("sur le telephone, les 3 jetons offerts, leur date limite et ce qu'ils achetent",
        jetonsApp.code === 200 && jetonsApp.donnees.offerts === 3 && Boolean(jetonsApp.donnees.expireLe) &&
-       jetonsApp.donnees.permet === "répondre à 3 demandes", jetonsApp.brut.slice(0, 200));
+       jetonsApp.donnees.uneAction === "mettre votre profil en avant", jetonsApp.brut.slice(0, 200));
 
   console.log("\n--- ECRAN 4 : ELLE REPOND, ET VOIT CE QU'ELLE TOUCHERA ---");
   const ecranReponse = await (await lire("/candidatures/nouvelle/" + annonce.id, pre.cookie)).text();

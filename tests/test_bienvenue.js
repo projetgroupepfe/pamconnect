@@ -46,7 +46,6 @@ const formReglages = (o) => {
   p.append("bienvenue_employeur", String(o.employeur === undefined ? 10 : o.employeur));
   p.append("bienvenue_prestataire", String(o.prestataire === undefined ? 3 : o.prestataire));
   p.append("bienvenue_jours", String(o.jours === undefined ? 60 : o.jours));
-  p.append("cout_candidature", String(o.coutReponse === undefined ? 1 : o.coutReponse));
   p.append("cout_mise_en_avant", String(o.coutAvant === undefined ? 20 : o.coutAvant));
   p.append("candidatures_par_jour", "3");
   p.append("duree_mise_en_avant_jours", "7");
@@ -169,13 +168,19 @@ setTimeout(async () => {
   // Un nombre de jetons ne veut rien dire tout seul. La page doit
   // traduire : combien d'actions, et ce qui manque le cas echeant.
   const pagePres = await ouvrir(pasVerifie.cookie);
-  dire("le prix d'une reponse est annonce", pagePres.includes("Répondre à une demande"));
-  dire("en jetons et en francs", pagePres.includes("1 jeton (100 FCFA)"));
+  dire("le prix d'une mise en avant est annonce de son cote aussi",
+       pagePres.includes("Mettre votre profil en avant"));
+  dire("en jetons et en francs", pagePres.includes("20 jetons (2 000 FCFA)"));
 
-  // LA PHRASE DIT L'ACTION, PAS UN MOT SEUL. "3 reponses" ne disait pas
-  // reponses a quoi.
-  dire("trois jetons permettent de repondre a trois demandes",
-       pagePres.includes("répondre à 3 demandes"));
+  // REPONDRE EST GRATUIT, et elle doit le lire ici : sinon elle croirait
+  // devoir acheter des jetons pour repondre a une demande.
+  dire("repondre a une demande est dit gratuit",
+       pagePres.includes("Répondre à une demande est gratuit"));
+
+  // TROIS JETONS OFFERTS, UNE MISE EN AVANT A VINGT : elle lit ce qui
+  // lui manque, plutot que de le decouvrir en cliquant.
+  dire("elle lit ce qui lui manque", pagePres.includes("Il vous manque"));
+  dire("et combien exactement", pagePres.includes("17 jetons (1 700 FCFA)"));
 
   // L'EMPLOYEUR RECOIT 10 JETONS ALORS QU'UNE MISE EN AVANT EN COUTE 20.
   // C'est une reduction de moitie, pas une mise en avant offerte - et il
@@ -193,8 +198,8 @@ setTimeout(async () => {
   // texte ecrit en dur passerait tous les tests precedents mais pas
   // celui-ci.
   dire("les deux pages ne disent pas la meme chose",
-       pagePres.includes("répondre à 8 demandes") &&
-       !pageEmp.includes("répondre à 8 demandes"));
+       pagePres.includes("Mettre votre profil en avant") &&
+       !pageEmp.includes("Mettre votre profil en avant"));
   dire("et l'inverse est vrai aussi",
        pageEmp.includes("mettre 1 demande en avant") &&
        !pagePres.includes("mettre 1 demande en avant"));
@@ -204,12 +209,11 @@ setTimeout(async () => {
   // mais il complete exactement les jetons qu'on lui a offerts. Ce qu'on
   // ignore, c'est ce que la personne a deja - on compte donc devant elle.
 
-  // Elle a 3 jetons, une reponse en coute 1.
-  dire("le pack de 5 lui permettra huit demandes",
-       pagePres.includes("répondre à 8 demandes"));
+  // Elle a 3 jetons, une mise en avant en coute 20.
+  dire("le pack de 5 ne lui suffit pas", pagePres.includes("manquera encore"));
   dire("avec son total apres achat", pagePres.includes("8 jetons</strong>"));
-  dire("le pack de 10 lui en permettra treize",
-       pagePres.includes("répondre à 13 demandes"));
+  dire("le pack de 30 lui permettra une mise en avant",
+       pagePres.includes("mettre votre profil en avant 1 fois"));
 
   // Lui a 10 jetons, une mise en avant en coute 20.
   dire("le pack de 5 ne lui suffit pas", pageEmp.includes("manquera encore"));
@@ -234,18 +238,17 @@ setTimeout(async () => {
        pageEmp.includes("vos demandes"));
   dire("et rien ne dit plus que l'option est fermee",
        !pageEmp.includes("pas encore ouverte"));
-  dire("elle, sait quand le jeton part",
-       pagePres.includes("seulement quand votre réponse part"));
+  dire("elle, sait ou lancer la sienne", pagePres.includes("votre profil"));
 
-  console.log(SAUT + "--- L'EQUIPE REGLE CE QU'UNE ACTION COUTE ---");
-  await poster("/admin/parametres", formReglages({ coutReponse: 2 }), eq.cookie);
+  console.log(SAUT + "--- L'EQUIPE REGLE CE QU'UNE MISE EN AVANT COUTE ---");
+  await poster("/admin/parametres", formReglages({ coutAvant: 2 }), eq.cookie);
   const pageDeux = await ouvrir(pasVerifie.cookie);
   dire("le nouveau cout s'affiche", pageDeux.includes("2 jetons (200 FCFA)"));
-  dire("et le solde ne permet plus qu'une demande",
-       pageDeux.includes("répondre à 1 demande"));
+  dire("et le solde permet maintenant une mise en avant",
+       pageDeux.includes("mettre votre profil en avant 1 fois"));
 
-  const gratuit = await poster("/admin/parametres", formReglages({ coutReponse: 0 }), eq.cookie);
-  dire("une action gratuite est refusee", gratuit.code === 400, String(gratuit.code));
+  const gratuit = await poster("/admin/parametres", formReglages({ coutAvant: 0 }), eq.cookie);
+  dire("une mise en avant gratuite est refusee", gratuit.code === 400, String(gratuit.code));
 
   await poster("/admin/parametres", formReglages({}), eq.cookie);
 

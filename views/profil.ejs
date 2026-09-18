@@ -184,6 +184,15 @@
           <%- include("partiels/icone", { nom: "jeton" }) %>
           Mes jetons
         </a>
+        <%# CE QUE LES JETONS ACHETENT DE CE COTE-CI : etre appele en
+            premier par l'equipe. La recherche des employeurs, elle, ne
+            se paie pas. %>
+        <% if (utilisateur.role === "prestataire" && utilisateur.statut_verification === "verifie") { %>
+          <a class="bouton bouton-secondaire" href="/mon-profil/mise-en-avant">
+            <%- include("partiels/icone", { nom: "suivant" }) %>
+            <%= locals.profilEnAvant ? "Profil en avant jusqu'au " + profilEnAvant : "Mettre mon profil en avant" %>
+          </a>
+        <% } %>
       <% } %>
     </div>
 
