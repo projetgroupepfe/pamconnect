@@ -3115,9 +3115,9 @@ function exigerAdmin(req, res, next) {
 
   if (!utilisateur.est_admin) {
     return res.status(403).render("message", {
-      titre: "Acces refuse",
-      texte: "Cette page est reservee a l'equipe de PamConnect.",
-      liens: [{ url: "/", texte: "Retour a l'accueil" }],
+      titre: "Accès refusé",
+      texte: "Cette page est réservée à l'équipe PamConnect.",
+      liens: [{ url: "/", texte: "Retour à l'accueil" }],
     });
   }
 
@@ -3787,10 +3787,10 @@ function demandesDeLEmployeur(employeurId) {
 app.get("/mes-demandes", exigerConnexion, interdireALEquipe, (req, res) => {
   if (req.utilisateur.role !== "employeur") {
     return res.status(403).render("message", {
-      titre: "Acces refuse",
+      titre: "Accès refusé",
       texte: "Cette page est celle des employeurs. Les demandes " +
-             "auxquelles vous avez repondu sont sur Mes reponses.",
-      liens: [{ url: "/mes-reponses", texte: "Voir mes reponses" }],
+             "auxquelles vous avez répondu sont sur Mes réponses.",
+      liens: [{ url: "/mes-reponses", texte: "Voir mes réponses" }],
     });
   }
 
@@ -3820,9 +3820,9 @@ function mesReponses(u) {
 app.get("/mes-reponses", exigerConnexion, interdireALEquipe, (req, res) => {
   if (req.utilisateur.role !== "prestataire") {
     return res.status(403).render("message", {
-      titre: "Acces refuse",
-      texte: "Cette page est celle des personnes qui repondent. Vos " +
-             "demandes publiees sont sur Mes demandes.",
+      titre: "Accès refusé",
+      texte: "Cette page est celle des personnes qui répondent. Vos " +
+             "demandes publiées sont sur Mes demandes.",
       liens: [{ url: "/mes-demandes", texte: "Voir mes demandes" }],
     });
   }
@@ -4162,9 +4162,9 @@ function exigerVerification(req, res, next) {
 app.get("/publier-annonce", exigerConnexion, interdireALEquipe, exigerVerification, (req, res) => {
   if (req.utilisateur.role !== "employeur") {
     return res.status(403).render("message", {
-      titre: "Acces refuse",
+      titre: "Accès refusé",
       texte: "Seuls les employeurs peuvent publier une demande.",
-      liens: [{ url: "/", texte: "Retour a l'accueil" }],
+      liens: [{ url: "/", texte: "Retour à l'accueil" }],
     });
   }
 
@@ -4239,9 +4239,9 @@ app.post("/annonces", exigerConnexion, interdireALEquipe, exigerVerification, li
   // pouvait en publier une en envoyant le formulaire a la main.
   if (req.utilisateur.role !== "employeur") {
     return res.status(403).render("message", {
-      titre: "Acces refuse",
+      titre: "Accès refusé",
       texte: "Seuls les employeurs peuvent publier une demande.",
-      liens: [{ url: "/", texte: "Retour a l'accueil" }],
+      liens: [{ url: "/", texte: "Retour à l'accueil" }],
     });
   }
 
@@ -4846,7 +4846,7 @@ function refusDeRepondre(u) {
   if (u.role !== "prestataire" || u.est_admin) {
     return {
       code: 403,
-      titre: "Acces refuse",
+      titre: "Accès refusé",
       texte: "Seules les personnes qui proposent leurs services peuvent répondre à une demande.",
       lien: { url: "/annonces", texte: "Retour aux demandes" },
     };
