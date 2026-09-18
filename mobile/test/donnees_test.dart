@@ -261,18 +261,12 @@ void main() {
           'metiers': ['metier 1', 'metier 2'],
           'quartiers': ['quartier 1'],
           'arrondissements': ['arrondissement 1'],
-          'unitesTarif': [
-            {'valeur': 'horaire', 'libelle': "de l'heure"},
-            {'valeur': 'forfaitaire', 'libelle': 'pour la prestation'},
-          ],
-          'uniteParDefaut': 'forfaitaire',
         };
 
     test('les listes du serveur sont lues telles quelles', () {
       final lu = FormulaireDemande.depuisJson(formulaire());
       expect(lu.metiers, ['metier 1', 'metier 2']);
-      expect(lu.unitesTarif.map((u) => u.libelle), ["de l'heure", 'pour la prestation']);
-      expect(lu.uniteParDefaut, 'forfaitaire');
+      expect(lu.quartiers, ['quartier 1']);
       expect(lu.invitee, isNull);
     });
 
@@ -282,11 +276,6 @@ void main() {
       expect(lu.invitee?.id, 7);
       expect(lu.invitee?.nom, 'nom 1');
       expect(lu.invitee?.metier, 'metier 1');
-    });
-
-    test('un choix par defaut absent de la liste est signale', () {
-      final json = formulaire()..['uniteParDefaut'] = 'journalier';
-      expect(() => FormulaireDemande.depuisJson(json), throwsA(isA<FormeInattendue>()));
     });
 
     test('une liste qui contient autre chose que du texte est signalee', () {
@@ -562,8 +551,7 @@ void main() {
             'horaire': 'horaire 1',
             'quartier': 'quartier 1',
             'arrondissement': 'arrondissement 1',
-            'prix': '8000',
-            'unite_tarif': 'forfaitaire',
+            'budget': '8000',
             'duree_estimee': '',
             'conditions': '',
           },
@@ -572,7 +560,7 @@ void main() {
 
     test('les valeurs actuelles et les listes arrivent ensemble', () {
       final lu = ModificationDemande.depuisJson(modification());
-      expect(lu.valeurs.prix, '8000');
+      expect(lu.valeurs.budget, '8000');
       expect(lu.formulaire.metiers, ['metier 1']);
       expect(lu.avertissement!.phrase, 'phrase 1');
     });
@@ -1024,15 +1012,16 @@ void main() {
         'quartier': null,
         'arrondissement': null,
         'conditions': null,
+        'dureeEstimee': 'duree 1',
       },
       'employeur': {'nom': 'nom 1', 'verifie': false, 'note': null, 'nombreAvis': 0},
-      'prix': {'annonce': null, 'dureeEstimee': null, 'lignes': []},
+      'phrase': 'phrase 1',
       'proposee': false,
-      'cout': {'envoyer': 'envoyer 1', 'reste': 'reste 1', 'soldeInsuffisant': true, 'solde': 'solde 1'},
       'limite': null,
     });
     expect(lu.proposee, isFalse);
-    expect(lu.cout?.soldeInsuffisant, isTrue);
+    expect(lu.phrase, 'phrase 1');
+    expect(lu.demande.dureeEstimee, 'duree 1');
     expect(lu.limite, isNull);
     expect(lu.employeur.note, isNull);
     expect(() => EcranReponse.depuisJson({'demande': null}), throwsA(isA<FormeInattendue>()));

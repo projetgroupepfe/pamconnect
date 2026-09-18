@@ -92,21 +92,14 @@ setTimeout(async () => {
   dire("la duree estimee", page.includes("environ 4 heures"));
   dire("le lieu general", page.includes("Mvan"));
   dire("les conditions particulieres", page.includes("Il y a un chien"));
-  dire("le prix annonce", page.includes("18 000 FCFA"));
-  dire("la commission de la plateforme", page.includes("Commission PamConnect"));
-  dire("le montant net revenant a la personne", page.includes("16 200 FCFA"));
-  dire("qu'aucun autre frais ne s'ajoute", page.includes("Aucun autre frais"));
+  dire("aucun prix n'est annonce sur cet ecran", !page.includes("Commission PamConnect"));
 
   // Un seul montant existe desormais : le prix de l'annonce. Il n'y a
   // plus d'ecart a calculer, puisqu'il n'y a plus deux chiffres.
-  dire("l'employeur reconnait son propre prix",
-       page.includes("le prix que vous avez annoncé"));
   dire("le nom de la personne choisie", page.includes("Test pre"));
   dire("un lien vers son profil complet", page.includes("/personnes/"));
 
   console.log("\n--- LE VOCABULAIRE EST CELUI DE L'EMPLOYEUR ---");
-  dire("il lit 'Vous payez', pas 'Vous demandez'",
-       page.includes("Vous payez") && !page.includes("Vous demandez"));
 
   console.log("\n--- L'ADRESSE EXACTE N'EST PAS LA ---");
   // La plateforme ne demande aucune adresse exacte : seul le lieu general

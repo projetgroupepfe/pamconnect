@@ -84,23 +84,9 @@
       </ul>
     </div>
 
-    <h2>Ce que vous payez</h2>
     <div class="carte">
-      <%# Le meme bloc que partout ailleurs, du point de vue de
-          l'employeur : le calcul ne varie jamais d'un ecran a l'autre. %>
-      <%- include("partiels/detail-tarif", {
-            tarif: c.prixAnnonce,
-            pourEmployeur: true,
-            beneficiaire: c.nomPrestataire }) %>
-
-      <p class="aide">
-        C'est le prix que vous avez annoncé dans votre demande.
-        <%= c.nomPrestataire %> a répondu en le connaissant.
-      </p>
-
-      <p class="aide">
-        Aucun autre frais ne s'ajoute : l'employeur paie le montant affiché,
-        rien de plus. La commission est retenue sur la part de la personne.
+      <p>
+        L'équipe PamConnect vous rappellera avec le prix, avant le service.
       </p>
     </div>
 

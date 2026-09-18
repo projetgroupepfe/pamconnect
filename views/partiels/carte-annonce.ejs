@@ -36,20 +36,6 @@
         prendre a partir d'elle. Elle apparait au moment ou quelqu'un
         s'engage a se deplacer chez lui - voir repondre.ejs. %>
 
-    <%# Le prix annonce : c'est sur lui que la personne decide de
-        repondre ou d'aller voir ailleurs. %>
-    <% if (prixEnClair(annonce)) { %>
-      <li>
-        <%- include("icone", { nom: "remuneration" }) %>
-        <span>
-          <strong><%= prixEnClair(annonce) %></strong>
-          <% if (annonce.duree_estimee) { %>
-            <span class="aide"><%= annonce.duree_estimee %></span>
-          <% } %>
-        </span>
-      </li>
-    <% } %>
-
     <% if (annonce.conditions) { %>
       <li>
         <%- include("icone", { nom: "info" }) %>

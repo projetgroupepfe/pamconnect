@@ -109,6 +109,7 @@ ajouterColonneSiAbsente("annonces", "prix", "INTEGER");
 ajouterColonneSiAbsente("annonces", "unite_tarif", "TEXT NOT NULL DEFAULT 'forfaitaire'");
 ajouterColonneSiAbsente("annonces", "duree_estimee", "TEXT");
 ajouterColonneSiAbsente("annonces", "conditions", "TEXT");
+ajouterColonneSiAbsente("annonces", "budget", "INTEGER");
 ajouterColonneSiAbsente("utilisateurs", "date_naissance", "TEXT");
 ajouterColonneSiAbsente("utilisateurs", "experience_annees", "INTEGER");
 ajouterColonneSiAbsente("utilisateurs", "disponibilites", "TEXT");
@@ -535,7 +536,7 @@ const requetes = {
     UPDATE annonces
     SET titre = @titre, metier = @metier,
         arrondissement = @arrondissement, quartier = @quartier,
-        horaire = @horaire, prix = @prix, unite_tarif = @unite_tarif,
+        horaire = @horaire, budget = @budget,
         duree_estimee = @duree_estimee, conditions = @conditions
     WHERE id = @id
   `),
@@ -554,10 +555,10 @@ const requetes = {
   creerAnnonce: db.prepare(`
     INSERT INTO annonces
       (employeur_id, titre, metier, arrondissement, quartier, horaire,
-       prix, unite_tarif, duree_estimee, conditions, personne_invitee_id)
+       budget, duree_estimee, conditions, personne_invitee_id)
     VALUES
       (@employeur_id, @titre, @metier, @arrondissement, @quartier, @horaire,
-       @prix, @unite_tarif, @duree_estimee, @conditions, @personne_invitee_id)
+       @budget, @duree_estimee, @conditions, @personne_invitee_id)
   `),
 
   // JOIN : on recupere la candidature ET le nom du prestataire
@@ -1660,24 +1661,18 @@ function verifierAnnonce(donnees) {
     };
   }
 
-  // Le prix est OBLIGATOIRE. C'est l'employeur qui annonce ce qu'il
-  // paiera : sans ce montant, une personne devrait postuler sans savoir
-  // ce qu'elle touchera, et il faudrait negocier - ce que cette
-  // plateforme ne fait pas.
-  const prix = Math.round(Number(String(donnees.prix || "").trim()));
+  // LE PRIX NE VIENT PLUS DE L'EMPLOYEUR. Il est annonce par la personne
+  // qui fera le travail, lors de l'appel de l'equipe, qui le rapporte a
+  // l'employeur majore de la commission.
+  //
+  // Le budget, lui, est facultatif : il aide l'equipe a savoir qui
+  // appeler, et ne sort jamais de son espace.
+  const budgetSaisi = String(donnees.budget || "").trim();
 
-  if (!(Number.isFinite(prix) && prix > 0)) {
+  if (budgetSaisi && !(Number(budgetSaisi) > 0)) {
     return {
-      titre: "Prix obligatoire",
-      texte: "Indiquez le montant que vous paierez pour ce service. " +
-             "C'est sur lui que les candidates décideront de répondre.",
-    };
-  }
-
-  if (!montantAccepte(prix)) {
-    return {
-      titre: "Prix non accepté",
-      texte: `Le prix doit être ${regleMontantLisible()}.`,
+      titre: "Budget non compris",
+      texte: "Écrivez votre budget en chiffres, ou laissez la case vide.",
     };
   }
 
@@ -1704,10 +1699,8 @@ function champsAnnonce(donnees) {
     arrondissement: lieu.arrondissement,
     quartier: lieu.quartier,
     horaire: String(donnees.horaire).trim(),
-    prix: Math.round(Number(String(donnees.prix || "").trim())) || null,
-    // L'unite vient d'une liste fermee. On ne fait pas confiance au
-    // navigateur : une valeur inconnue est ramenee a celle par defaut.
-    unite_tarif: UNITES_TARIF[donnees.unite_tarif] ? donnees.unite_tarif : "forfaitaire",
+    // Le budget, s'il est donne. Le prix n'est plus saisi ici.
+    budget: Math.round(Number(String(donnees.budget || "").trim())) || null,
     duree_estimee: String(donnees.duree_estimee || "").trim() || null,
     conditions: String(donnees.conditions || "").trim() || null,
   };
@@ -4053,28 +4046,18 @@ function publierDemande(employeurId, donnees) {
     personne_invitee_id: invitee ? invitee.id : null,
   });
 
-  // L'employeur n'a pas publie par plaisir : la somme qu'il annonce est
-  // bloquee des maintenant. La personne qui repondra sait ainsi que
-  // l'argent existe avant de se deplacer.
-  //
-  // SIMULATION : rien n'est encaisse. La ligne enregistree dit ce qui
-  // DEVRAIT se passer, et les ecrans le precisent.
-  //
-  // LES DEUX OU AUCUNE : une demande en ligne sans sa somme bloquee
-  // annoncerait un argent qui n'existe pas.
-  const id = db.transaction(() => {
-    const creee = requetes.creerAnnonce.run(Object.assign({ employeur_id: employeurId }, champs));
-    const nouvelle = Number(creee.lastInsertRowid);
-    requetes.bloquerVersement.run({ annonce: nouvelle, employeur: employeurId, montant: champs.prix || 0 });
-    return nouvelle;
-  })();
+  // PLUS AUCUNE SOMME N'EST BLOQUEE ICI. L'employeur ne paie rien a la
+  // publication : l'equipe l'appelle avec le prix, et il paie apres le
+  // service.
+  const id = Number(requetes.creerAnnonce.run(
+    Object.assign({ employeur_id: employeurId }, champs)).lastInsertRowid);
 
   return {
     id,
     titre: "Demande publiée",
     texte: `Votre demande "${champs.titre}" est en ligne.` +
            (invitee ? ` ${invitee.nom} la verra en premier.` : "") +
-           ` La somme annoncée est bloquée par PamConnect jusqu'à la fin du service.`,
+           " L'équipe PamConnect vous rappelle avec le prix.",
   };
 }
 
@@ -4152,9 +4135,8 @@ function avertissementModification(nombre) {
   return {
     phrase: `${nombre} personne${plusieurs ? "s ont" : " a"} déjà répondu à cette demande. ` +
             `Elle${plusieurs ? "s se sont décidées" : " s'est décidée"} sur ce qui est écrit aujourd'hui.`,
-    conseil: `Si vous changez l'horaire, le lieu ou le prix, prévenez-${plusieurs ? "les" : "la"} ` +
-             "dans la discussion : la plateforme ne le fait pas à votre place. " +
-             "Le prix peut augmenter, mais plus baisser.",
+    conseil: `Si vous changez l'horaire ou le lieu, prévenez-${plusieurs ? "les" : "la"} ` +
+             "dans la discussion : la plateforme ne le fait pas à votre place.",
   };
 }
 
@@ -4201,31 +4183,7 @@ function modifierDemande(annonceId, utilisateur, donnees) {
 
   const champs = champsAnnonce(donnees);
 
-  // LE PRIX NE BAISSE PLUS APRES UNE REPONSE. Chaque personne qui a
-  // repondu s'est decidee sur ce prix, et y a depense un jeton : le
-  // baisser changerait l'accord apres coup, sans qu'elle en soit prevenue.
-  // Le monter ne fait perdre personne, il reste possible. L'horaire et le
-  // lieu peuvent devoir etre corriges : l'employeur est seulement prevenu.
-  const reponses = requetes.nombreCandidatures.get(annonce.id).n;
-  if (reponses > 0 && (champs.prix || 0) < (annonce.prix || 0)) {
-    return {
-      annonce,
-      probleme: {
-        code: 409,
-        titre: "Le prix ne peut plus baisser",
-        texte: `${reponses} personne${reponses > 1 ? "s ont" : " a"} déjà répondu à cette demande : ` +
-               `le prix peut augmenter, mais plus descendre sous ${formaterMontant(annonce.prix)}.`,
-        lien: { url: `/annonces/${annonce.id}/modifier`, texte: "Retour au formulaire" },
-      },
-    };
-  }
-
-  // Le prix a peut-etre change : la somme bloquee doit suivre, sinon les
-  // deux chiffres se contredisent. Les deux ensemble, ou aucun.
-  db.transaction(() => {
-    requetes.majAnnonce.run(Object.assign({ id: annonce.id }, champs));
-    requetes.ajusterVersement.run({ annonce: annonce.id, montant: champs.prix || 0 });
-  })();
+  requetes.majAnnonce.run(Object.assign({ id: annonce.id }, champs));
 
   return {
     annonce,
@@ -4649,7 +4607,9 @@ function ecranPourRepondre(u, annonceId) {
     annonce,
     reputationEmployeur: reputationDe(annonce.employeur_id),
     proposee,
-    cout: proposee ? null : parametreNombre("cout_candidature"),
+    // PLUS AUCUN JETON POUR REPONDRE : dire qu'un service vous interesse
+    // est gratuit. Les jetons ne servent plus qu'a la mise en avant.
+    cout: null,
     solde: soldeJetonsDe(u.id).total,
     limite,
     restantAujourdhui: limite === null ? null : Math.max(0, limite - envoyees),
@@ -4741,7 +4701,7 @@ function envoyerReponse(u, annonceId) {
     };
   }
 
-  const cout = proposee ? null : parametreNombre("cout_candidature");
+  const cout = null;
   const solde = soldeJetonsDe(u.id);
   const manqueDeJetons = (avecReste) => ({
     probleme: {
@@ -7545,16 +7505,9 @@ app.get("/api/demandes", (req, res) => {
     quartier: a.quartier,
     arrondissement: a.arrondissement,
     horaire: a.horaire,
-    prix: a.prix,
-    uniteTarif: a.unite_tarif,
     dureeEstimee: a.duree_estimee,
     // Ce qu'il faut savoir avant de venir : la carte du site le montre.
     conditions: a.conditions || null,
-    // LA MEME MISE EN FORME QUE LES PAGES. prixEnClair est la
-    // fonction dont les vues se servent deja : l'application n'a pas a
-    // savoir comment on ecrit des francs CFA, et il n'existe qu'une
-    // seule facon de le faire.
-    prixLisible: prixEnClair(a),
     misEnAvant: Boolean(a.mise_en_avant_jusqu_au &&
                         a.mise_en_avant_jusqu_au > new Date().toISOString().slice(0, 10)),
   });
@@ -7643,8 +7596,6 @@ function listesDuFormulaireDemande() {
     metiers: metiers.map((m) => m.nom),
     quartiers: quartiers.map((q) => q.nom),
     arrondissements: app.locals.arrondissements,
-    unitesTarif: Object.keys(UNITES_TARIF).map((valeur) => ({ valeur, libelle: UNITES_TARIF[valeur] })),
-    uniteParDefaut: "forfaitaire",
   };
 }
 
@@ -7782,30 +7733,13 @@ app.post("/api/candidatures/:id/refuser", routeDeDecisionApi("refusee"));
 
 // Le detail du prix vu par chacun : le meme calcul et les memes mots que
 // le partiel detail-tarif du site.
-function prixDeLaDiscussion(conversation, jeSuisEmployeur) {
-  if (!conversation.prixAnnonce) {
-    return {
-      lignes: [],
-      phrase: "Cette demande a été publiée avant que le prix ne devienne obligatoire : " +
-              "elle n'en porte pas.",
-    };
-  }
-
-  const detail = detaillerTarif(conversation.prixAnnonce);
+// LE PRIX NE S'AFFICHE PLUS DANS LA DISCUSSION : il est convenu par
+// telephone, avec l'equipe, qui le rapporte a l'employeur majore de la
+// commission.
+function prixDeLaDiscussion() {
   return {
-    lignes: [
-      // retenue et total : la commission en orange, le montant recu en vert,
-      // comme le bloc detail-tarif du site.
-      { libelle: jeSuisEmployeur ? "Vous payez" : "L'employeur paie",
-        montant: formaterMontant(detail.brut), fort: true, retenue: false, total: false },
-      { libelle: `Commission PamConnect (${Math.round(TAUX_COMMISSION * 100)} %)`,
-        montant: "− " + formaterMontant(detail.commission), fort: false, retenue: true, total: false },
-      { libelle: jeSuisEmployeur ? `${conversation.nomPrestataire} reçoit` : "Vous recevez",
-        montant: formaterMontant(detail.net), fort: true, retenue: false, total: true },
-    ],
-    phrase: jeSuisEmployeur
-      ? "C'est le prix que vous avez annoncé dans votre demande."
-      : `C'est le prix annoncé par ${conversation.nomEmployeur} dans sa demande.`,
+    lignes: [],
+    phrase: "Le prix est convenu par téléphone avec l'équipe PamConnect.",
   };
 }
 
@@ -7857,7 +7791,7 @@ app.get("/api/discussions/:id", (req, res) => {
     lieu: [c.quartierAnnonce, c.arrondissementAnnonce].filter(Boolean).join(", ") || null,
     conditions: c.conditionsAnnonce || null,
     phraseStatut: phraseCandidature(c.statut, jeSuisEmployeur, c),
-    prix: prixDeLaDiscussion(c, jeSuisEmployeur),
+    prix: prixDeLaDiscussion(),
     messages: discussion.messages.map((m) => {
       const deMoi = m.auteur_id === moi.id;
       return {
@@ -8015,8 +7949,7 @@ app.get("/api/demandes/:id/modification", (req, res) => {
       horaire: a.horaire || "",
       quartier: a.quartier || "",
       arrondissement: a.arrondissement || null,
-      prix: a.prix != null ? String(a.prix) : "",
-      unite_tarif: a.unite_tarif || "forfaitaire",
+      budget: a.budget != null ? String(a.budget) : "",
       duree_estimee: a.duree_estimee || "",
       conditions: a.conditions || "",
     },
@@ -8348,9 +8281,7 @@ app.get("/api/demandes/:id/reponse", (req, res) => {
   const ecran = ecranPourRepondre(moi, Number(req.params.id));
   if (ecran.probleme) return erreurApiDuProbleme(res, ecran.probleme);
 
-  const { annonce, reputationEmployeur, proposee, cout, solde, limite, restantAujourdhui } = ecran;
-  const detail = detaillerTarif(annonce.prix);
-  const pourcentage = Math.round(TAUX_COMMISSION * 100);
+  const { annonce, reputationEmployeur, proposee, limite, restantAujourdhui } = ecran;
 
   res.json({
     demande: {
@@ -8361,6 +8292,7 @@ app.get("/api/demandes/:id/reponse", (req, res) => {
       quartier: annonce.quartier || null,
       arrondissement: annonce.arrondissement || null,
       conditions: annonce.conditions || null,
+      dureeEstimee: annonce.duree_estimee || null,
     },
     employeur: {
       nom: annonce.nomEmployeur,
@@ -8368,31 +8300,10 @@ app.get("/api/demandes/:id/reponse", (req, res) => {
       note: reputationEmployeur.nombre > 0 ? `${moyenneLisible(reputationEmployeur.moyenne)} sur 5` : null,
       nombreAvis: reputationEmployeur.nombre,
     },
-    prix: {
-      annonce: prixEnClair(annonce),
-      dureeEstimee: annonce.duree_estimee || null,
-      // Les lignes du bloc detail-tarif du site, vues par celle qui
-      // travaillera : ce que l'employeur paie, la commission, ce qu'elle
-      // recevra.
-      lignes: detail.brut > 0
-        ? [
-            { libelle: "L'employeur paie", montant: formaterMontant(detail.brut), retenue: false, total: false },
-            { libelle: `Commission PamConnect (${pourcentage} %)`,
-              montant: "− " + formaterMontant(detail.commission), retenue: true, total: false },
-            { libelle: "Vous recevez", montant: formaterMontant(detail.net), retenue: false, total: true },
-          ]
-        : [],
-    },
-    // Proposee a cette personne : pas de jeton, pas de limite du jour.
+    // LE PRIX N'EST PLUS ANNONCE ICI : c'est l'equipe qui appelle, et la
+    // personne lui dit son prix. Dire qu'un service interesse est gratuit.
+    phrase: "C'est l'équipe PamConnect qui vous appellera pour convenir du prix.",
     proposee,
-    cout: cout
-      ? {
-          envoyer: "− " + jetonsEnClair(cout),
-          reste: jetonsEnClair(Math.max(0, solde - cout)),
-          soldeInsuffisant: solde < cout,
-          solde: jetonsEnClair(solde),
-        }
-      : null,
     limite: limite ? { parJour: limite, restant: restantAujourdhui } : null,
   });
 });

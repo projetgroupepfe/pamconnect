@@ -152,10 +152,10 @@ setTimeout(async () => {
     "SELECT declaree_par_elle_le, terminee_le FROM candidatures WHERE id = ?").get(cJ.id);
   dire("la date est enregistree", typeof apresJ.declaree_par_elle_le === "string");
 
-  // LE POINT CENTRAL : sa declaration ne libere aucun argent. Sinon il
-  // suffirait de mentir pour toucher une somme sans avoir travaille.
-  dire("mais RIEN n'est verse",
-       base.prepare("SELECT etat FROM versements WHERE annonce_id = ?").get(aJ.id).etat === "bloque");
+  // LE POINT CENTRAL : sa declaration ne libere aucun argent. L'employeur
+  // paie apres le service, et c'est l'equipe qui enregistre ce paiement.
+  dire("aucune somme n'est engagee",
+       !base.prepare("SELECT etat FROM versements WHERE annonce_id = ?").get(aJ.id));
   dire("et le service n'est pas clos", apresJ.terminee_le === null);
   dire("la discussion reste ouverte a l'ecriture",
        (await poster("/messages/" + cJ.id, form({ texte: M + " a bientot" }), preJ.cookie)).code === 302);
@@ -176,18 +176,9 @@ setTimeout(async () => {
   dire("et le bouton ne lui est plus propose",
        !(await (await lire("/messages/" + cJ.id, preJ.cookie)).text())
          .includes("Avez-vous effectué ce service"));
-  // Pour l'equipe, un silence devient un desaccord date.
-  dire("l'equipe lit sa declaration sur la somme bloquee",
-       (await (await lire("/admin/versements", eqJ.cookie)).text())
-         // Le gabarit coupe la phrase apres "effectué le" : on s'arrete
-         // avant la cesure.
-         .includes("indique avoir effectué le"));
-
   console.log("\n--- QUAND L'EMPLOYEUR CONFIRME ENFIN ---");
   await poster("/candidatures/" + cJ.id + "/terminer", form({}), empJ.cookie);
-  dire("la somme part alors chez elle",
-       base.prepare("SELECT etat FROM versements WHERE annonce_id = ?").get(aJ.id).etat === "verse");
-  dire("et la discussion est archivee",
+  dire("la discussion est archivee",
        typeof base.prepare("SELECT terminee_le FROM candidatures WHERE id = ?").get(cJ.id).terminee_le === "string");
 
   console.log("\n--- NETTOYAGE ---");

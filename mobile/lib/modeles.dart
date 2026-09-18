@@ -373,33 +373,19 @@ class FormulaireDemande {
     required this.metiers,
     required this.quartiers,
     required this.arrondissements,
-    required this.unitesTarif,
-    required this.uniteParDefaut,
     this.invitee,
   });
 
-  factory FormulaireDemande.depuisJson(Map<String, dynamic> json) {
-    final formulaire = FormulaireDemande(
-      metiers: _lireTextes(json, 'metiers'),
-      quartiers: _lireTextes(json, 'quartiers'),
-      arrondissements: _lireTextes(json, 'arrondissements'),
-      unitesTarif: _lireListe(json, 'unitesTarif', UniteTarif.depuisJson),
-      uniteParDefaut: _lire<String>(json, 'uniteParDefaut'),
-      invitee: _lireObjet(json, 'invitee', PersonneInvitee.depuisJson),
-    );
-    // La liste deroulante doit pouvoir montrer le choix par defaut : un
-    // choix absent de la liste la ferait planter.
-    if (!formulaire.unitesTarif.any((unite) => unite.valeur == formulaire.uniteParDefaut)) {
-      throw const FormeInattendue('uniteParDefaut');
-    }
-    return formulaire;
-  }
+  factory FormulaireDemande.depuisJson(Map<String, dynamic> json) => FormulaireDemande(
+        metiers: _lireTextes(json, 'metiers'),
+        quartiers: _lireTextes(json, 'quartiers'),
+        arrondissements: _lireTextes(json, 'arrondissements'),
+        invitee: _lireObjet(json, 'invitee', PersonneInvitee.depuisJson),
+      );
 
   final List<String> metiers;
   final List<String> quartiers;
   final List<String> arrondissements;
-  final List<UniteTarif> unitesTarif;
-  final String uniteParDefaut;
 
   /// La personne a qui la demande est proposee. Absente pour une demande
   /// publiee pour tout le monde.
@@ -897,8 +883,7 @@ class ValeursDemande {
     required this.metier,
     required this.horaire,
     required this.quartier,
-    required this.prix,
-    required this.uniteTarif,
+    required this.budget,
     required this.dureeEstimee,
     required this.conditions,
     this.arrondissement,
@@ -909,8 +894,7 @@ class ValeursDemande {
         metier: _lire<String>(json, 'metier'),
         horaire: _lire<String>(json, 'horaire'),
         quartier: _lire<String>(json, 'quartier'),
-        prix: _lire<String>(json, 'prix'),
-        uniteTarif: _lire<String>(json, 'unite_tarif'),
+        budget: _lire<String>(json, 'budget'),
         dureeEstimee: _lire<String>(json, 'duree_estimee'),
         conditions: _lire<String>(json, 'conditions'),
         arrondissement: _lireFacultatif<String>(json, 'arrondissement'),
@@ -920,8 +904,7 @@ class ValeursDemande {
   final String metier;
   final String horaire;
   final String quartier;
-  final String prix;
-  final String uniteTarif;
+  final String budget;
   final String dureeEstimee;
   final String conditions;
   final String? arrondissement;
@@ -2115,6 +2098,7 @@ class DemandeARepondre {
     required this.id,
     required this.titre,
     required this.horaire,
+    this.dureeEstimee,
     this.metier,
     this.quartier,
     this.arrondissement,
@@ -2129,6 +2113,7 @@ class DemandeARepondre {
         quartier: _lireFacultatif<String>(json, 'quartier'),
         arrondissement: _lireFacultatif<String>(json, 'arrondissement'),
         conditions: _lireFacultatif<String>(json, 'conditions'),
+        dureeEstimee: _lireFacultatif<String>(json, 'dureeEstimee'),
       );
 
   final int id;
@@ -2138,6 +2123,7 @@ class DemandeARepondre {
   final String? quartier;
   final String? arrondissement;
   final String? conditions;
+  final String? dureeEstimee;
 }
 
 /// Chez qui la personne va : son nom, sa verification, sa reputation.
@@ -2159,42 +2145,6 @@ class EmployeurDeLaDemande {
   final String? note;
 }
 
-class PrixARepondre {
-  const PrixARepondre({required this.lignes, this.annonce, this.dureeEstimee});
-
-  factory PrixARepondre.depuisJson(Map<String, dynamic> json) => PrixARepondre(
-        lignes: _lireListe(json, 'lignes', LigneTarif.depuisJson),
-        annonce: _lireFacultatif<String>(json, 'annonce'),
-        dureeEstimee: _lireFacultatif<String>(json, 'dureeEstimee'),
-      );
-
-  /// Ce que l'employeur paie, la commission, ce qu'elle recevra.
-  final List<LigneTarif> lignes;
-  final String? annonce;
-  final String? dureeEstimee;
-}
-
-class CoutDeLaReponse {
-  const CoutDeLaReponse({
-    required this.envoyer,
-    required this.reste,
-    required this.soldeInsuffisant,
-    required this.solde,
-  });
-
-  factory CoutDeLaReponse.depuisJson(Map<String, dynamic> json) => CoutDeLaReponse(
-        envoyer: _lire<String>(json, 'envoyer'),
-        reste: _lire<String>(json, 'reste'),
-        soldeInsuffisant: _lire<bool>(json, 'soldeInsuffisant'),
-        solde: _lire<String>(json, 'solde'),
-      );
-
-  final String envoyer;
-  final String reste;
-  final bool soldeInsuffisant;
-  final String solde;
-}
-
 class LimiteDuJour {
   const LimiteDuJour({required this.parJour, required this.restant});
 
@@ -2212,31 +2162,27 @@ class EcranReponse {
   const EcranReponse({
     required this.demande,
     required this.employeur,
-    required this.prix,
+    required this.phrase,
     required this.proposee,
-    this.cout,
     this.limite,
   });
 
   factory EcranReponse.depuisJson(Map<String, dynamic> json) => EcranReponse(
         demande: DemandeARepondre.depuisJson(_lire<Map<String, dynamic>>(json, 'demande')),
         employeur: EmployeurDeLaDemande.depuisJson(_lire<Map<String, dynamic>>(json, 'employeur')),
-        prix: PrixARepondre.depuisJson(_lire<Map<String, dynamic>>(json, 'prix')),
+        phrase: _lire<String>(json, 'phrase'),
         proposee: _lire<bool>(json, 'proposee'),
-        cout: _lireObjet(json, 'cout', CoutDeLaReponse.depuisJson),
         limite: _lireObjet(json, 'limite', LimiteDuJour.depuisJson),
       );
 
   final DemandeARepondre demande;
   final EmployeurDeLaDemande employeur;
-  final PrixARepondre prix;
 
-  /// La demande a ete publiee pour cette personne : pas de jeton, pas de
-  /// limite du jour.
+  /// Ce que le serveur dit du prix : c'est l'equipe qui appelle.
+  final String phrase;
+
+  /// La demande a ete publiee pour cette personne.
   final bool proposee;
-
-  /// Absent si l'equipe n'a pas regle le cout d'une reponse.
-  final CoutDeLaReponse? cout;
   final LimiteDuJour? limite;
 }
 

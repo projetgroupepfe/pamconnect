@@ -2,7 +2,7 @@
 
   <div class="colonne">
 
-    <h1>Répondre à cette demande</h1>
+    <h1>Ce service m'intéresse</h1>
     <p class="chapeau">Vérifiez les informations avant d'envoyer votre réponse.</p>
 
     <div class="carte">
@@ -93,91 +93,28 @@
 
     <h2>Ce que vous toucherez</h2>
     <div class="carte">
-      <%# Le prix de l'annonce, et ce qu'il en restera. C'est le moment ou
-          la personne s'engage : elle doit voir le montant exact, avec son
-          unite - 10 000 FCFA par jour et 10 000 FCFA pour la prestation ne
-          sont pas la meme proposition. %>
-      <ul class="infos">
-        <li>
-          <%- include("partiels/icone", { nom: "remuneration" }) %>
-          <span>Prix annoncé : <strong><%= prixEnClair(annonce) %></strong></span>
-        </li>
-        <% if (annonce.duree_estimee) { %>
-          <li>
-            <%- include("partiels/icone", { nom: "disponibilite" }) %>
-            <span>Durée estimée : <strong><%= annonce.duree_estimee %></strong></span>
-          </li>
-        <% } %>
-      </ul>
-
-      <%# prixAnnonce : ce montant est celui de l'employeur, pas le tarif
-          qu'elle indique sur son profil. %>
-      <%- include("partiels/detail-tarif", { tarif: annonce.prix, prixAnnonce: true }) %>
-
-      <p class="aide">
-        C'est le prix fixé par l'employeur pour ce service.
-        Si ce montant ne vous convient pas, vous pouvez répondre à une autre demande.
-      </p>
-    </div>
-
-    <%# CE QUE CETTE REPONSE VA COUTER, avant de s'engager. La meme regle
-        que pour la commission : le prix ne se decouvre pas apres. %>
-    <% if (locals.proposee) { %>
-      <h2>Ce que cette réponse vous coûte</h2>
-      <div class="carte">
-        <p>
-          <strong>Rien.</strong> Cette demande a été publiée pour vous : y
-          répondre ne vous coûte aucun jeton.
+      <p>C'est l'équipe PamConnect qui vous appellera pour convenir du prix.</p>
+      <% if (annonce.duree_estimee) { %>
+        <p class="aide">Durée estimée : <%= annonce.duree_estimee %></p>
+      <% } %>
+      <% if (locals.limite) { %>
+        <p class="aide">
+          <%= limite %> réponses par tranche de 24 heures.
+          <% if (restantAujourdhui === 0) { %>
+            <strong>Vous les avez toutes utilisées.</strong>
+          <% } else { %>
+            Il vous en reste <strong><%= restantAujourdhui %></strong>.
+          <% } %>
         </p>
-      </div>
-    <% } else if (cout) { %>
-      <h2>Ce que cette réponse vous coûte</h2>
-      <div class="carte">
-        <div class="detail-tarif">
-          <div class="ligne-tarif">
-            <span>Envoyer cette réponse</span>
-            <span class="retenue">− <%= jetonsEnClair(cout) %></span>
-          </div>
-          <div class="ligne-tarif total">
-            <span>Il vous restera</span>
-            <strong><%= jetonsEnClair(Math.max(0, solde - cout)) %></strong>
-          </div>
-        </div>
-
-        <% if (solde < cout) { %>
-          <p class="aide">
-            <strong>Votre solde ne suffit pas.</strong> Il vous reste
-            <%= jetonsEnClair(solde) %>.
-          </p>
-          <p class="actions">
-            <a class="bouton bouton-secondaire" href="/mes-jetons">
-              <%- include("partiels/icone", { nom: "jeton" }) %>
-              Voir mes jetons
-            </a>
-          </p>
-        <% } %>
-
-        <%# LA LIMITE DU JOUR, dite avant l'envoi. La decouvrir apres
-            coup donnerait le sentiment d'un refus arbitraire. %>
-        <% if (limite) { %>
-          <p class="aide">
-            Vous pouvez envoyer <%= limite %> réponses par tranche de 24 heures.
-            <% if (restantAujourdhui === 0) { %>
-              <strong>Vous les avez toutes utilisées.</strong>
-            <% } else { %>
-              Il vous en reste <strong><%= restantAujourdhui %></strong>.
-            <% } %>
-          </p>
-        <% } %>
-      </div>
-    <% } %>
+      <% } %>
+    </div>
 
     <div class="actions">
       <form action="/candidatures" method="POST">
         <input type="hidden" name="annonceId" value="<%= annonce.id %>">
         <button type="submit">
           <%- include("partiels/icone", { nom: "valider" }) %>
-          Confirmer ma réponse
+          Ce service m'intéresse
         </button>
       </form>
       <a class="bouton bouton-secondaire" href="/annonces">Annuler</a>

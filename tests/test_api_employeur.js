@@ -110,7 +110,6 @@ setTimeout(async () => {
        !retiree.peutModifier && !retiree.peutMettreEnAvant && !retiree.peutRetirer);
   dire("l'ouverte propose modifier, mettre en avant et retirer",
        ouverte.peutModifier && ouverte.peutMettreEnAvant && ouverte.peutRetirer);
-  dire("le prix arrive deja ecrit", String(ouverte.prixLisible).includes("FCFA"), String(ouverte.prixLisible));
   dire("le lieu commence par le quartier", String(ouverte.lieu).startsWith("Mvan"), String(ouverte.lieu));
   dire("l'horaire est la", ouverte.horaire === "Mardi 8h", String(ouverte.horaire));
 
@@ -138,7 +137,6 @@ setTimeout(async () => {
   dire("la phrase de statut est dans la page", page.includes(deVerifiee.phrase));
   dire("le libelle d'identite aussi", page.includes(deAutre.libelleVerification));
   dire("la note aussi", page.includes(deVerifiee.note.badge));
-  dire("le prix aussi", page.includes(ouverte.prixLisible));
   dire("la page propose Choisir a la personne verifiee",
        page.includes("/candidatures/" + deVerifiee.id + "/confirmer"));
   dire("mais pas a la personne non verifiee",
@@ -166,9 +164,7 @@ setTimeout(async () => {
        reconnexion.corps.includes("Voir mes demandes") && !reconnexion.corps.includes("Voir mon profil"));
   const formulaireWeb = await (await lire("/publier-annonce", emp.cookie)).text();
   dire("Annuler ramene a Mes demandes", formulaireWeb.includes('href="/mes-demandes">Annuler'));
-  dire("le formulaire tire ses limites du serveur",
-       formulaireWeb.includes('min="500"') && formulaireWeb.includes('step="500"') &&
-       formulaireWeb.includes('maxlength="300"'));
+  dire("le formulaire tire ses limites du serveur", formulaireWeb.includes('maxlength="300"'));
 
   // Les appels de l'application : du JSON, avec un cookie ou un jeton.
   async function json(chemin, corps, entetes) {
@@ -212,10 +208,7 @@ setTimeout(async () => {
   dire("tous les quartiers de la table",
        Array.isArray(f.quartiers) && f.quartiers.length === base.prepare("SELECT COUNT(*) n FROM quartiers").get().n);
   dire("les arrondissements sont la", Array.isArray(f.arrondissements) && f.arrondissements.includes(unQuartier.arrondissement));
-  dire("les trois facons de compter le prix, forfaitaire par defaut",
-       Array.isArray(f.unitesTarif) &&
-       ["horaire", "journalier", "forfaitaire"].every((v) => f.unitesTarif.some((u) => u.valeur === v && u.libelle)) &&
-       f.uniteParDefaut === "forfaitaire");
+  dire("aucune unite de tarif n'est envoyee", f.unitesTarif === undefined);
 
   console.log(SAUT + "--- L'ARRONDISSEMENT D'UN QUARTIER ---");
   dire("sans session aussi : Creer un compte s'en sert", (await json("/api/quartier?nom=x")).code === 200);
@@ -228,8 +221,7 @@ setTimeout(async () => {
 
   console.log(SAUT + "--- PUBLIER : CE QUI EST REFUSE ---");
   const complet = (titre) => ({ titre, metier: "menagere", quartier: unQuartier.nom.toLowerCase(),
-                                horaire: "Mercredi 9h", prix: 8000, unite_tarif: "horaire",
-                                duree_estimee: "Environ 3 heures" });
+                                horaire: "Mercredi 9h", duree_estimee: "Environ 3 heures" });
   const compter = (titre) => base.prepare("SELECT COUNT(*) n FROM annonces WHERE titre = ?").get(titre).n;
 
   dire("publier sans session : 401", (await json("/api/demandes", complet(M + " sans session"))).code === 401);
@@ -248,11 +240,12 @@ setTimeout(async () => {
 
   const sansMetier = await json("/api/demandes", Object.assign(complet(M + " sans metier"), { metier: "" }), cookieDe(emp.cookie));
   dire("sans metier : 400", sansMetier.code === 400 && erreurDe(sansMetier).startsWith("Indiquez qui vous cherchez"), sansMetier.brut);
-  const sansPrix = await json("/api/demandes", Object.assign(complet(M + " sans prix"), { prix: "" }), cookieDe(emp.cookie));
-  dire("sans prix : 400", sansPrix.code === 400, sansPrix.brut);
+  const budgetEnLettres = await json("/api/demandes",
+    Object.assign(complet(M + " budget lettres"), { budget: "beaucoup" }), cookieDe(emp.cookie));
+  dire("un budget qui n'est pas un nombre : 400", budgetEnLettres.code === 400, budgetEnLettres.brut);
   dire("aucune de ces demandes n'a ete enregistree",
        compter(M + " sans session") + compter(M + " par une personne") + compter(M + " forme") +
-       compter(M + " sans metier") + compter(M + " sans prix") === 0);
+       compter(M + " sans metier") + compter(M + " budget lettres") === 0);
 
   // Le trou qui existait sur le site : le role n'etait verifie qu'a
   // l'ouverture du formulaire, pas a l'envoi.
@@ -274,7 +267,7 @@ setTimeout(async () => {
        parSite.code === 200 && parSite.corps.includes("Voir mes demandes"), "code " + parSite.code);
 
   const ligne = (titre) => base.prepare(`
-    SELECT metier, quartier, arrondissement, horaire, prix, unite_tarif, duree_estimee, annulee
+    SELECT metier, quartier, arrondissement, horaire, budget, duree_estimee, annulee
     FROM annonces WHERE titre = ?`).get(titre);
   const deLAppli = ligne(M + " appli");
   const duSite = ligne(M + " site");
@@ -284,7 +277,7 @@ setTimeout(async () => {
        deLAppli.quartier === unQuartier.nom && deLAppli.arrondissement === unQuartier.arrondissement,
        JSON.stringify(deLAppli));
   const bloque = base.prepare("SELECT montant, etat FROM versements WHERE annonce_id = ?").get(publiee.donnees.id);
-  dire("la somme annoncee est bloquee", bloque && bloque.montant === 8000 && bloque.etat === "bloque", JSON.stringify(bloque));
+  dire("aucune somme n'est bloquee a la publication", !bloque, JSON.stringify(bloque));
 
   const apresPublication = await mesDemandes(emp.cookie);
   dire("elle apparait dans Mes demandes de l'application",
@@ -292,36 +285,15 @@ setTimeout(async () => {
   dire("et sur la page du site",
        (await (await lire("/mes-demandes", emp.cookie)).text()).includes(M + " appli"));
 
-  console.log(SAUT + "--- LES MONTANTS : AU MOINS 500 FCFA, PAR TRANCHES DE 500 ---");
-  // Seul le navigateur de l'ordinateur les verifiait : le telephone, lui,
-  // publiait une demande a 750 FCFA.
-  let phrasePrix = "";
-  for (const prix of [250, 750, 10250]) {
-    const titre = M + " prix " + prix;
-    const r = await json("/api/demandes", Object.assign(complet(titre), { prix }), cookieDe(emp.cookie));
-    dire("un prix de " + prix + " FCFA est refuse", r.code === 400 && compter(titre) === 0, r.brut);
-    phrasePrix = erreurDe(r);
-  }
-  dire("la phrase dit la regle",
-       phrasePrix === "Le prix doit être au moins 500 FCFA, par tranches de 500 FCFA.", phrasePrix);
-  const prixWeb = await poster("/annonces", form(Object.assign(complet(M + " prix web"), { prix: "750" })), emp.cookie);
-  dire("le site refuse aussi, avec la meme phrase",
-       prixWeb.code === 400 && prixWeb.corps.includes(phrasePrix) && compter(M + " prix web") === 0,
-       "code " + prixWeb.code);
-  const prixRond = await json("/api/demandes", Object.assign(complet(M + " prix rond"), { prix: 10500 }), cookieDe(emp.cookie));
-  dire("un prix de 10500 FCFA est accepte", prixRond.code === 201, prixRond.brut);
-
-  const tropLong = await json("/api/demandes",
-    Object.assign(complet(M + " trop long"), { conditions: "x".repeat(301) }), cookieDe(emp.cookie));
-  dire("301 caracteres a savoir avant de venir : refuse",
-       tropLong.code === 400 && compter(M + " trop long") === 0, tropLong.brut);
-  const tropLongWeb = await poster("/annonces",
-    form(Object.assign(complet(M + " trop long web"), { prix: "8000", conditions: "x".repeat(301) })), emp.cookie);
-  dire("le site refuse aussi", tropLongWeb.code === 400 && compter(M + " trop long web") === 0,
-       "code " + tropLongWeb.code);
-  const juste = await json("/api/demandes",
-    Object.assign(complet(M + " juste"), { conditions: "x".repeat(300) }), cookieDe(emp.cookie));
-  dire("300 caracteres : accepte", juste.code === 201, juste.brut);
+  console.log(SAUT + "--- LE BUDGET, VU DE L'EQUIPE SEULEMENT ---");
+  const avecBudget = await json("/api/demandes",
+    Object.assign(complet(M + " budget"), { budget: "7000" }), cookieDe(emp.cookie));
+  dire("une demande avec budget est publiee", avecBudget.code === 201, avecBudget.brut);
+  dire("le budget est enregistre",
+       base.prepare("SELECT budget FROM annonces WHERE titre = ?").get(M + " budget").budget === 7000);
+  const listePourElle = await json("/api/demandes", undefined, cookieDe(verifiee.cookie));
+  dire("il n'est pas envoye aux personnes qui repondent",
+       !listePourElle.brut.includes('"budget"'), listePourElle.brut.slice(0, 120));
 
   console.log(SAUT + "--- CHOISIR ET REFUSER DEPUIS L'APPLICATION : QUI PEUT ---");
   const pre3 = await creerCompte("trois", "prestataire", { metier: "menagere", tarif: "15000" });
@@ -364,10 +336,9 @@ setTimeout(async () => {
   const d = conf.donnees || {};
   dire("l'ecran s'ouvre", conf.code === 200, conf.brut.slice(0, 120));
   dire("le nom de la personne", d.nom === "Test verifiee", String(d.nom));
-  dire("ce qu'il paie, la commission et ce que la personne recoit",
-       d.paiement && d.paiement.vousPayez === "8 000 FCFA" && d.paiement.commission === "800 FCFA" &&
-       d.paiement.pourcentageCommission === 10 && d.paiement.recoit === "7 200 FCFA",
-       JSON.stringify(d.paiement));
+  // LE PRIX SE CONVIENT PAR TELEPHONE, avec l'equipe : l'ecran de
+  // confirmation n'annonce plus aucun montant.
+  dire("aucun montant n'est annonce", d.paiement === null, JSON.stringify(d.paiement));
   dire("combien de personnes recevront un refus",
        d.refusAnnonces && d.refusAnnonces.nombre === 2 &&
        d.refusAnnonces.suite === "autres personnes qui attendaient recevront un refus.",
@@ -377,7 +348,6 @@ setTimeout(async () => {
   dire("aucune coordonnee ne sort", !conf.brut.includes("@example.com") && !conf.brut.includes("telephone"));
   const pageConf = await (await lire("/candidatures/" + cChoisie + "/confirmer", emp.cookie)).text();
   dire("la page du site dit la meme chose",
-       pageConf.includes(d.paiement.vousPayez) && pageConf.includes(d.paiement.recoit) &&
        pageConf.includes("<strong>2</strong> " + d.refusAnnonces.suite));
   dire("rien n'est decide tant qu'on n'a pas confirme", statutDe(cChoisie) === "en attente");
 
@@ -468,10 +438,9 @@ setTimeout(async () => {
        !lesMessages[1].deMoi && lesMessages[1].auteur === "Test verifiee");
   dire("seul le message de l'autre peut etre signale", !lesMessages[0].peutSignaler && lesMessages[1].peutSignaler);
   dire("la phrase de statut de l'employeur", de.phraseStatut === "Vous avez accepté cette candidature", de.phraseStatut);
-  dire("le prix vu par l'employeur",
-       de.prix && de.prix.lignes.length === 3 && de.prix.lignes[0].libelle === "Vous payez" &&
-       de.prix.lignes[2].libelle === "Test verifiee reçoit" && de.prix.lignes[2].montant === "7 200 FCFA" &&
-       de.prix.lignes[1].retenue === true && de.prix.lignes[2].total === true,
+  dire("aucun montant dans la discussion : le prix se convient par telephone",
+       de.prix && de.prix.lignes.length === 0 &&
+       de.prix.phrase === "Le prix est convenu par téléphone avec l'équipe PamConnect.",
        JSON.stringify(de.prix));
   dire("aucune coordonnee ne sort", !vueEmp.brut.includes("@example.com") && !vueEmp.brut.includes("motdepasse"));
   dire("le conseil ne parle plus du prix a negocier, et l'adresse va a la personne choisie",
@@ -480,9 +449,10 @@ setTimeout(async () => {
   dire("l'employeur peut declarer le service effectue", de.peutDeclarerService === true);
 
   const pageDiscussion = await (await lire("/messages/" + cChoisie, emp.cookie)).text();
-  dire("la page du site montre les memes messages, le meme prix et le meme statut",
-       pageDiscussion.includes(M + " bonjour depuis le telephone") && pageDiscussion.includes(M + " reponse depuis le site") &&
-       pageDiscussion.includes(de.prix.lignes[2].montant) && pageDiscussion.includes(de.phraseStatut));
+  dire("la page du site montre les memes messages et le meme statut",
+       pageDiscussion.includes(M + " bonjour depuis le telephone") &&
+       pageDiscussion.includes(M + " reponse depuis le site") &&
+       pageDiscussion.includes(de.phraseStatut));
   // Des bulles, pas des cadres : presentes en cartes blanches, les
   // messages se confondaient avec le champ pour ecrire.
   dire("sur le site, les messages sont des bulles, la sienne a part",
@@ -493,9 +463,9 @@ setTimeout(async () => {
   const vuePre = await discussion(cChoisie, cookieDe(verifiee.cookie));
   const dp = vuePre.donnees || {};
   dire("la personne lit la meme discussion, de son cote",
-       vuePre.code === 200 && dp.avec === "Test emp" && dp.messages[1].deMoi && dp.messages[0].auteur === "Test emp" &&
-       dp.prix.lignes[2].libelle === "Vous recevez" && dp.metierAutre === null,
-       JSON.stringify(dp.prix && dp.prix.lignes));
+       vuePre.code === 200 && dp.avec === "Test emp" && dp.messages[1].deMoi &&
+       dp.messages[0].auteur === "Test emp" && dp.metierAutre === null,
+       JSON.stringify(dp.messages && dp.messages.length));
   dire("la personne ne declare pas a la place de l'employeur, et son conseil ne parle pas d'adresse",
        dp.peutDeclarerService === false &&
        dp.conseilEcriture === "Accordez-vous sur l'horaire et le déroulement du service : le prix est déjà fixé.",
@@ -552,9 +522,10 @@ setTimeout(async () => {
 
   const finService = await terminer(cChoisie, { Authorization: "Bearer " + jeton });
   dire("l'employeur declare le service effectue depuis l'application", finService.code === 200, finService.brut);
-  const verse = base.prepare("SELECT etat, beneficiaire_id, net FROM versements WHERE annonce_id = ?").get(idAChoisir);
-  dire("la somme est versee a la personne, commission deduite",
-       verse.etat === "verse" && verse.beneficiaire_id === verifiee.id && verse.net === 7200, JSON.stringify(verse));
+  // LE PAIEMENT SE FAIT APRES LE SERVICE, hors de la plateforme, et
+  // l'equipe l'enregistrera : la declaration ne verse plus rien.
+  const verse = base.prepare("SELECT etat FROM versements WHERE annonce_id = ?").get(idAChoisir);
+  dire("aucune somme n'est versee par la declaration", !verse, JSON.stringify(verse));
   dire("declarer deux fois : 409", (await terminer(cChoisie, cookieDe(emp.cookie))).code === 409);
   dire("dans Mes demandes, le bouton dit maintenant Relire la discussion",
        (await reponseDansMesDemandes(cChoisie)).libelleDiscussion === "Relire la discussion");
@@ -636,7 +607,7 @@ setTimeout(async () => {
   const modification = (id, entetes) => json("/api/demandes/" + id + "/modification", undefined, entetes);
   const modifier = (id, corps, entetes) => json("/api/demandes/" + id, corps, entetes);
   const ligneDemande = (id) =>
-    base.prepare("SELECT titre, prix, annulee, mise_en_avant_jusqu_au FROM annonces WHERE id = ?").get(id);
+    base.prepare("SELECT titre, budget, annulee, mise_en_avant_jusqu_au FROM annonces WHERE id = ?").get(id);
   const sommeBloquee = (id) => base.prepare("SELECT montant, etat FROM versements WHERE annonce_id = ?").get(id);
 
   dire("sans session : 401", (await modification(idAModifier)).code === 401);
@@ -644,54 +615,36 @@ setTimeout(async () => {
   dire("un autre employeur : 404", (await modification(idAModifier, cookieDe(autreEmp.cookie))).code === 404);
   const mod = await modification(idAModifier, cookieDe(emp.cookie));
   dire("le formulaire arrive prerempli, avec ses listes",
-       mod.code === 200 && mod.donnees.valeurs.titre === M + " a modifier" && mod.donnees.valeurs.prix === "8000" &&
+       mod.code === 200 && mod.donnees.valeurs.titre === M + " a modifier" &&
        mod.donnees.valeurs.horaire === "Mercredi 9h" && Array.isArray(mod.donnees.metiers) &&
        mod.donnees.avertissement === null, mod.brut.slice(0, 200));
 
-  const sansReponse = await modifier(idAModifier, Object.assign(complet(M + " a modifier"), { prix: 7500 }),
-                                     cookieDe(emp.cookie));
-  dire("sans reponse, le prix peut encore baisser",
-       sansReponse.code === 200 && ligneDemande(idAModifier).prix === 7500 && sommeBloquee(idAModifier).montant === 7500,
-       sansReponse.brut);
-  await modifier(idAModifier, complet(M + " a modifier"), cookieDe(emp.cookie));
+  const budgetModifie = await modifier(idAModifier, Object.assign(complet(M + " a modifier"), { budget: 7500 }),
+                                       cookieDe(emp.cookie));
+  dire("le budget se modifie",
+       budgetModifie.code === 200 && ligneDemande(idAModifier).budget === 7500, budgetModifie.brut);
 
   await poster("/candidatures", form({ annonceId: String(idAModifier) }), pre3.cookie);
   const modAvecReponse = (await modification(idAModifier, cookieDe(emp.cookie))).donnees;
   dire("une fois quelqu'un a repondu, l'employeur est prevenu",
        modAvecReponse.avertissement && modAvecReponse.avertissement.phrase.startsWith("1 personne a déjà répondu") &&
-       modAvecReponse.avertissement.conseil.includes("prévenez-la") &&
-       modAvecReponse.avertissement.conseil.endsWith("Le prix peut augmenter, mais plus baisser."),
+       modAvecReponse.avertissement.conseil.includes("prévenez-la"),
        JSON.stringify(modAvecReponse.avertissement));
   dire("la page du site dit la meme chose",
        (await (await lire("/annonces/" + idAModifier + "/modifier", emp.cookie)).text())
          .includes("1 personne a déjà répondu à cette demande."));
 
-  const horsRegle = await modifier(idAModifier, Object.assign(complet(M + " a modifier"), { prix: 750 }), cookieDe(emp.cookie));
-  dire("un prix hors regle : 400", horsRegle.code === 400 && ligneDemande(idAModifier).prix === 8000, horsRegle.brut);
-  const modOk = await modifier(idAModifier, Object.assign(complet(M + " modifiee"), { prix: 9000 }),
-                               { Authorization: "Bearer " + jeton });
+  const modOk = await modifier(idAModifier, complet(M + " modifiee"), { Authorization: "Bearer " + jeton });
   dire("la modification passe depuis l'application",
-       modOk.code === 200 && ligneDemande(idAModifier).titre === M + " modifiee" && ligneDemande(idAModifier).prix === 9000,
-       modOk.brut);
-  dire("la somme bloquee suit le nouveau prix", sommeBloquee(idAModifier).montant === 9000,
-       JSON.stringify(sommeBloquee(idAModifier)));
-  const baisse = await modifier(idAModifier, Object.assign(complet(M + " modifiee"), { prix: 8500 }), cookieDe(emp.cookie));
-  dire("apres une reponse, le prix ne baisse plus : 409, en disant jusqu'ou",
-       baisse.code === 409 && ligneDemande(idAModifier).prix === 9000 && sommeBloquee(idAModifier).montant === 9000 &&
-       baisse.donnees.erreur === "1 personne a déjà répondu à cette demande : " +
-         "le prix peut augmenter, mais plus descendre sous 9 000 FCFA.", baisse.brut);
-  const baisseWeb = await poster("/annonces/" + idAModifier + "/modifier",
-    form(Object.assign(complet(M + " modifiee"), { prix: "8500" })), emp.cookie);
-  dire("le site la refuse aussi", baisseWeb.code === 409 && ligneDemande(idAModifier).prix === 9000,
-       "code " + baisseWeb.code);
+       modOk.code === 200 && ligneDemande(idAModifier).titre === M + " modifiee", modOk.brut);
 
   // La faille : une demande pourvue se modifiait encore, et la somme promise avec.
-  const modPourvue = await modifier(idAChoisir, Object.assign(complet(M + " a choisir"), { prix: 500 }), cookieDe(emp.cookie));
-  dire("une demande pourvue ne se modifie plus : 409", modPourvue.code === 409 && ligneDemande(idAChoisir).prix === 8000,
-       modPourvue.brut);
+  const modPourvue = await modifier(idAChoisir, complet(M + " pourvue modifiee"), cookieDe(emp.cookie));
+  dire("une demande pourvue ne se modifie plus : 409",
+       modPourvue.code === 409 && ligneDemande(idAChoisir).titre === M + " a choisir", modPourvue.brut);
   const modPourvueWeb = await poster("/annonces/" + idAChoisir + "/modifier",
-    form(Object.assign(complet(M + " a choisir"), { prix: "500" })), emp.cookie);
-  dire("le site le refuse aussi", modPourvueWeb.code === 409 && ligneDemande(idAChoisir).prix === 8000,
+    form(complet(M + " pourvue modifiee")), emp.cookie);
+  dire("le site le refuse aussi", modPourvueWeb.code === 409 && ligneDemande(idAChoisir).titre === M + " a choisir",
        "code " + modPourvueWeb.code);
   dire("et son formulaire ne s'ouvre plus", (await lire("/annonces/" + idAChoisir + "/modifier", emp.cookie)).status === 409);
 
@@ -749,7 +702,7 @@ setTimeout(async () => {
   const retraitApi = await retirerApi(idAModifier, { Authorization: "Bearer " + jeton });
   dire("le retrait passe depuis l'application", retraitApi.code === 200 && ligneDemande(idAModifier).annulee === 1,
        retraitApi.brut);
-  dire("la somme bloquee est rendue", sommeBloquee(idAModifier).etat === "rembourse", JSON.stringify(sommeBloquee(idAModifier)));
+  dire("aucune somme n'etait engagee", !sommeBloquee(idAModifier));
   dire("retirer deux fois : 409", (await retirerApi(idAModifier, cookieDe(emp.cookie))).code === 409);
   const reponseDePre3 = base.prepare("SELECT id FROM candidatures WHERE annonce_id = ?").get(idAModifier).id;
   dire("la personne qui avait repondu garde sa discussion",
@@ -1057,32 +1010,17 @@ setTimeout(async () => {
 
   const compteEmp = await monCompteApi({ Authorization: "Bearer " + jeton });
   const ce = compteEmp.donnees || {};
-  const versementsEmp = base.prepare("SELECT etat FROM versements WHERE employeur_id = ?").all(emp.id);
-  dire("l'employeur voit chaque somme posee, avec son etat et ses dates",
-       compteEmp.code === 200 && ce.jeSuisEmployeur === true && ce.totalRecu === null && ce.recus.length === 0 &&
-       versementsEmp.length > 0 && ce.envoyes.length === versementsEmp.length &&
-       ce.envoyes.some((v) => v.etat === "verse" && v.libelleEtat === "Versé à Test verifiee" && v.denoue.startsWith("Versé le ")) &&
-       ce.envoyes.filter((v) => v.etat === "bloque").every((v) => v.rappelDeclaration === true && v.denoue === null) &&
-       versementsEmp.some((v) => v.etat === "rembourse") === ce.envoyes.some((v) => v.libelleEtat === "Rendu"),
-       compteEmp.brut.slice(0, 300));
-  const pageCompteEmp = await (await lire("/mon-compte", emp.cookie)).text();
-  dire("la page du site montre les memes etats et les memes dates",
-       ce.envoyes.every((v) => pageCompteEmp.includes(v.libelleEtat) && pageCompteEmp.includes("Bloqué le " + v.bloqueLe)));
+  dire("l'employeur ouvre Mon compte, sans somme engagee",
+       compteEmp.code === 200 && ce.jeSuisEmployeur === true && ce.recus.length === 0 &&
+       ce.envoyes.length === 0, compteEmp.brut.slice(0, 200));
+  dire("la page du site s'ouvre aussi",
+       (await lire("/mon-compte", emp.cookie)).status === 200);
 
   const comptePre = await monCompteApi(cookieDe(verifiee.cookie));
   const cp = comptePre.donnees || {};
-  const soldePre = base.prepare(
-    "SELECT COALESCE(SUM(net), 0) AS s FROM versements WHERE beneficiaire_id = ? AND etat = 'verse'").get(verifiee.id).s;
-  dire("la personne voit le total recu et le detail de chaque service",
-       comptePre.code === 200 && cp.jeSuisEmployeur === false && cp.envoyes.length === 0 && soldePre > 0 &&
-       cp.totalRecu === soldePre.toLocaleString("fr-FR").replace(/[\u202f\u00a0]/g, " ") + " FCFA" &&
-       cp.recus.length >= 1 && cp.recus[0].chez === "Test emp" && cp.recus[0].lignes.length === 3 &&
-       cp.recus[0].lignes[1].retenue === true && cp.recus[0].lignes[2].total === true,
-       comptePre.brut.slice(0, 300));
-  const pageComptePre = await (await lire("/mon-compte", verifiee.cookie)).text();
-  dire("la page du site montre le meme total, le meme montant recu et la meme date",
-       pageComptePre.includes(cp.totalRecu) && pageComptePre.includes(cp.recus[0].lignes[2].montant) &&
-       pageComptePre.includes("Versé le " + cp.recus[0].verseLe));
+  dire("la personne aussi, et rien ne lui a encore ete verse",
+       comptePre.code === 200 && cp.jeSuisEmployeur === false && cp.envoyes.length === 0 &&
+       cp.recus.length === 0, comptePre.brut.slice(0, 200));
 
   console.log(SAUT + "--- MES JETONS ---");
   const mesJetonsApi = (entetes) => json("/api/mes-jetons", undefined, entetes);

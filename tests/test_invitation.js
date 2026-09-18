@@ -219,7 +219,6 @@ setTimeout(async () => {
   dire("et la demande y est",
        section >= 0 && saListe.texte.indexOf(M + " I1") > section &&
        saListe.texte.indexOf(M + " I1") < saListe.texte.indexOf("Pour vous :"));
-  dire("la gratuite est dite", saListe.texte.includes("Y répondre ne vous coûte aucun jeton"));
 
   const listeAutre = await page("/annonces", autre.cookie);
   dire("une autre personne ne voit pas la section",
@@ -240,38 +239,31 @@ setTimeout(async () => {
        apiAutre.donnees && apiAutre.donnees.proposees.length === 0 &&
        ids(apiAutre.donnees.pourMoi).concat(ids(apiAutre.donnees.autres)).includes(i1.id));
 
-  console.log(SAUT + "--- SA REPONSE NE COUTE RIEN ET NE COMPTE PAS ---");
-  crediter(elle.id, 5);
-  crediter(autre.id, 5);
+  console.log(SAUT + "--- SA REPONSE NE COMPTE PAS DANS LA LIMITE ---");
 
   const ecranProposee = await page("/candidatures/nouvelle/" + i1.id, elle.cookie);
-  dire("l'ecran dit que la reponse ne coute rien",
-       ecranProposee.texte.includes("Rien.") && ecranProposee.texte.includes("ne vous coûte aucun jeton"));
+  dire("l'ecran annonce l'appel de l'equipe",
+       ecranProposee.texte.includes("vous appellera pour convenir du prix"));
   dire("sans ligne de jetons ni limite du jour",
-       !ecranProposee.texte.includes("Envoyer cette réponse") && !ecranProposee.texte.includes("par tranche de 24 heures"));
+       !ecranProposee.texte.includes("Envoyer cette réponse") &&
+       !ecranProposee.texte.includes("par tranche de 24 heures"));
   const apiEcran = await json("/api/demandes/" + i1.id + "/reponse", undefined, elle.cookie);
   dire("l'application le sait",
-       apiEcran.donnees && apiEcran.donnees.proposee === true &&
-       apiEcran.donnees.cout === null && apiEcran.donnees.limite === null, apiEcran.brut.slice(-200));
+       apiEcran.donnees && apiEcran.donnees.proposee === true && apiEcran.donnees.limite === null,
+       apiEcran.brut.slice(-200));
 
-  const ecranAutre = await page("/candidatures/nouvelle/" + i1.id, autre.cookie);
-  dire("pour une autre personne, la meme demande coute un jeton",
-       ecranAutre.texte.includes("Envoyer cette réponse") && !ecranAutre.texte.includes("Rien."));
   const apiEcranAutre = await json("/api/demandes/" + i1.id + "/reponse", undefined, autre.cookie);
-  dire("et l'application le sait aussi",
-       apiEcranAutre.donnees && apiEcranAutre.donnees.proposee === false && apiEcranAutre.donnees.cout !== null);
+  dire("pour une autre personne, la demande n'est pas proposee",
+       apiEcranAutre.donnees && apiEcranAutre.donnees.proposee === false);
 
   // Limite du jour : 2. Une reponse ordinaire, la reponse proposee, puis
   // une seconde ordinaire : elle doit passer, la proposee n'a pas compte.
-  const avant = solde(elle.id);
   const rO1 = await poster("/candidatures", form({ annonceId: String(o1.id) }), elle.cookie);
   dire("une reponse ordinaire passe", rO1.code === 200, String(rO1.code));
-  dire("et coute un jeton", solde(elle.id) === avant - 1, avant + " -> " + solde(elle.id));
 
   const rI1 = await poster("/candidatures", form({ annonceId: String(i1.id) }), elle.cookie);
   dire("la reponse proposee passe", rI1.code === 200, String(rI1.code));
-  dire("sans jeton preleve", solde(elle.id) === avant - 1, avant + " -> " + solde(elle.id));
-  dire("et sans phrase de jeton", !rI1.corps.includes("a été prélevé"));
+  dire("et rien n'est preleve", !rI1.corps.includes("a été prélevé"));
 
   const rO2 = await poster("/candidatures", form({ annonceId: String(o2.id) }), elle.cookie);
   dire("la seconde reponse ordinaire passe : la proposee n'a pas compte", rO2.code === 200, String(rO2.code));
@@ -280,12 +272,9 @@ setTimeout(async () => {
 
   const apiI2 = await json("/api/demandes/" + i2.id + "/reponse", {}, elle.cookie);
   dire("une demande proposee passe meme a la limite", apiI2.code === 201, apiI2.brut);
-  dire("toujours sans jeton", solde(elle.id) === avant - 2, avant + " -> " + solde(elle.id));
 
-  const avantAutre = solde(autre.id);
   const rAutre = await poster("/candidatures", form({ annonceId: String(i1.id) }), autre.cookie);
-  dire("une autre personne repond a la demande proposee", rAutre.code === 200, String(rAutre.code));
-  dire("et paie son jeton comme d'habitude", solde(autre.id) === avantAutre - 1, String(solde(autre.id)));
+  dire("une autre personne repond aussi a la demande proposee", rAutre.code === 200, String(rAutre.code));
 
   console.log(SAUT + "--- REFUSEE PUIS RENVOYEE : UN ENVOI ORDINAIRE ---");
   const cand = base.prepare("SELECT id FROM candidatures WHERE prestataire_id = ? AND annonce_id = ?")
@@ -294,13 +283,9 @@ setTimeout(async () => {
   base.prepare("UPDATE candidatures SET envoyee_le = datetime('now', '-2 day') WHERE prestataire_id = ?")
     .run(elle.id);
 
-  const ecranRenvoi = await page("/candidatures/nouvelle/" + i1.id, elle.cookie);
-  dire("l'ecran annonce le jeton du renvoi",
-       ecranRenvoi.texte.includes("Envoyer cette réponse") && !ecranRenvoi.texte.includes("Rien."));
-  const avantRenvoi = solde(elle.id);
   const renvoi = await poster("/candidatures", form({ annonceId: String(i1.id) }), elle.cookie);
   dire("le renvoi passe", renvoi.code === 200, String(renvoi.code));
-  dire("et coute un jeton", solde(elle.id) === avantRenvoi - 1, avantRenvoi + " -> " + solde(elle.id));
+  dire("et ne coute rien", !renvoi.corps.includes("a été prélevé"));
 
   console.log(SAUT + "--- L'EMPLOYEUR VOIT A QUI IL L'A PROPOSEE ---");
   const mesDemandes = await page("/mes-demandes", emp.cookie);

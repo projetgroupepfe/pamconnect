@@ -48,34 +48,6 @@
       </ul>
     </div>
 
-    <%# ---- Le prix de la demande ---- %>
-    <h2>Le prix</h2>
-    <div class="carte">
-      <%# Un seul montant compte : celui que l'employeur a annonce. La
-          personne a postule en le connaissant. On le rappelle ici avec la
-          commission, pour que le calcul soit le meme partout. %>
-      <% if (conversation.prixAnnonce) { %>
-        <%- include("partiels/detail-tarif", {
-              tarif: conversation.prixAnnonce,
-              pourEmployeur: jeSuisEmployeur,
-              prixAnnonce: true,
-              beneficiaire: conversation.nomPrestataire }) %>
-
-        <p class="aide">
-          <% if (jeSuisEmployeur) { %>
-            C'est le prix que vous avez annoncé dans votre demande.
-          <% } else { %>
-            C'est le prix annoncé par <%= conversation.nomEmployeur %> dans sa demande.
-          <% } %>
-        </p>
-      <% } else { %>
-        <p class="aide">
-          Cette demande a été publiée avant que le prix ne devienne obligatoire :
-          elle n'en porte pas.
-        </p>
-      <% } %>
-    </div>
-
     <%# ---- Les messages ---- %>
     <h2>Les messages</h2>
 

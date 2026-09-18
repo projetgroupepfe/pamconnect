@@ -53,7 +53,7 @@ setTimeout(async () => {
     + "WHERE email LIKE ?").run("%" + M + "%");
 
   await poster("/annonces", form({ titre: M + " avant", metier: "menagere",
-    quartier: "Mvan", horaire: "Lundi 8h", prix: "10000",
+    quartier: "Mvan", horaire: "Lundi 8h", budget: "10000",
     unite_tarif: "forfaitaire", duree_estimee: "2 heures" }), emp.cookie);
   const a = base.prepare("SELECT id FROM annonces WHERE titre LIKE ? ORDER BY id DESC LIMIT 1").get("%" + M + " avant%");
   const url = "/annonces/" + a.id + "/modifier";
@@ -67,7 +67,7 @@ setTimeout(async () => {
 
   // Masquer le bouton ne suffit pas : on envoie la requete a la main.
   const volEcriture = await poster(url, form({ titre: "vole", metier: "menagere",
-    quartier: "Mvan", horaire: "x", prix: "10000" }), autreEmp.cookie);
+    quartier: "Mvan", horaire: "x", budget: "10000" }), autreEmp.cookie);
   dire("un autre employeur ne peut pas ecrire non plus", volEcriture.code === 404);
   dire("le titre n'a pas bouge",
        base.prepare("SELECT titre FROM annonces WHERE id = ?").get(a.id).titre === M + " avant");
@@ -78,13 +78,13 @@ setTimeout(async () => {
   dire("l'horaire", page.includes('value="Lundi 8h"'));
   dire("le metier officiel", page.includes('value="Ménage à domicile"'));
   dire("le quartier", page.includes('value="Mvan"'));
-  dire("le budget", page.includes('value="10000"'));
+  dire("le budget", page.includes('value="10000"'));  // saisi a la publication
   dire("la duree", page.includes('value="2 heures"'));
 
   console.log("\n--- LA MODIFICATION ---");
   await poster(url, form({ titre: M + " apres", metier: "nounous",
     quartier: "biyemassi", horaire: "Mardi et vendredi, de 9h à 13h",
-    prix: "22000", unite_tarif: "journalier",
+    budget: "22000",
     duree_estimee: "environ 4 heures", conditions: "Deuxième étage." }), emp.cookie);
   const apres = base.prepare("SELECT * FROM annonces WHERE id = ?").get(a.id);
   dire("le titre est change", apres.titre === M + " apres", apres.titre);
@@ -92,30 +92,22 @@ setTimeout(async () => {
   dire("le metier est ramene au nom officiel", apres.metier === "Garde d'enfants", apres.metier);
   dire("le quartier aussi", apres.quartier === "Biyem-Assi", apres.quartier);
   dire("et l'arrondissement en est deduit", apres.arrondissement === "Yaoundé 6", apres.arrondissement);
-  dire("le prix et son unite", apres.prix === 22000 && apres.unite_tarif === "journalier");
+  dire("le budget", apres.budget === 22000, String(apres.budget));
   dire("les conditions", apres.conditions === "Deuxième étage.");
 
   console.log("\n--- LES MEMES REGLES QU'A LA PUBLICATION ---");
   const sansHoraire = await poster(url, form({ titre: "x", metier: "menagere",
-    quartier: "Mvan", horaire: "  ", prix: "10000" }), emp.cookie);
+    quartier: "Mvan", horaire: "  ", budget: "10000" }), emp.cookie);
   dire("sans horaire : refuse", sansHoraire.code === 400, "code " + sansHoraire.code);
   const sansQuartier = await poster(url, form({ titre: "x", metier: "menagere",
-    quartier: "", horaire: "Lundi", prix: "10000" }), emp.cookie);
+    quartier: "", horaire: "Lundi", budget: "10000" }), emp.cookie);
   dire("sans quartier : refuse", sansQuartier.code === 400, "code " + sansQuartier.code);
-  const budgetNegatif = await poster(url, form({ titre: "x", metier: "menagere",
-    quartier: "Mvan", horaire: "Lundi", prix: "-500" }), emp.cookie);
-  dire("budget negatif : refuse", budgetNegatif.code === 400, "code " + budgetNegatif.code);
-  const horsTranche = await poster(url, form({ titre: "x", metier: "menagere",
-    quartier: "Mvan", horaire: "Lundi", prix: "10250" }), emp.cookie);
-  dire("prix hors tranche de 500 : refuse", horsTranche.code === 400, "code " + horsTranche.code);
+  const budgetEnLettres = await poster(url, form({ titre: "x", metier: "menagere",
+    quartier: "Mvan", horaire: "Lundi", budget: "beaucoup" }), emp.cookie);
+  dire("un budget qui n'est pas un nombre : refuse", budgetEnLettres.code === 400,
+       "code " + budgetEnLettres.code);
   dire("aucun de ces essais n'a modifie l'annonce",
        base.prepare("SELECT titre FROM annonces WHERE id = ?").get(a.id).titre === M + " apres");
-
-  const uniteInventee = await poster(url, form({ titre: M + " apres", metier: "menagere",
-    quartier: "Mvan", horaire: "Lundi", prix: "5000", unite_tarif: "gratuit" }), emp.cookie);
-  dire("une unite inventee est ramenee a la valeur par defaut",
-       base.prepare("SELECT unite_tarif FROM annonces WHERE id = ?").get(a.id).unite_tarif === "forfaitaire",
-       "code " + uniteInventee.code);
 
   console.log("\n--- ON PREVIENT QUAND DES GENS ONT DEJA REPONDU ---");
   let p = await (await lire(url, emp.cookie)).text();
@@ -128,7 +120,7 @@ setTimeout(async () => {
        p.includes("ne le fait pas à votre place"));
   dire("mais la correction reste possible",
        (await poster(url, form({ titre: M + " corrige", metier: "menagere",
-         quartier: "Mvan", horaire: "Lundi 8h", prix: "10000" }), emp.cookie)).code === 200);
+         quartier: "Mvan", horaire: "Lundi 8h", budget: "10000" }), emp.cookie)).code === 200);
 
   console.log("\n--- LE BOUTON EST SUR SES ANNONCES, PAS AILLEURS ---");
   const profilEmp = await (await lire("/mes-demandes", emp.cookie)).text();

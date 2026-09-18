@@ -198,37 +198,26 @@ setTimeout(async () => {
 
   console.log("\n--- ECRAN 4 : ELLE REPOND, ET VOIT CE QU'ELLE TOUCHERA ---");
   const ecranReponse = await (await lire("/candidatures/nouvelle/" + annonce.id, pre.cookie)).text();
-  dire("l'ecran s'ouvre maintenant", ecranReponse.includes("Confirmer ma réponse"));
-  dire("il montre le prix annonce", ecranReponse.includes("20 000"));
-  dire("la commission", ecranReponse.includes("2 000"));
-  dire("et ce qu'elle touchera", ecranReponse.includes("18 000"));
+  dire("l'ecran s'ouvre maintenant", ecranReponse.includes("Ce service m'intéresse"));
 
-  // ELLE NE DEMANDE RIEN : c est l employeur qui a annonce ce prix.
-  // "Vous demandez" n est juste que sur son propre profil.
-  dire("le prix est presente comme celui de l employeur",
-       ecranReponse.includes("employeur paie"));
-  dire("et jamais comme le sien", !ecranReponse.includes("Vous demandez"));
+  // DEUXIEME MOMENT FORT : aucun prix n'est annonce ici. Il est convenu
+  // par telephone, avec l'equipe, qui appelle les deux cotes.
+  dire("l'ecran annonce l'appel de l'equipe",
+       ecranReponse.includes("vous appellera pour convenir du prix"));
+  dire("aucun montant n'y figure", !ecranReponse.includes("Commission PamConnect"));
+  dire("et repondre ne coute aucun jeton", !ecranReponse.includes("Envoyer cette réponse"));
 
-  // TROISIEME MOMENT FORT : le prix de la reponse, annonce AVANT l'envoi.
-  dire("le cout de la reponse est annonce avant", ecranReponse.includes("Envoyer cette réponse"));
-  dire("en jetons et en francs", ecranReponse.includes("1 jeton (100 FCFA)"));
-  dire("ce qu'il lui restera aussi", ecranReponse.includes("Il vous restera"));
   const reponseApp = await json("/api/demandes/" + annonce.id + "/reponse", pre.cookie);
-  dire("sur le telephone, l'ecran s'ouvre avec les memes montants et le meme cout",
-       reponseApp.code === 200 && ["20 000", "2 000", "18 000", "1 jeton (100 FCFA)"]
-         .every((morceau) => reponseApp.brut.includes(morceau)), reponseApp.brut.slice(0, 300));
+  dire("sur le telephone, la meme phrase",
+       reponseApp.code === 200 && reponseApp.brut.includes("vous appellera pour convenir du prix"),
+       reponseApp.brut.slice(0, 200));
 
   const reponse = await poster("/candidatures", form({ annonceId: String(annonce.id) }), pre.cookie);
   const cand = base.prepare("SELECT id FROM candidatures WHERE annonce_id = ?").get(annonce.id);
   dire("sa reponse est enregistree", Boolean(cand));
-  dire("un jeton a ete preleve",
-       base.prepare("SELECT COALESCE(SUM(quantite),0) n FROM jetons_mouvements WHERE utilisateur_id = ?")
-         .get(pre.id).n === 2);
-  dire("l'ecran le lui dit", reponse.corps.includes("Il vous reste"));
-  dire("le prelevement porte le nom de la demande",
-       String(base.prepare(`SELECT detail FROM jetons_mouvements
-                            WHERE utilisateur_id = ? AND motif = 'candidature'`)
-         .get(pre.id).detail).includes("garde des enfants"));
+  dire("aucun jeton n'a ete preleve",
+       base.prepare(`SELECT COUNT(*) n FROM jetons_mouvements
+                     WHERE utilisateur_id = ? AND motif = 'candidature'`).get(pre.id).n === 0);
 
   console.log("\n--- ECRAN 5 : L'EMPLOYEUR LA CHOISIT ---");
   const profilApres = await (await lire("/mes-demandes", emp.cookie)).text();
@@ -252,27 +241,16 @@ setTimeout(async () => {
        (await json("/api/moi", pre.cookie)).donnees.moi.aVoir >= 1 &&
        (await json("/api/mes-reponses", pre.cookie)).brut.includes("Votre candidature a été acceptée"));
 
-  console.log("\n--- ECRAN 6 : L'ARGENT ---");
+  console.log("\n--- ECRAN 6 : LE SERVICE EST DECLARE ---");
+  // L'ARGENT NE PASSE PLUS PAR LA PLATEFORME A CE STADE : l'employeur
+  // paie apres le service, et l'equipe enregistre ce paiement.
   const compteEmp = await (await lire("/mon-compte", emp.cookie)).text();
-  dire("l'employeur voit sa somme bloquee", compteEmp.includes("Bloqué par PamConnect"));
-  dire("avec le rappel de declarer", compteEmp.includes("déclarez-le à PamConnect"));
+  dire("aucune somme n'est bloquee", !compteEmp.includes("Bloqué par PamConnect"));
 
   await poster("/candidatures/" + cand.id + "/terminer", form({}), emp.cookie);
 
-  const comptePre = await (await lire("/mon-compte", pre.cookie)).text();
-  dire("elle a recu 18 000 FCFA", comptePre.includes("18 000"));
-  dire("avec le detail de la commission", comptePre.includes("2 000"));
   dire("la discussion rejoint les services termines",
        (await (await lire("/messages", pre.cookie)).text()).includes("Services terminés"));
-  const compteApp = await json("/api/mon-compte", pre.cookie);
-  dire("sur le telephone, Mon compte montre les 18 000 FCFA recus",
-       compteApp.code === 200 && compteApp.brut.includes("18 000"), compteApp.brut.slice(0, 200));
-
-  const versementsEquipe = await (await lire("/admin/versements", eq.cookie)).text();
-  const attendent = versementsEquipe.slice(0, versementsEquipe.indexOf("Sommes dénouées"));
-  dire("la somme quitte les sommes bloquees de l'equipe",
-       !attendent.includes(M + " garde des enfants"));
-  dire("mais reste dans la trace", versementsEquipe.includes(M + " garde des enfants"));
 
   console.log("\n--- NETTOYAGE ---");
   // Les documents ont deja ete effaces par la validation ; on nettoie au

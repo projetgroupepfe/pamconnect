@@ -24,7 +24,9 @@ const SERIES = [
   "test_messagerie", "test_roles", "test_metiers", "test_profil_enrichi",
   "test_moderation", "test_fiche", "test_confirmation", "test_modifier_annonce",
   "test_annuler_age", "test_probleme", "test_notification", "test_archivage",
-  "test_versements", "test_jetons", "test_bienvenue", "test_repondre_jeton", "test_mise_en_avant", "test_avis", "test_classement", "test_api", "test_api_employeur", "test_api_personne", "test_demonstration", "test_invitation", "test_photos",
+  "test_jetons", "test_bienvenue", "test_mise_en_avant", "test_avis", "test_classement",
+  "test_api", "test_api_employeur", "test_api_personne", "test_demonstration", "test_invitation",
+  "test_photos", "test_telephone", "test_publication",
 ];
 
 // Le serveur de test est une copie de server.js dont on change le port.

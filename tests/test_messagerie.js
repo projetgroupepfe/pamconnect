@@ -139,9 +139,8 @@ setTimeout(async () => {
   const pageConf = await confirmation.text();
   dire("l'ecran de confirmation s'ouvre", confirmation.status === 200);
   dire("il rappelle de quelle annonce il s'agit", pageConf.includes(M + " ménage"));
-  dire("il montre le prix annonce", pageConf.includes("10 000 FCFA par jour"));
-  dire("il montre la commission", pageConf.includes("Commission PamConnect"));
-  dire("il montre ce que la personne touchera", pageConf.includes("9 000 FCFA"));
+  dire("il annonce l'appel de l'equipe", pageConf.includes("vous appellera pour convenir du prix"));
+  dire("il ne montre plus de prix", !pageConf.includes("Commission PamConnect"));
 
   dire("un employeur n'y a pas acces",
        (await lire("/candidatures/nouvelle/" + annonce.id, emp.cookie)).status === 403);
@@ -152,33 +151,25 @@ setTimeout(async () => {
 
   console.log("\n--- LE BUDGET DE L'EMPLOYEUR ---");
   const laAnnonce = base.prepare("SELECT * FROM annonces WHERE id = ?").get(annonce.id);
-  dire("le prix est enregistre", laAnnonce.prix === 10000, String(laAnnonce.prix));
-  dire("l'unite aussi", laAnnonce.unite_tarif === "journalier", laAnnonce.unite_tarif);
-  dire("la duree et les conditions aussi",
+  dire("aucun prix n'est enregistre", laAnnonce.prix === null, String(laAnnonce.prix));
+  dire("la duree et les conditions le sont",
        laAnnonce.duree_estimee === "environ 4 heures" && laAnnonce.conditions === "Il y a un chien.");
 
   const listeAnnonces = await (await lire("/annonces", pre.cookie)).text();
-  dire("la candidate voit le prix dans la liste", listeAnnonces.includes("10 000 FCFA par jour"));
-  dire("elle voit aussi les conditions", listeAnnonces.includes("Il y a un chien"));
+  dire("aucun prix n'apparait dans la liste", !listeAnnonces.includes("FCFA par jour"));
+  dire("elle voit les conditions", listeAnnonces.includes("Il y a un chien"));
 
-  const convBudget = await (await lire("/messages/" + conv.id, pre.cookie)).text();
-  dire("et le prix dans la discussion", convBudget.includes("10 000 FCFA"));
+  // Le budget est facultatif, et ne sort pas de l'espace de l'equipe.
+  await poster("/annonces", form({ titre: M + " budget", metier: "MetierMsg",
+    quartier: "Mvan", horaire: "x", budget: "7000" }), emp.cookie);
+  dire("le budget saisi est enregistre",
+       base.prepare("SELECT budget FROM annonces ORDER BY id DESC LIMIT 1").get().budget === 7000);
+  dire("il n'apparait pas aux personnes qui repondent",
+       !(await (await lire("/annonces", pre.cookie)).text()).includes("7 000"));
 
-  // Une unite inventee ne doit pas atteindre la base.
-  await poster("/annonces", form({ titre: M + " triche", metier: "MetierMsg",
-    quartier: "Mvan", horaire: "x", prix: "5000", unite_tarif: "gratuit" }), emp.cookie);
-  dire("une unite inconnue est ramenée à la valeur par défaut",
-       base.prepare("SELECT unite_tarif FROM annonces ORDER BY id DESC LIMIT 1").get().unite_tarif === "forfaitaire");
-
-  const negatif = await poster("/annonces", form({ titre: M + " neg", metier: "MetierMsg",
-    quartier: "Mvan", horaire: "x", prix: "-500" }), emp.cookie);
-  dire("un prix négatif est refusé", negatif.code === 400, "code " + negatif.code);
-
-  // Le prix est desormais OBLIGATOIRE : c'est lui qui sera paye, et une
-  // demande sans prix obligerait a negocier.
   const sansPrix = await poster("/annonces", form({ titre: M + " libre", metier: "MetierMsg",
     quartier: "Mvan", horaire: "x" }), emp.cookie);
-  dire("publier sans prix est refusé", sansPrix.code === 400, "code " + sansPrix.code);
+  dire("publier sans prix est accepté", sansPrix.code === 200, "code " + sansPrix.code);
 
   // La negociation a disparu avec le changement de modele : c'est
   // l'employeur qui annonce le prix, la personne postule ou repond
@@ -192,12 +183,10 @@ setTimeout(async () => {
   dire("la route de negociation n'existe plus",
        (await poster("/messages/" + conv.id + "/tarif", form({ tarif: "1000" }), pre.cookie)).code === 404);
 
-  // Le prix de l'annonce est rappele des deux cotes, avec la commission.
-  dire("la personne lit le prix annonce", vuePre.includes("10 000 FCFA"));
-  dire("et d'ou il vient", vuePre.includes("prix annoncé par"));
-  dire("l'employeur reconnait son propre prix", vueEmp.includes("le prix que vous avez annoncé"));
-  dire("le calcul est le meme des deux cotes",
-       vuePre.includes("Commission PamConnect") && vueEmp.includes("Commission PamConnect"));
+  // Plus aucun prix dans la discussion : il se convient par telephone,
+  // avec l'equipe.
+  dire("aucun prix n'est affiché dans la discussion",
+       !vuePre.includes("Commission PamConnect") && !vueEmp.includes("Commission PamConnect"));
 
   console.log("\n--- LES DEUX CÔTÉS ONT LE BOUTON ---");
   dire("l'employeur voit 'Discuter' sur ses demandes",

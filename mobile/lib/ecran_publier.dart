@@ -50,7 +50,7 @@ class _EcranPublierState extends State<EcranPublier> {
 
   final _titre = TextEditingController();
   final _horaire = TextEditingController();
-  final _prix = TextEditingController();
+  final _budget = TextEditingController();
   final _duree = TextEditingController();
   final _conditions = TextEditingController();
 
@@ -60,7 +60,6 @@ class _EcranPublierState extends State<EcranPublier> {
   TextEditingController? _quartier;
 
   String? _arrondissement;
-  String? _unite;
   String _aideArrondissement = _aideArrondissementDepart;
   Timer? _attenteQuartier;
   int _rechercheQuartier = 0;
@@ -77,7 +76,7 @@ class _EcranPublierState extends State<EcranPublier> {
   @override
   void dispose() {
     _attenteQuartier?.cancel();
-    for (final controleur in [_titre, _horaire, _prix, _duree, _conditions]) {
+    for (final controleur in [_titre, _horaire, _budget, _duree, _conditions]) {
       controleur.dispose();
     }
     super.dispose();
@@ -102,7 +101,6 @@ class _EcranPublierState extends State<EcranPublier> {
       if (!mounted) return;
       setState(() {
         _formulaire = formulaire;
-        _unite = formulaire.uniteParDefaut;
         // Le metier de la personne remplit le champ, comme sur le site :
         // l'employeur peut le changer.
         _metierDepart = formulaire.invitee?.metier ?? _metierDepart;
@@ -133,16 +131,13 @@ class _EcranPublierState extends State<EcranPublier> {
     final valeurs = modification.valeurs;
     _titre.text = valeurs.titre;
     _horaire.text = valeurs.horaire;
-    _prix.text = valeurs.prix;
+    _budget.text = valeurs.budget;
     _duree.text = valeurs.dureeEstimee;
     _conditions.text = valeurs.conditions;
     _metierDepart = valeurs.metier;
     _quartierDepart = valeurs.quartier;
     if (formulaire.arrondissements.contains(valeurs.arrondissement)) {
       _arrondissement = valeurs.arrondissement;
-    }
-    if (formulaire.unitesTarif.any((unite) => unite.valeur == valeurs.uniteTarif)) {
-      _unite = valeurs.uniteTarif;
     }
     _avertissement = modification.avertissement;
   }
@@ -196,8 +191,7 @@ class _EcranPublierState extends State<EcranPublier> {
         'horaire': _horaire.text,
         'quartier': _quartier?.text ?? '',
         'arrondissement': _arrondissement ?? '',
-        'prix': _prix.text,
-        'unite_tarif': _unite ?? '',
+        'budget': _budget.text,
         'duree_estimee': _duree.text,
         'conditions': _conditions.text,
         if (_formulaire?.invitee != null) 'pour': '${_formulaire?.invitee?.id}',
@@ -336,7 +330,6 @@ class _EcranPublierState extends State<EcranPublier> {
 
   List<Widget> _champs(BuildContext context, FormulaireDemande formulaire) {
     const espace = SizedBox(height: 16);
-    final aide = Theme.of(context).textTheme.bodyMedium?.copyWith(color: Couleurs.encrePale);
     final erreurEnvoi = _erreurEnvoi;
 
     return [
@@ -400,39 +393,16 @@ class _EcranPublierState extends State<EcranPublier> {
         ),
       ),
       const SizedBox(height: 24),
-      const TitreSection('Le prix que vous payez'),
-      Text(
-        "C'est vous qui fixez le prix de ce service. Les candidates répondront "
-        'si ce montant leur convient.',
-        style: aide,
-      ),
-      espace,
       TextField(
-        controller: _prix,
+        controller: _budget,
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         textInputAction: TextInputAction.next,
         decoration: const InputDecoration(
-          labelText: 'Le prix (FCFA)',
-          hintText: 'ex : 10000',
-        ),
-      ),
-      espace,
-      InputDecorator(
-        decoration: const InputDecoration(labelText: "Ce montant, c'est…"),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: _unite,
-            isExpanded: true,
-            isDense: true,
-            items: [
-              for (final unite in formulaire.unitesTarif)
-                DropdownMenuItem<String>(value: unite.valeur, child: Text(unite.libelle)),
-            ],
-            onChanged: (choix) {
-              if (choix != null) setState(() => _unite = choix);
-            },
-          ),
+          labelText: 'Votre budget (facultatif)',
+          helperText: "Vu par l'équipe seulement. Le prix vient de la personne\n"
+              'qui fera le travail, plus 10 %.',
+          helperMaxLines: 2,
         ),
       ),
       espace,

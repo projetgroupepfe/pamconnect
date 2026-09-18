@@ -147,10 +147,9 @@ setTimeout(async () => {
   // LE SERVEUR MET EN FORME, PAS L'APPLICATION. Sinon les francs CFA
   // s'ecriraient de deux facons selon l'ecran ou l'on regarde.
   const sienne = vues.donnees.pourMoi.find((a) => a.titre === M + " menage");
-  dire("le prix arrive deja ecrit en toutes lettres",
-       typeof sienne.prixLisible === "string" && sienne.prixLisible.includes("FCFA"),
-       String(sienne.prixLisible));
-  dire("le montant brut est la aussi, pour trier", sienne.prix === 12000, String(sienne.prix));
+  dire("aucun prix n'est envoyé à l'application",
+       sienne.prixLisible === undefined && sienne.prix === undefined,
+       String(sienne.prixLisible) + " / " + String(sienne.prix));
 
   // UN VISITEUR N'A PAS DE METIER : la liste ne doit pas planter, elle
   // doit tout mettre dans "autres".

@@ -135,7 +135,7 @@
                     publique, les discussions restent. %>
                 <form action="/annonces/<%= annonce.id %>/annuler" method="POST"
                       data-question="Voulez-vous vraiment retirer cette demande ?"
-                      data-precision="Elle disparaîtra de la liste, personne ne pourra plus y répondre, et la somme bloquée vous sera rendue.">
+                      data-precision="Elle disparaîtra de la liste et personne ne pourra plus y répondre.">
                   <button type="submit" class="bouton-danger">
                     <%- include("partiels/icone", { nom: "refuser" }) %>
                     Retirer cette demande
@@ -151,8 +151,7 @@
                 couleur, meme icone. On dit donc ce que chacune fait. %>
             <p class="aide">
               <strong>Retirer ferme votre demande</strong> : elle disparaît
-              de la liste, personne ne peut plus y répondre, et la somme
-              bloquée vous est rendue.
+              de la liste et personne ne peut plus y répondre.
               Pour écarter une seule personne sans fermer votre demande,
               utilisez <strong>Refuser cette candidature</strong> plus bas :
               les autres pourront encore vous répondre.
@@ -189,16 +188,6 @@
                         services: candidature.servicesTermines }) %>
                 </p>
 
-                <%# Le montant retenu pour CETTE candidature : celui du
-                    profil, ou celui convenu en discutant. %>
-                <ul class="infos">
-                  <li>
-                    <%- include("partiels/icone", { nom: "remuneration" }) %>
-                    <span>
-                      <%= annonce.prixLisible %>
-                    </span>
-                  </li>
-                </ul>
 
                 <% if (candidature.experience) { %>
                   <ul class="infos">

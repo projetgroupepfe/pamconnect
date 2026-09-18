@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'ecran_connexion.dart';
-import 'ecran_mes_jetons.dart';
 import 'ecran_verification.dart';
 import 'elements.dart';
 import 'modeles.dart';
@@ -66,14 +65,6 @@ class _EcranRepondreState extends State<EcranRepondre> {
   Future<void> _faireVerifier() async {
     await Navigator.of(context).push<String>(
       MaterialPageRoute(builder: (_) => EcranVerification(api: widget.api)),
-    );
-    if (!mounted) return;
-    await _charger();
-  }
-
-  Future<void> _voirJetons() async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => EcranMesJetons(api: widget.api)),
     );
     if (!mounted) return;
     await _charger();
@@ -147,15 +138,12 @@ class _EcranRepondreState extends State<EcranRepondre> {
     const fort = TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre);
     final demande = ecran.demande;
     final employeur = ecran.employeur;
-    final prix = ecran.prix;
-    final cout = ecran.cout;
     final limite = ecran.limite;
     final metier = demande.metier;
     final quartier = demande.quartier;
     final arrondissement = demande.arrondissement;
     final conditions = demande.conditions;
-    final prixAnnonce = prix.annonce;
-    final duree = prix.dureeEstimee;
+    final duree = demande.dureeEstimee;
     final note = employeur.note;
     final erreurEnvoi = _erreurEnvoi;
 
@@ -163,7 +151,7 @@ class _EcranRepondreState extends State<EcranRepondre> {
       padding: const EdgeInsets.all(16),
       children: [
         Text(
-          "Vérifiez les informations avant d'envoyer votre réponse.",
+          'Vérifiez les informations avant de répondre.',
           style: texte.bodyLarge?.copyWith(color: Couleurs.encreDouce),
         ),
         const SizedBox(height: 16),
@@ -244,108 +232,41 @@ class _EcranRepondreState extends State<EcranRepondre> {
           ),
         ),
         const SizedBox(height: 8),
-        const TitreSection('Ce que vous toucherez'),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (prixAnnonce != null)
-                  LigneRiche(
-                    icone: Icons.payments_outlined,
-                    morceaux: [const TextSpan(text: 'Prix annoncé : '), TextSpan(text: prixAnnonce, style: fort)],
+                // C'EST L'EQUIPE QUI APPELLE : aucun prix n'est annonce ici,
+                // et dire qu'un service interesse ne coute rien.
+                Text(ecran.phrase, style: texte.bodyMedium?.copyWith(color: Couleurs.encreDouce)),
+                if (duree != null) ...[
+                  const SizedBox(height: 8),
+                  Text('Durée estimée : $duree', style: aide),
+                ],
+                if (limite != null) ...[
+                  const SizedBox(height: 8),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: '${limite.parJour} réponses par tranche de 24 heures.'),
+                        if (limite.restant == 0)
+                          const TextSpan(text: ' Vous les avez toutes utilisées.', style: fort)
+                        else ...[
+                          const TextSpan(text: ' Il vous en reste '),
+                          TextSpan(text: '${limite.restant}', style: fort),
+                          const TextSpan(text: '.'),
+                        ],
+                      ],
+                    ),
+                    style: aide,
                   ),
-                if (duree != null)
-                  LigneRiche(
-                    icone: Icons.schedule,
-                    morceaux: [const TextSpan(text: 'Durée estimée : '), TextSpan(text: duree, style: fort)],
-                  ),
-                if (prix.lignes.isNotEmpty) DetailMontants(lignes: prix.lignes),
-                Text(
-                  "C'est le prix fixé par l'employeur pour ce service. Si ce montant ne vous convient pas, "
-                  'vous pouvez répondre à une autre demande.',
-                  style: aide,
-                ),
+                ],
               ],
             ),
           ),
         ),
-        // CE QUE CETTE REPONSE VA COUTER, avant de s'engager.
-        if (ecran.proposee) ...[
-          const SizedBox(height: 8),
-          const TitreSection('Ce que cette réponse vous coûte'),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text.rich(
-                const TextSpan(
-                  children: [
-                    TextSpan(text: 'Rien.', style: fort),
-                    TextSpan(text: ' Cette demande a été publiée pour vous : y répondre ne vous coûte aucun jeton.'),
-                  ],
-                ),
-                style: texte.bodyMedium?.copyWith(color: Couleurs.encreDouce),
-              ),
-            ),
-          ),
-        ] else if (cout != null) ...[
-          const SizedBox(height: 8),
-          const TitreSection('Ce que cette réponse vous coûte'),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  DetailMontants(
-                    lignes: [
-                      LigneTarif(libelle: 'Envoyer cette réponse', montant: cout.envoyer, retenue: true, total: false),
-                      LigneTarif(libelle: 'Il vous restera', montant: cout.reste, retenue: false, total: true),
-                    ],
-                  ),
-                  if (cout.soldeInsuffisant) ...[
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          const TextSpan(text: 'Votre solde ne suffit pas.', style: fort),
-                          TextSpan(text: ' Il vous reste ${cout.solde}.'),
-                        ],
-                      ),
-                      style: aide,
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: _voirJetons,
-                      icon: const Icon(Icons.toll_outlined),
-                      label: const Text('Voir mes jetons'),
-                      style: OutlinedButton.styleFrom(minimumSize: hauteurBouton),
-                    ),
-                  ],
-                  // LA LIMITE DU JOUR, dite avant l'envoi.
-                  if (limite != null) ...[
-                    const SizedBox(height: 8),
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(text: 'Vous pouvez envoyer ${limite.parJour} réponses par tranche de 24 heures.'),
-                          if (limite.restant == 0)
-                            const TextSpan(text: ' Vous les avez toutes utilisées.', style: fort)
-                          else ...[
-                            const TextSpan(text: ' Il vous en reste '),
-                            TextSpan(text: '${limite.restant}', style: fort),
-                            const TextSpan(text: '.'),
-                          ],
-                        ],
-                      ),
-                      style: aide,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
         const SizedBox(height: 24),
         if (erreurEnvoi != null) ...[
           Avertissement(texte: erreurEnvoi),
@@ -361,7 +282,7 @@ class _EcranRepondreState extends State<EcranRepondre> {
                   child: CircularProgressIndicator(strokeWidth: 2.5, color: Couleurs.bleuFonce),
                 )
               : const Icon(Icons.check),
-          label: const Text('Confirmer ma réponse'),
+          label: const Text("Ce service m'intéresse"),
         ),
         const SizedBox(height: 8),
         OutlinedButton(

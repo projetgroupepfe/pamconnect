@@ -238,6 +238,9 @@ CREATE TABLE IF NOT EXISTS annonces (
 -- ------------------------------------------------------------
 -- Table candidatures : les reponses des prestataires aux annonces
 -- ------------------------------------------------------------
+-- Le budget que l'employeur pense mettre, en FCFA. FACULTATIF, et vu de
+-- l'equipe seulement : il l'aide a savoir qui appeler. Le prix, lui, est
+-- annonce par la personne qui fera le travail, lors de l'appel.
 CREATE TABLE IF NOT EXISTS candidatures (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
 

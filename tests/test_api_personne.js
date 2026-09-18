@@ -119,14 +119,12 @@ setTimeout(async () => {
        ecran.code === 200 && e.demande.titre === M + " ouverte" &&
        e.demande.conditions === "Deuxième étage sans ascenseur." && e.demande.horaire === "Samedi 9h" &&
        e.employeur.nom === "Test emp" && e.employeur.verifie === true && e.employeur.note === null &&
-       e.prix.lignes.length === 3 && e.prix.lignes[2].libelle === "Vous recevez" &&
-       e.prix.lignes[2].montant === "18 000 FCFA" && e.prix.lignes[1].retenue === true && e.prix.lignes[2].total === true,
+       e.phrase === "C'est l'équipe PamConnect qui vous appellera pour convenir du prix.",
        ecran.brut.slice(0, 300));
   const pageReponse = await (await lire("/candidatures/nouvelle/" + ouverte, elle.cookie)).text();
-  dire("la page du site montre le meme montant, le meme cout et la meme limite",
-       pageReponse.includes(e.prix.lignes[2].montant) && pageReponse.includes("Test emp") &&
-       (e.cout === null || (pageReponse.includes(e.cout.envoyer) && pageReponse.includes(e.cout.reste))) &&
-       (e.cout === null || e.limite === null || pageReponse.includes(e.limite.parJour + " réponses par tranche")));
+  dire("la page du site dit la meme chose",
+       pageReponse.includes("vous appellera pour convenir du prix") && pageReponse.includes("Test emp") &&
+       (e.limite === null || pageReponse.includes(e.limite.parJour + " réponses par tranche")));
 
   console.log(SAUT + "--- LA REPONSE PART DEPUIS L'APPLICATION ---");
   const avant = soldeDe(elle.id);
@@ -138,9 +136,7 @@ setTimeout(async () => {
        envoi.code === 201 && Boolean(candidature) && candidature.statut === "en attente" &&
        envoi.donnees.candidatureId === candidature.id &&
        envoi.donnees.texte.startsWith("Votre réponse a bien été enregistrée."), envoi.brut);
-  dire("le jeton preleve est celui annonce avant l'envoi",
-       e.cout === null ? preleve === 0 : preleve > 0 && envoi.donnees.texte.includes(e.cout.envoyer.replace("− ", "")),
-       "preleve : " + preleve);
+  dire("repondre ne coute aucun jeton", preleve === 0, "preleve : " + preleve);
   const doublon = await repondre(ouverte, parJeton);
   dire("une seconde reponse : 409, sans second jeton",
        doublon.code === 409 && avant - soldeDe(elle.id) === preleve, doublon.brut);
