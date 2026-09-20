@@ -283,6 +283,16 @@ CREATE TABLE IF NOT EXISTS annonces (
   -- ON DELETE SET NULL : si le compte disparait, la demande reste.
   personne_invitee_id INTEGER REFERENCES utilisateurs(id) ON DELETE SET NULL,
 
+  -- --- Le budget ---
+  -- Ce que l'employeur pense mettre, en FCFA. FACULTATIF, et vu de
+  -- l'equipe seulement : il l'aide a savoir qui appeler. Le prix, lui, est
+  -- annonce par la personne qui fera le travail, lors de l'appel.
+  --
+  -- Cette colonne DOIT etre ici : sur une base neuve, server.js ne la
+  -- rattrape pas (ajouterColonneSiAbsente ne fait rien tant que la table
+  -- n'existe pas) et le serveur ne demarrait plus.
+  budget          INTEGER,
+
   cree_le         TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -290,9 +300,6 @@ CREATE TABLE IF NOT EXISTS annonces (
 -- ------------------------------------------------------------
 -- Table candidatures : les reponses des prestataires aux annonces
 -- ------------------------------------------------------------
--- Le budget que l'employeur pense mettre, en FCFA. FACULTATIF, et vu de
--- l'equipe seulement : il l'aide a savoir qui appeler. Le prix, lui, est
--- annonce par la personne qui fera le travail, lors de l'appel.
 CREATE TABLE IF NOT EXISTS candidatures (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
 

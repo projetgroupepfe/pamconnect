@@ -86,7 +86,7 @@
             <p class="exemple-titre">Exemple de calcul</p>
             <p>
               Ce tarif est indicatif. Le montant réellement reçu dépend de la demande
-              à laquelle vous répondez : pour une demande à
+              à laquelle vous etes interessees: pour une demande à
               <strong><%= exempleTarif.prix %></strong>, la commission est de
               <strong><%= exempleTarif.commission %></strong> et vous recevez
               <strong><%= exempleTarif.recu %></strong>.
@@ -135,7 +135,7 @@
 
   // --- Le detail du tarif, calcule pendant la saisie ------------------
   // Le taux vient du serveur : il n'est ecrit qu'a un seul endroit.
-  const TAUX = <%= pourcentageCommission %> / 100;
+  const TAUX = <%= pourcentageCommission %> 100;
   const detail = document.getElementById("detailTarif");
 
   function montant(nombre) {

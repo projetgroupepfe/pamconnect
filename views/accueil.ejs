@@ -39,7 +39,7 @@
     <li>
       <span class="etape-numero">2</span>
       <div>
-        <h3>Les personnes vérifiées répondent</h3>
+        <h3>Les personnes vérifiées signalent qu'elles sont interessees</h3>
         <p>Celles que l'horaire arrange se proposent. Une pastille verte indique
            que nous avons contrôlé leurs papiers.</p>
       </div>
@@ -50,7 +50,7 @@
         <%# ANCIEN MODELE : cette etape disait que l'employeur paie le tarif
             affiche et que la personne est reversee aussitot. %>
         <h3>L'employeur choisit et confirme le service</h3>
-        <p>Le prix qu'il annonce est bloqué dès la publication. La personne le reçoit,
+        <p>La personne le reçoit la somme via la plateforme avec la
            commission déduite, quand il déclare le service effectué.</p>
       </div>
     </li>
@@ -61,7 +61,7 @@
       "Vous proposez vos services", ou il s'adresse a la bonne personne. %>
   <p class="mention-tarif">
     <%- include("partiels/icone", { nom: "remuneration", taille: 18 }) %>
-    L'employeur paie le prix qu'il annonce, sans frais en plus.
+    L'employeur paie le prix que l'equipe de la plateforme annonce, sans frais en plus.
     PamConnect retient <%= pourcentageCommission %> % sur ce montant.
     <a href="/prestataire">Voir le détail</a>
   </p>
