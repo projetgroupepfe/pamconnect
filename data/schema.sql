@@ -730,25 +730,31 @@ CREATE TABLE IF NOT EXISTS parametres (
 -- lequel des deux dit vrai. Un seul nombre a changer, une seule verite.
 INSERT OR IGNORE INTO parametres (cle, valeur) VALUES
   ('jeton_valeur_fcfa', '100'),
-  ('packs_jetons', '5|10|30|60'),
+  ('packs_jetons', '10|30|60'),
 
   -- LES JETONS DE BIENVENUE. Ils ne sont pas un cadeau : ils arrivent
   -- apres la verification d'identite, c'est-a-dire apres avoir envoye
   -- ses papiers et attendu. Une seule fois par compte, et ils expirent -
   -- le gratuit a une date de fin, on ne peut pas s'y installer.
   --
-  -- UN EMPLOYEUR N'EN RECOIT PAS (0) : rien ne lui coute a la publication,
-  -- et un solde offert qu'il n'a aucune raison d'utiliser n'est qu'un
-  -- message de plus a l'ecran. Modifiable dans l'espace equipe.
+  -- PERSONNE N'EN RECOIT (0) : repondre est gratuit, et le seul usage d'un
+  -- jeton est une mise en avant, qui en coute davantage que ce qu'on
+  -- offrirait. Un solde offert qu'on ne peut rien en faire n'est qu'un
+  -- message de plus a l'ecran. Modifiable dans l'espace equipe : c'est un
+  -- levier pour une offre de lancement.
   ('bienvenue_employeur', '0'),
-  ('bienvenue_prestataire', '3'),
+  ('bienvenue_prestataire', '0'),
   ('bienvenue_jours', '60'),
 
   -- CE QUE COUTE UNE MISE EN AVANT. Le seul prix en jetons : repondre a
   -- une demande est gratuit. Le meme nombre des deux cotes - une demande
   -- qui passe devant les autres, un profil que l'equipe appelle en
   -- premier.
-  ('cout_mise_en_avant', '20'),
+  --
+  -- 10 JETONS = UN PACK DE BASE : chaque pack achete vaut un nombre entier
+  -- de mises en avant (10 -> 1, 30 -> 3, 60 -> 6). Un pack plus petit que
+  -- ce prix ne permettrait jamais rien a lui seul.
+  ('cout_mise_en_avant', '10'),
 
   -- COMBIEN DE REPONSES PAR 24 HEURES. Repondre ne coute rien ; sans
   -- cette limite, une seule personne pourrait repondre a tout.

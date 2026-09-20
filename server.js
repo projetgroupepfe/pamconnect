@@ -922,6 +922,24 @@ const requetes = {
     ORDER BY c.statut = 'acceptee' DESC, enAvant DESC, c.id
   `),
 
+  // LA PERSONNE A QUI L'EMPLOYEUR A PROPOSE SA DEMANDE (depuis sa fiche).
+  // Il est venu la chercher : l'equipe doit l'appeler en premier, qu'elle
+  // ait repondu ou non. Sans cette ligne, elle n'apparaissait sur l'ecran
+  // que si elle avait deja repondu.
+  personneInviteeDeLaDemande: db.prepare(`
+    SELECT u.id AS prestataireId, u.nom, u.metier, u.quartier, u.tarif,
+           u.telephone, u.statut_verification AS verification,
+           (u.mise_en_avant_jusqu_au IS NOT NULL
+            AND u.mise_en_avant_jusqu_au > datetime('now')) AS enAvant,
+           (SELECT ROUND(AVG(note), 1) FROM avis v
+             WHERE v.vise_id = u.id AND v.masque = 0) AS moyenne,
+           (SELECT c.statut FROM candidatures c
+             WHERE c.annonce_id = a.id AND c.prestataire_id = u.id) AS statut
+    FROM annonces a
+    JOIN utilisateurs u ON u.id = a.personne_invitee_id
+    WHERE a.id = ? AND u.role = 'prestataire' AND u.est_admin = 0 AND u.suspendu = 0
+  `),
+
   // Et si personne ne s'est manifeste, les prestataires du metier, ceux
   // du quartier en tete. Seules les personnes verifiees : l'equipe ne
   // met en relation que des identites controlees.
@@ -7056,6 +7074,30 @@ function ecranMisesEnRelation() {
   const demandes = requetes.demandesATraiter.all().map((a) => {
     const enCours = requetes.ficheEnCours.get(a.id);
 
+    // Une personne que l'employeur avait refusee (ou dont il a renonce au
+    // prix) n'est plus "celle qu'il veut" : on ne la remet pas en tete.
+    const invitee = requetes.personneInviteeDeLaDemande.get(a.id);
+    const inviteeId = invitee && invitee.statut !== "refusee" ? invitee.prestataireId : null;
+    const marquer = (p) => Object.assign(personneAAppeler(p), { proposee: p.prestataireId === inviteeId });
+
+    const interesses = requetes.interessesDeLaDemande.all(a.id).map(marquer);
+    const autres = a.metier
+      ? requetes.autresPrestatairesPour.all({
+          metier: a.metier, quartier: a.quartier || "", annonce: a.id,
+        }).map(marquer)
+      : [];
+
+    // LA LISTE D'APPELS, dans l'ordre ou l'equipe doit appeler : la
+    // personne deja choisie, puis celle que l'employeur a demandee, puis
+    // le reste. Elle est ajoutee meme si elle n'a pas repondu ou si elle
+    // depasse la limite des "autres".
+    const appels = interesses.concat(autres);
+    if (inviteeId !== null && !appels.some((p) => p.id === inviteeId)) {
+      appels.push(marquer(invitee));
+    }
+    const rang = (p) => (p.dejaChoisie ? 0 : p.proposee ? 1 : 2);
+    appels.sort((x, y) => rang(x) - rang(y));
+
     return {
       id: a.id,
       titre: a.titre,
@@ -7078,12 +7120,10 @@ function ecranMisesEnRelation() {
         verifie: a.verificationEmployeur === "verifie",
       },
 
-      interesses: requetes.interessesDeLaDemande.all(a.id).map(personneAAppeler),
-      autres: a.metier
-        ? requetes.autresPrestatairesPour.all({
-            metier: a.metier, quartier: a.quartier || "", annonce: a.id,
-          }).map(personneAAppeler)
-        : [],
+      interesses,
+      autres,
+      appels,
+      invitee: inviteeId !== null ? { id: invitee.prestataireId, nom: invitee.nom } : null,
 
       fiche: enCours ? ficheLisible(enCours) : null,
       refusees: requetes.fichesRefusees.all(a.id).map((m) => ({

@@ -78,9 +78,13 @@ setTimeout(async () => {
   dire("sans assez de jetons, c'est refusé", sansJetons.code === 402, "code " + sansJetons.code);
 
   console.log("\n--- 3. LA MISE EN AVANT ---");
+  // Le prix d'une mise en avant est un reglage de l'equipe : on le lit au
+  // lieu de supposer un nombre, et on credite exactement de quoi la payer.
+  const coutAvant = Number(
+    base.prepare("SELECT valeur FROM parametres WHERE cle = 'cout_mise_en_avant'").get().valeur);
   base.prepare(
     "INSERT INTO jetons_mouvements (utilisateur_id, quantite, nature, motif, detail) "
-    + "VALUES (?, 20, 'achete', 'achat', 'Série de test')").run(pre.id);
+    + "VALUES (?, ?, 'achete', 'achat', 'Série de test')").run(pre.id, coutAvant);
   const soldeAvant = soldeDe(pre.id);
 
   const pose = await poster("/mon-profil/mise-en-avant", form({}), pre.cookie);
@@ -88,12 +92,12 @@ setTimeout(async () => {
 
   const apres = base.prepare("SELECT mise_en_avant_jusqu_au FROM utilisateurs WHERE id = ?").get(pre.id);
   dire("la date de fin est posée", Boolean(apres.mise_en_avant_jusqu_au));
-  dire("vingt jetons sont partis", soldeDe(pre.id) === soldeAvant - 20,
+  dire("le prix d'une mise en avant a ete preleve", soldeDe(pre.id) === soldeAvant - coutAvant,
        soldeAvant + " -> " + soldeDe(pre.id));
 
   const deuxFois = await poster("/mon-profil/mise-en-avant", form({}), pre.cookie);
   dire("on ne prolonge pas en payant deux fois", deuxFois.code === 409, "code " + deuxFois.code);
-  dire("et rien n'a été prélevé de plus", soldeDe(pre.id) === soldeAvant - 20);
+  dire("et rien n'a été prélevé de plus", soldeDe(pre.id) === soldeAvant - coutAvant);
 
   const profil = await (await lire("/mon-profil", pre.cookie)).text();
   // L'apostrophe est echappee par le gabarit : on cherche la phrase sans elle.

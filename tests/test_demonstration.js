@@ -184,18 +184,34 @@ setTimeout(async () => {
   // La cause et l'effet tiennent dans le meme geste.
   const soldeOffert = base.prepare(
     "SELECT COALESCE(SUM(quantite),0) n FROM jetons_mouvements WHERE utilisateur_id = ?").get(pre.id).n;
-  dire("trois jetons lui sont offerts", soldeOffert === 3, String(soldeOffert));
+  //
+  // COMBIEN ? Le reglage de l'equipe le dit (zero par defaut : rien n'est
+  // offert, car un solde qu'on ne peut rien en faire n'a pas d'usage). La
+  // serie lit ce reglage plutot que de supposer un nombre : elle passe
+  // quelle que soit la valeur choisie.
+  const offertAttendu = Number(
+    base.prepare("SELECT valeur FROM parametres WHERE cle = 'bienvenue_prestataire'").get().valeur);
+  dire("les jetons offerts sont ceux que l'equipe a regles (" + offertAttendu + ")",
+       soldeOffert === offertAttendu, String(soldeOffert));
   const pageJetons = await (await lire("/mes-jetons", pre.cookie)).text();
-  dire("sa page dit d ou ils viennent", pageJetons.includes("Offerts à la vérification"));
-  dire("et jusqu a quand ils durent", pageJetons.includes("à utiliser avant le"));
-  dire("et ce qu'il lui manque pour une mise en avant",
-       pageJetons.includes("Il vous manque"));
   const jetonsApp = await json("/api/mes-jetons", pre.cookie);
-  // La phrase autour des chiffres est ecrite par chaque ecran ; les
-  // chiffres, eux, viennent du serveur.
-  dire("sur le telephone, les 3 jetons offerts, leur date limite et ce qu'ils achetent",
-       jetonsApp.code === 200 && jetonsApp.donnees.offerts === 3 && Boolean(jetonsApp.donnees.expireLe) &&
-       jetonsApp.donnees.uneAction === "mettre votre profil en avant", jetonsApp.brut.slice(0, 200));
+  if (offertAttendu > 0) {
+    dire("sa page dit d ou ils viennent", pageJetons.includes("Offerts à la vérification"));
+    dire("et jusqu a quand ils durent", pageJetons.includes("à utiliser avant le"));
+    dire("et ce qu'il lui manque pour une mise en avant",
+         pageJetons.includes("Il vous manque"));
+    // La phrase autour des chiffres est ecrite par chaque ecran ; les
+    // chiffres, eux, viennent du serveur.
+    dire("sur le telephone, les jetons offerts, leur date limite et ce qu'ils achetent",
+         jetonsApp.code === 200 && jetonsApp.donnees.offerts === offertAttendu && Boolean(jetonsApp.donnees.expireLe) &&
+         jetonsApp.donnees.uneAction === "mettre votre profil en avant", jetonsApp.brut.slice(0, 200));
+  } else {
+    dire("sa page ne parle d'aucun jeton offert",
+         !pageJetons.includes("Offerts à la vérification") && pageJetons.includes("pas encore de jetons"));
+    dire("sur le telephone, aucun jeton offert, et l'usage d'un jeton est dit",
+         jetonsApp.code === 200 && jetonsApp.donnees.offerts === 0 &&
+         jetonsApp.donnees.uneAction === "mettre votre profil en avant", jetonsApp.brut.slice(0, 200));
+  }
 
   console.log("\n--- ECRAN 4 : ELLE REPOND, ET VOIT CE QU'ELLE TOUCHERA ---");
   const ecranReponse = await (await lire("/candidatures/nouvelle/" + annonce.id, pre.cookie)).text();

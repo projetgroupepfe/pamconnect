@@ -46,6 +46,18 @@
             <span>Budget annoncé : <strong><%= d.budget %></strong> <span class="aide">(équipe seulement)</span></span>
           </li>
         <% } %>
+        <% if (d.invitee && !d.pourvue) { %>
+          <%# L'EMPLOYEUR A PROPOSE SA DEMANDE A UNE PERSONNE, depuis sa
+              fiche : il l'a choisie avant de publier. Elle passe en tete
+              de la liste d'appels, qu'elle ait repondu ou non. %>
+          <li>
+            <%- include("partiels/icone", { nom: "profil" }) %>
+            <span>
+              <strong>Proposée par l'employeur à <%= d.invitee.nom %>.</strong>
+              Appelez-la en premier.
+            </span>
+          </li>
+        <% } %>
         <% if (d.pourvue) { %>
           <%# L'EMPLOYEUR A CHOISI : c'est ce qu'il y a de plus important sur
               cette carte. L'equipe appelle cette personne EN PREMIER, pour
@@ -132,7 +144,7 @@
         <%# PREMIER APPEL : la personne qui fera le travail. Celles qui
             ont signale leur interet d'abord : elles ont deja lu la
             demande, l'appel est plus court. %>
-        <% const aAppeler = d.interesses.concat(d.autres); %>
+        <% const aAppeler = d.appels; %>
 
         <% if (aAppeler.length === 0) { %>
           <p class="aide">
@@ -154,6 +166,8 @@
                   </span>
                   <% if (p.dejaChoisie) { %>
                     <span class="badge badge-verifie">Choisie par l'employeur : à appeler en premier</span>
+                  <% } else if (p.proposee) { %>
+                    <span class="badge badge-verifie">Demandée par l'employeur : à appeler en premier</span>
                   <% } else if (d.interesses.some(function (i) { return i.id === p.id; })) { %>
                     <span class="badge badge-en-attente">Intéressée</span>
                   <% } %>
