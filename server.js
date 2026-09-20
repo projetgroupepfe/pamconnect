@@ -3808,7 +3808,11 @@ function demandesDeLEmployeur(employeurId) {
       // reapparait sans explication. Deduit des fiches, jamais stocke.
       prixRefuseDe: fermee ? null : dernierPrixRefuse(annonce.id),
       horaireLisible: annonce.horaire || "Horaire non précisé",
-      prixLisible: prixEnClair(annonce),
+      // LE PRIX D'UNE ANCIENNE DEMANDE N'EST PLUS MONTRE. Avant, l'employeur
+      // le fixait lui-meme en publiant ; aujourd'hui le prix se convient
+      // par telephone avec l'equipe, commission comprise. Afficher l'ancien
+      // montant sur les seules anciennes demandes laisserait croire a un
+      // prix deja decide. La donnee reste en base : rien n'est efface.
       lieu: [annonce.quartier, annonce.arrondissement].filter(Boolean).join(", "),
       proposeeA: annonce.nomInvitee || null,
       enAvant,
@@ -8572,7 +8576,6 @@ app.get("/api/mes-demandes", (req, res) => {
       titre: a.titre,
       metier: a.metier,
       horaire: a.horaireLisible,
-      prixLisible: a.prixLisible,
       dureeEstimee: a.duree_estimee || null,
       lieu: a.lieu || null,
       proposeeA: a.proposeeA,
