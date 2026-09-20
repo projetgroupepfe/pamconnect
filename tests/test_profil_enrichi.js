@@ -211,7 +211,7 @@ setTimeout(async () => {
   const pagePrestataire = await (await lire("/prestataire")).text();
   dire("la page du modele est corrigee",
        !pagePrestataire.includes("C'est ce montant que l'employeur paie"));
-  dire("elle annonce un tarif souhaite", pagePrestataire.includes("tarif souhaité"));
+  dire("elle dit que la personne annonce son prix", pagePrestataire.includes("vous annoncez votre prix"));
 
   // Une seule mention par ecran : ajouter la meme phrase a cote d'un
   // paragraphe qui la disait deja n'aurait rien clarifie.

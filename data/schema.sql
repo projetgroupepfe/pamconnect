@@ -736,7 +736,11 @@ INSERT OR IGNORE INTO parametres (cle, valeur) VALUES
   -- apres la verification d'identite, c'est-a-dire apres avoir envoye
   -- ses papiers et attendu. Une seule fois par compte, et ils expirent -
   -- le gratuit a une date de fin, on ne peut pas s'y installer.
-  ('bienvenue_employeur', '10'),
+  --
+  -- UN EMPLOYEUR N'EN RECOIT PAS (0) : rien ne lui coute a la publication,
+  -- et un solde offert qu'il n'a aucune raison d'utiliser n'est qu'un
+  -- message de plus a l'ecran. Modifiable dans l'espace equipe.
+  ('bienvenue_employeur', '0'),
   ('bienvenue_prestataire', '3'),
   ('bienvenue_jours', '60'),
 

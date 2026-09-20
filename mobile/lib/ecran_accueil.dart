@@ -379,44 +379,32 @@ class EcranVousProposez extends StatelessWidget {
                     Text.rich(
                       const TextSpan(
                         children: [
-                          TextSpan(text: 'Le prix se fixe '),
-                          TextSpan(text: 'au téléphone', style: _gras),
                           TextSpan(
-                            text: ". Quand un employeur vous choisit, l'équipe PamConnect vous appelle : "
-                                "vous annoncez votre prix, et c'est ce prix que vous recevez.",
+                            text: "Quand un employeur vous choisit, l'équipe PamConnect vous appelle : ",
                           ),
+                          TextSpan(text: 'vous annoncez votre prix', style: _gras),
+                          TextSpan(text: ' et vous le recevez en entier.'),
                         ],
                       ),
                       style: corps,
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      "PamConnect ajoute sa commission au prix que vous annoncez : c'est l'employeur qui "
-                      'la paie, pas vous. Vous recevez votre prix entier, reversé par PamConnect après '
-                      "le paiement de l'employeur.",
+                      "La commission de ${presentation.pourcentageCommission} % s'ajoute à ce prix : "
+                      "c'est l'employeur qui la paie.",
                       style: corps,
                     ),
                     const SizedBox(height: 12),
                     CadreExemple(
                       morceaux: [
-                        const TextSpan(text: 'Vous annoncez '),
+                        const TextSpan(text: 'Exemple : vous annoncez '),
                         montantExemple(exemple.prix),
-                        const TextSpan(text: '. La commission de '),
-                        montantExemple('${presentation.pourcentageCommission} %'),
-                        const TextSpan(text: ' est de '),
-                        montantExemple(exemple.commission),
-                        const TextSpan(text: " : l'employeur paie "),
+                        const TextSpan(text: ", l'employeur paie "),
                         montantExemple(exemple.employeur),
-                        const TextSpan(text: ', et vous recevez '),
+                        const TextSpan(text: ', vous recevez '),
                         montantExemple(exemple.recu),
                         const TextSpan(text: '.'),
                       ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      "Le tarif de votre profil est un tarif souhaité : seule l'équipe le voit, jamais les "
-                      "employeurs. Il lui sert de point de départ quand elle vous appelle.",
-                      style: texte.bodyMedium?.copyWith(color: Couleurs.encrePale),
                     ),
                   ],
                 ),

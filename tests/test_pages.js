@@ -110,15 +110,13 @@ setTimeout(async () => {
        accueilPlat.includes("Vous payez PamConnect après le service"));
   dire("aucune page ne parle plus d'une somme bloquee",
        [accueil, vousCherchez, vousProposez].every((corps) => !/bloqué|bloquée/.test(corps)));
-  dire("la personne fixe son prix au telephone et recoit son prix entier",
-       proposez.includes("Le prix se fixe <strong>au téléphone</strong>") &&
-       proposez.includes("Vous recevez votre prix entier"));
-  dire("l'exemple porte son nom, et la commission s'ajoute au prix de la personne",
-       vousProposez.includes('<p class="exemple-titre">Exemple de calcul</p>') &&
-       vousProposez.includes("<strong>10 000 FCFA</strong>") && vousProposez.includes("<strong>1 000 FCFA</strong>") &&
-       vousProposez.includes("<strong>11 000 FCFA</strong>"));
-  dire("son tarif de profil est dit visible de l'equipe seule",
-       proposez.includes("seule l'équipe le voit, jamais les employeurs"));
+  dire("la personne annonce son prix a l'equipe et le recoit en entier",
+       proposez.includes("<strong>vous annoncez votre prix</strong> et vous le recevez en entier"));
+  dire("la commission s'ajoute au prix, c'est l'employeur qui la paie, et l'exemple le chiffre",
+       proposez.includes("La commission de 10 % s'ajoute à ce prix : c'est l'employeur qui la paie") &&
+       proposez.includes("Exemple : vous annoncez <strong>10 000 FCFA</strong>, l'employeur paie <strong>11 000 FCFA</strong>, vous recevez <strong>10 000 FCFA</strong>"));
+  dire("la page reste courte : pas de calcul detaille ni de paragraphe sur le tarif du profil",
+       !proposez.includes("Exemple de calcul") && !proposez.includes("reversé par PamConnect"));
   dire("le mot prestataire ne s'affiche plus dans le titre",
        !/<title>[^<]*prestataire/i.test(vousProposez) && !/<title>[^<]*prestataire/i.test(vousCherchez));
   dire("Proposer mes services ouvre l'inscription sur ce choix",
