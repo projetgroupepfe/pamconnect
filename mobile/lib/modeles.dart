@@ -1163,7 +1163,6 @@ class FichePersonne {
     required this.note,
     required this.badges,
     required this.disponibilites,
-    required this.tarif,
     required this.avis,
     required this.peutPublier,
     required this.peutProposer,
@@ -1180,7 +1179,6 @@ class FichePersonne {
         note: NotePersonne.depuisJson(_lire<Map<String, dynamic>>(json, 'note')),
         badges: _lireTextes(json, 'badges'),
         disponibilites: _lireListe(json, 'disponibilites', Creneau.depuisJson),
-        tarif: _lire<String>(json, 'tarif'),
         avis: AvisDeLaFiche.depuisJson(_lire<Map<String, dynamic>>(json, 'avis')),
         peutPublier: _lire<bool>(json, 'peutPublier'),
         peutProposer: _lire<bool>(json, 'peutProposer'),
@@ -1196,7 +1194,6 @@ class FichePersonne {
   final NotePersonne note;
   final List<String> badges;
   final List<Creneau> disponibilites;
-  final String tarif;
   final AvisDeLaFiche avis;
   final bool peutPublier;
 
@@ -1299,7 +1296,7 @@ class BadgeDuProfil {
   final bool verifie;
 }
 
-/// Une ligne du detail d'un tarif : "Vous demandez 15 000 FCFA".
+/// Une ligne du detail d'un tarif : "Vous recevez 15 000 FCFA".
 class LigneTarif {
   const LigneTarif({required this.libelle, required this.montant, required this.retenue, required this.total});
 
@@ -1313,7 +1310,7 @@ class LigneTarif {
   final String libelle;
   final String montant;
 
-  /// La commission, retiree du montant.
+  /// La commission, ajoutee au prix et payee par l'employeur.
   final bool retenue;
   final bool total;
 }
@@ -1726,17 +1723,24 @@ class RoleInscription {
 
 /// Les montants de l'exemple sous le tarif, calcules par le serveur avec
 /// la commission.
+///
+/// La commission s'AJOUTE au prix de la personne, et c'est l'employeur qui la
+/// paie : [prix] est ce que la personne annonce, [employeur] ce que
+/// l'employeur paie en tout, et [recu] ce que la personne recoit, soit son
+/// prix entier.
 class ExempleTarif {
-  const ExempleTarif({required this.prix, required this.commission, required this.recu});
+  const ExempleTarif({required this.prix, required this.commission, required this.employeur, required this.recu});
 
   factory ExempleTarif.depuisJson(Map<String, dynamic> json) => ExempleTarif(
         prix: _lire<String>(json, 'prix'),
         commission: _lire<String>(json, 'commission'),
+        employeur: _lire<String>(json, 'employeur'),
         recu: _lire<String>(json, 'recu'),
       );
 
   final String prix;
   final String commission;
+  final String employeur;
   final String recu;
 }
 
@@ -2066,7 +2070,6 @@ class PersonneTrouvee {
     required this.verifiee,
     required this.libelleVerification,
     required this.note,
-    required this.tarif,
     this.metier,
     this.joursDisponibles,
     this.experience,
@@ -2080,7 +2083,6 @@ class PersonneTrouvee {
         verifiee: _lire<bool>(json, 'verifiee'),
         libelleVerification: _lire<String>(json, 'libelleVerification'),
         note: NotePersonne.depuisJson(_lire<Map<String, dynamic>>(json, 'note')),
-        tarif: _lire<String>(json, 'tarif'),
         metier: _lireFacultatif<String>(json, 'metier'),
         joursDisponibles: _lireFacultatif<String>(json, 'joursDisponibles'),
         experience: _lireFacultatif<String>(json, 'experience'),
@@ -2093,7 +2095,6 @@ class PersonneTrouvee {
   final bool verifiee;
   final String libelleVerification;
   final NotePersonne note;
-  final String tarif;
   final String? metier;
   final String? joursDisponibles;
   final String? experience;

@@ -535,10 +535,11 @@ class _EcranModifierProfilState extends State<EcranModifierProfil> {
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           onChanged: _tarifChange,
           decoration: const InputDecoration(
-            labelText: 'Le tarif que vous demandez (FCFA)',
+            labelText: 'Votre tarif souhaité (FCFA)',
             hintText: 'ex : 10000',
-            helperText: "C'est ce que vous demandez pour vos services.",
-            helperMaxLines: 2,
+            helperText: "Vu par l'équipe PamConnect seulement, jamais par les employeurs : c'est le point de "
+                "départ de l'appel où vous fixerez le prix avec elle.",
+            helperMaxLines: 4,
           ),
         ),
         // Le detail se recalcule pendant la saisie, comme sur le site.
@@ -731,12 +732,14 @@ class _ExempleDeTarif extends StatelessWidget {
     return CadreExemple(
       morceaux: [
         const TextSpan(
-          text: 'Ce tarif est indicatif. Le montant réellement reçu dépend de la demande '
-              'à laquelle vous répondez : pour une demande à ',
+          text: 'Ce tarif est un point de départ : le prix se fixe au téléphone avec l\'équipe. '
+              'Si vous annoncez ',
         ),
         montantExemple(exemple.prix),
         const TextSpan(text: ', la commission est de '),
         montantExemple(exemple.commission),
+        const TextSpan(text: ", l'employeur paie "),
+        montantExemple(exemple.employeur),
         const TextSpan(text: ' et vous recevez '),
         montantExemple(exemple.recu),
         const TextSpan(text: '.'),

@@ -769,7 +769,8 @@ setTimeout(async () => {
   const fv = ficheVerifiee.donnees || {};
   dire("la fiche de la personne, avec ce que la plateforme a verifie",
        ficheVerifiee.code === 200 && fv.nom === "Test verifiee" && fv.verifiee === true &&
-       fv.libelleVerification === "Identité et casier vérifiés" && fv.tarif === "15 000 FCFA" &&
+       fv.libelleVerification === "Identité et casier vérifiés" && fv.tarif === undefined &&
+       !ficheVerifiee.brut.includes("15 000 FCFA") &&
        fv.peutPublier === true, ficheVerifiee.brut.slice(0, 200));
   dire("l'avis qu'elle a recu y figure, avec son auteur",
        fv.avis && fv.avis.nombre >= 1 &&
@@ -778,7 +779,7 @@ setTimeout(async () => {
   dire("aucune coordonnee ne sort", !ficheVerifiee.brut.includes("@example.com") && !ficheVerifiee.brut.includes("date_naissance"));
   const pageFiche = await (await lire("/personnes/" + verifiee.id, emp.cookie)).text();
   dire("la page du site montre la meme verification, mais plus le tarif (reserve a l'equipe)",
-       !pageFiche.includes(fv.tarif) && pageFiche.includes(fv.libelleVerification));
+       !pageFiche.includes("15 000 FCFA") && pageFiche.includes(fv.libelleVerification));
   const ficheVisiteur = await fiche(verifiee.id);
   dire("un visiteur y accede aussi, comme sur le site, sans bouton pour publier",
        ficheVisiteur.code === 200 && ficheVisiteur.donnees.peutPublier === false);
@@ -1097,7 +1098,8 @@ setTimeout(async () => {
   const rechDonnees = rech.donnees || {};
   dire("l'employeur trouve les personnes du metier, sans distance ni score",
        rech.code === 200 && rechDonnees.titre.includes("pour « " + metierEnBase + " »") && rechDonnees.peutPublier === true &&
-       rechDonnees.personnes.some((p) => p.id === verifiee.id && p.tarif === "15 000 FCFA" && p.verifiee === true) &&
+       rechDonnees.personnes.some((p) => p.id === verifiee.id && p.tarif === undefined && p.verifiee === true) &&
+       !rech.brut.includes("15 000 FCFA") &&
        rechDonnees.personnes.every((p) => p.distance === null && p.classement === undefined),
        rech.brut.slice(0, 300));
   dire("sans position, c'est son quartier qui compte",

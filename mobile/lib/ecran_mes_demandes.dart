@@ -123,8 +123,7 @@ class _EcranMesDemandesState extends State<EcranMesDemandes> {
     final confirme = await demanderConfirmation(
       context,
       question: 'Voulez-vous vraiment retirer cette demande ?',
-      precision: 'Elle disparaîtra de la liste, personne ne pourra plus y répondre, '
-          'et la somme bloquée vous sera rendue.',
+      precision: 'Elle disparaîtra de la liste et personne ne pourra plus y répondre.',
       action: 'Retirer',
       danger: true,
     );
@@ -491,9 +490,8 @@ class _CarteDemandePubliee extends StatelessWidget {
                       children: [
                         TextSpan(text: 'Retirer ferme votre demande', style: TextStyle(fontWeight: FontWeight.w600)),
                         TextSpan(
-                          text: ' : elle disparaît de la liste, personne ne peut plus y répondre, et la '
-                              'somme bloquée vous est rendue. Pour écarter une seule personne sans fermer '
-                              'votre demande, utilisez ',
+                          text: ' : elle disparaît de la liste et personne ne peut plus y répondre. '
+                              'Pour écarter une seule personne sans fermer votre demande, utilisez ',
                         ),
                         TextSpan(text: 'Refuser cette candidature', style: TextStyle(fontWeight: FontWeight.w600)),
                         TextSpan(text: ' plus bas : les autres pourront encore vous répondre.'),

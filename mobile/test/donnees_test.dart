@@ -484,7 +484,11 @@ void main() {
     ));
     await tester.tap(find.text('ouvrir'));
     await tester.pumpAndSettle();
-    expect(find.text("La somme bloquée sera versée à nom 1. Cette déclaration ne s'annule pas."), findsOneWidget);
+    // Cette declaration ne deplace aucun argent : elle previent l'equipe.
+    expect(
+      find.text("L'équipe PamConnect sera prévenue que le service est effectué. Cette déclaration ne s'annule pas."),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Déclarer'));
     await tester.pumpAndSettle();
     expect(resultat, isTrue);
@@ -680,7 +684,6 @@ void main() {
       'disponibilites': [
         {'jour': 'Lundi', 'moments': 'Matin'},
       ],
-      'tarif': 'tarif 1',
       'avis': {'moyenne': null, 'nombre': 0, 'liste': []},
       'peutPublier': true,
       'peutProposer': true,
@@ -823,11 +826,15 @@ void main() {
           'exempleTarif': exemple,
         };
     const role = {'valeur': 'valeur 1', 'libelle': 'libelle 2', 'pourPersonne': false};
-    const exemple = {'prix': 'prix 1', 'commission': 'commission 2', 'recu': 'recu 3'};
+    const exemple = {'prix': 'prix 1', 'commission': 'commission 2', 'employeur': 'employeur 4', 'recu': 'recu 3'};
 
     final lu = FormulaireInscription.depuisJson(formulaire(roles: [role], exemple: exemple));
     expect(lu.roles.single.pourPersonne, isFalse);
     expect(lu.exempleTarif.recu, 'recu 3');
+    // La commission s'ajoute : l'exemple dit aussi ce que l'employeur paie.
+    expect(lu.exempleTarif.employeur, 'employeur 4');
+    expect(() => ExempleTarif.depuisJson({'prix': 'prix 1', 'commission': 'commission 2', 'recu': 'recu 3'}),
+        throwsA(isA<FormeInattendue>()));
     expect(lu.profil.motDePasseMin, 4);
     // Sans choix ou sans exemple, le formulaire serait incomplet.
     expect(() => FormulaireInscription.depuisJson(formulaire(roles: [], exemple: exemple)),
@@ -845,10 +852,11 @@ void main() {
   test('les pages de presentation lisent la commission et l exemple du serveur', () {
     final lu = Presentation.depuisJson({
       'pourcentageCommission': 1,
-      'exempleTarif': {'prix': 'prix 2', 'commission': 'commission 3', 'recu': 'recu 4'},
+      'exempleTarif': {'prix': 'prix 2', 'commission': 'commission 3', 'employeur': 'employeur 5', 'recu': 'recu 4'},
     });
     expect(lu.pourcentageCommission, 1);
     expect(lu.exempleTarif.commission, 'commission 3');
+    expect(lu.exempleTarif.employeur, 'employeur 5');
     expect(() => Presentation.depuisJson({'pourcentageCommission': 1}), throwsA(isA<FormeInattendue>()));
   });
 
@@ -989,7 +997,6 @@ void main() {
           'joursDisponibles': null,
           'experience': null,
           'lieu': null,
-          'tarif': 'tarif 1',
           'distance': null,
         };
     final lu = ResultatRecherche.depuisJson({

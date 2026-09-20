@@ -327,12 +327,12 @@ Future<bool> confirmerRetraitPhoto(BuildContext context) => demanderConfirmation
       danger: true,
     );
 
-/// Declarer le service effectue verse la somme bloquee : on le confirme
-/// d'abord.
+/// Declarer le service effectue previent l'equipe PamConnect (aucun argent ne
+/// bouge par ce bouton) : on le confirme d'abord.
 Future<bool> confirmerDeclarationService(BuildContext context, String nom) => demanderConfirmation(
       context,
       question: 'Confirmez-vous que le service a été effectué ?',
-      precision: "La somme bloquée sera versée à $nom. Cette déclaration ne s'annule pas.",
+      precision: "L'équipe PamConnect sera prévenue que le service est effectué. Cette déclaration ne s'annule pas.",
       action: 'Déclarer',
     );
 

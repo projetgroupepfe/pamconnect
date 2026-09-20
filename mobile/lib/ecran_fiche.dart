@@ -10,7 +10,7 @@ import 'theme.dart';
 /// La fiche d'une personne : la page du site, ecrite par le serveur.
 ///
 /// Ce qui vient de la plateforme (la verification, la note) se distingue de
-/// ce que la personne declare (metier, tarif, disponibilites).
+/// ce que la personne declare (metier, disponibilites).
 class EcranFiche extends StatefulWidget {
   const EcranFiche({super.key, required this.api, required this.personneId});
 
@@ -73,7 +73,6 @@ class _EcranFicheState extends State<EcranFiche> {
 
     final texte = Theme.of(context).textTheme;
     final gris = texte.bodyMedium?.copyWith(color: Couleurs.encreDouce);
-    final aide = texte.bodyMedium?.copyWith(color: Couleurs.encrePale);
     const fort = TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre);
     final metier = fiche.metier;
     final trancheAge = fiche.trancheAge;
@@ -172,34 +171,9 @@ class _EcranFicheState extends State<EcranFiche> {
             ),
           ),
         ],
-        const SizedBox(height: 8),
-        const TitreSection('Le tarif demandé'),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Ce montant n'est PAS ce qui sera paye : c'est l'employeur qui
-                // fixe le prix de sa demande.
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(text: fiche.tarif, style: fort),
-                      const TextSpan(text: ' pour une prestation.'),
-                    ],
-                  ),
-                  style: texte.bodyLarge?.copyWith(color: Couleurs.encreDouce),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'C\'est le montant souhaité. Le prix payé est celui que vous annoncez dans votre demande.',
-                  style: aide,
-                ),
-              ],
-            ),
-          ),
-        ),
+        // Le tarif souhaite par la personne n'est PAS montre a l'employeur :
+        // l'equipe PamConnect le voit, appelle les deux parties et annonce le
+        // prix (commission comprise) a l'employeur.
         const SizedBox(height: 16),
         // Ce que la verification couvre, et ce qu'elle ne couvre pas.
         Container(

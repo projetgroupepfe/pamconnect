@@ -288,8 +288,8 @@ class _EcranPublierState extends State<EcranPublier> {
             ),
           ],
           const SizedBox(height: 16),
-          // Ce qui arrive a l'argent, annonce AVANT le formulaire, comme sur
-          // le site.
+          // Ce que l'employeur paiera, annonce AVANT le formulaire, comme sur
+          // le site : rien maintenant.
           const _CarteSomme(),
         ] else ...[
           Text(
@@ -455,7 +455,8 @@ class _EcranPublierState extends State<EcranPublier> {
   }
 }
 
-/// "Ce qui arrive a la somme que vous annoncez", le texte du site.
+/// "Ce que vous payez", le texte du site : rien a la publication, l'equipe
+/// rappelle avec le prix, et on paie PamConnect apres le service.
 class _CarteSomme extends StatelessWidget {
   const _CarteSomme();
 
@@ -477,7 +478,7 @@ class _CarteSomme extends StatelessWidget {
           Semantics(
             header: true,
             child: Text(
-              'Ce qui arrive à la somme que vous annoncez',
+              'Ce que vous payez',
               style: texte.titleMedium?.copyWith(
                 color: Couleurs.bleuFonce,
                 fontWeight: FontWeight.w600,
@@ -488,11 +489,10 @@ class _CarteSomme extends StatelessWidget {
           Text.rich(
             const TextSpan(
               children: [
-                TextSpan(text: 'Dès la publication, elle est '),
-                TextSpan(text: 'bloquée par PamConnect', style: gras),
+                TextSpan(text: 'Vous ne payez rien maintenant.', style: gras),
                 TextSpan(
-                  text: ". Les personnes qui vous répondent savent ainsi que l'argent "
-                      'existe avant de se déplacer chez vous.',
+                  text: " Quand vous avez choisi quelqu'un, l'équipe PamConnect vous rappelle avec le "
+                      'prix, commission comprise : aucun frais ne s\'y ajoute.',
                 ),
               ],
             ),
@@ -503,13 +503,12 @@ class _CarteSomme extends StatelessWidget {
             const TextSpan(
               children: [
                 TextSpan(
-                  text: 'Après chaque service effectué, déclarez-le obligatoirement.',
+                  text: 'Vous payez PamConnect après le service.',
                   style: gras,
                 ),
                 TextSpan(
-                  text: " C'est cette déclaration qui verse la somme à la personne qui a "
-                      "travaillé. Sans elle, elle n'est pas payée, et un désaccord s'ouvre "
-                      'pour rien.',
+                  text: " Déclarez ensuite le service effectué : cela prévient l'équipe, qui "
+                      'reverse à la personne qui a travaillé.',
                 ),
               ],
             ),
@@ -519,10 +518,7 @@ class _CarteSomme extends StatelessWidget {
           Text.rich(
             const TextSpan(
               children: [
-                TextSpan(
-                  text: 'Si vous retirez votre demande sans avoir choisi personne, la somme '
-                      'vous est rendue. Les montants sont ',
-                ),
+                TextSpan(text: 'Les montants sont '),
                 TextSpan(text: 'simulés', style: gras),
                 TextSpan(text: ' : aucun argent réel ne circule encore.'),
               ],

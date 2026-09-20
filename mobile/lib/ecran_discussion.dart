@@ -655,9 +655,9 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
       ],
       if (discussion.peutDeclarerService) ...[
         const SizedBox(height: 16),
-        // Clore le service appartient a celui qui l'a RECU. Ce n'est pas une
-        // formalite : c'est le seul chemin par lequel la somme bloquee arrive
-        // chez la personne qui a travaille.
+        // Clore le service appartient a celui qui l'a RECU. Cette declaration ne
+        // deplace AUCUN argent : elle previent l'equipe PamConnect, qui sait
+        // alors que l'employeur doit payer, puis reverse a la personne.
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -676,12 +676,12 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                   TextSpan(
                     children: [
                       const TextSpan(
-                        text: 'Déclarez-le obligatoirement après chaque service.',
+                        text: 'Déclarez-le après chaque service.',
                         style: TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre),
                       ),
                       TextSpan(
-                        text: " C'est cette déclaration qui verse la somme bloquée à ${discussion.avec}. "
-                            "Sans elle, elle n'est pas payée, et un désaccord s'ouvre pour rien.",
+                        text: " Cette déclaration prévient l'équipe PamConnect : vous lui payez le montant "
+                            'convenu, puis elle le reverse à ${discussion.avec}.',
                       ),
                     ],
                   ),
@@ -732,8 +732,8 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                           const TextSpan(text: '. '),
                         ],
                         TextSpan(
-                          text: '${maDeclaration.employeur} doit le confirmer de son côté pour que la somme '
-                              'vous soit versée.',
+                          text: "L'équipe PamConnect voit votre déclaration et sa date. ${maDeclaration.employeur} "
+                              'déclare de son côté que le service a eu lieu, puis paie PamConnect, qui vous reverse.',
                         ),
                       ],
                     ),
@@ -741,14 +741,14 @@ class _EcranDiscussionState extends State<EcranDiscussion> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "S'il ne le fait pas, signalez le problème à l'équipe : elle verra votre déclaration et sa date.",
+                    "S'il ne le fait pas, signalez le problème à l'équipe : elle a votre déclaration et sa date.",
                     style: aide,
                   ),
                 ] else ...[
                   Text(
-                    'Le dire ne vous paie pas tout de suite : ${maDeclaration.employeur} le confirme de son '
-                    "côté, puis l'équipe PamConnect vous reverse. Votre déclaration est enregistrée avec sa "
-                    "date, et l'équipe la verra s'il ne confirme rien.",
+                    'Le dire ne vous paie pas tout de suite : ${maDeclaration.employeur} paie d\'abord '
+                    "PamConnect, puis l'équipe vous reverse le prix que vous avez annoncé. Votre déclaration "
+                    "est enregistrée avec sa date, et l'équipe la verra s'il ne déclare rien.",
                     style: gris,
                   ),
                   const SizedBox(height: 12),

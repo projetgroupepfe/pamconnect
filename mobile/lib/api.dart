@@ -338,8 +338,8 @@ class ApiPamConnect {
     _interpreter(() => ActionFaite.depuisJson(donnees));
   }
 
-  /// Declarer le service effectue : le serveur clot la discussion et verse
-  /// la somme bloquee a la personne qui a travaille.
+  /// Declarer le service effectue : le serveur clot la discussion et previent
+  /// l'equipe. Aucun argent ne bouge : l'employeur paie PamConnect, qui reverse.
   /// Les reponses de la personne, et ou elles en sont.
   Future<MesReponses> mesReponses() async {
     final donnees = await _appeler('/api/mes-reponses');

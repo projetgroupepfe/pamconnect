@@ -323,8 +323,8 @@ class _EcranRechercherState extends State<EcranRechercher> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "La somme que vous annoncez est bloquée dès la publication, et vous ne payez qu'après le "
-                    'service.',
+                    "Vous ne payez rien maintenant : l'équipe PamConnect vous rappelle avec le prix, et vous "
+                    'payez après le service.',
                     style: aide,
                   ),
                   const SizedBox(height: 12),
@@ -411,7 +411,8 @@ class _CartePersonne extends StatelessWidget {
               if (jours != null) LigneDetail(icone: Icons.calendar_today_outlined, texte: 'Disponible', enGras: jours),
               if (experience != null) LigneDetail(icone: Icons.work_outline, texte: experience),
               if (lieu != null) LigneDetail(icone: Icons.place_outlined, texte: lieu),
-              LigneDetail(icone: Icons.payments_outlined, texte: 'Tarif demandé :', enGras: personne.tarif),
+              // Le tarif souhaite n'est PAS montre a l'employeur : l'equipe le voit,
+              // et c'est elle qui lui annonce le prix.
               // Comme le site : "Distance inconnue" quand la recherche est
               // partie sans position.
               LigneDetail(icone: Icons.schedule, texte: distance ?? 'Distance inconnue'),

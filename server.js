@@ -1794,13 +1794,6 @@ function prixAvecCommission(prixPrestataire) {
   return { prix, commission, prixEmployeur: prix + commission };
 }
 
-// Affiche le tarif tel que l'employeur le paiera.
-function formaterTarif(tarif) {
-  const brut = Math.round(Number(tarif) || 0);
-  if (brut <= 0) return "Tarif non indiqué";
-  return formaterMontant(brut);
-}
-
 // Les memes regles s'appliquent quand on cree un compte et quand on le
 // modifie. Elles sont ecrites ICI, une seule fois : impossible qu'elles
 // finissent par dire deux choses differentes selon l'ecran.
@@ -2903,7 +2896,6 @@ function motifJetonsLisible(motif) {
 }
 
 // app.locals : disponible dans TOUTES les vues .ejs sans le repasser.
-app.locals.formaterTarif = formaterTarif;
 app.locals.formaterMontant = formaterMontant;
 // Les limites des champs de montant, lues par les formulaires : les memes
 // valeurs que celles que le serveur fait respecter.
@@ -5787,7 +5779,8 @@ function rechercherPersonnes(criteres, moi) {
         joursDisponibles: disponibilitesLisibles(p.disponibilites).map((c) => c.jour).join(", ") || null,
         experience: libelleExperience(p.experience_annees),
         lieu: [p.arrondissement, p.quartier].filter(Boolean).join(", ") || null,
-        tarif: formaterTarif(p.tarif),
+        // LE TARIF SOUHAITE N'EST PAS ICI : l'employeur ne le voit jamais. L'equipe
+        // le voit, appelle la personne, puis annonce le prix a l'employeur.
         distance: p.distance !== undefined ? `${p.distance.toFixed(1)} km` : null,
 
         classement: score.total + proximite,
@@ -9141,7 +9134,6 @@ app.get("/api/recherche", (req, res) => {
       joursDisponibles: p.joursDisponibles,
       experience: p.experience,
       lieu: p.lieu,
-      tarif: p.tarif,
       distance: p.distance,
     })),
     peutPublier: Boolean(moi.role === "employeur" && !moi.est_admin),
@@ -9245,7 +9237,6 @@ app.get("/api/personnes/:id", (req, res) => {
       jour: c.jour.charAt(0).toUpperCase() + c.jour.slice(1),
       moments: c.moments.join(", "),
     })),
-    tarif: formaterTarif(p.tarif),
     avis: {
       moyenne: reputation.nombre > 0 ? `${moyenneLisible(reputation.moyenne)} sur 5` : null,
       nombre: reputation.nombre,

@@ -140,11 +140,11 @@ class _EcranAccueilState extends State<EcranAccueil> {
         ),
         const _Etape(
           numero: 3,
-          titre: "L'employeur choisit et confirme le service",
+          titre: "L'employeur choisit, l'équipe fixe le prix",
           morceaux: [
             TextSpan(
-              text: "Le prix qu'il annonce est bloqué dès la publication. La personne le reçoit, "
-                  'commission déduite, quand il déclare le service effectué.',
+              text: 'Nous appelons la personne choisie, puis nous rappelons l\'employeur avec le prix. '
+                  'Il paie PamConnect après le service.',
             ),
           ],
         ),
@@ -166,8 +166,9 @@ class _EcranAccueilState extends State<EcranAccueil> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "L'employeur paie le prix qu'il annonce, sans frais en plus. "
-                      'PamConnect retient ${presentation.pourcentageCommission} % sur ce montant.',
+                      "L'employeur paie le prix que l'équipe lui annonce, commission comprise, sans frais en plus. "
+                      'PamConnect ajoute ${presentation.pourcentageCommission} % au prix de la personne, '
+                      'qui reçoit son prix entier.',
                       style: texte.bodyMedium?.copyWith(color: Couleurs.encreDouce),
                     ),
                     TextButton(
@@ -258,17 +259,19 @@ class EcranVousCherchez extends StatelessWidget {
                     Text.rich(
                       const TextSpan(
                         children: [
-                          TextSpan(text: 'Vous payez '),
-                          TextSpan(text: 'le prix que vous annoncez', style: _gras),
-                          TextSpan(text: ' dans votre demande, sans aucun frais de votre côté.'),
+                          TextSpan(text: 'Vous ne payez rien à la publication.', style: _gras),
+                          TextSpan(
+                            text: " Quand vous avez choisi quelqu'un, l'équipe PamConnect vous rappelle "
+                                'avec le prix, et vous payez après le service.',
+                          ),
                         ],
                       ),
                       style: texte.bodyLarge?.copyWith(color: Couleurs.encre),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Cette somme est bloquée dès la publication, et versée à la personne '
-                      'quand vous déclarez le service effectué.',
+                      "Le prix qu'elle vous annonce est le prix total, commission de PamConnect "
+                      "comprise : aucun frais ne s'y ajoute.",
                       style: texte.bodyMedium?.copyWith(color: Couleurs.encrePale),
                     ),
                   ],
@@ -376,11 +379,11 @@ class EcranVousProposez extends StatelessWidget {
                     Text.rich(
                       const TextSpan(
                         children: [
-                          TextSpan(text: 'Votre tarif est '),
-                          TextSpan(text: 'indicatif', style: _gras),
+                          TextSpan(text: 'Le prix se fixe '),
+                          TextSpan(text: 'au téléphone', style: _gras),
                           TextSpan(
-                            text: ' : il aide les employeurs à vous trouver. Le montant payé est '
-                                'celui annoncé dans la demande à laquelle vous répondez.',
+                            text: ". Quand un employeur vous choisit, l'équipe PamConnect vous appelle : "
+                                "vous annoncez votre prix, et c'est ce prix que vous recevez.",
                           ),
                         ],
                       ),
@@ -388,19 +391,22 @@ class EcranVousProposez extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      "PamConnect y retient une commission et vous verse le reste quand l'employeur "
-                      'déclare le service effectué.',
+                      "PamConnect ajoute sa commission au prix que vous annoncez : c'est l'employeur qui "
+                      'la paie, pas vous. Vous recevez votre prix entier, reversé par PamConnect après '
+                      "le paiement de l'employeur.",
                       style: corps,
                     ),
                     const SizedBox(height: 12),
                     CadreExemple(
                       morceaux: [
-                        const TextSpan(text: 'Pour une demande à '),
+                        const TextSpan(text: 'Vous annoncez '),
                         montantExemple(exemple.prix),
-                        const TextSpan(text: ', la commission de '),
+                        const TextSpan(text: '. La commission de '),
                         montantExemple('${presentation.pourcentageCommission} %'),
                         const TextSpan(text: ' est de '),
                         montantExemple(exemple.commission),
+                        const TextSpan(text: " : l'employeur paie "),
+                        montantExemple(exemple.employeur),
                         const TextSpan(text: ', et vous recevez '),
                         montantExemple(exemple.recu),
                         const TextSpan(text: '.'),
@@ -408,8 +414,8 @@ class EcranVousProposez extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Vous voyez ce calcul avant de répondre. Après votre réponse, le prix ne '
-                      'peut plus baisser.',
+                      "Le tarif de votre profil est un tarif souhaité : seule l'équipe le voit, jamais les "
+                      "employeurs. Il lui sert de point de départ quand elle vous appelle.",
                       style: texte.bodyMedium?.copyWith(color: Couleurs.encrePale),
                     ),
                   ],
@@ -421,7 +427,7 @@ class EcranVousProposez extends StatelessWidget {
             _CarteAction(
               titre: '1. Créez votre compte',
               morceaux: const [
-                TextSpan(text: 'Votre métier, votre quartier et votre tarif.'),
+                TextSpan(text: 'Votre métier, votre quartier et votre tarif souhaité.'),
               ],
               bouton: FilledButton.icon(
                 onPressed: proposerSesServices,
