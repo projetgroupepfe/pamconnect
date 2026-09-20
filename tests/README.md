@@ -34,10 +34,11 @@ SELECT COUNT(*) FROM utilisateurs WHERE email LIKE '%example.com';
 ## Comment lire le résultat
 
 ```
-  test_versements          99 tests
-  test_demonstration       38 tests
+  test_tarif_equipe        37 tests
+  test_liberer_demande     34 tests
+  test_demonstration       48 tests
 
-  TOTAL : 907 tests, 0 échec(s), 0 série(s) plantée(s)
+  TOTAL : 1917 tests, 0 échec(s), 0 série(s) plantée(s)
 ```
 
 Une série qui **plante** n'affiche aucun échec : elle s'arrête avant
