@@ -9,23 +9,22 @@
   <h2>Ce que vous gagnez</h2>
 
   <div class="carte">
-    <%# ANCIEN MODELE : cette page affirmait que l'employeur paie le
-        tarif indique sur le profil. C'est lui qui annonce son prix ; le
-        tarif du profil sert a se faire connaitre, pas a facturer. %>
+    <%# LE MODELE : le prix se fixe au telephone. L'equipe appelle la
+        personne quand un employeur l'a choisie ; elle annonce son prix.
+        Le tarif du profil n'est vu que de l'equipe, jamais des employeurs. %>
     <p>
-      Votre tarif est <strong>indicatif</strong> : il aide les employeurs à vous
-      trouver. Le montant payé est celui annoncé dans la demande à laquelle vous
-      etes interessees.
+      Le prix se fixe <strong>au téléphone</strong>. Quand un employeur vous
+      choisit, l'équipe PamConnect vous appelle : vous annoncez votre prix, et
+      c'est ce prix que vous recevez.
     </p>
 
-    <%# L'ORDRE DE LECTURE COMPTE. Annoncer "PamConnect retient une
-        commission de 10 %" comme premiere phrase se lit comme une
-        retenue sur un salaire : la personne s'arrete la. Le meme chiffre,
-        pose a l'interieur d'un exemple chiffre, se lit comme un calcul
-        qu'elle peut verifier elle-meme. %>
+    <%# L'ORDRE DE LECTURE COMPTE. La commission est dite comme un ajout
+        que l'EMPLOYEUR paie, puis chiffree dans un exemple : la personne
+        voit d'elle-meme qu'elle ne perd rien sur son prix. %>
     <p>
-      PamConnect y retient une commission et vous verse le reste quand
-      l'employeur déclare le service effectué.
+      PamConnect ajoute sa commission au prix que vous annoncez : c'est
+      l'employeur qui la paie, pas vous. Vous recevez votre prix entier,
+      reversé par PamConnect après le paiement de l'employeur.
     </p>
 
     <%# Un exemple doit se lire comme un exemple : il porte son nom en
@@ -33,16 +32,18 @@
     <div class="exemple">
       <p class="exemple-titre">Exemple de calcul</p>
       <p>
-        Pour une demande à <strong><%= exempleTarif.prix %></strong>, la
+        Vous annoncez <strong><%= exempleTarif.prix %></strong>. La
         commission de <strong><%= pourcentageCommission %> %</strong> est de
-        <strong><%= exempleTarif.commission %></strong>, et vous recevez
+        <strong><%= exempleTarif.commission %></strong> : l'employeur paie
+        <strong><%= exempleTarif.employeur %></strong>, et vous recevez
         <strong><%= exempleTarif.recu %></strong>.
       </p>
     </div>
 
     <p class="aide">
-      Vous voyez ce calcul avant de répondre. Après votre réponse, le prix ne
-      peut plus baisser.
+      Le tarif de votre profil est un tarif souhaité : seule l'équipe le voit,
+      jamais les employeurs. Il lui sert de point de départ quand elle vous
+      appelle.
     </p>
   </div>
 

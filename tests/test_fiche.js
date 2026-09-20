@@ -58,12 +58,12 @@ setTimeout(async () => {
   dire("l'experience", page.includes("6 ans d&#39;expérience"));
   dire("les disponibilites, jour par jour", page.includes("Samedi") && page.includes("Après-midi"));
   dire("le quartier", page.includes("Bastos"));
-  // Le tarif du profil n'est plus ce qui sera paye : c'est le prix de
-  // l'annonce qui compte. La fiche l'annonce comme une indication, sans
-  // calcul de commission - le calcul se fait sur le prix, ailleurs.
-  dire("le tarif demande est affiche", page.includes("20 000 FCFA"));
-  dire("il est presente comme une indication",
-       page.includes("celui que vous annoncez dans votre demande"));
+  // Le tarif souhaite par la personne est reserve a l'equipe : l'employeur
+  // ne le voit pas. L'equipe l'appelle, la personne annonce son prix, et
+  // c'est l'equipe qui annonce le prix total a l'employeur.
+  dire("le tarif souhaite n'est PAS affiche a l'employeur", !page.includes("20 000 FCFA"));
+  dire("la fiche n'a plus de section tarif",
+       !page.includes("Le tarif demandé") && !page.includes("montant souhaité"));
   // La fiche ne suppose pas que la personne est une femme : son genre
   // n'est ni connu de la plateforme, ni demande.
   dire("la fiche ne suppose aucun genre",

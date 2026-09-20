@@ -39,7 +39,7 @@
     <li>
       <span class="etape-numero">2</span>
       <div>
-        <h3>Les personnes vérifiées signalent qu'elles sont interessees</h3>
+        <h3>Les personnes vérifiées signalent qu'elles sont intéressées</h3>
         <p>Celles que l'horaire arrange se proposent. Une pastille verte indique
            que nous avons contrôlé leurs papiers.</p>
       </div>
@@ -47,11 +47,11 @@
     <li>
       <span class="etape-numero">3</span>
       <div>
-        <%# ANCIEN MODELE : cette etape disait que l'employeur paie le tarif
-            affiche et que la personne est reversee aussitot. %>
-        <h3>L'employeur choisit et confirme le service</h3>
-        <p>La personne le reçoit la somme via la plateforme avec la
-           commission déduite, quand il déclare le service effectué.</p>
+        <%# LE MODELE : l'employeur choisit ; l'equipe appelle la personne, qui
+            annonce son prix, puis rappelle l'employeur avec le prix total. %>
+        <h3>L'employeur choisit, l'équipe fixe le prix</h3>
+        <p>Nous appelons la personne choisie, puis vous rappelons avec le prix.
+           Vous payez PamConnect après le service.</p>
       </div>
     </li>
   </ol>
@@ -61,8 +61,8 @@
       "Vous proposez vos services", ou il s'adresse a la bonne personne. %>
   <p class="mention-tarif">
     <%- include("partiels/icone", { nom: "remuneration", taille: 18 }) %>
-    L'employeur paie le prix que l'equipe de la plateforme annonce, sans frais en plus.
-    PamConnect retient <%= pourcentageCommission %> % sur ce montant.
+    L'employeur paie le prix que l'équipe lui annonce, commission comprise, sans frais en plus.
+    PamConnect ajoute <%= pourcentageCommission %> % au prix de la personne, qui reçoit son prix entier.
     <a href="/prestataire">Voir le détail</a>
   </p>
 

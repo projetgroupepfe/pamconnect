@@ -144,10 +144,9 @@
                 <span><%= prestataire.lieu %></span>
               </li>
             <% } %>
-            <li>
-              <%- include("partiels/icone", { nom: "remuneration" }) %>
-              <span>Tarif demandé : <strong><%= prestataire.tarif %></strong></span>
-            </li>
+            <%# Le tarif souhaite par la personne n'est PAS montre a l'employeur :
+                c'est l'equipe qui le voit et qui l'appelle pour convenir du
+                prix. %>
             <li>
               <%- include("partiels/icone", { nom: "disponibilite" }) %>
               <span><%= prestataire.distance || "Distance inconnue" %></span>
@@ -212,9 +211,8 @@
       plateforme on n'embauche pas depuis une fiche : on publie une
       demande, et les personnes y repondent.
 
-      C'est un choix - la somme est bloquee des la publication, et les
-      autres gardent leur chance - mais un choix que personne ne devine.
-      On le dit ici, la ou la question se pose. %>
+      C'est un choix - les autres gardent leur chance - mais un choix que
+      personne ne devine. On le dit ici, la ou la question se pose. %>
   <% if (locals.jePeux && jePeux.publier && prestataires.length > 0) { %>
     <div class="carte confiance">
       <h3>Vous avez trouvé quelqu'un ?</h3>
@@ -226,8 +224,8 @@
         demande pour tout le monde.
       </p>
       <p class="aide">
-        La somme que vous annoncez est indicatif pour l'equipe, et vous
-        ne payez qu'après le service.
+        Vous ne payez rien maintenant : l'équipe PamConnect vous rappelle
+        avec le prix, et vous payez après le service.
       </p>
       <div class="actions">
         <a class="bouton" href="/publier-annonce">

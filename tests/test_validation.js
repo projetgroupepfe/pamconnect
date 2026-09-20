@@ -99,13 +99,14 @@ setTimeout(async () => {
     arrondissement: "Yaounde 5", metier: "MetierTest", tarif: "10000" }) });
   const coTarif = await requete("/connexion", { method: "POST", body: form({ email: tarifMail, motdepasse: mdp }) });
   const pTarif = await requete("/mon-profil", { cookie: coTarif.cookie });
-  v("le tarif demande est affiche", pTarif.corps.includes("10 000 FCFA"));
+  v("le tarif souhaite est affiche", pTarif.corps.includes("10 000 FCFA"));
   v("la commission de 10 % est affichee", pTarif.corps.includes("1 000 FCFA"));
-  v("le montant recu est affiche", pTarif.corps.includes("9 000 FCFA"));
+  v("le montant que l'employeur paiera est affiche", pTarif.corps.includes("11 000 FCFA"));
 
   const rech = await requete("/recherche?metier=metiertest");
   v("la recherche trouve ce prestataire", rech.corps.includes("Tarif Test"));
-  v("l'employeur voit le tarif demande, pas un montant a payer", rech.corps.includes("10 000 FCFA") && rech.corps.includes("Tarif demandé"));
+  v("l'employeur ne voit PAS le tarif souhaite : il est reserve a l'equipe",
+    !rech.corps.includes("10 000 FCFA") && !rech.corps.includes("Tarif demandé") && !rech.corps.includes("Tarif souhaité"));
   v("l'employeur ne voit PAS la commission", !rech.corps.includes("Commission"));
 
   console.log("\n--- NETTOYAGE ---");

@@ -99,14 +99,26 @@ setTimeout(async () => {
   // Le gabarit coupe les phrases par des retours a la ligne : on ramene les
   // espaces a un seul avant de chercher une phrase entiere.
   const proposez = vousProposez.replace(/\s+/g, " ");
-  dire("la somme est bloquee a la publication et versee a la declaration du service",
-       accueil.includes("bloqué dès la publication") && vousCherchez.includes("bloquée dès la publication") &&
-       proposez.includes("quand l'employeur déclare le service effectué"));
-  dire("la page dit que le prix ne baisse plus apres une reponse",
-       proposez.includes("Après votre réponse, le prix ne peut plus baisser."));
-  dire("l'exemple porte son nom et suit la commission",
+  // LE MODELE : rien n'est paye a la publication ; l'equipe appelle avec le
+  // prix (commission comprise) et l'employeur paie PamConnect apres le service.
+  const accueilPlat = accueil.replace(/\s+/g, " ");
+  const cherchezPlat = vousCherchez.replace(/\s+/g, " ");
+  dire("l'employeur ne paie rien a la publication : l'equipe l'appelle avec le prix, il paie apres le service",
+       cherchezPlat.includes("Vous ne payez rien à la publication") &&
+       cherchezPlat.includes("l'équipe PamConnect vous rappelle avec le prix") &&
+       cherchezPlat.includes("payez après le service") &&
+       accueilPlat.includes("Vous payez PamConnect après le service"));
+  dire("aucune page ne parle plus d'une somme bloquee",
+       [accueil, vousCherchez, vousProposez].every((corps) => !/bloqué|bloquée/.test(corps)));
+  dire("la personne fixe son prix au telephone et recoit son prix entier",
+       proposez.includes("Le prix se fixe <strong>au téléphone</strong>") &&
+       proposez.includes("Vous recevez votre prix entier"));
+  dire("l'exemple porte son nom, et la commission s'ajoute au prix de la personne",
        vousProposez.includes('<p class="exemple-titre">Exemple de calcul</p>') &&
-       vousProposez.includes("<strong>1 000 FCFA</strong>") && vousProposez.includes("<strong>9 000 FCFA</strong>"));
+       vousProposez.includes("<strong>10 000 FCFA</strong>") && vousProposez.includes("<strong>1 000 FCFA</strong>") &&
+       vousProposez.includes("<strong>11 000 FCFA</strong>"));
+  dire("son tarif de profil est dit visible de l'equipe seule",
+       proposez.includes("seule l'équipe le voit, jamais les employeurs"));
   dire("le mot prestataire ne s'affiche plus dans le titre",
        !/<title>[^<]*prestataire/i.test(vousProposez) && !/<title>[^<]*prestataire/i.test(vousCherchez));
   dire("Proposer mes services ouvre l'inscription sur ce choix",

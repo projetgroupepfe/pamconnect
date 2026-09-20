@@ -56,40 +56,38 @@
           <%- include("partiels/champ-disponibilites", { utilisateur: null }) %>
 
           <div class="champ">
-            <label for="tarif">Le tarif que vous demandez (FCFA)</label>
+            <label for="tarif">Votre tarif souhaité (FCFA)</label>
             <input type="number" id="tarif" name="tarif" placeholder="ex : 10000" min="<%= montantMinimum %>" step="<%= pasMontant %>">
-            <span class="aide">C'est ce que vous demandez pour vos services.</span>
+            <span class="aide">Vu par l'équipe PamConnect seulement, jamais par les employeurs : c'est le point de départ de l'appel où vous fixerez le prix avec elle.</span>
           </div>
 
           <%# Le detail apparait des que le montant est saisi : la personne
-              voit ce qu'elle touchera AVANT de valider son inscription. %>
+              voit ce qu'elle touchera, et ce que l'employeur paiera, AVANT
+              de valider son inscription. %>
           <div class="detail-tarif" id="detailTarif" hidden>
             <div class="ligne-tarif">
-              <span>Vous demandez</span>
+              <span>Vous recevez</span>
               <strong id="montantBrut">…</strong>
             </div>
             <div class="ligne-tarif">
-              <span>Commission PamConnect (<%= pourcentageCommission %> %)</span>
+              <span>Commission PamConnect (<%= pourcentageCommission %> %), ajoutée pour l'employeur</span>
               <span class="retenue" id="montantCommission">…</span>
             </div>
             <div class="ligne-tarif total">
-              <span>Vous recevez</span>
-              <strong id="montantNet">…</strong>
+              <span>L'employeur paie</span>
+              <strong id="montantEmployeur">…</strong>
             </div>
           </div>
 
-          <%# Ce paragraphe existait deja : on le complete plutot que
-              d'en ajouter un second qui dirait la meme chose. Ce qui lui
-              manquait, c'est d'ou vient le montant reellement paye.
-              Les montants viennent du serveur : ils suivent la commission. %>
+          <%# Les montants viennent du serveur : ils suivent la commission. %>
           <div class="exemple">
             <p class="exemple-titre">Exemple de calcul</p>
             <p>
-              Ce tarif est indicatif. Le montant réellement reçu dépend de la demande
-              à laquelle vous etes interessees: pour une demande à
-              <strong><%= exempleTarif.prix %></strong>, la commission est de
-              <strong><%= exempleTarif.commission %></strong> et vous recevez
-              <strong><%= exempleTarif.recu %></strong>.
+              Ce tarif est un point de départ : le prix se fixe au téléphone avec
+              l'équipe. Si vous annoncez <strong><%= exempleTarif.prix %></strong>,
+              la commission est de <strong><%= exempleTarif.commission %></strong>,
+              l'employeur paie <strong><%= exempleTarif.employeur %></strong> et
+              vous recevez <strong><%= exempleTarif.recu %></strong>.
             </p>
           </div>
         </div>
@@ -122,7 +120,7 @@
     // "required" mais cache empecherait le navigateur de valider le
     // formulaire, sans pouvoir expliquer pourquoi a la personne.
     champMetier.required = proposeServices;
-    champTarif.required = proposeServices;   // sans tarif, aucun paiement possible
+    champTarif.required = proposeServices;   // le tarif souhaité est le point de départ de l'appel
 
     if (!proposeServices) {
       champMetier.value = "";
@@ -135,7 +133,7 @@
 
   // --- Le detail du tarif, calcule pendant la saisie ------------------
   // Le taux vient du serveur : il n'est ecrit qu'a un seul endroit.
-  const TAUX = <%= pourcentageCommission %> 100;
+  const TAUX = <%= pourcentageCommission %> / 100;
   const detail = document.getElementById("detailTarif");
 
   function montant(nombre) {
@@ -152,8 +150,8 @@
 
     const commission = Math.round(brut * TAUX);
     document.getElementById("montantBrut").textContent = montant(brut);
-    document.getElementById("montantCommission").textContent = "− " + montant(commission);
-    document.getElementById("montantNet").textContent = montant(brut - commission);
+    document.getElementById("montantCommission").textContent = "+ " + montant(commission);
+    document.getElementById("montantEmployeur").textContent = montant(brut + commission);
     detail.hidden = false;
   }
 

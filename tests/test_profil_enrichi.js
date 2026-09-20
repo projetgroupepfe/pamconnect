@@ -142,7 +142,7 @@ setTimeout(async () => {
        ficheAncien.status === 200 && !casse(texteAncien));
   dire("les blocs vides sont simplement absents",
        !/\d+ - \d+ ans/.test(texteAncien) && !texteAncien.includes("Ses disponibilités"));
-  dire("mais son tarif demande reste affiche", texteAncien.includes("FCFA"));
+  dire("mais son tarif n'est pas montre a un visiteur : il est reserve a l'equipe", !texteAncien.includes("FCFA"));
 
   // Une annonce publiee avant que le prix ne devienne obligatoire :
   // c'est le cas de quatre demandes reelles.
@@ -189,20 +189,21 @@ setTimeout(async () => {
   // phrase entiere serait coupee par un retour a la ligne, et le test
   // echouerait sur du texte pourtant present.
   const monProfil = await (await lire("/mon-profil", cookie)).text();
-  dire("le tarif declare reste affiche", monProfil.includes("Vous demandez"));
-  dire("mais l'ecran dit qu'il est indicatif",
-       monProfil.includes("Ce tarif est indicatif"));
-  dire("et d'ou viendra le vrai montant",
-       monProfil.includes("dépend de la demande"));
+  dire("le tarif souhaite reste affiche, avec ce que la personne recoit",
+       monProfil.includes("Vous recevez") && monProfil.includes("L&#39;employeur paie"));
+  dire("mais l'ecran dit que c'est un point de depart",
+       monProfil.includes("Ce tarif est un point de départ"));
+  dire("vu de l'equipe seule, jamais des employeurs",
+       monProfil.includes("seule l'équipe PamConnect le voit"));
 
   const pageInscription = await (await lire("/inscription")).text();
-  dire("l'inscription le dit aussi", pageInscription.includes("Ce tarif est indicatif"));
+  dire("l'inscription le dit aussi", pageInscription.includes("Ce tarif est un point de départ"));
   dire("l'ancienne phrase fausse a disparu",
        !pageInscription.includes("montant que l'employeur paiera"));
 
   const pageModif = await (await lire("/mon-profil/modifier", cookie)).text();
   dire("la modification du profil aussi",
-       pageModif.includes("Ce tarif est indicatif")
+       pageModif.includes("Ce tarif est un point de départ")
        && !pageModif.includes("montant que l'employeur paiera"));
 
   // La page qui EXPLIQUE le modele affirmait encore que l'employeur paie
@@ -210,19 +211,19 @@ setTimeout(async () => {
   const pagePrestataire = await (await lire("/prestataire")).text();
   dire("la page du modele est corrigee",
        !pagePrestataire.includes("C'est ce montant que l'employeur paie"));
-  dire("elle annonce un tarif indicatif", pagePrestataire.includes("indicatif"));
+  dire("elle annonce un tarif souhaite", pagePrestataire.includes("tarif souhaité"));
 
   // Une seule mention par ecran : ajouter la meme phrase a cote d'un
   // paragraphe qui la disait deja n'aurait rien clarifie.
   const compter = (t, m) => t.split(m).length - 1;
   dire("l'inscription ne le dit qu'une fois",
-       compter(pageInscription, "Ce tarif est indicatif") === 1);
-  dire("le profil non plus", compter(monProfil, "Ce tarif est indicatif") === 1);
+       compter(pageInscription, "Ce tarif est un point de départ") === 1);
+  dire("le profil non plus", compter(monProfil, "Ce tarif est un point de départ") === 1);
 
   // La ou le montant est REEL - le prix d'une annonce - cette mention
   // n'a rien a faire : elle jetterait un doute sur un chiffre certain.
   dire("l'ecran de reponse a une demande ne porte pas cette mention",
-       !(await (await lire("/annonces")).text()).includes("Ce tarif est indicatif"));
+       !(await (await lire("/annonces")).text()).includes("Ce tarif est un point de départ"));
 
   console.log("\n--- NETTOYAGE ---");
   const n = base.prepare("DELETE FROM utilisateurs WHERE email LIKE ?").run("%" + M + "%").changes;

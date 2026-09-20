@@ -286,7 +286,8 @@ setTimeout(async () => {
        fi.metiers.length > 0 && fi.jours.length === 7);
   dire("l'exemple sous le tarif suit la commission",
        Boolean(fi.exempleTarif) && fi.exempleTarif.prix === "10 000 FCFA" &&
-       fi.exempleTarif.commission === "1 000 FCFA" && fi.exempleTarif.recu === "9 000 FCFA");
+       fi.exempleTarif.commission === "1 000 FCFA" && fi.exempleTarif.employeur === "11 000 FCFA" &&
+       fi.exempleTarif.recu === "10 000 FCFA");
 
   const adresse = (s) => M + "-insc-" + s + "@example.com";
   const ligneDe = (mail) => base.prepare("SELECT * FROM utilisateurs WHERE email = ?").get(mail);
@@ -368,7 +369,8 @@ setTimeout(async () => {
   const pageInscription = await (await fetch(RACINE + "/inscription")).text();
   dire("la page du site annonce le minimum, et son exemple est calcule",
        pageInscription.includes('minlength="6"') && pageInscription.includes("6 caractères au minimum.") &&
-       pageInscription.includes("<strong>9 000 FCFA</strong>"));
+       pageInscription.includes("<strong>11 000 FCFA</strong>") &&
+       pageInscription.includes("<strong>10 000 FCFA</strong>"));
 
   console.log(SAUT + "--- LES PAGES DE PRESENTATION ---");
   const presentation = await api("/api/presentation");

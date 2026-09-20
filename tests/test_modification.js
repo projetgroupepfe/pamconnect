@@ -78,11 +78,11 @@ setTimeout(async () => {
 
   const profil = await (await lire("/mon-profil", cPre)).text();
   dire("le nouveau calcul apparait sur le profil",
-       profil.includes("12 000 FCFA") && profil.includes("1 200 FCFA") && profil.includes("10 800 FCFA"));
+       profil.includes("12 000 FCFA") && profil.includes("1 200 FCFA") && profil.includes("13 200 FCFA"));
 
   const recherche = await (await lire("/recherche?metier=metierapres")).text();
-  dire("la recherche voit le nouveau metier et le nouveau tarif",
-       recherche.includes("Pre Apres") && recherche.includes("12 000 FCFA"));
+  dire("la recherche voit le nouveau metier, mais jamais le tarif",
+       recherche.includes("Pre Apres") && !recherche.includes("12 000 FCFA"));
 
   console.log("\n--- 3. Les regles du profil tiennent aussi ici ---");
   const sansMetier = await poster("/mon-profil/modifier", form({

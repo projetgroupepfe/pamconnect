@@ -199,7 +199,8 @@ setTimeout(async () => {
   const vueEmp = await (await lire("/recherche?metier=" + encodeURIComponent(METIER), emp.cookie)).text();
   dire("l employeur lit ce qu il doit faire", vueEmp.includes("Vous avez trouvé quelqu'un"));
   dire("avec le bouton qui y mene", vueEmp.includes("/publier-annonce"));
-  dire("et la raison : la somme est bloquee", vueEmp.includes("dès la publication"));
+  dire("et la raison : rien n'est paye maintenant, l'equipe rappelle avec le prix",
+       vueEmp.replace(/\s+/g, " ").includes("Vous ne payez rien maintenant : l'équipe PamConnect vous rappelle avec le prix"));
   dire("il sait qu'il peut proposer une demande depuis un profil",
        vueEmp.replace(/\s+/g, " ").includes("Depuis le profil d'une personne vérifiée, publiez une demande pour elle"));
 

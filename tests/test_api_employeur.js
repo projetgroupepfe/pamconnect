@@ -445,7 +445,7 @@ setTimeout(async () => {
        JSON.stringify(de.prix));
   dire("aucune coordonnee ne sort", !vueEmp.brut.includes("@example.com") && !vueEmp.brut.includes("motdepasse"));
   dire("le conseil ne parle plus du prix a negocier, et l'adresse va a la personne choisie",
-       de.conseilEcriture === "Accordez-vous sur l'horaire et le déroulement du service : le prix est déjà fixé. " +
+       de.conseilEcriture === "Accordez-vous sur l'horaire et le déroulement du service : l'équipe PamConnect s'occupe du prix. " +
          "Vous pouvez maintenant donner votre adresse exacte à Test verifiee.", de.conseilEcriture);
   dire("l'employeur peut declarer le service effectue", de.peutDeclarerService === true);
 
@@ -469,10 +469,10 @@ setTimeout(async () => {
        JSON.stringify(dp.messages && dp.messages.length));
   dire("la personne ne declare pas a la place de l'employeur, et son conseil ne parle pas d'adresse",
        dp.peutDeclarerService === false &&
-       dp.conseilEcriture === "Accordez-vous sur l'horaire et le déroulement du service : le prix est déjà fixé.",
+       dp.conseilEcriture === "Accordez-vous sur l'horaire et le déroulement du service : l'équipe PamConnect s'occupe du prix.",
        dp.conseilEcriture);
   dire("la page du site donne le meme conseil, et demande confirmation avant de declarer",
-       pageDiscussion.includes("le prix est déjà fixé. Vous pouvez maintenant donner votre adresse exacte à Test verifiee.") &&
+       pageDiscussion.replace(/&#39;/g, "'").includes("l'équipe PamConnect s'occupe du prix. Vous pouvez maintenant donner votre adresse exacte à Test verifiee.") &&
        pageDiscussion.includes('data-question="Confirmez-vous que le service a été effectué ?"'));
 
   // Un numero de telephone dans un message : l'avertissement doit suivre.
@@ -777,8 +777,8 @@ setTimeout(async () => {
        JSON.stringify(fv.avis));
   dire("aucune coordonnee ne sort", !ficheVerifiee.brut.includes("@example.com") && !ficheVerifiee.brut.includes("date_naissance"));
   const pageFiche = await (await lire("/personnes/" + verifiee.id, emp.cookie)).text();
-  dire("la page du site montre le meme tarif et la meme verification",
-       pageFiche.includes(fv.tarif) && pageFiche.includes(fv.libelleVerification));
+  dire("la page du site montre la meme verification, mais plus le tarif (reserve a l'equipe)",
+       !pageFiche.includes(fv.tarif) && pageFiche.includes(fv.libelleVerification));
   const ficheVisiteur = await fiche(verifiee.id);
   dire("un visiteur y accede aussi, comme sur le site, sans bouton pour publier",
        ficheVisiteur.code === 200 && ficheVisiteur.donnees.peutPublier === false);
@@ -855,7 +855,7 @@ setTimeout(async () => {
        pp.badges.some((b) => b.verifie === true && b.texte === "Identité et casier vérifiés") &&
        pp.tarif.lignes.length === 3 && pp.tarif.lignes[0].montant === "15 000 FCFA" &&
        pp.tarif.lignes[1].retenue === true && pp.tarif.lignes[2].total === true &&
-       pp.tarif.lignes[2].montant === "13 500 FCFA" && pp.tarif.aide.startsWith("Ce tarif est indicatif"),
+       pp.tarif.lignes[2].montant === "16 500 FCFA" && pp.tarif.aide.startsWith("Ce tarif est un point de départ"),
        profilPre.brut.slice(0, 400));
   dire("l'avertissement y attend", pp.avertissement && pp.avertissement.motif === MOTIF && pp.aLire === 1);
   dire("l'avis recu de l'employeur, pas signale",
@@ -948,7 +948,7 @@ setTimeout(async () => {
   const detailTarif = await json("/api/detail-tarif?montant=15000", undefined, cookieDe(verifiee.cookie));
   const detailVide = await json("/api/detail-tarif?montant=abc", undefined, cookieDe(verifiee.cookie));
   dire("le detail du tarif pendant la saisie, calcule par le serveur, meme sans session",
-       detailTarif.code === 200 && detailTarif.donnees.lignes[2].montant === "13 500 FCFA" &&
+       detailTarif.code === 200 && detailTarif.donnees.lignes[2].montant === "16 500 FCFA" &&
        detailVide.donnees.lignes.length === 0 && (await json("/api/detail-tarif?montant=15000")).code === 200,
        detailTarif.brut);
 
@@ -1108,7 +1108,7 @@ setTimeout(async () => {
   const pageRecherche = await (await lire("/recherche?metier=" + encodeURIComponent(metierEnBase), emp.cookie)).text();
   dire("la page du site dit la meme chose, dans le meme ordre",
        pageRecherche.includes(rechDonnees.phraseLieu) && pageRecherche.includes(rechDonnees.titre) &&
-       pageRecherche.includes("Tarif demandé : <strong>15 000 FCFA</strong>") &&
+       !pageRecherche.includes("Tarif demandé") && !pageRecherche.includes("15 000 FCFA") &&
        pageRecherche.indexOf("Test proche") < pageRecherche.indexOf("Test loin"));
   const pageVisiteur = await (await lire("/recherche?metier=" + encodeURIComponent(metierEnBase))).text();
   dire("un visiteur n'a pas de quartier : aucune phrase, l'ordre d'inscription reste",

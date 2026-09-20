@@ -101,7 +101,7 @@
             <% if (p.tarif) { %>
               <li>
                 <%- include("partiels/icone", { nom: "remuneration" }) %>
-                <span>Tarif indicatif : <%= p.tarif %></span>
+                <span>Tarif souhaité : <%= p.tarif %></span>
               </li>
             <% } %>
             <li>
@@ -210,7 +210,7 @@
     </div>
 
     <div class="champ">
-      <label for="tarif-ajout">Tarif indicatif <span class="aide">(facultatif)</span></label>
+      <label for="tarif-ajout">Tarif souhaité <span class="aide">(facultatif)</span></label>
       <input type="number" id="tarif-ajout" name="tarif"
              min="<%= montantMinimum %>" step="<%= pasMontant %>">
     </div>

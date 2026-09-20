@@ -47,9 +47,16 @@
           </li>
         <% } %>
         <% if (d.pourvue) { %>
+          <%# L'EMPLOYEUR A CHOISI : c'est ce qu'il y a de plus important sur
+              cette carte. L'equipe appelle cette personne EN PREMIER, pour
+              convenir du prix, puis rappelle l'employeur. %>
+          <% const choisie = d.interesses.find(function (i) { return i.dejaChoisie; }); %>
           <li>
-            <%- include("partiels/icone", { nom: "info" }) %>
-            <span>L'employeur a déjà retenu quelqu'un : il reste à noter le prix.</span>
+            <%- include("partiels/icone", { nom: "valider" }) %>
+            <span>
+              <strong>Choisie par l'employeur<%= choisie ? " : " + choisie.nom : "" %>.</strong>
+              Appelez-la en premier pour convenir du prix, puis rappelez l'employeur.
+            </span>
           </li>
         <% } %>
       </ul>
@@ -126,10 +133,10 @@
                     <a href="tel:<%= p.appel %>"><%= p.telephone %></a>
                   <% } %>
                   <span class="aide">
-                    <%= p.quartier || "" %><% if (p.tarif) { %> · tarif indicatif <%= p.tarif %><% } %><% if (p.moyenne) { %> · <%= p.moyenne %>/5<% } %>
+                    <%= p.quartier || "" %><% if (p.tarif) { %> · tarif souhaité <%= p.tarif %><% } %><% if (p.moyenne) { %> · <%= p.moyenne %>/5<% } %>
                   </span>
                   <% if (p.dejaChoisie) { %>
-                    <span class="badge badge-verifie">Retenue</span>
+                    <span class="badge badge-verifie">Choisie par l'employeur : à appeler en premier</span>
                   <% } else if (d.interesses.some(function (i) { return i.id === p.id; })) { %>
                     <span class="badge badge-en-attente">Intéressée</span>
                   <% } %>

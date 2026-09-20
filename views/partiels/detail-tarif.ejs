@@ -5,24 +5,19 @@
    annonce ne varie jamais d'un ecran a l'autre. */
 const detail = detaillerTarif(locals.tarif);
 
-/* Le CALCUL est le meme pour tout le monde - c'est le but de ce bloc.
-   Ce qui change, ce sont les PHRASES : la personne qui travaille demande
-   un montant et en recoit un autre ; l'employeur, lui, paie. Lui
-   afficher "Vous demandez" etait une erreur.
+/* Le CALCUL est le meme pour tout le monde - c'est le but de ce bloc :
+   la personne recoit son prix ENTIER, la commission est ajoutee par-dessus
+   et payee par l'employeur, qui paie donc le total.
+
+   Ce qui change, ce sont les PHRASES, selon celui a qui on parle.
 
    Par defaut on s'adresse a la personne qui travaille : c'est le cas le
-   plus frequent (son inscription, son profil, la liste des annonces). */
+   plus frequent (son inscription, son profil). */
 const pourEmployeur = locals.pourEmployeur === true;
 const beneficiaire  = locals.beneficiaire || "La personne";
 
-/* TROISIEME CAS : la personne qui travaille regarde le prix D'UNE
-   DEMANDE, et non son propre tarif.
-
-   "Vous demandez" etait faux la : elle ne demande rien, elle a postule
-   a un prix annonce par quelqu'un d'autre. On nomme donc celui qui
-   paie, ce qui evite aussi de repeter mot pour mot le "Prix annonce"
-   affiche juste au-dessus. */
-const prixAnnonce = locals.prixAnnonce === true;
+/* Le tarif de la personne n'est jamais montre a un employeur : ce bloc ne
+   s'affiche, en pratique, que sur SON profil. */
 %>
 <% if (detail.brut <= 0) { %>
 
@@ -33,14 +28,14 @@ const prixAnnonce = locals.prixAnnonce === true;
         <span><%= beneficiaire %> n'a pas encore indiqué de tarif.</span>
       </div>
       <div class="ligne-tarif">
-        <span class="aide">Demandez-lui son montant dans la discussion.</span>
+        <span class="aide">L'équipe PamConnect vous annoncera le prix.</span>
       </div>
     <% } else { %>
       <div class="ligne-tarif">
-        <span>Vous n'avez pas encore indiqué votre tarif.</span>
+        <span>Vous n'avez pas encore indiqué votre tarif souhaité.</span>
       </div>
       <div class="ligne-tarif">
-        <span class="aide">Sans tarif, les employeurs ne savent pas ce que vous demandez.</span>
+        <span class="aide">Sans tarif souhaité, l'équipe n'a pas de point de départ quand elle vous appelle.</span>
       </div>
     <% } %>
   </div>
@@ -49,28 +44,25 @@ const prixAnnonce = locals.prixAnnonce === true;
 
   <div class="detail-tarif">
     <div class="ligne-tarif">
-      <span><%= pourEmployeur ? "Vous payez" : (prixAnnonce ? "L'employeur paie" : "Vous demandez") %></span>
+      <span><%= pourEmployeur ? beneficiaire + " reçoit" : "Vous recevez" %></span>
       <strong><%= formaterMontant(detail.brut) %></strong>
     </div>
     <div class="ligne-tarif">
-      <span>Commission PamConnect (<%= pourcentageCommission %> %)</span>
-      <span class="retenue">− <%= formaterMontant(detail.commission) %></span>
+      <span>Commission PamConnect (<%= pourcentageCommission %> %), ajoutée pour l'employeur</span>
+      <span class="retenue">+ <%= formaterMontant(detail.commission) %></span>
     </div>
     <div class="ligne-tarif total">
-      <span><%= pourEmployeur ? beneficiaire + " reçoit" : "Vous recevez" %></span>
-      <strong><%= formaterMontant(detail.net) %></strong>
+      <span><%= pourEmployeur ? "Vous payez" : "L'employeur paie" %></span>
+      <strong><%= formaterMontant(detail.employeur) %></strong>
     </div>
   </div>
 
-  <%# Sur SON profil, ce montant n'est qu'une indication : le prix
-      reellement paye est celui annonce dans la demande a laquelle elle
-      repond. Sans cette phrase, l'ecran promettait une somme qui n'a
-      aucune raison d'etre celle qu'elle touchera. %>
+  <%# Sur SON profil, ce montant n'est qu'un point de depart : seule
+      l'equipe le voit, et le prix se fixe au telephone. %>
   <% if (locals.indicatif && !pourEmployeur) { %>
     <p class="aide">
-      Ce tarif est indicatif. Le montant réellement reçu dépend de la demande
-      à laquelle vous répondez : la commission de <%= pourcentageCommission %> %
-      s'applique au prix annoncé par l'employeur.
+      Ce tarif est un point de départ : seule l'équipe PamConnect le voit,
+      jamais les employeurs. C'est au téléphone que le prix est fixé, avec vous.
     </p>
   <% } %>
 

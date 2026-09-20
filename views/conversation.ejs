@@ -165,20 +165,22 @@
             <h3>Vous avez déclaré avoir effectué ce service</h3>
             <p>
               Le <strong><%= conversation.declaree_par_elle_le %></strong>.
-              <%= conversation.nomEmployeur %> doit le confirmer de son côté pour que
-              la somme vous soit versée.
+              L'équipe PamConnect voit votre déclaration et sa date.
+              <%= conversation.nomEmployeur %> déclare de son côté que le service
+              a eu lieu, puis paie PamConnect, qui vous reverse.
             </p>
             <p class="aide">
-              S'il ne le fait pas, signalez le problème à l'équipe : elle verra votre
-              déclaration et sa date.
+              S'il ne le fait pas, signalez le problème à l'équipe : elle a
+              votre déclaration et sa date.
             </p>
           <% } else { %>
             <h3>Avez-vous effectué ce service ?</h3>
             <p>
               Le dire ne vous paie pas tout de suite :
-              <%= conversation.nomEmployeur %> le confirme de son côté, puis
-              l'équipe PamConnect vous reverse. Votre déclaration est enregistrée
-              avec sa date, et l'équipe la verra s'il ne confirme rien.
+              <%= conversation.nomEmployeur %> paie d'abord PamConnect, puis
+              l'équipe vous reverse le prix que vous avez annoncé. Votre
+              déclaration est enregistrée avec sa date, et l'équipe la verra
+              s'il ne déclare rien.
             </p>
             <%# Une question avant de declarer, sur les deux appareils : la
                 declaration est datee et ne s'efface pas. %>
@@ -202,15 +204,15 @@
       <% if (jeSuisEmployeur && conversation.statut === "acceptee") { %>
         <div class="carte">
           <h3>Le service a-t-il été effectué ?</h3>
-          <%# CE N'EST PAS UNE FORMALITE. Cette declaration est le seul
-              chemin par lequel la somme bloquee arrive chez la personne
-              qui a travaille. Un employeur qui oublie la laisse impayee
-              et ouvre un desaccord que rien ne justifiait. %>
+          <%# Cette declaration ne deplace AUCUN argent : elle previent l'equipe
+              que le service a eu lieu. L'employeur paie PamConnect, qui
+              reverse a la personne. Un employeur qui oublie de la faire
+              laisse l'equipe sans savoir si elle doit reverser. %>
           <p>
-            <strong>Déclarez-le obligatoirement après chaque service.</strong>
-            C'est cette déclaration qui verse la somme bloquée à
-            <%= conversation.nomPrestataire %>. Sans elle, elle n'est pas
-            payée, et un désaccord s'ouvre pour rien.
+            <strong>Déclarez-le après chaque service.</strong>
+            Cette déclaration prévient l'équipe PamConnect : vous lui payez le
+            montant convenu, puis elle le reverse à
+            <%= conversation.nomPrestataire %>.
           </p>
           <p class="aide">
             Cette discussion rejoindra vos services terminés : vous pourrez
@@ -218,7 +220,7 @@
           </p>
           <form action="/candidatures/<%= conversation.id %>/terminer" method="POST"
                 data-question="Confirmez-vous que le service a été effectué ?"
-                data-precision="La somme bloquée sera versée à <%= conversation.nomPrestataire %>. Cette déclaration ne s'annule pas.">
+                data-precision="L'équipe PamConnect sera prévenue que le service est effectué. Cette déclaration ne s'annule pas.">
             <div class="actions">
               <button type="submit" class="bouton-secondaire">
                 <%- include("partiels/icone", { nom: "valider" }) %>

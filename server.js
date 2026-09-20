@@ -1729,10 +1729,11 @@ function verifierMotDePasse(motDePasseSaisi, motDePasseHache) {
 // ============================================================
 // LE MODELE ECONOMIQUE
 // ------------------------------------------------------------
-// La personne qui propose ses services annonce son tarif BRUT.
-// L'employeur paie exactement ce tarif, sans frais ajoute.
-// La plateforme retient une commission sur ce montant, puis
-// reverse le solde a la personne qui a fait le travail.
+// Le prix se fixe AU TELEPHONE, par l'equipe : elle appelle la
+// personne, qui annonce son prix ; la plateforme AJOUTE sa commission,
+// et c'est ce total que l'employeur entend. L'employeur paie PamConnect
+// apres le service ; PamConnect reverse a la personne SON prix, entier.
+// Le tarif du profil n'est qu'un tarif souhaite, vu de l'equipe seule.
 //
 // Le taux est ecrit ICI, une seule fois. Le changer met a jour
 // tous les calculs et tous les affichages du site.
@@ -1769,12 +1770,15 @@ function regleMontantLisible() {
          `par tranches de ${formaterMontant(PAS_MONTANT_FCFA)}`;
 }
 
-// Detaille un tarif : ce qui est demande, ce que retient la
-// plateforme, et ce qui revient reellement a la personne.
+// Detaille un tarif, dans le sens ou il se paie vraiment : ce que la
+// personne recoit (son prix, entier), la commission que l'employeur
+// ajoute par-dessus, et ce que l'employeur paie en tout.
+//
+// La commission n'est JAMAIS retiree du prix de la personne : c'est
+// prixAvecCommission qui decide, et cette fonction ne fait que la lire.
 function detaillerTarif(tarifBrut) {
-  const brut = Math.round(Number(tarifBrut) || 0);
-  const commission = Math.round(brut * TAUX_COMMISSION);
-  return { brut, commission, net: brut - commission };
+  const detail = prixAvecCommission(tarifBrut);
+  return { brut: detail.prix, commission: detail.commission, employeur: detail.prixEmployeur };
 }
 
 // LE PRIX D'UN SERVICE, tel qu'il se fixe au telephone : la personne
@@ -1918,8 +1922,8 @@ function verifierProfilPrestataire(donnees) {
   if (!(Math.round(Number(donnees.tarif) || 0) > 0)) {
     return {
       titre: "Tarif obligatoire",
-      texte: "Indiquez le tarif que vous demandez pour une prestation. " +
-             "C'est ce montant que l'employeur paiera.",
+      texte: "Indiquez votre tarif souhaité pour une prestation. " +
+             "Seule l'équipe PamConnect le voit : c'est le point de départ de l'appel où le prix est fixé.",
     };
   }
 
@@ -1960,9 +1964,9 @@ function verifierProfilPrestataire(donnees) {
 // lisent au lieu d'ecrire "24" chacun de leur cote.
 const DELAI_VERIFICATION_HEURES = 24;
 
-// Une somme bloquee sur une demande POURVUE attend que l'employeur
-// declare le service effectue. Passe ce delai, l'equipe doit la voir :
-// la personne a peut-etre travaille sans etre payee.
+// Une demande POURVUE attend que l'employeur declare le service effectue.
+// Passe ce delai, l'equipe doit la voir : la personne a peut-etre
+// travaille sans que l'equipe le sache.
 //
 // CE NOMBRE EST UN CHOIX, pas une regle du metier. Il se change ici, en
 // une ligne.
@@ -3293,12 +3297,17 @@ const ROLES_INSCRIPTION = [
 
 // L'exemple sous le tarif. Ecrits a la main dans la page, ses montants
 // auraient menti le jour ou la commission changerait.
+//   prix       : ce que la personne annonce a l'equipe
+//   commission : ce que PamConnect ajoute, payee par l'employeur
+//   employeur  : ce que l'employeur paie en tout
+//   recu       : ce que la personne recoit - son prix, entier
 function exempleDeTarif() {
   const detail = detaillerTarif(10000);
   return {
     prix: formaterMontant(detail.brut),
     commission: formaterMontant(detail.commission),
-    recu: formaterMontant(detail.net),
+    employeur: formaterMontant(detail.employeur),
+    recu: formaterMontant(detail.brut),
   };
 }
 app.locals.exempleTarif = exempleDeTarif();
@@ -3415,7 +3424,7 @@ function inscrire(donnees) {
   }
 
   // Sans metier, la personne n'apparait dans aucune recherche.
-  // Sans tarif, la plateforme ne peut ni faire payer, ni reverser.
+  // Sans tarif souhaite, l'equipe n'a pas de point de depart pour l'appel.
   const personne = role.pourPersonne;
   if (personne) {
     const probleme = verifierProfilPrestataire(donnees);
@@ -3564,6 +3573,11 @@ function phraseAttenteVerification(envoyeLe) {
 }
 
 // Le tarif sur SON profil, avec les montants du bloc detail-tarif du site.
+//
+// C'est un tarif SOUHAITE : seule l'equipe le voit, jamais les employeurs.
+// Il lui sert de point de depart quand elle appelle la personne, qui
+// annonce alors son prix. Ce que la personne recoit est ce prix, entier ;
+// la commission est payee EN PLUS par l'employeur.
 function tarifSurMonProfil(tarifBrut) {
   const detail = detaillerTarif(tarifBrut);
   const pourcentage = Math.round(TAUX_COMMISSION * 100);
@@ -3571,24 +3585,21 @@ function tarifSurMonProfil(tarifBrut) {
   if (detail.brut <= 0) {
     return {
       lignes: [],
-      phrase: "Vous n'avez pas encore indiqué votre tarif.",
-      aide: "Sans tarif, les employeurs ne savent pas ce que vous demandez.",
+      phrase: "Vous n'avez pas encore indiqué votre tarif souhaité.",
+      aide: "Sans tarif souhaité, l'équipe n'a pas de point de départ quand elle vous appelle.",
     };
   }
 
   return {
     lignes: [
-      { libelle: "Vous demandez", montant: formaterMontant(detail.brut), retenue: false, total: false },
-      { libelle: `Commission PamConnect (${pourcentage} %)`,
-        montant: "− " + formaterMontant(detail.commission), retenue: true, total: false },
-      { libelle: "Vous recevez", montant: formaterMontant(detail.net), retenue: false, total: true },
+      { libelle: "Vous recevez", montant: formaterMontant(detail.brut), retenue: false, total: false },
+      { libelle: `Commission PamConnect (${pourcentage} %), ajoutée pour l'employeur`,
+        montant: "+ " + formaterMontant(detail.commission), retenue: true, total: false },
+      { libelle: "L'employeur paie", montant: formaterMontant(detail.employeur), retenue: false, total: true },
     ],
     phrase: null,
-    // Sur SON profil, ce montant n'est qu'une indication : le prix paye
-    // est celui de la demande a laquelle elle repond.
-    aide: "Ce tarif est indicatif. Le montant réellement reçu dépend de la demande " +
-          `à laquelle vous répondez : la commission de ${pourcentage} % s'applique ` +
-          "au prix annoncé par l'employeur.",
+    aide: "Ce tarif est un point de départ : seule l'équipe PamConnect le voit, jamais " +
+          "les employeurs. C'est au téléphone que le prix est fixé, avec vous.",
   };
 }
 
@@ -3755,8 +3766,8 @@ function demandesDeLEmployeur(employeurId) {
       candidatures: candidatures.map((c) => {
         // UNE DECISION NE SE PREND QU'UNE FOIS, ET SUR UNE DEMANDE OUVERTE.
         // Retirer une demande laisse ses reponses en attente : sans la
-        // seconde condition, "Choisir" restait propose alors que la somme
-        // bloquee avait deja ete rendue.
+        // seconde condition, "Choisir" restait propose sur une demande
+        // qui n'existe plus.
         const decidable = c.statut === "en attente" && !fermee;
         const verifiee = c.verificationPrestataire === "verifie";
         return {
@@ -4206,7 +4217,7 @@ function lirePersonneInvitee(valeur) {
 //
 // PUBLIER EST ECRIT UNE SEULE FOIS. Le site et l'application passent par
 // cette fonction : la meme verification, le meme enregistrement, la meme
-// somme bloquee, la meme phrase de confirmation.
+// phrase de confirmation. Rien n'est paye a la publication.
 function publierDemande(employeurId, donnees) {
   const probleme = verifierAnnonce(donnees);
   if (probleme) return { probleme };
@@ -4317,8 +4328,8 @@ function demandeAModifier(annonceId, utilisateur) {
   if (!annonce) return { probleme: DEMANDE_INTROUVABLE };
 
   // UNE DEMANDE FERMEE NE SE MODIFIE PLUS. Le bouton etait cache, mais
-  // l'adresse restait ouverte : apres avoir choisi quelqu'un, changer le
-  // prix changeait la somme bloquee que cette personne allait recevoir.
+  // l'adresse restait ouverte : apres avoir choisi quelqu'un, changer la
+  // demande changeait ce que cette personne avait accepte de faire.
   if (annonce.annulee) {
     return {
       annonce,
@@ -4705,9 +4716,8 @@ function retirerDemande(annonceId, utilisateur) {
   const annonce = maDemande(annonceId, utilisateur);
   if (!annonce) return { probleme: DEMANDE_INTROUVABLE };
 
-  // ON NE REPREND PAS SON ARGENT APRES AVOIR CHOISI. Retirer rend la somme
-  // bloquee : une demande pourvue ne se retire donc pas, sinon la personne
-  // choisie travaillerait pour rien.
+  // ON NE RETIRE PAS UNE DEMANDE APRES AVOIR CHOISI : la personne choisie
+  // travaillerait pour rien, et l'equipe l'a peut-etre deja appelee.
   if (requetes.annonceEstPourvue.get(annonce.id)) {
     return {
       annonce,
@@ -5115,9 +5125,8 @@ app.post("/candidatures", exigerConnexion, exigerVerification, lireFormulaire, (
 // --- Confirmer avant d'embaucher -----------------------------------
 //
 // Accepter une candidature engageait jusqu'ici d'un seul clic, sans que
-// l'employeur relise ce sur quoi il s'engage. Le cahier des charges
-// demande qu'il confirme le service, le lieu, l'horaire, la duree, le
-// tarif final, la commission et le montant net.
+// l'employeur relise ce sur quoi il s'engage : le service, le lieu,
+// l'horaire et la duree. Le prix, lui, lui est annonce par l'equipe.
 //
 // CET ECRAN EST CELUI DE L'EMPLOYEUR. La requete n'accepte que
 // l'employeur PROPRIETAIRE de l'annonce : une candidate qui taperait
@@ -5157,8 +5166,8 @@ function problemeDeDecision(candidature, statut) {
     };
   }
 
-  // Retirer une demande rend la somme bloquee et laisse ses reponses en
-  // attente : choisir quelqu'un ensuite l'engagerait sans argent bloque.
+  // Retirer une demande laisse ses reponses en attente : choisir quelqu'un
+  // ensuite l'engagerait sur une demande qui n'existe plus.
   if (candidature.demandeFermee) {
     return {
       code: 409,
@@ -5397,14 +5406,14 @@ app.get("/messages", exigerConnexion, (req, res) => {
 
 // Ouvrir une discussion, c'est l'avoir lue. Renvoie null si la personne
 // n'y participe pas.
-// CE QUE L'ON CONSEILLE D'ECRIRE. Le prix ne se discute plus : il est
-// fixe dans la demande, et la somme est bloquee des la publication.
+// CE QUE L'ON CONSEILLE D'ECRIRE. Le prix ne se discute pas ici : c'est
+// l'equipe PamConnect qui le fixe au telephone, et l'employeur la paie.
 // L'adresse exacte n'est ni demandee ni conservee par la plateforme :
 // c'est a l'employeur de la donner, et seulement a la personne choisie.
 // La phrase precedente promettait qu'elle serait "transmise
 // automatiquement apres le paiement", ce qui n'existe pas.
 function conseilPourEcrire(conversation, jeSuisEmployeur) {
-  const base = "Accordez-vous sur l'horaire et le déroulement du service : le prix est déjà fixé.";
+  const base = "Accordez-vous sur l'horaire et le déroulement du service : l'équipe PamConnect s'occupe du prix.";
   if (!jeSuisEmployeur) return base;
   return conversation.statut === "acceptee"
     ? `${base} Vous pouvez maintenant donner votre adresse exacte à ${conversation.nomPrestataire}.`
@@ -5642,7 +5651,7 @@ function lireFichePublique(personneId, moi) {
     personne,
     peutVoirAge,
     // LA SEULE CHOSE DE CETTE PAGE QUI NE VIENNE PAS D ELLE. Tout le
-    // reste - metier, tarif, disponibilites - est declare par la
+    // reste - metier, disponibilites - est declare par la
     // personne. Les avis viennent de ceux qui l ont employee.
     reputation: Object.assign(reputationDe(personne.id), {
       services: requetes.reputationEtExperience.get({ personne: personne.id }).services,
@@ -6110,12 +6119,12 @@ app.post("/mon-profil/photo/retirer", exigerConnexion, interdireALEquipe, (req, 
 
 // LA PERSONNE QUI A TRAVAILLE DECLARE L'AVOIR FAIT.
 //
-// Sa declaration ne libere AUCUN argent : seule celle de l'employeur le
-// fait, ou la decision de l'equipe. Sinon il suffirait de mentir pour
-// toucher une somme sans avoir travaille.
+// Sa declaration ne paie RIEN : c'est une trace datee, que l'employeur et
+// l'equipe voient. L'employeur paie PamConnect, qui reverse ensuite.
 //
 // Ce qu'elle change : l'employeur voit qu'elle attend sa confirmation,
-// et l'equipe lit un desaccord date au lieu d'une somme qui traine.
+// et l'equipe lit un desaccord date au lieu d'un service dont personne
+// ne sait s'il a eu lieu.
 function declarerAvoirTravaille(candidatureId, u) {
   const conversation = conversationDe(candidatureId, u);
 
@@ -6132,7 +6141,7 @@ function declarerAvoirTravaille(candidatureId, u) {
 
   const retour = { url: "/messages/" + conversation.id, texte: "Retour à la discussion" };
 
-  // L'employeur a son propre bouton, qui lui verse la somme. Celui-ci
+  // L'employeur a son propre bouton, qui previent l'equipe. Celui-ci
   // n'est pas le sien.
   if (u.id !== conversation.prestataireId) {
     return {
@@ -6192,8 +6201,8 @@ function declarerAvoirTravaille(candidatureId, u) {
   return {
     conversation,
     ok: true,
-    texte: `Votre déclaration est enregistrée. ${conversation.nomEmployeur} doit la confirmer ` +
-           "de son côté pour que la somme vous soit versée.",
+    texte: `Votre déclaration est enregistrée avec sa date : l'équipe PamConnect la voit. ` +
+           `${conversation.nomEmployeur} paie PamConnect après le service, puis l'équipe vous reverse.`,
   };
 }
 
@@ -6813,7 +6822,7 @@ function monCompte(u) {
       paye: p.recu_le
         ? `Reçu le ${dateLisible(p.recu_le)}` + (p.moyen_reception ? ` (${p.moyen_reception})` : "")
         : null,
-      // L'OBLIGATION, ecrite la ou la somme est encore due.
+      // L'OBLIGATION, ecrite la ou le paiement est encore du.
       rappelPaiement: !p.recu_le,
       serviceTermine: Boolean(p.serviceTermineLe),
     })) : [],
@@ -7487,7 +7496,7 @@ function ajouterAuRepertoire(admin, donnees) {
 
   if (tarifSaisi && (!(tarif > 0) || !montantAccepte(tarif))) {
     return { probleme: { code: 400, titre: "Tarif à revoir",
-      texte: `Le tarif indicatif doit être ${regleMontantLisible()}, ou laissé vide.` } };
+      texte: `Le tarif souhaité doit être ${regleMontantLisible()}, ou laissé vide.` } };
   }
 
   // Le quartier se reconnait comme partout ailleurs : les accents et les
@@ -8557,7 +8566,6 @@ app.get("/api/candidatures/:id/confirmation", (req, res) => {
   if (ecran.probleme) return erreurApi(res, ecran.probleme.code, ecran.probleme.texte);
 
   const { c, reputation, refusAnnonces } = ecran;
-  const detail = detaillerTarif(c.prixAnnonce);
 
   // Les champs sont choisis un par un : ni email, ni telephone, ni
   // adresse. Le lieu reste general, comme sur le site.
@@ -8573,14 +8581,9 @@ app.get("/api/candidatures/:id/confirmation", (req, res) => {
     duree: c.dureeAnnonce || null,
     lieu: [c.quartierAnnonce, c.arrondissementAnnonce].filter(Boolean).join(", ") || null,
     conditions: c.conditionsAnnonce || null,
-    paiement: detail.brut > 0
-      ? {
-          vousPayez: formaterMontant(detail.brut),
-          commission: formaterMontant(detail.commission),
-          pourcentageCommission: Math.round(TAUX_COMMISSION * 100),
-          recoit: formaterMontant(detail.net),
-        }
-      : null,
+    // Aucun prix n'est annonce ici : l'equipe rappelle l'employeur avec le
+    // prix, avant le service. La cle reste, a null, pour l'application.
+    paiement: null,
     refusAnnonces,
   });
 });
