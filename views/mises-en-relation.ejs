@@ -112,6 +112,23 @@
 
       <% } else { %>
 
+        <% if (d.pourvue) { %>
+          <%# L'EMPLOYEUR RENONCE a la personne qu'il avait choisie (le prix
+              ne lui convient pas). L'equipe rouvre la demande : la personne
+              est ecartee, les autres retrouvent leur place, et l'employeur
+              peut en choisir une autre. %>
+          <form action="/admin/demandes/<%= d.id %>/liberer" method="POST"
+                data-question="L'employeur renonce à cette personne ?"
+                data-precision="La demande sera de nouveau ouverte : l'employeur pourra choisir quelqu'un d'autre.">
+            <p class="actions">
+              <button class="bouton bouton-secondaire" type="submit">
+                <%- include("partiels/icone", { nom: "refuser" }) %>
+                L'employeur renonce à cette personne
+              </button>
+            </p>
+          </form>
+        <% } %>
+
         <%# PREMIER APPEL : la personne qui fera le travail. Celles qui
             ont signale leur interet d'abord : elles ont deja lu la
             demande, l'appel est plus court. %>

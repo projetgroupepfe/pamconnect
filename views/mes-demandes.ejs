@@ -107,6 +107,14 @@
               Vos discussions restent accessibles.
             </p>
           <% } else { %>
+            <% if (annonce.prixRefuseDe) { %>
+              <%# La demande a ete rouverte : l'employeur doit savoir pourquoi. %>
+              <p class="aide">
+                Le prix proposé pour <strong><%= annonce.prixRefuseDe %></strong>
+                n'a pas convenu. Votre demande est ouverte : vous pouvez
+                choisir une autre personne.
+              </p>
+            <% } %>
             <% if (annonce.enAvant) { %>
               <p>
                 <span class="badge badge-info">Mise en avant</span>

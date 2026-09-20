@@ -438,6 +438,42 @@ const requetes = {
     WHERE id = @id AND annulee = 0
   `),
 
+  // --- Liberer une demande quand l'employeur renonce a la personne ----
+  //
+  // La personne choisie d'une demande, et le moment exact du choix : c'est
+  // ce moment qui permet de retrouver les autres personnes refusees EN
+  // MEME TEMPS qu'elle (voir rendreLesAutres).
+  choisieDeLaDemande: db.prepare(`
+    SELECT id, prestataire_id, statut_change_le, terminee_le
+    FROM candidatures
+    WHERE annonce_id = ? AND statut = 'acceptee'
+    ORDER BY id LIMIT 1
+  `),
+
+  // Choisir quelqu'un refuse d'un coup toutes les autres personnes en
+  // attente, a la meme seconde. Liberer la demande leur rend leur place :
+  // elles n'ont rien fait de mal, elles ont seulement ete devancees.
+  //
+  // Une personne que l'EMPLOYEUR avait refusee lui-meme, a un autre moment,
+  // reste refusee : seule la meme seconde (a 3 secondes pres) compte.
+  rendreLesAutres: db.prepare(`
+    UPDATE candidatures
+    SET statut = 'en attente', statut_change_le = NULL
+    WHERE annonce_id = @annonce AND id != @choisie AND statut = 'refusee'
+      AND statut_change_le IS NOT NULL
+      AND ABS(strftime('%s', statut_change_le) - strftime('%s', @quand)) <= 3
+  `),
+
+  ficheAccepteeDeLaDemande: db.prepare(`
+    SELECT 1 AS oui FROM mises_en_relation
+    WHERE annonce_id = ? AND statut = 'acceptee' LIMIT 1
+  `),
+
+  rouvrirAnnonce: db.prepare(`
+    UPDATE annonces SET annulee = 0, annulee_le = NULL
+    WHERE id = @id AND annulee = 1
+  `),
+
   // Une demande fermee l'est soit parce que quelqu'un a ete choisi,
   // soit parce que l'employeur l'a retiree. La colonne annulee ne
   // distingue pas les deux : on le DEDUIT des candidatures, comme le
@@ -3728,6 +3764,11 @@ app.get("/mon-profil", exigerConnexion, (req, res) => {
 // lisent cette fonction. Tout ce qui depend des donnees est decide ici :
 // demande pourvue ou retiree, mise en avant, phrases de statut, note,
 // boutons proposes. Rien de tout cela n'est recopie dans les ecrans.
+function dernierPrixRefuse(annonceId) {
+  const refusees = requetes.fichesRefusees.all(annonceId);
+  return refusees.length ? refusees[refusees.length - 1].nomPrestataire : null;
+}
+
 function demandesDeLEmployeur(employeurId) {
   const annonces = requetes.annoncesDeEmployeur.all(employeurId).map((annonce) => {
     const candidatures = requetes.candidaturesDeAnnonce.all(annonce.id);
@@ -3744,6 +3785,10 @@ function demandesDeLEmployeur(employeurId) {
       phraseFermeture: fermee
         ? (pourvue ? "Vous avez choisi quelqu'un." : "Vous avez retiré cette demande.")
         : null,
+      // UNE DEMANDE ROUVERTE PAR L'EQUIPE : le prix annonce pour la personne
+      // choisie n'a pas convenu. L'employeur doit le lire, sinon sa demande
+      // reapparait sans explication. Deduit des fiches, jamais stocke.
+      prixRefuseDe: fermee ? null : dernierPrixRefuse(annonce.id),
       horaireLisible: annonce.horaire || "Horaire non précisé",
       prixLisible: prixEnClair(annonce),
       lieu: [annonce.quartier, annonce.arrondissement].filter(Boolean).join(", "),
@@ -7205,6 +7250,78 @@ function noterReponseEmployeur(admin, ficheId, donnees) {
 
 app.post("/admin/mises-en-relation/:id/reponse", exigerAdmin, lireFormulaire, (req, res) => {
   const resultat = noterReponseEmployeur(req.utilisateur, Number(req.params.id), req.body);
+
+  if (resultat.probleme) {
+    return afficherProbleme(res, Object.assign({}, resultat.probleme,
+      { lien: { url: "/admin/mises-en-relation", texte: "Retour aux mises en relation" } }));
+  }
+
+  res.redirect("/admin/mises-en-relation");
+});
+
+// L'EMPLOYEUR RENONCE A LA PERSONNE QU'IL AVAIT CHOISIE.
+//
+// Le cas : il a choisi quelqu'un, l'equipe a appele cette personne, puis
+// l'employeur, et le prix annonce ne lui convient pas. Sans ce bouton, la
+// personne restait "choisie" et la demande restait fermee : plus personne
+// ne pouvait y repondre, et l'employeur n'avait aucun moyen d'en choisir
+// une autre.
+//
+// C'EST L'EQUIPE QUI LIBERE, PAS L'EMPLOYEUR. Elle est celle qui a eu
+// l'employeur au telephone et qui sait qu'il renonce ; et un employeur qui
+// pourrait defaire son choix seul pourrait aussi faire attendre sans fin
+// quelqu'un qui a deja dit oui.
+//
+// TOUT OU RIEN : la personne est refusee, les autres retrouvent leur place
+// et la demande rouvre. Rouvrir sans rendre leur place aux autres
+// laisserait la demande ouverte sans personne dedans.
+function libererDemande(admin, annonceId) {
+  const annonce = requetes.annonceParId.get(annonceId);
+
+  if (!annonce) {
+    return { probleme: { code: 404, titre: "Demande introuvable",
+      texte: "Cette demande n'existe plus." } };
+  }
+
+  const choisie = requetes.choisieDeLaDemande.get(annonce.id);
+
+  if (!choisie) {
+    return { probleme: { code: 409, titre: "Personne à libérer",
+      texte: "L'employeur n'a choisi personne sur cette demande : il n'y a " +
+             "rien à libérer." } };
+  }
+
+  if (requetes.ficheEnCours.get(annonce.id)) {
+    return { probleme: { code: 409, titre: "Une fiche attend encore",
+      texte: "Un prix est enregistré et l'employeur n'a pas encore répondu. " +
+             "Notez d'abord sa réponse (« Il refuse »), puis libérez la demande." } };
+  }
+
+  // UN PRIX ACCEPTE, OU UN SERVICE COMMENCE, ne se defait pas d'un clic :
+  // de l'argent est du a l'equipe et une personne est deja engagee.
+  if (requetes.ficheAccepteeDeLaDemande.get(annonce.id) || choisie.terminee_le) {
+    return { probleme: { code: 409, titre: "Le prix a été accepté",
+      texte: "L'employeur a accepté le prix de cette personne : la mise en " +
+             "relation est conclue et ne peut plus être libérée." } };
+  }
+
+  db.transaction(() => {
+    requetes.changerStatutCandidature.run("refusee", choisie.id);
+
+    if (choisie.statut_change_le) {
+      requetes.rendreLesAutres.run({
+        annonce: annonce.id, choisie: choisie.id, quand: choisie.statut_change_le,
+      });
+    }
+
+    requetes.rouvrirAnnonce.run({ id: annonce.id });
+  })();
+
+  return { ok: true };
+}
+
+app.post("/admin/demandes/:id/liberer", exigerAdmin, lireFormulaire, (req, res) => {
+  const resultat = libererDemande(req.utilisateur, Number(req.params.id));
 
   if (resultat.probleme) {
     return afficherProbleme(res, Object.assign({}, resultat.probleme,
